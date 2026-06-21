@@ -46,23 +46,23 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="record"
-        options={{
-          title: '记录',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused}>
-              <Feather name="calendar" size={ICON_SIZE} color={color(focused)} />
-            </TabIcon>
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="wardrobe"
         options={{
           title: '衣橱',
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
               <MaterialCommunityIcons name="hanger" size={ICON_SIZE + 2} color={color(focused)} />
+            </TabIcon>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="record"
+        options={{
+          title: '记录',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused}>
+              <Feather name="calendar" size={ICON_SIZE} color={color(focused)} />
             </TabIcon>
           ),
         }}
