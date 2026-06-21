@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Stylee",
+    "slug": "stylee-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "stylee",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stylee.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#FBF8F2"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "./plugins/withIOSPrivacy",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Stylee 需要访问你的相册来添加衣物照片",
+          "cameraPermission": "Stylee 需要使用相机来拍摄衣物照片"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#FBF8F2",
+          "imageWidth": 100
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
