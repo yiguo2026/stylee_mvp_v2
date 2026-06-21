@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
+  ScrollView, ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -9,10 +9,16 @@ import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { PRESET_STYLE_PREFERENCES, PRESET_STYLE_DISLIKES, StyleTag } from '@/types';
 
-const isWeb = Platform.OS === 'web';
-
 const LIKE_COLOR = '#34C759';
 const DISLIKE_COLOR = '#FF3B30';
+
+// v2: 看图选风格 — 14种风格配代表emoji（图片资源后续替换）
+const STYLE_EMOJIS: Record<string, string> = {
+  korean: '🇰🇷', sweet: '🍰', new_chinese: '🏮', preppy: '🎓',
+  city_chic: '🏙️', artsy: '🎨', sporty_casual: '🏃', commute_style: '💼',
+  french: '🥐', maillard: '🍂', japanese: '🇯🇵', business: '👔',
+  american: '🇺🇸', british: '🇬🇧',
+};
 
 export default function OnboardingStep2() {
   const { user, stylePreferences, fetchProfile } = useUserStore();
@@ -28,12 +34,8 @@ export default function OnboardingStep2() {
   const toggleLike = (tag: StyleTag) => {
     const next = new Set(liked);
     const nextDislike = new Set(disliked);
-    if (next.has(tag.tag_id)) {
-      next.delete(tag.tag_id);
-    } else {
-      next.add(tag.tag_id);
-      nextDislike.delete(tag.tag_id);
-    }
+    if (next.has(tag.tag_id)) { next.delete(tag.tag_id); }
+    else { next.add(tag.tag_id); nextDislike.delete(tag.tag_id); }
     setLiked(next);
     setDisliked(nextDislike);
   };
@@ -41,46 +43,23 @@ export default function OnboardingStep2() {
   const toggleDislike = (tag: StyleTag) => {
     const next = new Set(disliked);
     const nextLike = new Set(liked);
-    if (next.has(tag.tag_id)) {
-      next.delete(tag.tag_id);
-    } else {
-      next.add(tag.tag_id);
-      nextLike.delete(tag.tag_id);
-    }
+    if (next.has(tag.tag_id)) { next.delete(tag.tag_id); }
+    else { next.add(tag.tag_id); nextLike.delete(tag.tag_id); }
     setDisliked(next);
     setLiked(nextLike);
   };
 
   const handleNext = async () => {
-    if (!user?.id) {
-      Alert.alert('提示', '请先完成上一步');
-      return;
-    }
+    if (!user?.id) { Alert.alert('提示', '请先完成上一步'); return; }
     setLoading(true);
     try {
-      // Try delete first, ignore errors
       await supabase.from('user_style_preferences').delete().eq('user_id', user.id);
-
-      // Upsert each preference one by one to avoid 409 conflicts
-      const allPrefs: { user_id: string; tag_id: string; preference_type: string }[] = [
-        ...Array.from(liked).map(id => ({
-          user_id: user.id,
-          tag_id: id,
-          preference_type: 'like',
-        })),
-        ...Array.from(disliked).map(id => ({
-          user_id: user.id,
-          tag_id: id,
-          preference_type: 'dislike',
-        })),
+      const allPrefs = [
+        ...Array.from(liked).map(id => ({ user_id: user.id, tag_id: id, preference_type: 'like' })),
+        ...Array.from(disliked).map(id => ({ user_id: user.id, tag_id: id, preference_type: 'dislike' })),
       ];
       for (const pref of allPrefs) {
-        const { error: upsertError } = await supabase
-          .from('user_style_preferences')
-          .upsert(pref as any, { onConflict: 'user_id,tag_id' });
-        if (upsertError) {
-          console.warn('[Step2] upsert error for', pref.tag_id, upsertError.message);
-        }
+        await supabase.from('user_style_preferences').upsert(pref as any, { onConflict: 'user_id,tag_id' });
       }
       await fetchProfile();
       if (from === 'profile') {
@@ -106,7 +85,7 @@ export default function OnboardingStep2() {
       </View>
 
       <Text style={styles.title}>你的风格偏好</Text>
-      <Text style={styles.subtitle}>标记最喜欢和最不喜欢的风格，让我们更懂你的审美</Text>
+      <Text style={styles.subtitle}>标记喜欢和不喜欢，让我们更懂你的审美</Text>
 
       <View style={styles.legend}>
         <View style={[styles.legendDot, { backgroundColor: LIKE_COLOR }]} />
@@ -115,20 +94,24 @@ export default function OnboardingStep2() {
         <Text style={styles.legendText}>不喜欢</Text>
       </View>
 
-      {/* Like section */}
+      {/* Like section — 看图选风格，双列 */}
       <Text style={styles.sectionLabel}>😍 点击选择喜欢的风格</Text>
       <View style={styles.tagsGrid}>
         {PRESET_STYLE_PREFERENCES.map(tag => {
           const isLiked = liked.has(tag.tag_id);
+          const emoji = STYLE_EMOJIS[tag.tag_id] ?? '✨';
           return (
             <TouchableOpacity
               key={tag.tag_id}
-              style={[styles.tag, isLiked && styles.tagLiked]}
+              style={[styles.styleCard, isLiked && styles.styleCardLiked]}
               onPress={() => toggleLike(tag)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.tagText, isLiked && styles.tagTextLiked]}>
+              <Text style={styles.styleEmoji}>{emoji}</Text>
+              <Text style={[styles.styleName, isLiked && styles.styleNameLiked]}>
                 {tag.tag_name}
               </Text>
+              {isLiked && <Text style={styles.styleCheck}>✓</Text>}
             </TouchableOpacity>
           );
         })}
@@ -151,6 +134,24 @@ export default function OnboardingStep2() {
             </TouchableOpacity>
           );
         })}
+      </View>
+
+      {/* Preview */}
+      <View style={styles.previewRow}>
+        <Text style={styles.previewLabel}>喜欢：</Text>
+        <Text style={styles.previewValue}>
+          {liked.size > 0
+            ? Array.from(liked).map(id => PRESET_STYLE_PREFERENCES.find(t => t.tag_id === id)?.tag_name).join('、')
+            : '—'}
+        </Text>
+      </View>
+      <View style={styles.previewRow}>
+        <Text style={styles.previewLabel}>不喜欢：</Text>
+        <Text style={styles.previewValue}>
+          {disliked.size > 0
+            ? Array.from(disliked).map(id => PRESET_STYLE_DISLIKES.find(t => t.tag_id === id)?.tag_name).join('、')
+            : '—'}
+        </Text>
       </View>
 
       <View style={styles.actions}>
@@ -176,11 +177,9 @@ export default function OnboardingStep2() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.paper },
   container: { flex: 1 },
-  inner: { padding: Spacing.four, paddingTop: Spacing.six, gap: Spacing.three },
+  inner: { padding: Spacing.four, paddingTop: Spacing.six, gap: Spacing.three, paddingBottom: Spacing.six },
   progress: { flexDirection: 'row', gap: Spacing.one, marginBottom: Spacing.two },
-  progressDot: {
-    width: 24, height: 4, borderRadius: 2, backgroundColor: Colors.line,
-  },
+  progressDot: { width: 24, height: 4, borderRadius: 2, backgroundColor: Colors.line },
   progressDotActive: { backgroundColor: Colors.ink },
   title: { ...T.pageTitle },
   subtitle: { ...T.bodyText, fontSize: 14, lineHeight: 22 },
@@ -188,37 +187,48 @@ const styles = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { ...T.tag, color: Colors.walnut },
   sectionLabel: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 14 },
-  tagsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  tag: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.xl,
+  tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+
+  // Style cards (看图选风格)
+  styleCard: {
+    width: '47%',
+    alignItems: 'center',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: Colors.line,
     backgroundColor: Colors.paperCard,
+    gap: Spacing.one,
   },
-  tagLiked: {
-    backgroundColor: LIKE_COLOR,
-    borderColor: LIKE_COLOR,
+  styleCardLiked: { borderColor: LIKE_COLOR, backgroundColor: '#E8F5E9' },
+  styleEmoji: { fontSize: 32 },
+  styleName: { ...T.tag, color: Colors.ink, fontWeight: '500' },
+  styleNameLiked: { color: '#1B7D32', fontWeight: '600' },
+  styleCheck: {
+    position: 'absolute', top: 6, right: 8,
+    fontSize: 14, color: LIKE_COLOR, fontWeight: '700',
   },
-  tagDisliked: {
-    backgroundColor: DISLIKE_COLOR,
-    borderColor: DISLIKE_COLOR,
+
+  // Dislike tags (compact)
+  tag: {
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    borderRadius: Radius.xl, borderWidth: 1,
+    borderColor: Colors.line, backgroundColor: Colors.paperCard,
   },
+  tagDisliked: { backgroundColor: DISLIKE_COLOR, borderColor: DISLIKE_COLOR },
   tagText: { ...T.tag, color: Colors.walnut },
-  tagTextLiked: { ...T.tag, color: '#fff' },
   tagTextDisliked: { ...T.tag, color: '#fff' },
+
+  // Preview
+  previewRow: { flexDirection: 'row', gap: Spacing.one },
+  previewLabel: { ...T.formLabel },
+  previewValue: { ...T.bodyText, fontSize: 13, flex: 1 },
+
   actions: { gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
   finishBtn: {
-    backgroundColor: Colors.ink,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.two + 4,
-    width: '100%',
-    alignItems: 'center',
+    backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingVertical: Spacing.two + 4, width: '100%', alignItems: 'center',
   },
   disabled: { opacity: 0.6 },
   finishText: { ...T.buttonPrimary, color: Colors.paper },

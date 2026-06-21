@@ -10,17 +10,25 @@ import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { Gender } from '@/types';
 import { searchCitiesOnline, CityResult } from '@/lib/weather';
 
-const GENDERS: { label: string; value: Gender }[] = [
-  { label: '女', value: 'female' },
-  { label: '男', value: 'male' },
-  { label: '其他', value: 'other' },
-  { label: '不公开', value: 'private' },
+const ADJECTIVES = ['快乐的', '阳光的', '温柔的', '酷酷的', '可爱的', '优雅的', '元气', '自由', '治愈系', '文艺范'];
+const NOUNS = ['小鹿', '猫咪', '云朵', '星星', '月亮', '花栗鼠', '企鹅', '棉花糖', '小熊', '兔子'];
+
+function randomNickname(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const num = Math.floor(Math.random() * 100);
+  return `${adj}${noun}${num}`;
+}
+
+const GENDERS: { label: string; emoji: string; value: Gender }[] = [
+  { label: '女士', emoji: '👩', value: 'female' },
+  { label: '男士', emoji: '👨', value: 'male' },
+  { label: '其他', emoji: '✨', value: 'other' },
 ];
 
 export default function OnboardingStep1() {
   const { user, profile, fetchProfile } = useUserStore();
-  // Pre-fill with existing profile if editing from profile tab
-  const [nickname, setNickname] = useState(profile?.nickname ?? '');
+  const [nickname, setNickname] = useState(profile?.nickname ?? randomNickname());
   const [gender, setGender] = useState<Gender>(profile?.gender ?? 'female');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
   const [profession, setProfession] = useState(profile?.profession ?? '');
@@ -31,14 +39,11 @@ export default function OnboardingStep1() {
   const [loading, setLoading] = useState(false);
 
   const handleNext = async () => {
-    if (!nickname.trim()) {
-      return;
-    }
     setLoading(true);
     try {
       const { error } = await supabase.from('users').upsert({
         user_id: user?.id,
-        nickname: nickname.trim(),
+        nickname: nickname.trim() || randomNickname(),
         gender,
         age: age ? parseInt(age) : null,
         profession: profession.trim() || null,
@@ -69,11 +74,16 @@ export default function OnboardingStep1() {
         <View style={styles.progressDot} />
       </View>
 
-      <Text style={styles.title}>先来认识一下</Text>
-      <Text style={styles.subtitle}>帮助我们提供更个性化的穿搭建议，可随时跳过</Text>
+      <Text style={styles.title}>让我们认识你</Text>
+      <Text style={styles.subtitle}>帮助我们提供更个性化的穿搭建议</Text>
 
       <View style={styles.section}>
-        <Text style={styles.label}>昵称 *</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>昵称</Text>
+          <TouchableOpacity onPress={() => setNickname(randomNickname())}>
+            <Text style={styles.randomBtn}>换一个</Text>
+          </TouchableOpacity>
+        </View>
         <TextInput
           style={styles.input}
           placeholder="你的昵称"
@@ -92,6 +102,7 @@ export default function OnboardingStep1() {
               style={[styles.genderBtn, gender === g.value && styles.genderBtnActive]}
               onPress={() => setGender(g.value)}
             >
+              <Text style={styles.genderEmoji}>{g.emoji}</Text>
               <Text style={[styles.genderText, gender === g.value && styles.genderTextActive]}>
                 {g.label}
               </Text>
@@ -124,7 +135,7 @@ export default function OnboardingStep1() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>常驻城市</Text>
+        <Text style={styles.label}>常住地</Text>
         <TouchableOpacity
           style={styles.citySelect}
           onPress={() => { setCityModalVisible(true); searchCitiesOnline('').then(setCityResults); }}
@@ -148,12 +159,11 @@ export default function OnboardingStep1() {
           }
         </TouchableOpacity>
         <TouchableOpacity onPress={handleSkip}>
-          <Text style={styles.skipText}>跳过，直接进入</Text>
+          <Text style={styles.skipText}>跳过</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
 
-      {/* City Selection Modal */}
       <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
@@ -188,9 +198,6 @@ export default function OnboardingStep1() {
                   </TouchableOpacity>
                 );
               })}
-              {citySearch.trim() && cityResults.length === 0 && (
-                <Text style={styles.cityEmpty}>没有找到匹配的城市</Text>
-              )}
             </ScrollView>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
               <Text style={styles.modalCloseText}>取消</Text>
@@ -207,19 +214,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { padding: Spacing.four, paddingTop: Spacing.six, gap: Spacing.three },
   progress: { flexDirection: 'row', gap: Spacing.one, marginBottom: Spacing.two },
-  progressDot: {
-    width: 24, height: 4, borderRadius: 2, backgroundColor: Colors.line,
-  },
+  progressDot: { width: 24, height: 4, borderRadius: 2, backgroundColor: Colors.line },
   progressDotActive: { backgroundColor: Colors.ink },
   title: { ...T.pageTitle },
   subtitle: { ...T.bodyText, fontSize: 14, lineHeight: 22 },
   section: { gap: Spacing.one },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { ...T.formLabel },
+  randomBtn: { ...T.tag, color: Colors.terracotta, fontSize: 12 },
   input: {
     ...T.inputText,
     backgroundColor: Colors.paperCard,
-    borderWidth: 1,
-    borderColor: Colors.line,
+    borderWidth: 1, borderColor: Colors.line,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 2,
@@ -227,17 +233,17 @@ const styles = StyleSheet.create({
   },
   genderRow: { flexDirection: 'row', gap: Spacing.two },
   genderBtn: {
-    paddingHorizontal: Spacing.three,
+    flex: 1,
+    alignItems: 'center',
     paddingVertical: Spacing.two,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.line,
     backgroundColor: Colors.paperCard,
+    gap: 4,
   },
-  genderBtnActive: {
-    backgroundColor: Colors.ink,
-    borderColor: Colors.ink,
-  },
+  genderBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  genderEmoji: { fontSize: 22 },
   genderText: { ...T.tag, color: Colors.walnut },
   genderTextActive: { ...T.tag, color: Colors.paper },
   actions: { gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
@@ -253,81 +259,38 @@ const styles = StyleSheet.create({
   skipText: { ...T.buttonSecondary, color: Colors.walnut },
   citySelect: {
     backgroundColor: Colors.paperCard,
-    borderWidth: 1,
-    borderColor: Colors.line,
+    borderWidth: 1, borderColor: Colors.line,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 2,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   citySelectText: { ...T.inputText, color: Colors.ink },
   citySelectArrow: { fontSize: 16, color: Colors.walnut2 },
   placeholder: { color: Colors.walnut2 },
-  // City modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: Colors.paper,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    maxHeight: '70%',
-    padding: Spacing.four,
+    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
+    maxHeight: '70%', padding: Spacing.four,
   },
-  modalTitle: {
-    ...T.sectionTitle,
-    textAlign: 'center',
-    marginBottom: Spacing.three,
-  },
+  modalTitle: { ...T.sectionTitle, textAlign: 'center', marginBottom: Spacing.three },
   citySearchInput: {
     ...T.inputText,
     backgroundColor: Colors.paperCard,
-    borderWidth: 1.5,
-    borderColor: Colors.line,
+    borderWidth: 1.5, borderColor: Colors.line,
     borderRadius: 10,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 13,
-    color: Colors.ink,
-    marginBottom: Spacing.two,
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    fontSize: 13, color: Colors.ink, marginBottom: Spacing.two,
   },
-  cityList: {
-    maxHeight: 200,
-  },
+  cityList: { maxHeight: 200 },
   cityRow: {
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three,
     borderRadius: Radius.sm,
   },
-  cityRowActive: {
-    backgroundColor: '#F0EDFF',
-  },
-  cityRowText: {
-    ...T.bodyText,
-    color: Colors.walnut,
-    fontSize: 14,
-  },
-  cityRowTextActive: {
-    color: '#6C5CE7',
-    fontWeight: '500',
-  },
-  cityEmpty: {
-    ...T.micro,
-    textAlign: 'center',
-    paddingVertical: Spacing.three,
-    color: Colors.walnut2,
-  },
-  modalCloseBtn: {
-    marginTop: Spacing.three,
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-  },
-  modalCloseText: {
-    ...T.buttonSecondary,
-    color: Colors.walnut,
-  },
+  cityRowActive: { backgroundColor: '#F0EDFF' },
+  cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
+  cityRowTextActive: { color: '#6C5CE7', fontWeight: '500' },
+  modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
+  modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });
