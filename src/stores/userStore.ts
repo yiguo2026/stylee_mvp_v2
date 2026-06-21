@@ -14,6 +14,7 @@ interface UserState {
   setProfile: (profile: UserProfile | null) => void;
   setStylePreferences: (prefs: UserStylePreference[]) => void;
   fetchProfile: () => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -49,9 +50,23 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (prefs) set({ stylePreferences: prefs as UserStylePreference[] });
     } catch (e: any) {
       console.warn('[UserStore] fetchProfile failed:', e.message);
-      throw e;
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  updateProfile: async (updates) => {
+    const { user, profile } = get();
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+      if (error) throw error;
+      set({ profile: { ...profile!, ...updates } });
+    } catch (e: any) {
+      console.warn('[UserStore] updateProfile failed:', e.message);
     }
   },
 

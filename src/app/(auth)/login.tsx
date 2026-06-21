@@ -9,35 +9,36 @@ import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
+// Supabase Auth only supports email/phone, so we use username@stylee.local as virtual email
+function usernameToEmail(username: string) {
+  return `${username.toLowerCase().trim()}@stylee.local`;
+}
+
 function translateLoginError(msg: string): string {
   const m = msg.toLowerCase();
-  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '邮箱或密码错误';
-  if (m.includes('email not confirmed')) return '邮箱未验证，请先查收验证邮件';
+  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '用户名或密码错误';
+  if (m.includes('email not confirmed')) return '账号未验证';
   if (m.includes('too many requests') || m.includes('rate limit')) return '尝试次数过多，请稍后再试';
   if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络';
-  if (m.includes('user not found')) return '该邮箱未注册';
-  return '邮箱或密码错误，请重试';
+  return '用户名或密码错误，请重试';
 }
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const canSubmit = username.trim().length > 0 && password.length > 0;
+
   const handleLogin = async () => {
     setError('');
-    if (!email.trim()) {
-      setError('请输入邮箱');
-      return;
-    }
-    if (!password) {
-      setError('请输入密码');
-      return;
-    }
+    if (!username.trim()) { setError('请输入用户名'); return; }
+    if (!password) { setError('请输入密码'); return; }
+
     setLoading(true);
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: usernameToEmail(username),
       password,
     });
     if (authError) {
@@ -61,16 +62,15 @@ export default function LoginScreen() {
     >
       <View style={styles.inner}>
         <Text style={styles.logo}>Stylee</Text>
-        <Text style={styles.tagline}>你的 AI 穿搭助手</Text>
+        <Text style={styles.tagline}>你的AI穿搭助手</Text>
 
         <View style={styles.form}>
           <TextInput
             style={[styles.input, error && styles.inputError]}
-            placeholder="邮箱"
+            placeholder="用户名"
             placeholderTextColor={Colors.walnut2}
-            value={email}
-            onChangeText={(t) => { setEmail(t); setError(''); }}
-            keyboardType="email-address"
+            value={username}
+            onChangeText={(t) => { setUsername(t); setError(''); }}
             autoCapitalize="none"
           />
           <TextInput
@@ -85,9 +85,9 @@ export default function LoginScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.button, (!canSubmit || loading) && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={!canSubmit || loading}
           >
             {loading
               ? <ActivityIndicator color={Colors.paperRaised} />
@@ -109,16 +109,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.paper,
-  },
+  container: { flex: 1, backgroundColor: Colors.paper },
   inner: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: Spacing.four, gap: Spacing.two,
   },
   logo: {
     fontFamily: Fonts.numeric,
@@ -134,10 +128,7 @@ const styles = StyleSheet.create({
     color: Colors.walnut,
     marginBottom: Spacing.five,
   },
-  form: {
-    width: '100%',
-    gap: Spacing.two,
-  },
+  form: { width: '100%', gap: Spacing.two },
   input: {
     ...T.inputText,
     backgroundColor: Colors.paperCard,
@@ -148,9 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 4,
     color: Colors.ink,
   },
-  inputError: {
-    borderColor: '#FF3B30',
-  },
+  inputError: { borderColor: '#FF3B30' },
   errorText: {
     ...T.micro,
     color: '#FF3B30',
@@ -164,25 +153,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.one,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    ...T.buttonPrimary,
-    color: Colors.paper,
-  },
+  buttonDisabled: { opacity: 0.4 },
+  buttonText: { ...T.buttonPrimary, color: Colors.paper },
   linkRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: Spacing.one,
+    flexDirection: 'row', justifyContent: 'center',
+    gap: 4, marginTop: Spacing.one,
   },
-  linkText: {
-    ...T.buttonSecondary,
-    color: Colors.walnut,
-  },
-  linkAccent: {
-    ...T.buttonSecondary,
-    color: Colors.terracotta,
-  },
+  linkText: { ...T.buttonSecondary, color: Colors.walnut },
+  linkAccent: { ...T.buttonSecondary, color: Colors.terracotta },
 });
