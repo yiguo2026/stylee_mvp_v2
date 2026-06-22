@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS wardrobe_items (
   price DECIMAL(10, 2),
   images JSONB DEFAULT '[]',           -- v2: 多图URL数组
   image_url TEXT,                        -- 主图（兼容）
-  source_type TEXT CHECK (source_type IN ('manual', 'photo_ai', 'album_ai', 'ai_recommended')) DEFAULT 'manual',
+  source_type TEXT CHECK (source_type IN ('manual', 'photo_ai', 'album_ai', 'ai_recommended', 'link')) DEFAULT 'manual',
   source_label TEXT DEFAULT '手动添加',   -- v2: '手动添加' | 'AI推荐添加'
   fit_type TEXT,
   sleeve_length TEXT CHECK (sleeve_length IN ('无袖', '短袖', '长袖')),
