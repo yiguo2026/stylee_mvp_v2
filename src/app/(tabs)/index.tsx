@@ -2,22 +2,34 @@ import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal,
+  Image, Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { fetchWeather, getMockWeather, searchCitiesOnline, getTempTag, CityResult } from '@/lib/weather';
-import { aiExtractTags } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { WeatherIcon } from '@/components/WeatherIcon';
+import { CategoryIcon } from '@/components/CategoryIcon';
 import {
-  WeatherData, FilterTag, Outfit,
+  WeatherData, FilterTag, Outfit, InspirationCard,
   OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS, TEMP_TAGS,
 } from '@/types';
+
+const SCREEN_W = Dimensions.get('window').width;
+
+// Mock inspiration data (will be replaced by DB content)
+const MOCK_INSPIRATIONS: InspirationCard[] = [
+  { card_id: '1', image_url: '', style_tags: ['french', 'artsy'], comment: '法式慵懒——白衬衫+高腰牛仔裤，永不过时的优雅', occasion: '休闲', sort_order: 1 },
+  { card_id: '2', image_url: '', style_tags: ['commute_style', 'city_chic'], comment: '都市通勤——西装外套+直筒裤，干练又温柔', occasion: '职场', sort_order: 2 },
+  { card_id: '3', image_url: '', style_tags: ['korean', 'sweet'], comment: '韩系甜美——针织开衫+百褶裙，温柔满分', occasion: '约会', sort_order: 3 },
+];
+
+type InputMode = 'description' | 'tags';
 
 export default function OutfitTab() {
   const { profile, user } = useUserStore();
@@ -28,34 +40,27 @@ export default function OutfitTab() {
   const [cityModalVisible, setCityModalVisible] = useState(false);
   const [citySearch, setCitySearch] = useState('');
   const [cityResults, setCityResults] = useState<CityResult[]>([]);
+
+  // Input mode
+  const [inputMode, setInputMode] = useState<InputMode>('description');
   const [query, setQuery] = useState('');
+
+  // Tags
   const [allTags, setAllTags] = useState<FilterTag[]>([
-    ...OCCASION_TAGS, ...STYLE_TAGS, ...COLOR_TAGS, ...TEMP_TAGS,
+    ...OCCASION_TAGS, ...STYLE_TAGS, ...COLOR_TAGS,
   ]);
-  const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
+
+  // Inspiration
+  const [inspirations, setInspirations] = useState<InspirationCard[]>(MOCK_INSPIRATIONS);
 
   useEffect(() => {
     if (user) fetchItems(user.id);
   }, [user]);
 
-  // Fetch real weather on mount / city change
   useEffect(() => {
     fetchWeather(defaultCity).then(setWeather);
   }, [defaultCity]);
 
-  // Load saved outfits history
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase
-      .from('outfits')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(6)
-      .then(({ data }) => { if (data) setSavedOutfits(data as Outfit[]); });
-  }, [user?.id]);
-
-  // Auto-select temperature tag based on weather
   useEffect(() => {
     const tempTagId = getTempTag(weather.temp);
     setAllTags(prev => prev.map(t =>
@@ -63,19 +68,17 @@ export default function OutfitTab() {
     ));
   }, [weather]);
 
-  const handleQueryChange = (text: string) => {
-    setQuery(text);
-    if (text.length > 0) {
-      aiExtractTags(text).then(matched => {
-        if (matched.length > 0) {
-          setAllTags(prev => prev.map(t => ({
-            ...t,
-            selected: matched.includes(t.id) || t.selected,
-          })));
-        }
+  // Load inspirations from DB if available
+  useEffect(() => {
+    supabase
+      .from('inspiration_cards')
+      .select('*')
+      .order('sort_order')
+      .limit(10)
+      .then(({ data }) => {
+        if (data && data.length > 0) setInspirations(data as InspirationCard[]);
       });
-    }
-  };
+  }, []);
 
   const toggleTag = (tagId: string) => {
     setAllTags(prev => prev.map(t =>
@@ -83,7 +86,8 @@ export default function OutfitTab() {
     ));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = (modeOverride?: InputMode) => {
+    const mode = modeOverride ?? inputMode;
     const selectedTagIds = allTags.filter(t => t.selected).map(t => t.id);
     router.push({
       pathname: '/outfit/result',
@@ -91,8 +95,23 @@ export default function OutfitTab() {
         city: weather.city,
         temp: weather.temp,
         weather: weather.condition,
-        query,
-        tags: selectedTagIds.join(','),
+        query: mode === 'description' ? query : '',
+        tags: mode === 'tags' ? selectedTagIds.join(',') : '',
+        inputMode: mode,
+      },
+    });
+  };
+
+  const handleInspire = (card: InspirationCard) => {
+    router.push({
+      pathname: '/outfit/result',
+      params: {
+        city: weather.city,
+        temp: weather.temp,
+        weather: weather.condition,
+        query: '',
+        tags: card.style_tags.join(','),
+        inputMode: 'tags',
       },
     });
   };
@@ -108,92 +127,206 @@ export default function OutfitTab() {
     searchCitiesOnline(text).then(setCityResults);
   };
 
-  // Initialize city results on modal open
   const openCityModal = () => {
     setCityModalVisible(true);
     setCitySearch('');
     searchCitiesOnline('').then(setCityResults);
   };
 
+  const recentItems = items.slice(0, 8);
+
   const tagSections = [
     { title: '场合', tags: allTags.filter(t => t.type === 'occasion') },
     { title: '风格', tags: allTags.filter(t => t.type === 'style') },
     { title: '色系', tags: allTags.filter(t => t.type === 'color_system') },
-    { title: '温度', tags: allTags.filter(t => t.type === 'temperature') },
   ];
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Header */}
-        <Text style={styles.pageTitle}>今日穿搭</Text>
-
-        {/* Weather Card */}
-        <TouchableOpacity
-          style={styles.weatherCard}
-          onPress={openCityModal}
-        >
-          <View style={styles.weatherLeft}>
-            <View style={styles.weatherIconWrap}>
-              <WeatherIcon condition={weather.condition} size={28} color={Colors.ink} />
-            </View>
-            <View>
-              <Text style={styles.weatherCity}>{weather.city} · {weather.condition}</Text>
-              <Text style={styles.weatherTemp}>{weather.temp}°C</Text>
-            </View>
-          </View>
-          <Text style={styles.weatherChange}>切换城市 ›</Text>
-        </TouchableOpacity>
-
-        {/* NLP Input */}
-        <View style={styles.inputCard}>
-          <TextInput
-            style={styles.queryInput}
-            placeholder="描述你的需求，例如：周末约会优雅一点"
-            placeholderTextColor={Colors.walnut2}
-            value={query}
-            onChangeText={handleQueryChange}
-            multiline
-          />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* ── Section 0: Weather Bar ── */}
+        <View style={styles.weatherBar}>
+          <Text style={styles.brandText}>Stylee</Text>
+          <TouchableOpacity style={styles.weatherBtn} onPress={openCityModal}>
+            <WeatherIcon condition={weather.condition} size={16} color={Colors.ink} />
+            <Text style={styles.weatherBtnText}>{weather.temp}°C · {weather.city}</Text>
+            <Feather name="chevron-down" size={12} color={Colors.walnut2} />
+          </TouchableOpacity>
         </View>
 
-        {/* Filter Tags */}
-        {tagSections.map(section => (
-          <View key={section.title} style={styles.tagSection}>
-            <Text style={styles.tagSectionTitle}>{section.title}</Text>
+        {/* ── Section 1: AI Input Area ── */}
+        <View style={styles.inputSection}>
+          {/* Tab switcher */}
+          <View style={styles.inputTabRow}>
+            <TouchableOpacity
+              style={[styles.inputTab, inputMode === 'description' && styles.inputTabActive]}
+              onPress={() => setInputMode('description')}
+            >
+              <Ionicons name="chatbubble-outline" size={14} color={inputMode === 'description' ? Colors.paper : Colors.walnut} />
+              <Text style={[styles.inputTabText, inputMode === 'description' && styles.inputTabTextActive]}>
+                描述需求
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.inputTab, inputMode === 'tags' && styles.inputTabActive]}
+              onPress={() => setInputMode('tags')}
+            >
+              <Feather name="tag" size={14} color={inputMode === 'tags' ? Colors.paper : Colors.walnut} />
+              <Text style={[styles.inputTabText, inputMode === 'tags' && styles.inputTabTextActive]}>
+                标签筛选
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Path A: Description input */}
+          {inputMode === 'description' && (
+            <View style={styles.descCard}>
+              <TextInput
+                style={styles.queryInput}
+                placeholder="周末约会穿什么？"
+                placeholderTextColor={Colors.walnut2}
+                value={query}
+                onChangeText={setQuery}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.generateBtn, !query.trim() && styles.generateBtnDisabled]}
+                onPress={() => handleGenerate('description')}
+                disabled={!query.trim()}
+              >
+                <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
+                <Text style={styles.generateBtnText}>生成穿搭</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Path B: Tag filter */}
+          {inputMode === 'tags' && (
+            <View style={styles.tagsCard}>
+              {tagSections.map(section => (
+                <View key={section.title} style={styles.tagSection}>
+                  <Text style={styles.tagSectionTitle}>{section.title}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.tagRow}>
+                      {section.tags.map(tag => (
+                        <TouchableOpacity
+                          key={tag.id}
+                          style={[styles.tag, tag.selected && styles.tagSelected]}
+                          onPress={() => toggleTag(tag.id)}
+                        >
+                          <Text style={[styles.tagText, tag.selected && styles.tagTextSelected]}>
+                            {tag.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={[styles.generateBtn, !allTags.some(t => t.selected) && styles.generateBtnDisabled]}
+                onPress={() => handleGenerate('tags')}
+                disabled={!allTags.some(t => t.selected)}
+              >
+                <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
+                <Text style={styles.generateBtnText}>生成穿搭</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* ── Section 2: My Wardrobe Preview ── */}
+        <View style={styles.wardrobeSection}>
+          <View style={styles.wardrobeHeader}>
+            <Text style={styles.wardrobeTitle}>我的衣橱</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/wardrobe')}>
+              <Text style={styles.wardrobeViewAll}>查看全部 ›</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recentItems.length === 0 ? (
+            <TouchableOpacity
+              style={styles.wardrobeEmpty}
+              onPress={() => router.push('/wardrobe/add')}
+            >
+              <Feather name="camera" size={24} color={Colors.walnut2} />
+              <Text style={styles.wardrobeEmptyText}>拍一件衣服开始你的穿搭之旅</Text>
+            </TouchableOpacity>
+          ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.tagRow}>
-                {section.tags.map(tag => (
+              <View style={styles.wardrobeRow}>
+                {/* Add button first */}
+                <TouchableOpacity
+                  style={styles.wardrobeAddBtn}
+                  onPress={() => router.push('/wardrobe/add')}
+                >
+                  <Feather name="plus" size={20} color={Colors.terracotta} />
+                  <Text style={styles.wardrobeAddText}>添加</Text>
+                </TouchableOpacity>
+                {recentItems.map(item => (
                   <TouchableOpacity
-                    key={tag.id}
-                    style={[styles.tag, tag.selected && styles.tagSelected]}
-                    onPress={() => toggleTag(tag.id)}
+                    key={item.item_id}
+                    style={styles.wardrobeThumb}
+                    onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
                   >
-                    <Text style={[styles.tagText, tag.selected && styles.tagTextSelected]}>
-                      {tag.label}
-                    </Text>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.wardrobeThumbImg} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.wardrobeThumbPlaceholder}>
+                        <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
+                      </View>
+                    )}
+                    <Text style={styles.wardrobeThumbName} numberOfLines={1}>{item.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
-          </View>
-        ))}
+          )}
+        </View>
 
-        {/* Wardrobe hint */}
-        {items.length === 0 && (
-          <View style={styles.hintCard}>
-            <Feather name="info" size={14} color={Colors.walnut} style={styles.hintIcon} />
-            <Text style={styles.hintText}>
-              衣橱还是空的，先去添加几件衣服，推荐效果更好哦
-            </Text>
+        {/* ── Section 3: Outfit Inspiration ── */}
+        <View style={styles.inspirationSection}>
+          <View style={styles.inspirationHeader}>
+            <Text style={styles.inspirationTitle}>✨ 穿搭灵感</Text>
           </View>
-        )}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.inspirationRow}>
+              {inspirations.map(card => (
+                <View key={card.card_id} style={styles.inspirationCard}>
+                  <View style={styles.inspirationImage}>
+                    <MaterialCommunityIcons name="hanger" size={32} color={Colors.walnut2} />
+                  </View>
+                  <View style={styles.inspirationTags}>
+                    {card.style_tags.slice(0, 2).map((tag, i) => (
+                      <View key={i} style={styles.inspirationTag}>
+                        <Text style={styles.inspirationTagText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={styles.inspirationComment} numberOfLines={2}>{card.comment}</Text>
+                  <TouchableOpacity
+                    style={styles.inspireBtn}
+                    onPress={() => handleInspire(card)}
+                  >
+                    <Text style={styles.inspireBtnText}>以此推荐</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
 
-        {/* Generate Button */}
-        <TouchableOpacity style={styles.generateBtn} onPress={handleGenerate}>
-          <Ionicons name="sparkles-outline" size={16} color={Colors.paper} style={styles.generateIcon} />
-          <Text style={styles.generateText}>生成穿搭推荐</Text>
-        </TouchableOpacity>
+        {/* ── Section P2: AI Try-on ── */}
+        <View style={styles.tryOnSection}>
+          <View style={styles.tryOnPreview}>
+            <Ionicons name="person-outline" size={48} color={Colors.walnut2} />
+            <Text style={styles.tryOnLabel}>AI试穿</Text>
+            <Text style={styles.tryOnDesc}>真人建模·场景化氛围感生图</Text>
+          </View>
+          <TouchableOpacity style={styles.tryOnBtn}>
+            <Text style={styles.tryOnBtnText}>生成图像</Text>
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
 
@@ -225,9 +358,6 @@ export default function OutfitTab() {
                   </TouchableOpacity>
                 );
               })}
-              {citySearch.trim() && cityResults.length === 0 && (
-                <Text style={styles.cityEmpty}>没有找到匹配的城市</Text>
-              )}
             </ScrollView>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
               <Text style={styles.modalCloseText}>取消</Text>
@@ -243,160 +373,169 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
   container: { flex: 1 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
-  pageTitle: { ...T.pageTitle, marginBottom: Spacing.one },
-  weatherCard: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.line,
-    ...Shadow.one,
+
+  // ── Weather Bar ──
+  weatherBar: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  weatherLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  weatherIconWrap: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  weatherCity: { ...T.caption, fontSize: 13, letterSpacing: 1.04 },
-  weatherTemp: { ...T.tempLarge, fontSize: 30 },
-  weatherChange: { ...T.buttonSecondary, color: Colors.terracotta },
-  inputCard: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    borderWidth: 1,
-    borderColor: Colors.line,
+  brandText: {
+    fontFamily: Fonts.numeric,
+    fontSize: 28,
+    letterSpacing: -0.56,
+    color: Colors.ink,
+  },
+  weatherBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.xl,
+    paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.one + 2,
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  weatherBtnText: { ...T.tag, color: Colors.ink },
+
+  // ── Input Section ──
+  inputSection: { gap: Spacing.two },
+  inputTabRow: { flexDirection: 'row', gap: Spacing.one },
+  inputTab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: Spacing.two,
+    borderRadius: Radius.md, borderWidth: 1,
+    borderColor: Colors.line, backgroundColor: Colors.paperCard,
+  },
+  inputTabActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  inputTabText: { ...T.tag, color: Colors.walnut },
+  inputTabTextActive: { ...T.tag, color: Colors.paper },
+
+  descCard: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line,
   },
   queryInput: {
-    ...T.bodyText,
-    color: Colors.ink,
-    minHeight: 60,
+    ...T.bodyText, color: Colors.ink, minHeight: 60,
     textAlignVertical: 'top',
+  },
+  tagsCard: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line,
   },
   tagSection: { gap: Spacing.one },
   tagSectionTitle: { ...T.formLabel, letterSpacing: 1.56 },
   tagRow: { flexDirection: 'row', gap: Spacing.one },
   tag: {
-    paddingHorizontal: Spacing.two + 4,
-    paddingVertical: Spacing.one + 2,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.line,
-    backgroundColor: Colors.paperCard,
+    paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.one + 2,
+    borderRadius: Radius.xl, borderWidth: 1,
+    borderColor: Colors.line, backgroundColor: Colors.paperCard,
   },
   tagSelected: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   tagText: { ...T.tag, color: Colors.walnut },
   tagTextSelected: { ...T.tag, color: Colors.paper },
-  hintCard: {
-    backgroundColor: Colors.vintageCream,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-    borderWidth: 1,
-    borderColor: Colors.linen,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.one,
-  },
-  hintIcon: { marginTop: 3 },
-  hintText: { ...T.emptyTitle, fontSize: 13, letterSpacing: 0.78, lineHeight: 22, flex: 1 },
+
   generateBtn: {
-    backgroundColor: Colors.ink,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingVertical: Spacing.two + 2, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  generateBtnDisabled: { opacity: 0.4 },
+  generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
+
+  // ── Wardrobe Preview ──
+  wardrobeSection: { gap: Spacing.two },
+  wardrobeHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  wardrobeTitle: { ...T.subTitle },
+  wardrobeViewAll: { ...T.tag, color: Colors.terracotta },
+  wardrobeEmpty: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.four, alignItems: 'center', gap: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
+  },
+  wardrobeEmptyText: { ...T.emptyTitle, fontSize: 14 },
+  wardrobeRow: { flexDirection: 'row', gap: Spacing.two },
+  wardrobeAddBtn: {
+    width: 80, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.vintageCream, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.linen, gap: 4,
     paddingVertical: Spacing.three,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: Spacing.one,
-    marginTop: Spacing.two,
   },
-  generateIcon: { marginRight: 2 },
-  generateText: { ...T.buttonPrimary, color: Colors.paper },
-  historySection: { gap: Spacing.two, marginTop: Spacing.one },
-  historySectionTitle: { ...T.subTitle, color: Colors.walnut },
-  historyRow: { flexDirection: 'row', gap: Spacing.two },
-  historyCard: {
-    width: 90,
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.md,
-    padding: Spacing.two,
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.line,
-    ...Shadow.one,
+  wardrobeAddText: { ...T.micro, color: Colors.terracotta },
+  wardrobeThumb: { width: 80, gap: 4 },
+  wardrobeThumbImg: { width: 80, height: 80, borderRadius: Radius.md },
+  wardrobeThumbPlaceholder: {
+    width: 80, height: 80, borderRadius: Radius.md,
+    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
   },
-  historyEmoji: {
-    width: 56, height: 56,
-    backgroundColor: Colors.vintageCream,
-    borderRadius: Radius.md,
+  wardrobeThumbName: { ...T.micro, fontSize: 10, textAlign: 'center' },
+
+  // ── Inspiration ──
+  inspirationSection: { gap: Spacing.two },
+  inspirationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  inspirationTitle: { ...T.subTitle },
+  inspirationRow: { flexDirection: 'row', gap: Spacing.two },
+  inspirationCard: {
+    width: SCREEN_W * 0.6, backgroundColor: Colors.paperCard,
+    borderRadius: Radius.lg, overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  inspirationImage: {
+    width: '100%', height: 120, backgroundColor: Colors.vintageCream,
     alignItems: 'center', justifyContent: 'center',
   },
-  historyName: { ...T.itemName, fontSize: 11, textAlign: 'center' },
-  historyDate: { ...T.micro, fontSize: 10 },
-
-  // City modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
+  inspirationTags: { flexDirection: 'row', gap: 4, paddingVertical: Spacing.one, paddingHorizontal: Spacing.two },
+  inspirationTag: {
+    backgroundColor: Colors.ink, borderRadius: Radius.sm,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
+  inspirationTagText: { ...T.micro, color: Colors.paper, fontSize: 10 },
+  inspirationComment: {
+    ...T.bodyText, fontSize: 12, lineHeight: 18,
+    paddingHorizontal: Spacing.two, color: Colors.walnut,
+  },
+  inspireBtn: {
+    margin: Spacing.two, backgroundColor: Colors.terracotta,
+    borderRadius: Radius.sm, paddingVertical: Spacing.one + 2,
+    alignItems: 'center',
+  },
+  inspireBtnText: { ...T.tag, color: Colors.paper, fontSize: 12 },
+
+  // ── AI Try-on (P2) ──
+  tryOnSection: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, alignItems: 'center', gap: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  tryOnPreview: { alignItems: 'center', gap: Spacing.one },
+  tryOnLabel: { ...T.subTitle },
+  tryOnDesc: { ...T.micro, fontSize: 12 },
+  tryOnBtn: {
+    backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingHorizontal: Spacing.four, paddingVertical: Spacing.two,
+  },
+  tryOnBtnText: { ...T.buttonSecondary, color: Colors.paper, fontSize: 13 },
+
+  // ── City Modal ──
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: Colors.paper,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    maxHeight: '70%',
-    padding: Spacing.four,
+    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
+    maxHeight: '70%', padding: Spacing.four,
   },
-  modalTitle: {
-    ...T.sectionTitle,
-    textAlign: 'center',
-    marginBottom: Spacing.three,
-  },
+  modalTitle: { ...T.sectionTitle, textAlign: 'center', marginBottom: Spacing.three },
   citySearchInput: {
     ...T.inputText,
-    backgroundColor: Colors.paperCard,
-    borderWidth: 1.5,
-    borderColor: Colors.line,
-    borderRadius: 10,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 13,
-    color: Colors.ink,
-    marginBottom: Spacing.two,
+    backgroundColor: Colors.paperCard, borderWidth: 1.5, borderColor: Colors.line,
+    borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    fontSize: 13, color: Colors.ink, marginBottom: Spacing.two,
   },
-  cityList: {
-    maxHeight: 200,
-  },
+  cityList: { maxHeight: 200 },
   cityRow: {
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three,
     borderRadius: Radius.sm,
   },
-  cityRowActive: {
-    backgroundColor: '#F0EDFF',
-  },
-  cityRowText: {
-    ...T.bodyText,
-    color: Colors.walnut,
-    fontSize: 14,
-  },
-  cityRowTextActive: {
-    color: '#6C5CE7',
-    fontWeight: '500',
-  },
-  cityEmpty: {
-    ...T.micro,
-    textAlign: 'center',
-    paddingVertical: Spacing.three,
-    color: Colors.walnut2,
-  },
-  modalCloseBtn: {
-    marginTop: Spacing.three,
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-  },
-  modalCloseText: {
-    ...T.buttonSecondary,
-    color: Colors.walnut,
-  },
+  cityRowActive: { backgroundColor: '#F0EDFF' },
+  cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
+  cityRowTextActive: { color: '#6C5CE7', fontWeight: '500' },
+  modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
+  modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

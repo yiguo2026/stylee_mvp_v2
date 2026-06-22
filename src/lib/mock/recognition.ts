@@ -19,7 +19,7 @@ export const mockRecognizeClothing = async (imageUri: string): Promise<Recogniti
   return { ...result };
 };
 
-export const CATEGORY_OPTIONS: ClothingCategory[] = ['上装', '下装', '连衣裙', '外套', '鞋', '包', '配饰'];
+export const CATEGORY_OPTIONS: ClothingCategory[] = ['上装', '下装', '连体装', '外套', '鞋', '包', '帽子', '围巾'];
 
 export const COLOR_OPTIONS = [
   '白色', '黑色', '灰色', '米白', '米色',

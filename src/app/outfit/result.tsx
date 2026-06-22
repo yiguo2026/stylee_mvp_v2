@@ -15,19 +15,15 @@ import { aiRecommendOutfits } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory } from '@/types';
+import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
 
-const SCREEN_W = Dimensions.get('window').width;
-
-// Category → emoji/icon for flatlay
 const CATEGORY_EMOJI: Record<string, string> = {
-  '上装': '👔', '下装': '👖', '连衣裙': '👗', '外套': '🧥', '鞋': '👟', '包': '👜', '配饰': '💍',
+  '上装': '👔', '下装': '👖', '连体装': '👗', '外套': '🧥', '鞋': '👟', '包': '👜', '帽子': '🧢', '围巾': '🧣',
 };
-
 
 export default function OutfitResultScreen() {
   const params = useLocalSearchParams<{
-    city: string; temp: string; weather: string; query: string; tags: string;
+    city: string; temp: string; weather: string; query: string; tags: string; inputMode?: string;
   }>();
   const { user, stylePreferences } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
@@ -38,10 +34,12 @@ export default function OutfitResultScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [isFavorited, setIsFavorited] = useState(false);
   const [showSavedConfirm, setShowSavedConfirm] = useState(false);
-  // 稍作调整 — swap individual items
   const [adjustMode, setAdjustMode] = useState(false);
   const [swapTarget, setSwapTarget] = useState<OutfitItem | null>(null);
+  // Wishlist states per recommended item
+  const [wishlistedRecs, setWishlistedRecs] = useState<Set<number>>(new Set());
 
   const dotAnim = useRef(new Animated.Value(0)).current;
 
@@ -61,16 +59,16 @@ export default function OutfitResultScreen() {
           Animated.timing(dotAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
         ])
       ).start();
-    } else {
-      dotAnim.stopAnimation();
-    }
+    } else { dotAnim.stopAnimation(); }
   }, [loading]);
 
   const generateOutfits = async () => {
     setLoading(true);
     setSavedId(null);
+    setIsFavorited(false);
     setCurrentIndex(0);
     setErrorMessage(null);
+    setWishlistedRecs(new Set());
     const sessionId = `session_${Date.now()}`;
     const freshItems = useWardrobeStore.getState().items;
     const freshPrefs = useUserStore.getState().stylePreferences;
@@ -104,20 +102,12 @@ export default function OutfitResultScreen() {
         })
         .select()
         .single();
-
       if (error) throw error;
-
       const outfitId = data.outfit_id;
       const itemRows = (currentOutfit.items ?? []).map((oi, idx) => ({
-        outfit_id: outfitId,
-        item_id: oi.item_id,
-        display_order: idx,
+        outfit_id: outfitId, item_id: oi.item_id, display_order: idx,
       }));
-
-      if (itemRows.length > 0) {
-        await supabase.from('outfit_items').insert(itemRows);
-      }
-
+      if (itemRows.length > 0) await supabase.from('outfit_items').insert(itemRows);
       setSavedId(outfitId);
       setShowSavedConfirm(true);
     } catch (e: any) {
@@ -127,13 +117,30 @@ export default function OutfitResultScreen() {
     }
   };
 
-  const handleSwap = () => {
-    if (outfits.length <= 1) {
-      generateOutfits();
-      return;
+  const handleFavorite = async () => {
+    if (!currentOutfit || !user) return;
+    if (isFavorited) {
+      // Unfavorite
+      await supabase.from('outfit_favorites').delete()
+        .eq('user_id', user.id)
+        .eq('outfit_id', currentOutfit.outfit_id);
+      setIsFavorited(false);
+    } else {
+      // Need to save outfit first if not saved
+      if (!savedId) await handleWear();
+      const outfitId = savedId ?? currentOutfit.outfit_id;
+      await supabase.from('outfit_favorites').insert({
+        user_id: user.id, outfit_id: outfitId,
+      });
+      setIsFavorited(true);
     }
+  };
+
+  const handleSwap = () => {
+    if (outfits.length <= 1) { generateOutfits(); return; }
     setCurrentIndex((currentIndex + 1) % outfits.length);
     setSavedId(null);
+    setIsFavorited(false);
     setAdjustMode(false);
   };
 
@@ -157,9 +164,7 @@ export default function OutfitResultScreen() {
       return {
         ...o,
         items: o.items?.map(oi =>
-          oi.item_id === swapTarget.item_id
-            ? { ...oi, item_id: newItem.item_id, item: newItem }
-            : oi
+          oi.item_id === swapTarget.item_id ? { ...oi, item_id: newItem.item_id, item: newItem } : oi
         ),
       };
     }));
@@ -172,16 +177,13 @@ export default function OutfitResultScreen() {
     ? items.filter(i => i.category === swapTarget.item?.category && !outfitItemIds.has(i.item_id))
     : [];
 
-  const addRecommendedToWardrobe = async (rec: RecommendedItem) => {
+  const addRecommendedToWardrobe = async (rec: RecommendedItem, idx: number) => {
     if (!user?.id) return;
     const { addItem } = useWardrobeStore.getState();
     const saved = await addItem({
-      user_id: user.id,
-      name: rec.name,
-      category: rec.category,
-      color: rec.color,
-      source_type: 'manual',
-      status: 'active',
+      user_id: user.id, name: rec.name, category: rec.category,
+      color: rec.color, source_type: 'ai_recommended',
+      source_label: 'AI推荐添加', status: 'active',
       image_url: rec.image_url || undefined,
     });
     if (saved) {
@@ -189,74 +191,66 @@ export default function OutfitResultScreen() {
         if (i !== currentIndex) return o;
         const newItems = [
           ...(o.items ?? []),
-          {
-            item_id: saved.item_id,
-            outfit_id: o.outfit_id,
-            display_order: (o.items ?? []).length,
-            item: saved,
-          },
+          { item_id: saved.item_id, outfit_id: o.outfit_id, display_order: (o.items ?? []).length, item: saved },
         ];
-        return {
-          ...o,
-          items: newItems,
-          recommended_items: o.recommended_items?.filter(r => r !== rec),
-        };
+        return { ...o, items: newItems, recommended_items: o.recommended_items?.filter((_, ri) => ri !== idx) };
       }));
       await fetchItems(user.id);
       Alert.alert('提示', '已添加到衣橱');
     }
   };
 
-  // Normalize category: AI or user may use variants like "衬衫" "裙子" "夹克" etc.
+  const addRecommendedToWishlist = async (rec: RecommendedItem, idx: number) => {
+    if (!user?.id) return;
+    await supabase.from('wishlist_items').insert({
+      user_id: user.id, name: rec.name, category: rec.category,
+      color: rec.color, source: 'ai_recommended',
+    });
+    setWishlistedRecs(prev => new Set(prev).add(idx));
+  };
+
   const normalizeCategory = (raw: string): string => {
     const s = raw.trim();
     if (['上装', '衬衫', 'T恤', '毛衣', '卫衣', '上衣', '针织衫', '吊带', '背心', '打底衫', '马甲', 'Polo衫'].some(k => s.includes(k))) return '上装';
     if (['下装', '裤子', '牛仔裤', '阔腿裤', '短裤', '长裤', '半裙', '西裤', '运动裤', '休闲裤', '哈伦裤', '工装裤', '直筒裤', '喇叭裤'].some(k => s.includes(k))) return '下装';
-    if (['连衣裙', '裙子', '长裙', '短裙', '裙装', 'onepiece'].some(k => s.includes(k))) return '连衣裙';
+    if (['连衣裙', '裙子', '长裙', '短裙', '裙装', 'onepiece', '连体装'].some(k => s.includes(k))) return '连体装';
     if (['外套', '夹克', '大衣', '风衣', '羽绒服', '棉服', '西装', '开衫', '皮衣', '冲锋衣', '棒球服', '皮草'].some(k => s.includes(k))) return '外套';
-    if (['鞋', '鞋子', '高跟鞋', '运动鞋', '靴子', '凉鞋', '皮鞋', '单鞋', '帆布鞋', '板鞋', '拖鞋', '乐福鞋', '短靴', '长靴', '老爹鞋'].some(k => s.includes(k))) return '鞋';
+    if (['鞋', '鞋子', '高跟鞋', '运动鞋', '靴子', '凉鞋', '皮鞋', '单鞋', '帆布鞋', '板鞋', '拖鞋', '乐福鞋', '短靴', '长靴', '老爹鞋', '马丁靴'].some(k => s.includes(k))) return '鞋';
     if (['包', '包包', '手提包', '双肩包', '斜挎包', '手袋', '挎包', '托特包', '链条包', '腰包', '背包'].some(k => s.includes(k))) return '包';
-    if (['配饰', '饰品', '围巾', '帽子', '手表', '项链', '耳环', '戒指', '丝巾', '眼镜', '腰带', '领带', '胸针', '发饰', '墨镜', '手链', '发带'].some(k => s.includes(k))) return '配饰';
-    // Exact standard match passthrough
-    if (['上装', '下装', '连衣裙', '外套', '鞋', '包', '配饰'].includes(s)) return s;
-    return s; // unknown — leave as-is
+    if (['帽子', '帽', '棒球帽', '渔夫帽', '冷帽', '贝雷帽', '针织帽', '遮阳帽', '草帽'].some(k => s.includes(k))) return '帽子';
+    if (['围巾', '丝巾', '领巾', '披肩', '脖套'].some(k => s.includes(k))) return '围巾';
+    if (CLOTHING_CATEGORIES.includes(s as ClothingCategory)) return s;
+    return s;
   };
 
-  // Split flatlay items into main body (left) and accessories (right)
+  // Build flatlay items
   const allFlatlayItems = currentOutfit
     ? [
         ...(currentOutfit.items ?? []).map(oi => ({
-          id: oi.item_id,
-          name: oi.item?.name ?? oi.item?.category ?? '',
-          category: normalizeCategory(oi.item?.category ?? ''),
-          color: oi.item?.color ?? '',
-          image_url: oi.item?.image_url,
-          owned: true,
+          id: oi.item_id, name: oi.item?.name ?? oi.item?.category ?? '',
+          category: normalizeCategory(oi.item?.category ?? ''), color: oi.item?.color ?? '',
+          image_url: oi.item?.image_url, owned: true,
         })),
         ...(currentOutfit.recommended_items ?? []).map((rec, idx) => ({
-          id: `rec_${idx}`,
-          name: rec.name,
-          category: normalizeCategory(rec.category),
-          color: rec.color,
-          image_url: rec.image_url,
-          owned: false,
+          id: `rec_${idx}`, name: rec.name, category: normalizeCategory(rec.category),
+          color: rec.color, image_url: rec.image_url, owned: false,
         })),
       ]
     : [];
 
-  // Sort & group: tops together, then bottom, then shoes; accessories/bags on side
-  const MAIN_ORDER: Record<string, number> = { '外套': 0, '上装': 1, '下装': 2, '连衣裙': 2, '鞋': 3 };
+  const MAIN_ORDER: Record<string, number> = { '外套': 0, '上装': 1, '下装': 2, '连体装': 2, '鞋': 3 };
   const mainItems = allFlatlayItems
     .filter(fi => fi.category in MAIN_ORDER)
     .sort((a, b) => (MAIN_ORDER[a.category] ?? 9) - (MAIN_ORDER[b.category] ?? 9));
-  const sideItems = allFlatlayItems.filter(fi => fi.category === '配饰' || fi.category === '包');
-
-  // Group multiple tops (外套 + 上装) side-by-side
+  const sideItems = allFlatlayItems.filter(fi => fi.category === '围巾' || fi.category === '帽子' || fi.category === '包');
   const topItems = mainItems.filter(fi => fi.category === '上装' || fi.category === '外套');
-  const bottomItems = mainItems.filter(fi => fi.category === '下装');
+  const bottomItems = mainItems.filter(fi => fi.category === '下装' || fi.category === '连体装');
   const shoeItems = mainItems.filter(fi => fi.category === '鞋');
 
-  // ─── Loading ──────────────────────────────────────────
+  const ownedItems = currentOutfit?.items ?? [];
+  const recommendedItems = currentOutfit?.recommended_items ?? [];
+
+  // ── Loading ──
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -270,28 +264,21 @@ export default function OutfitResultScreen() {
     );
   }
 
-  // ─── Empty ────────────────────────────────────────────
+  // ── Empty ──
   if (outfits.length === 0) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>‹ 返回</Text>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()}><Text style={styles.back}>‹ 返回</Text></TouchableOpacity>
         </View>
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="hanger" size={52} color={Colors.walnut2} style={styles.emptyIconView} />
+          <MaterialCommunityIcons name="hanger" size={52} color={Colors.walnut2} />
           <Text style={styles.emptyTitle}>无法生成推荐</Text>
           <Text style={styles.emptySubtitle}>
             {errorMessage || '需要衣橱里有上装和下装才能生成搭配'}{'\n'}快去添加几件衣服吧！
           </Text>
-          <TouchableOpacity
-            style={styles.addWardrobeBtn}
-            onPress={() => {
-              router.back();
-              router.push('/wardrobe/add');
-            }}
-          >
+          <TouchableOpacity style={styles.addWardrobeBtn}
+            onPress={() => { router.back(); router.push('/wardrobe/add'); }}>
             <Text style={styles.addWardrobeBtnText}>去添加衣物</Text>
           </TouchableOpacity>
         </View>
@@ -299,16 +286,9 @@ export default function OutfitResultScreen() {
     );
   }
 
-  const ownedItems = currentOutfit.items ?? [];
-  const recommendedItems = currentOutfit.recommended_items ?? [];
-
-  // Render a top garment (上装/外套) — used in the side-by-side tops row
   const renderGarment = (fi: { id: string; name: string; category: string; image_url?: string }) => (
     <View key={fi.id} style={styles.flatlayTopWrap}>
-      <View style={[
-        styles.flatlayTopShape,
-        !fi.image_url && { backgroundColor: '#D4A574' },
-      ]}>
+      <View style={[styles.flatlayTopShape, !fi.image_url && { backgroundColor: '#D4A574' }]}>
         {fi.image_url ? (
           <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
         ) : (
@@ -333,15 +313,9 @@ export default function OutfitResultScreen() {
           推荐方案 <Text style={styles.headerIdx}>{currentIndex + 1}</Text>
           <Text style={styles.headerTotal}>/{outfits.length}</Text>
         </Text>
-        <TouchableOpacity
-          style={styles.favBtn}
-          onPress={() => {
-            if (!savedId) handleWear();
-          }}
-          disabled={!!savedId}
-        >
-          <Text style={[styles.favIcon, savedId && styles.favIconActive]}>
-            {savedId ? '♥' : '♡'}
+        <TouchableOpacity style={styles.favBtn} onPress={handleFavorite}>
+          <Text style={[styles.favIcon, isFavorited && styles.favIconActive]}>
+            {isFavorited ? '♥' : '♡'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -349,34 +323,19 @@ export default function OutfitResultScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Weather & Context */}
         <View style={styles.contextRow}>
-          <Text style={styles.contextText}>
-            {params.weather} {params.temp}°C · {params.city}
-          </Text>
-          {params.query ? (
-            <Text style={styles.queryText}>「{params.query}」</Text>
-          ) : null}
+          <Text style={styles.contextText}>{params.weather} {params.temp}°C · {params.city}</Text>
+          {params.query ? <Text style={styles.queryText}>「{params.query}」</Text> : null}
         </View>
 
-        {/* ── 1. 穿搭展示 (Flatlay) ── 上装/外套在上，下装在中，鞋在下，配饰/包在右侧 */}
+        {/* ── 1. Flatlay ── */}
         <View style={styles.flatlayArea}>
           {allFlatlayItems.length > 0 ? (
             <View style={styles.flatlayRow}>
-              {/* Left: main garments — tops row → bottom → shoes */}
               <View style={styles.flatlayMain}>
-                {/* Tops row: 外套 + 上装 side by side */}
-                {topItems.length > 0 && (
-                  <View style={styles.flatlayTopsRow}>
-                    {topItems.map((fi) => renderGarment(fi))}
-                  </View>
-                )}
-
-                {/* Bottom */}
+                {topItems.length > 0 && <View style={styles.flatlayTopsRow}>{topItems.map(renderGarment)}</View>}
                 {bottomItems.map((fi) => (
                   <View key={fi.id} style={styles.flatlayBottomWrap}>
-                    <View style={[
-                      styles.flatlayBottomShape,
-                      !fi.image_url && { backgroundColor: '#5C6B73' },
-                    ]}>
+                    <View style={[styles.flatlayBottomShape, !fi.image_url && { backgroundColor: '#5C6B73' }]}>
                       {fi.image_url ? (
                         <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
                       ) : (
@@ -389,8 +348,6 @@ export default function OutfitResultScreen() {
                     <Text style={styles.flatlayItemName} numberOfLines={1}>{fi.name}</Text>
                   </View>
                 ))}
-
-                {/* Shoes */}
                 {shoeItems.length > 0 && (
                   <View style={styles.flatlayShoesRow}>
                     {shoeItems.map((fi) => (
@@ -408,8 +365,6 @@ export default function OutfitResultScreen() {
                   </View>
                 )}
               </View>
-
-              {/* Right: accessories & bags */}
               {sideItems.length > 0 && (
                 <View style={styles.flatlaySide}>
                   {sideItems.map((fi) => (
@@ -428,37 +383,32 @@ export default function OutfitResultScreen() {
               )}
             </View>
           ) : (
-            <View style={styles.flatlayEmpty}>
-              <Text style={styles.flatlayEmptyText}>暂无搭配单品</Text>
-            </View>
+            <View style={styles.flatlayEmpty}><Text style={styles.flatlayEmptyText}>暂无搭配单品</Text></View>
           )}
-          <Text style={styles.flatlayLabel}>← 滑动切换方案 →</Text>
         </View>
 
-        {/* Dot Indicator */}
+        {/* Dot indicator */}
         <View style={styles.dotIndicator}>
           {outfits.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => { setCurrentIndex(i); setSavedId(null); setAdjustMode(false); }}>
+            <TouchableOpacity key={i} onPress={() => { setCurrentIndex(i); setSavedId(null); setIsFavorited(false); setAdjustMode(false); }}>
               <View style={[styles.dot, i === currentIndex && styles.dotActive]} />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── 2. 你的单品 ── */}
+        {/* ── 2. Owned Items ── */}
         {ownedItems.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>👕 你的单品</Text>
-              <Text style={styles.sectionSubtitleOwned}>衣橱中已有</Text>
+              <Text style={styles.sectionTitle}>👕 已有单品</Text>
+              <Text style={styles.sectionSubOwned}>来自你的衣橱</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.itemsRow}>
                 {ownedItems.map((oi) => (
-                  <TouchableOpacity
-                    key={oi.item_id}
-                    style={[styles.itemCard, styles.itemCardOwned, adjustMode && styles.itemCardAdjust]}
-                    onPress={() => handleItemTap(oi)}
-                    activeOpacity={adjustMode ? 0.6 : 1}
+                  <TouchableOpacity key={oi.item_id}
+                    style={[styles.itemCard, adjustMode && styles.itemCardAdjust]}
+                    onPress={() => handleItemTap(oi)} activeOpacity={adjustMode ? 0.6 : 1}
                   >
                     <View style={styles.itemThumbSmall}>
                       {oi.item?.image_url ? (
@@ -474,9 +424,7 @@ export default function OutfitResultScreen() {
                       <Text style={styles.itemCardOwned}>✓ 已有</Text>
                     </View>
                     {adjustMode && (
-                      <View style={styles.swapBadge}>
-                        <Feather name="refresh-cw" size={10} color={Colors.paper} />
-                      </View>
+                      <View style={styles.swapBadge}><Feather name="refresh-cw" size={10} color={Colors.paper} /></View>
                     )}
                   </TouchableOpacity>
                 ))}
@@ -485,49 +433,51 @@ export default function OutfitResultScreen() {
           </View>
         )}
 
-        {/* ── 3. 推荐单品 (only if wardrobe is missing items) ── */}
+        {/* ── 3. Recommended Items ── */}
         {recommendedItems.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>✨ 推荐单品</Text>
-              <Text style={styles.sectionSubtitleRec}>衣橱中没有，建议添加</Text>
+              <Text style={styles.sectionSubRec}>建议添加</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.itemsRow}>
-                {recommendedItems.map((rec, idx) => (
-                  <TouchableOpacity
-                    key={`rec_${idx}`}
-                    style={[styles.itemCard, styles.itemCardRecommended]}
-                    onPress={() => router.push({
-                      pathname: '/wardrobe/[id]',
-                      params: { id: `rec_${idx}`, itemData: JSON.stringify(rec) },
-                    })}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.itemThumbSmall, { backgroundColor: '#F0EDFF' }]}>
-                      {rec.image_url ? (
-                        <Image source={{ uri: rec.image_url }} style={styles.itemThumbImg} resizeMode="cover" />
-                      ) : (
-                        <View style={styles.itemThumbPlaceholder}>
-                          <CategoryIcon category={rec.category} size={22} color={Colors.walnut2} />
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.itemCardInfo}>
-                      <Text style={styles.itemCardName} numberOfLines={1}>{rec.name}</Text>
-                      <TouchableOpacity
-                        style={styles.addToWardrobeBtn}
-                        onPress={(e) => { e.stopPropagation(); addRecommendedToWardrobe(rec); }}
-                      >
-                        <Text style={styles.addToWardrobeBtnText}>+ 加入衣橱</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {/* "推荐" badge */}
-                    <View style={styles.recBadge}>
-                      <Text style={styles.recBadgeText}>推荐</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                {recommendedItems.map((rec, idx) => {
+                  const isWishlisted = wishlistedRecs.has(idx);
+                  return (
+                    <TouchableOpacity key={`rec_${idx}`}
+                      style={[styles.itemCard, styles.itemCardRecommended]}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.itemThumbSmall, { backgroundColor: '#F0EDFF' }]}>
+                        {rec.image_url ? (
+                          <Image source={{ uri: rec.image_url }} style={styles.itemThumbImg} resizeMode="cover" />
+                        ) : (
+                          <View style={styles.itemThumbPlaceholder}>
+                            <CategoryIcon category={rec.category} size={22} color={Colors.walnut2} />
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.itemCardInfo}>
+                        <Text style={styles.itemCardName} numberOfLines={1}>{rec.name}</Text>
+                        <TouchableOpacity style={styles.addToWardrobeBtn}
+                          onPress={() => addRecommendedToWardrobe(rec, idx)}>
+                          <Text style={styles.addToWardrobeBtnText}>+ 加入衣橱</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.wishlistBtn, isWishlisted && styles.wishlistBtnDone]}
+                          onPress={() => !isWishlisted && addRecommendedToWishlist(rec, idx)}
+                          disabled={isWishlisted}
+                        >
+                          <Text style={[styles.wishlistBtnText, isWishlisted && styles.wishlistBtnTextDone]}>
+                            {isWishlisted ? '已收藏' : '♡ 收藏'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.recBadge}><Text style={styles.recBadgeText}>推荐</Text></View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </ScrollView>
           </View>
@@ -540,81 +490,50 @@ export default function OutfitResultScreen() {
           </View>
         )}
 
-        {/* ── 4. 推荐理由 ── */}
+        {/* ── 4. AI Comment ── */}
         {currentOutfit.ai_comment && (
           <View style={styles.aiCommentCard}>
-            <View style={styles.aiBadge}>
-              <Text style={styles.aiBadgeText}>AI</Text>
-            </View>
+            <View style={styles.aiBadge}><Text style={styles.aiBadgeText}>AI</Text></View>
             <Text style={styles.aiCommentText}>{currentOutfit.ai_comment}</Text>
           </View>
         )}
-
-        {/* "这些都不喜欢?" */}
-        <TouchableOpacity style={styles.dislikeLink} onPress={generateOutfits}>
-          <Text style={styles.dislikeLinkText}>这些都不喜欢？</Text>
-        </TouchableOpacity>
       </ScrollView>
 
-      {/* ── 5. 操作按钮 (Decision Bar) ── */}
+      {/* ── 5. Decision Bar ── */}
       <View style={styles.decisionBar}>
-        <TouchableOpacity
-          style={[styles.decisionBtn, styles.decisionBtnAdjust, adjustMode && styles.decisionBtnAdjustActive]}
-          onPress={handleAdjustToggle}
-        >
-          <Text style={[styles.decisionBtnAdjustText, adjustMode && styles.decisionBtnAdjustTextActive]}>
+        <TouchableOpacity style={styles.decisionBtnAdjust} onPress={handleAdjustToggle}>
+          <Text style={[styles.decisionBtnAdjustText, adjustMode && { color: Colors.terracotta }]}>
             {adjustMode ? '完成调整' : '稍作调整'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.decisionBtnSwap} onPress={handleSwap}>
+          <Text style={styles.decisionBtnSwapText}>换一套看看</Text>
+        </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.decisionBtn, styles.decisionBtnConfirm, !!savedId && styles.decisionBtnSaved]}
-          onPress={handleWear}
-          disabled={saving || !!savedId}
+          style={[styles.decisionBtnConfirm, !!savedId && styles.decisionBtnSaved]}
+          onPress={handleWear} disabled={saving || !!savedId}
         >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.decisionBtnConfirmText}>
-              {savedId ? '✓ 已保存' : '✨ 就这么穿'}
-            </Text>
-          )}
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? '✓ 已保存' : '就这么穿'}</Text>}
         </TouchableOpacity>
       </View>
 
-      {/* Swap Item Modal */}
-      <Modal
-        visible={swapTarget !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSwapTarget(null)}
-      >
+      {/* Swap Modal */}
+      <Modal visible={swapTarget !== null} transparent animationType="slide" onRequestClose={() => setSwapTarget(null)}>
         <TouchableOpacity style={styles.modalBackdrop} onPress={() => setSwapTarget(null)} />
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              替换{swapTarget?.item?.category ?? ''}
-            </Text>
-            <TouchableOpacity onPress={() => setSwapTarget(null)}>
-              <Text style={styles.modalClose}>取消</Text>
-            </TouchableOpacity>
+            <Text style={styles.modalTitle}>替换{swapTarget?.item?.category ?? ''}</Text>
+            <TouchableOpacity onPress={() => setSwapTarget(null)}><Text style={styles.modalClose}>取消</Text></TouchableOpacity>
           </View>
           {swapAlternatives.length === 0 ? (
             <View style={styles.modalEmpty}>
-              <Text style={styles.modalEmptyText}>
-                衣橱里没有其他{swapTarget?.item?.category}可以替换{'\n'}去衣橱添加更多单品吧
-              </Text>
+              <Text style={styles.modalEmptyText}>衣橱里没有其他{swapTarget?.item?.category}可以替换{'\n'}去衣橱添加更多单品吧</Text>
             </View>
           ) : (
-            <FlatList
-              data={swapAlternatives}
-              keyExtractor={i => i.item_id}
-              numColumns={3}
+            <FlatList data={swapAlternatives} keyExtractor={i => i.item_id} numColumns={3}
               contentContainerStyle={styles.swapGrid}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.swapOption}
-                  onPress={() => confirmSwap(item)}
-                >
+                <TouchableOpacity style={styles.swapOption} onPress={() => confirmSwap(item)}>
                   {item.image_url ? (
                     <Image source={{ uri: item.image_url }} style={styles.swapOptionImage} resizeMode="cover" />
                   ) : (
@@ -630,12 +549,8 @@ export default function OutfitResultScreen() {
         </View>
       </Modal>
 
-      <ConfirmModal
-        visible={showSavedConfirm && !!savedId}
-        title="已保存"
-        message="这套搭配已保存到你的搭配记录 🎉"
-        confirmText="好的"
-        singleButton
+      <ConfirmModal visible={showSavedConfirm && !!savedId} title="已保存"
+        message="这套搭配已保存到你的穿搭记录 🎉" confirmText="好的" singleButton
         onConfirm={() => { setShowSavedConfirm(false); router.back(); }}
         onCancel={() => setShowSavedConfirm(false)}
       />
@@ -646,346 +561,101 @@ export default function OutfitResultScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
 
-  // ── Loading ──
-  loadingContainer: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two,
-    padding: Spacing.four,
-  },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
   loadingIconView: { marginBottom: Spacing.one },
   loadingTitle: { ...T.storyTitle, fontSize: 22 },
   loadingSubtitle: { ...T.bodyText, textAlign: 'center' },
 
-  // ── Header ──
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.line,
-    backgroundColor: '#fff',
-  },
-  back: { ...T.buttonSecondary, color: '#2C2C2C', fontWeight: '600' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: Colors.line, backgroundColor: Colors.paperRaised },
+  back: { ...T.buttonSecondary, color: Colors.ink, fontWeight: '600' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.ink },
-  headerIdx: { color: '#6C5CE7' },
+  headerIdx: { color: Colors.terracotta },
   headerTotal: { color: Colors.walnut2 },
   favBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  favIcon: { fontSize: 20, color: '#8A8A8A' },
+  favIcon: { fontSize: 20, color: Colors.walnut2 },
   favIconActive: { color: '#FF3B30' },
 
-  // ── Content ──
   content: { padding: Spacing.three, gap: Spacing.two, paddingBottom: 100 },
   contextRow: { gap: 2 },
   contextText: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   queryText: { ...T.itemDesc, color: Colors.walnut },
 
-  // ── 1. Flatlay (穿搭展示) ── 上装在上，下装在中，鞋在下，配饰/包在右侧
-  flatlayArea: {
-    marginHorizontal: Spacing.two,
-    minHeight: 280,
-    borderRadius: Radius.xl,
-    backgroundColor: '#FAFAFA',
-    position: 'relative',
-    overflow: 'hidden',
-    padding: Spacing.three,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flatlayRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.three,
-    width: '100%',
-  },
-  // Left column: top row → bottom → shoes (vertical)
-  flatlayMain: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  // Multiple tops side-by-side (外套 + 上装)
-  flatlayTopsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.two,
-  },
+  flatlayArea: { marginHorizontal: Spacing.two, minHeight: 280, borderRadius: Radius.xl, backgroundColor: '#FAFAFA', position: 'relative', overflow: 'hidden', padding: Spacing.three, alignItems: 'center', justifyContent: 'center' },
+  flatlayRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three, width: '100%' },
+  flatlayMain: { flex: 1, alignItems: 'center', gap: Spacing.two },
+  flatlayTopsRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two },
   flatlayTopWrap: { alignItems: 'center', gap: 4 },
-  flatlayTopShape: {
-    width: 140,
-    height: 80,
-    borderRadius: 24,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  flatlayTopShape: { width: 140, height: 80, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlayBottomWrap: { alignItems: 'center', gap: 4 },
-  flatlayBottomShape: {
-    width: 160,
-    height: 120,
-    borderRadius: 8,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  flatlayBottomShape: { width: 160, height: 120, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlayGarmentImg: { width: '100%', height: '100%' },
   flatlayGarmentInner: { alignItems: 'center', gap: 2 },
   flatlayGarmentLabel: { fontSize: 10, opacity: 0.7, color: '#fff', textAlign: 'center' },
   flatlayEmoji: { fontSize: 24, textAlign: 'center' },
-  flatlayItemName: {
-    fontSize: 11,
-    color: Colors.walnut2,
-    textAlign: 'center',
-    maxWidth: 160,
-  },
-  flatlayShoesRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.three,
-  },
+  flatlayItemName: { fontSize: 11, color: Colors.walnut2, textAlign: 'center', maxWidth: 160 },
+  flatlayShoesRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.three },
   flatlayShoeWrap: { alignItems: 'center', gap: 4 },
-  flatlayShoeShape: {
-    width: 60,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0F0F0',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  flatlayShoeShape: { width: 60, height: 36, borderRadius: 18, backgroundColor: '#F0F0F0', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlayShoeImg: { width: '100%', height: '100%' },
-  // Right column: accessories & bags
-  flatlaySide: {
-    width: 64,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingTop: Spacing.two,
-  },
+  flatlaySide: { width: 64, alignItems: 'center', gap: Spacing.three, paddingTop: Spacing.two },
   flatlaySideItem: { alignItems: 'center', gap: 4 },
-  flatlaySideCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFF8E1',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  flatlaySideCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#FFF8E1', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlaySideImg: { width: '100%', height: '100%', borderRadius: 26 },
   flatlaySideEmoji: { fontSize: 20, textAlign: 'center' },
-  flatlaySideName: {
-    fontSize: 10,
-    color: Colors.walnut2,
-    textAlign: 'center',
-    maxWidth: 60,
-  },
+  flatlaySideName: { fontSize: 10, color: Colors.walnut2, textAlign: 'center', maxWidth: 60 },
   flatlayEmpty: { padding: Spacing.five, alignItems: 'center' },
   flatlayEmptyText: { ...T.bodyText, color: Colors.walnut2, fontSize: 13 },
-  flatlayLabel: {
-    position: 'absolute',
-    bottom: 4,
-    fontSize: 10,
-    color: '#B2BEC3',
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
 
-  // ── Dot Indicator ──
   dotIndicator: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: Spacing.two },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#DFE6E9' },
-  dotActive: { width: 20, borderRadius: 4, backgroundColor: '#6C5CE7' },
+  dotActive: { width: 20, borderRadius: 4, backgroundColor: Colors.terracotta },
 
-  // ── Section ──
   section: { gap: Spacing.two },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { ...T.bodyText, fontWeight: '600', fontSize: 13, color: Colors.ink },
-  sectionSubtitleOwned: { ...T.micro, color: '#2E7D32' },
-  sectionSubtitleRec: { ...T.micro, color: '#6C5CE7' },
+  sectionSubOwned: { ...T.micro, color: Colors.sage },
+  sectionSubRec: { ...T.micro, color: Colors.terracotta },
 
-  // ── Item Cards (horizontal row, compact) ──
   itemsRow: { flexDirection: 'row', gap: 10, paddingVertical: Spacing.one },
-  itemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    padding: Spacing.two,
-    backgroundColor: '#fff',
-    borderRadius: Radius.md,
-    minWidth: 140,
-    ...Shadow.one,
-    position: 'relative',
-  },
-  itemCardOwned: { borderWidth: 2, borderColor: 'transparent' },
-  itemCardRecommended: {
-    borderWidth: 2,
-    borderColor: '#6C5CE7',
-    borderStyle: 'dashed',
-    backgroundColor: '#FAFAFF',
-  },
+  itemCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.two, backgroundColor: Colors.paperRaised, borderRadius: Radius.md, minWidth: 140, ...Shadow.one, position: 'relative' },
   itemCardAdjust: { opacity: 0.85 },
-  itemThumbSmall: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  itemCardRecommended: { borderWidth: 2, borderColor: Colors.terracotta, borderStyle: 'dashed', backgroundColor: '#FFFAF5' },
+  itemThumbSmall: { width: 48, height: 48, borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   itemThumbImg: { width: '100%', height: '100%', borderRadius: 10 },
-  itemThumbPlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 10,
-    backgroundColor: Colors.vintageCream,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  itemThumbPlaceholder: { width: '100%', height: '100%', borderRadius: 10, backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
   itemCardInfo: { flexDirection: 'column', flex: 1 },
   itemCardName: { fontWeight: '500', fontSize: 12, color: Colors.ink },
-  itemCardOwned: { fontSize: 10, color: '#2E7D32', marginTop: 1 },
-
-  // Recommended item button
-  addToWardrobeBtn: {
-    marginTop: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#6C5CE7',
-    alignSelf: 'flex-start',
-  },
+  itemCardOwned: { fontSize: 10, color: Colors.sage, marginTop: 1 },
+  addToWardrobeBtn: { marginTop: 4, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: Colors.ink, alignSelf: 'flex-start' },
   addToWardrobeBtnText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-
-  // "推荐" badge
-  recBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -4,
-    backgroundColor: '#6C5CE7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
+  wishlistBtn: { marginTop: 2, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: Colors.terracotta, alignSelf: 'flex-start' },
+  wishlistBtnDone: { borderColor: Colors.line, backgroundColor: Colors.paperCard },
+  wishlistBtnText: { fontSize: 10, color: Colors.terracotta, fontWeight: '500' },
+  wishlistBtnTextDone: { fontSize: 10, color: Colors.walnut2 },
+  swapBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.terracotta, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  recBadge: { position: 'absolute', top: -6, right: -4, backgroundColor: Colors.terracotta, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   recBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
 
-  swapBadge: {
-    position: 'absolute', top: 4, right: 4,
-    backgroundColor: Colors.terracotta,
-    borderRadius: 10, width: 20, height: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  allOwnedHint: { backgroundColor: '#E8F5E9', borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
+  allOwnedText: { ...T.bodyText, color: Colors.sage, fontSize: 13 },
 
-  // ── All Owned Hint ──
-  allOwnedHint: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-    alignItems: 'center',
-  },
-  allOwnedText: { ...T.bodyText, color: '#2E7D32', fontSize: 13 },
-
-  // ── 4. AI Comment ──
-  aiCommentCard: {
-    marginHorizontal: Spacing.two,
-    padding: Spacing.three,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    ...Shadow.two,
-    position: 'relative',
-    marginTop: Spacing.one,
-  },
-  aiBadge: {
-    position: 'absolute',
-    top: -8,
-    left: 14,
-    backgroundColor: '#6C5CE7',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
+  aiCommentCard: { marginHorizontal: Spacing.two, padding: Spacing.three, backgroundColor: Colors.paperRaised, borderRadius: 14, ...Shadow.two, position: 'relative', marginTop: Spacing.one },
+  aiBadge: { position: 'absolute', top: -8, left: 14, backgroundColor: Colors.ink, paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: 6 },
   aiBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  aiCommentText: {
-    fontSize: 13,
-    lineHeight: 22,
-    color: '#636E72',
-    marginTop: Spacing.one,
-  },
+  aiCommentText: { fontSize: 13, lineHeight: 22, color: '#636E72', marginTop: Spacing.one },
 
-  // ── "这些都不喜欢?" ──
-  dislikeLink: { alignItems: 'center', paddingVertical: Spacing.two },
-  dislikeLinkText: {
-    fontSize: 11,
-    color: '#8A8A8A',
-    textDecorationLine: 'underline',
-    textDecorationColor: '#8A8A8A',
-  },
+  decisionBar: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three, backgroundColor: Colors.paperRaised, borderTopWidth: 1, borderTopColor: Colors.line },
+  decisionBtnAdjust: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.line, backgroundColor: Colors.paperCard },
+  decisionBtnAdjustText: { fontSize: 13, fontWeight: '600', color: Colors.walnut },
+  decisionBtnSwap: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.line, backgroundColor: Colors.paperCard },
+  decisionBtnSwapText: { fontSize: 13, fontWeight: '600', color: Colors.ink },
+  decisionBtnConfirm: { flex: 1.3, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.ink, ...Shadow.two },
+  decisionBtnSaved: { backgroundColor: Colors.sage },
+  decisionBtnConfirmText: { fontSize: 14, fontWeight: '600', color: Colors.paper },
 
-  // ── 5. Decision Bar ──
-  decisionBar: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E8ECF0',
-  },
-  decisionBtn: {
-    paddingVertical: 14,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  decisionBtnAdjust: {
-    flex: 1,
-    borderColor: '#6C5CE7',
-    backgroundColor: '#fff',
-  },
-  decisionBtnAdjustActive: {
-    backgroundColor: '#F0EDFF',
-  },
-  decisionBtnAdjustText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6C5CE7',
-  },
-  decisionBtnAdjustTextActive: {
-    color: '#5A4BD1',
-  },
-  decisionBtnConfirm: {
-    flex: 1.5,
-    backgroundColor: '#6C5CE7',
-    ...Shadow.two,
-  },
-  decisionBtnSaved: {
-    backgroundColor: Colors.sage,
-  },
-  decisionBtnConfirmText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-
-  // ── Swap Modal ──
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  modalSheet: {
-    backgroundColor: Colors.paperRaised,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    maxHeight: '60%',
-  },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: Spacing.three,
-    borderBottomWidth: 1, borderBottomColor: Colors.line,
-  },
+  modalSheet: { backgroundColor: Colors.paperRaised, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '60%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: Colors.line },
   modalTitle: { ...T.subTitle },
   modalClose: { ...T.buttonSecondary, color: Colors.terracotta },
   modalEmpty: { padding: Spacing.five, alignItems: 'center' },
@@ -993,27 +663,12 @@ const styles = StyleSheet.create({
   swapGrid: { padding: Spacing.three, gap: Spacing.two },
   swapOption: { flex: 1, margin: Spacing.one, alignItems: 'center', gap: 4 },
   swapOptionImage: { width: '100%', aspectRatio: 1, borderRadius: Radius.md },
-  swapOptionPlaceholder: {
-    width: '100%', aspectRatio: 1, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  swapOptionPlaceholder: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
   swapOptionName: { ...T.micro, textAlign: 'center' },
 
-  // ── Empty ──
-  emptyContainer: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    gap: Spacing.two, padding: Spacing.four,
-  },
-  emptyIconView: { marginBottom: Spacing.one },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
   emptyTitle: { ...T.emptyTitle, fontSize: 20 },
   emptySubtitle: { ...T.itemDesc, textAlign: 'center', lineHeight: 22 },
-  addWardrobeBtn: {
-    backgroundColor: Colors.ink,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two + 4,
-    marginTop: Spacing.two,
-  },
+  addWardrobeBtn: { backgroundColor: Colors.ink, borderRadius: Radius.md, paddingHorizontal: Spacing.four, paddingVertical: Spacing.two + 4, marginTop: Spacing.two },
   addWardrobeBtnText: { ...T.buttonPrimary, color: Colors.paper },
 });

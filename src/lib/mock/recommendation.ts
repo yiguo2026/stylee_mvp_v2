@@ -11,25 +11,24 @@ const AI_COMMENTS = [
 ];
 
 const STYLE_AI_COMMENTS: Record<string, string> = {
-  'minimalist': '极简风格的精髓在于少即是多，这套搭配用克制的选择展现高级感。',
-  'french': '法式风情讲究不经意的优雅，随性中自有品味。',
-  'vintage': '复古元素赋予这套搭配独特的时光质感，经典永不过时。',
-  'street': '街头风格大胆张扬，这套搭配让你自信表达态度。',
-  'elegant': '优雅风格注重细节与质感，这套搭配低调中尽显精致。',
-  'casual': '休闲风格追求舒适自在，这套搭配日常百搭又不失品味。',
-  'sporty': '运动风格活力满满，这套搭配让你行动自如又不失时尚。',
+  'korean': '韩系风格温柔清新，这套搭配让你散发迷人的少女感。',
   'sweet': '甜美风格温柔可人，这套搭配给人亲切又精致的感觉。',
-  'cool': '酷感风格个性十足，这套搭配让你气场全开。',
-  'arty': '文艺风格注重内涵表达，这套搭配透着独特的审美品味。',
+  'new_chinese': '新中式风格将传统与现代完美融合，这套搭配韵味十足。',
+  'preppy': '学院风青春活力，这套搭配减龄又时髦。',
+  'city_chic': '都市风格干练洒脱，这套搭配让你在都市中自信出众。',
+  'artsy': '文艺风格注重内涵表达，这套搭配透着独特的审美品味。',
+  'sporty_casual': '运动休闲风格活力满满，这套搭配让你行动自如又不失时尚。',
+  'commute_style': '通勤风格简洁利落，这套搭配职场日常两不误。',
+  'french': '法式风情讲究不经意的优雅，随性中自有品味。',
+  'maillard': '美拉德风格用温暖棕色系打造质感，高级又耐看。',
+  'japanese': '日系风格清新自然，这套搭配舒适中透着小精致。',
+  'business': '商务风格稳重得体，这套搭配展现专业气场。',
+  'american': '美式风格自由随性，这套搭配自信又有型。',
+  'british': '英伦风格经典优雅，这套搭配低调中彰显品味。',
 };
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function pickRandomN<T>(arr: T[], n: number): T[] {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, n);
 }
 
 function buildOutfit(
@@ -37,6 +36,7 @@ function buildOutfit(
   sessionId: string,
   tops: WardrobeItem[],
   bottoms: WardrobeItem[],
+  dresses: WardrobeItem[],
   shoes: WardrobeItem[],
   others: WardrobeItem[],
   index: number,
@@ -45,11 +45,18 @@ function buildOutfit(
   const items: Outfit['items'] = [];
   let order = 0;
 
-  const top = tops[index % tops.length];
-  if (top) items.push({ item_id: top.item_id, outfit_id: '', display_order: order++, item: top });
+  // Alternate between top+bottom and dress
+  const useDress = dresses.length > 0 && index === 1;
+  if (useDress) {
+    const dress = dresses[index % dresses.length];
+    if (dress) items.push({ item_id: dress.item_id, outfit_id: '', display_order: order++, item: dress });
+  } else {
+    const top = tops[index % tops.length];
+    if (top) items.push({ item_id: top.item_id, outfit_id: '', display_order: order++, item: top });
 
-  const bottom = bottoms[index % bottoms.length];
-  if (bottom) items.push({ item_id: bottom.item_id, outfit_id: '', display_order: order++, item: bottom });
+    const bottom = bottoms[index % bottoms.length];
+    if (bottom) items.push({ item_id: bottom.item_id, outfit_id: '', display_order: order++, item: bottom });
+  }
 
   const shoe = shoes[index % shoes.length];
   if (shoe) items.push({ item_id: shoe.item_id, outfit_id: '', display_order: order++, item: shoe });
@@ -87,50 +94,57 @@ export const mockGetOutfitRecommendations = async (
   sessionId: string,
   stylePreferences?: UserStylePreference[]
 ): Promise<Outfit[]> => {
-  await delay(2000); // Simulate AI thinking time
+  await delay(2000);
 
   const byCategory = (cat: ClothingCategory) =>
     wardrobeItems.filter(i => i.category === cat && i.status === 'active');
 
   const tops = byCategory('上装');
   const bottoms = byCategory('下装');
+  const dresses = byCategory('连体装');
   const shoes = byCategory('鞋');
   const coats = byCategory('外套');
   const bags = byCategory('包');
-  const accessories = byCategory('配饰');
-  const extras = [...coats, ...bags, ...accessories];
+  const hats = byCategory('帽子');
+  const scarves = byCategory('围巾');
+  const extras = [...coats, ...bags, ...hats, ...scarves];
 
-  // Need at least top + bottom to generate recommendations
-  if (tops.length === 0 || bottoms.length === 0) {
-    return [];
-  }
+  // Need at least top+bottom or a dress
+  if (tops.length === 0 && dresses.length === 0) return [];
+  if (bottoms.length === 0 && dresses.length === 0) return [];
 
-  const count = Math.min(3, tops.length, bottoms.length);
   const likedStyleNames = stylePreferences
     ?.filter(p => p.preference_type === 'like' && p.tag?.tag_name)
     .map(p => p.tag!.tag_name) ?? [];
   const outfits: Outfit[] = [];
 
-  for (let i = 0; i < count; i++) {
-    outfits.push(buildOutfit(userId, sessionId, tops, bottoms, shoes, extras, i, likedStyleNames));
+  for (let i = 0; i < 3; i++) {
+    outfits.push(buildOutfit(userId, sessionId, tops, bottoms, dresses, shoes, extras, i, likedStyleNames));
   }
 
   return outfits;
 };
 
 export const MOCK_NLP_KEYWORDS: Record<string, string[]> = {
-  '约会': ['date', 'elegant', 'warm'],
-  '工作': ['work', 'minimalist', 'neutral'],
-  '周末': ['casual', 'daily', 'warm'],
-  '运动': ['sport', 'cool'],
-  '派对': ['party', 'elegant'],
+  '约会': ['date', 'sweet', 'warm'],
+  '工作': ['commute', 'commute_style', 'morandi'],
+  '通勤': ['commute', 'commute_style', 'morandi'],
+  '周末': ['casual', 'korean', 'warm'],
+  '运动': ['sport', 'sporty_casual'],
   '旅行': ['travel', 'casual'],
-  '优雅': ['elegant', 'french'],
-  '休闲': ['casual', 'daily'],
-  '法式': ['french', 'elegant'],
-  '极简': ['minimalist', 'neutral'],
-  '复古': ['vintage', 'warm'],
-  '街头': ['street', 'cool'],
+  '出游': ['travel', 'french'],
+  '休闲': ['casual', 'korean'],
+  '法式': ['french', 'sweet'],
+  '韩系': ['korean', 'sweet'],
+  '日系': ['japanese', 'morandi'],
+  '商务': ['business', 'british'],
+  '英伦': ['british', 'business'],
+  '美拉德': ['maillard', 'warm'],
+  '新中式': ['new_chinese', 'morandi'],
+  '学院': ['preppy', 'korean'],
+  '都市': ['city_chic', 'commute_style'],
+  '文艺': ['artsy', 'japanese'],
+  '美式': ['american', 'casual'],
 };
 
 export const extractTagsFromQuery = (query: string): string[] => {
