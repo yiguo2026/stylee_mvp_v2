@@ -8,12 +8,21 @@ import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
-import { Gender } from '@/types';
+import { Gender, BodyShape } from '@/types';
 
 const GENDERS: { label: string; value: Gender }[] = [
-  { label: '👩 女', value: 'female' },
-  { label: '👨 男', value: 'male' },
+  { label: '👩 女士', value: 'female' },
+  { label: '👨 男士', value: 'male' },
+  { label: '✨ 其他', value: 'other' },
   { label: '保密', value: 'private' },
+];
+
+const BODY_SHAPES: { label: string; value: BodyShape }[] = [
+  { label: '🍐 梨形', value: 'pear' },
+  { label: '⏳ 沙漏形', value: 'hourglass' },
+  { label: '🍎 苹果形', value: 'apple' },
+  { label: '📏 直筒型', value: 'rectangle' },
+  { label: '🔺 倒三角', value: 'inverted_triangle' },
 ];
 
 interface Props {
@@ -29,6 +38,7 @@ export function ProfileEditModal({ visible, onClose }: Props) {
   const [city, setCity] = useState(profile?.permanent_city ?? '');
   const [profession, setProfession] = useState(profile?.profession ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
+  const [bodyShape, setBodyShape] = useState<BodyShape | ''>(profile?.body_shape ?? '');
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -71,6 +81,7 @@ export function ProfileEditModal({ visible, onClose }: Props) {
           profession: profession.trim() || null,
           permanent_city: city.trim() || null,
           avatar_url: avatarUrl || null,
+          body_shape: bodyShape || null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -190,6 +201,31 @@ export function ProfileEditModal({ visible, onClose }: Props) {
                 placeholderTextColor={Colors.walnut2}
               />
             </View>
+
+            {/* Body Info for AI Try-on */}
+            <View style={styles.bodyInfoSection}>
+              <Text style={styles.bodyInfoTitle}>身体信息（AI试穿）</Text>
+              <Text style={styles.bodyInfoStatus}>
+                {bodyShape ? '已录入' : '未录入'}
+              </Text>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>体型</Text>
+              <View style={styles.genderRow}>
+                {BODY_SHAPES.map(b => (
+                  <TouchableOpacity
+                    key={b.value}
+                    style={[styles.genderBtn, bodyShape === b.value && styles.genderBtnActive]}
+                    onPress={() => setBodyShape(bodyShape === b.value ? '' : b.value)}
+                  >
+                    <Text style={[styles.genderText, bodyShape === b.value && styles.genderTextActive]}>
+                      {b.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </ScrollView>
 
           {/* Save Button */}
@@ -284,6 +320,13 @@ const styles = StyleSheet.create({
   },
   genderText: { ...T.tag, color: Colors.walnut },
   genderTextActive: { ...T.tag, color: Colors.paper },
+  bodyInfoSection: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: Spacing.two, paddingTop: Spacing.two,
+    borderTopWidth: 1, borderTopColor: Colors.line,
+  },
+  bodyInfoTitle: { ...T.bodyText, fontWeight: '600', fontSize: 13, color: Colors.walnut },
+  bodyInfoStatus: { ...T.micro, color: Colors.walnut2 },
   footer: {
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,

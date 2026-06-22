@@ -109,15 +109,15 @@ export default function SettingsPage() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>账号与安全</Text>
           <View style={styles.group}>
-            <TouchableOpacity style={styles.row} onPress={() => Alert.alert('手机号绑定', '请前往飞书管理员后台配置手机号绑定功能')}>
-              <Text style={styles.rowIcon}>📱</Text>
-              <Text style={styles.rowLabel}>手机号</Text>
-              <Text style={styles.rowRight}>未绑定 ›</Text>
+            <TouchableOpacity style={styles.row} onPress={() => Alert.alert('用户名', `当前用户名: ${profile?.username ?? '未设置'}`)}>
+              <Text style={styles.rowIcon}>👤</Text>
+              <Text style={styles.rowLabel}>用户名</Text>
+              <Text style={styles.rowRight}>{profile?.username ?? '未设置'} ›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.row} onPress={() => Alert.alert('修改密码', '请通过登录页面的"忘记密码"功能重置密码')}>
               <Text style={styles.rowIcon}>🔑</Text>
               <Text style={styles.rowLabel}>登录密码</Text>
-              <Text style={styles.rowRight}>修改 ›</Text>
+              <Text style={styles.rowRight}>已设置 ›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.row} onPress={() => Alert.alert('微信绑定', '微信绑定功能即将上线，敬请期待')}>
               <Text style={styles.rowIcon}>💬</Text>
