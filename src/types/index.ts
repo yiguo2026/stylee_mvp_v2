@@ -25,7 +25,7 @@ export const CLOTHING_CATEGORIES_WITH_ALL: (ClothingCategory | '全部')[] = [
 
 export type Season = '春' | '夏' | '秋' | '冬';
 export type TagType = 'occasion' | 'style' | 'color_system' | 'season' | 'custom';
-export type SourceType = 'manual' | 'photo_ai' | 'album_ai' | 'ai_recommended';
+export type SourceType = 'manual' | 'photo_ai' | 'album_ai' | 'ai_recommended' | 'link';
 export type ItemStatus = 'active' | 'inactive' | 'archived';
 export type OutfitSource = 'ai_generated' | 'user_created';
 export type WeatherCondition = '晴' | '多云' | '阴' | '小雨' | '大雨' | '雪' | '雷阵雨' | '雾';

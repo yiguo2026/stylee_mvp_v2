@@ -23,7 +23,7 @@ const MATERIAL_OPTIONS = [
   '雪纺', '涤纶', '亚麻', '皮革/橡胶',
 ];
 
-const FIT_OPTIONS: FitType[] = ['修身', '宽松', '常规', 'oversize'];
+const FIT_OPTIONS: FitType[] = ['修身', '宽松', '标准', 'oversize'];
 const SEASON_OPTIONS = [
   { id: 'spring', label: '春' },
   { id: 'summer', label: '夏' },
@@ -45,7 +45,7 @@ export default function EditItemScreen() {
   const [material, setMaterial] = useState(item?.material ?? '');
   const [brand, setBrand] = useState(item?.brand ?? '');
   const [price, setPrice] = useState(item?.price?.toString() ?? '');
-  const [fitType, setFitType] = useState<FitType | ''>(item?.fit_type ?? '');
+  const [fitType, setFitType] = useState<string>(item?.fit_type ?? '');
   const [seasons, setSeasons] = useState<string[]>(item?.season ?? []);
   const [occasionTags, setOccasionTags] = useState<string[]>(item?.occasion_tags ?? []);
   const [purchaseDate, setPurchaseDate] = useState(item?.purchase_date ?? '');
@@ -103,7 +103,7 @@ export default function EditItemScreen() {
         material: material.trim() || undefined,
         brand: brand.trim() || undefined,
         price: price ? parseFloat(price) : undefined,
-        fit_type: fitType || undefined,
+        fit_type: (fitType || undefined) as FitType | undefined,
         season: seasons.length > 0 ? seasons as any : undefined,
         occasion_tags: occasionTags.length > 0 ? occasionTags : undefined,
         purchase_date: purchaseDate || undefined,

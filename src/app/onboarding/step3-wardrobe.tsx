@@ -8,7 +8,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, CategoryIcon } from '@/types';
+import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
+import { CategoryIcon } from '@/components/CategoryIcon';
 
 const CATEGORY_ICONS: Record<string, string> = {
   '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',

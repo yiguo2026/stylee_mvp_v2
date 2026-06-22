@@ -96,6 +96,8 @@ export const getConditionIcon = (condition: WeatherCondition): string => {
     '小雨': '🌧️',
     '大雨': '🌧️',
     '雪': '❄️',
+    '雷阵雨': '⛈️',
+    '雾': '🌫️',
   };
   return map[condition] ?? '🌤️';
 };

@@ -18,11 +18,11 @@ const GENDERS: { label: string; value: Gender }[] = [
 ];
 
 const BODY_SHAPES: { label: string; value: BodyShape }[] = [
-  { label: '🍐 梨形', value: 'pear' },
-  { label: '⏳ 沙漏形', value: 'hourglass' },
-  { label: '🍎 苹果形', value: 'apple' },
-  { label: '📏 直筒型', value: 'rectangle' },
-  { label: '🔺 倒三角', value: 'inverted_triangle' },
+  { label: '🍐 梨形', value: '梨形' },
+  { label: '⏳ 沙漏形', value: '沙漏形' },
+  { label: '🍎 苹果形', value: '苹果形' },
+  { label: '📏 矩形', value: '矩形' },
+  { label: '🔺 倒三角', value: '倒三角' },
 ];
 
 interface Props {

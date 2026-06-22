@@ -30,7 +30,7 @@ export function CategoryIcon({ category, size = 32, color = Colors.walnut2 }: Pr
     case '帽子':
       return <MaterialCommunityIcons name="hat-fedora" size={size} color={color} />;
     case '围巾':
-      return <MaterialCommunityIcons name="scarf" size={size} color={color} />;
+      return <MaterialCommunityIcons name="necklace" size={size} color={color} />;
     default:
       return <MaterialCommunityIcons name="hanger" size={size} color={color} />;
   }
