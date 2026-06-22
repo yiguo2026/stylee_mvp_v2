@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
-  Modal,
+  Modal, FlatList,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -18,6 +18,10 @@ interface SavedOutfit {
   ai_comment: string | null;
   source: string;
   created_at: string;
+  is_favorited?: boolean;
+  occasion_tag?: string;
+  temp_range?: string;
+  style_tags?: string[];
   items?: OutfitItemDetail[];
 }
 
@@ -38,13 +42,13 @@ function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 function getFirstDayOfMonth(year: number, month: number) {
-  return new Date(year, month, 1).getDay(); // 0=Sun
+  return new Date(year, month, 1).getDay();
 }
 function toDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-// CATEGORY_EMOJI removed — now uses CategoryIcon component
+type RecordTab = 'worn' | 'favorite';
 
 // ── Main Component ────────────────────────────────────────
 export default function RecordTab() {
@@ -54,14 +58,15 @@ export default function RecordTab() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
+  const [activeTab, setActiveTab] = useState<RecordTab>('worn');
 
-  // key: "YYYY-MM-DD", value: outfit list for that day
   const [outfitsByDay, setOutfitsByDay] = useState<Record<string, SavedOutfit[]>>({});
+  const [favorites, setFavorites] = useState<SavedOutfit[]>([]);
   const [loading, setLoading] = useState(false);
   const [detailOutfit, setDetailOutfit] = useState<SavedOutfit | null>(null);
   const [loadingItems, setLoadingItems] = useState(false);
 
-  // Fetch all outfits in the current month
+  // Fetch worn outfits for calendar
   const fetchMonthOutfits = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -71,7 +76,7 @@ export default function RecordTab() {
 
     const { data } = await supabase
       .from('outfits')
-      .select('outfit_id, name, ai_comment, source, created_at')
+      .select('outfit_id, name, ai_comment, source, created_at, occasion_tag, temp_range, style_tags')
       .eq('user_id', user.id)
       .gte('created_at', start)
       .lte('created_at', end)
@@ -80,8 +85,6 @@ export default function RecordTab() {
     setLoading(false);
 
     if (!data) return;
-
-    // Group by date key
     const grouped: Record<string, SavedOutfit[]> = {};
     data.forEach((o: SavedOutfit) => {
       const key = toDateKey(new Date(o.created_at));
@@ -91,9 +94,43 @@ export default function RecordTab() {
     setOutfitsByDay(grouped);
   }, [user?.id, viewYear, viewMonth]);
 
-  useEffect(() => { fetchMonthOutfits(); }, [fetchMonthOutfits]);
+  // Fetch favorited outfits
+  const fetchFavorites = useCallback(async () => {
+    if (!user?.id) return;
+    const { data } = await supabase
+      .from('outfit_favorites')
+      .select(`
+        favorite_id,
+        outfit_id,
+        outfits ( outfit_id, name, ai_comment, source, created_at, occasion_tag, temp_range, style_tags )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-  // Open detail modal and load items
+    if (data) {
+      const favs: SavedOutfit[] = data
+        .map((r: any) => r.outfits)
+        .filter(Boolean)
+        .map((o: any) => ({
+          outfit_id: o.outfit_id,
+          name: o.name,
+          ai_comment: o.ai_comment,
+          source: o.source,
+          created_at: o.created_at,
+          is_favorited: true,
+          occasion_tag: o.occasion_tag,
+          temp_range: o.temp_range,
+          style_tags: o.style_tags,
+        }));
+      setFavorites(favs);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchMonthOutfits();
+    fetchFavorites();
+  }, [fetchMonthOutfits, fetchFavorites]);
+
   const openDetail = async (outfit: SavedOutfit) => {
     setDetailOutfit(outfit);
     setLoadingItems(true);
@@ -120,7 +157,6 @@ export default function RecordTab() {
     }
   };
 
-  // ── Calendar grid ─────────────────────────────────────
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
     else setViewMonth(m => m - 1);
@@ -136,158 +172,181 @@ export default function RecordTab() {
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
-  // Build selected day key and its outfits
   const selectedKey = selectedDay
     ? `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
     : null;
   const selectedOutfits = selectedKey ? (outfitsByDay[selectedKey] ?? []) : [];
 
-  // Total outfits this month
   const monthTotal = Object.values(outfitsByDay).reduce((sum, arr) => sum + arr.length, 0);
+  const weekCount = Object.entries(outfitsByDay).filter(([key]) => {
+    const d = new Date(key);
+    const now = new Date();
+    return now.getTime() - d.getTime() < 7 * 24 * 3600 * 1000;
+  }).reduce((sum, [, arr]) => sum + arr.length, 0);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>穿搭记录</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.pageTitle}>记录</Text>
+        <Text style={styles.headerStats}>共 {monthTotal} 套 · 本周 {weekCount} 套</Text>
+      </View>
 
-        {/* Month navigator */}
-        <View style={styles.monthNav}>
-          <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
-            <Feather name="chevron-left" size={20} color={Colors.ink} />
-          </TouchableOpacity>
-          <Text style={styles.monthLabel}>
-            {viewYear}年 {MONTH_NAMES[viewMonth]}
-          </Text>
-          <TouchableOpacity
-            onPress={nextMonth}
-            style={styles.navBtn}
-            disabled={isCurrentMonth && viewMonth === today.getMonth() && viewYear === today.getFullYear()}
-          >
-            <Feather
-              name="chevron-right"
-              size={20}
-              color={isCurrentMonth ? Colors.line : Colors.ink}
-            />
-          </TouchableOpacity>
-        </View>
+      {/* Month navigator */}
+      <View style={styles.monthNav}>
+        <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
+          <Feather name="chevron-left" size={20} color={Colors.ink} />
+        </TouchableOpacity>
+        <Text style={styles.monthLabel}>{viewYear}年 {MONTH_NAMES[viewMonth]}</Text>
+        <TouchableOpacity
+          onPress={nextMonth}
+          style={styles.navBtn}
+          disabled={isCurrentMonth}
+        >
+          <Feather name="chevron-right" size={20} color={isCurrentMonth ? Colors.line : Colors.ink} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Month summary */}
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryText}>
-            本月已保存 <Text style={styles.summaryNum}>{monthTotal}</Text> 套搭配
-          </Text>
-          {loading && <ActivityIndicator size="small" color={Colors.walnut2} />}
-        </View>
+      {/* Tabs */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'worn' && styles.tabActive]}
+          onPress={() => setActiveTab('worn')}
+        >
+          <Text style={[styles.tabText, activeTab === 'worn' && styles.tabTextActive]}>已穿搭配</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'favorite' && styles.tabActive]}
+          onPress={() => setActiveTab('favorite')}
+        >
+          <Text style={[styles.tabText, activeTab === 'favorite' && styles.tabTextActive]}>收藏搭配</Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* Calendar */}
-        <View style={styles.calendar}>
-          {/* Weekday headers */}
-          <View style={styles.weekRow}>
-            {WEEKDAYS.map(d => (
-              <Text key={d} style={styles.weekDay}>{d}</Text>
-            ))}
-          </View>
+      {activeTab === 'worn' ? (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Calendar */}
+          <View style={styles.calendar}>
+            <View style={styles.weekRow}>
+              {WEEKDAYS.map(d => (
+                <Text key={d} style={styles.weekDay}>{d}</Text>
+              ))}
+            </View>
+            <View style={styles.daysGrid}>
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <View key={`empty-${i}`} style={styles.dayCell} />
+              ))}
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const hasOutfit = !!outfitsByDay[key]?.length;
+                const outfitCount = outfitsByDay[key]?.length ?? 0;
+                const isToday = isCurrentMonth && day === today.getDate();
+                const isSelected = day === selectedDay;
 
-          {/* Day cells */}
-          <View style={styles.daysGrid}>
-            {/* Empty prefix cells */}
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <View key={`empty-${i}`} style={styles.dayCell} />
-            ))}
-
-            {/* Day cells */}
-            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-              const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const hasOutfit = !!outfitsByDay[key]?.length;
-              const outfitCount = outfitsByDay[key]?.length ?? 0;
-              const isToday = isCurrentMonth && day === today.getDate();
-              const isSelected = day === selectedDay;
-
-              return (
-                <TouchableOpacity
-                  key={day}
-                  style={[
-                    styles.dayCell,
-                    isToday && styles.dayCellToday,
-                    isSelected && styles.dayCellSelected,
-                  ]}
-                  onPress={() => setSelectedDay(day)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.dayNum,
-                    isToday && styles.dayNumToday,
-                    isSelected && styles.dayNumSelected,
-                  ]}>
-                    {day}
-                  </Text>
-                  {hasOutfit && (
-                    <View style={styles.dotRow}>
-                      {Array.from({ length: Math.min(outfitCount, 3) }).map((_, i) => (
-                        <View
-                          key={i}
-                          style={[styles.dot, isSelected && styles.dotSelected]}
-                        />
-                      ))}
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Selected day outfits */}
-        {selectedDay && (
-          <View style={styles.dayDetail}>
-            <Text style={styles.dayDetailTitle}>
-              {viewMonth + 1}月{selectedDay}日
-              {isCurrentMonth && selectedDay === today.getDate() ? '（今天）' : ''}
-            </Text>
-
-            {selectedOutfits.length === 0 ? (
-              <View style={styles.emptyDay}>
-                <Feather name="calendar" size={28} color={Colors.walnut2} />
-                <Text style={styles.emptyDayText}>这天没有保存搭配</Text>
-              </View>
-            ) : (
-              selectedOutfits.map(outfit => (
-                <TouchableOpacity
-                  key={outfit.outfit_id}
-                  style={styles.outfitCard}
-                  onPress={() => openDetail(outfit)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.outfitCardLeft}>
-                    <MaterialCommunityIcons name="hanger" size={22} color={Colors.walnut2} />
-                  </View>
-                  <View style={styles.outfitCardInfo}>
-                    <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
-                    {outfit.ai_comment ? (
-                      <Text style={styles.outfitComment} numberOfLines={2}>
-                        {outfit.ai_comment}
-                      </Text>
-                    ) : null}
-                    <Text style={styles.outfitTime}>
-                      {new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.dayCell, isToday && styles.dayCellToday, isSelected && styles.dayCellSelected]}
+                    onPress={() => setSelectedDay(day)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.dayNum, isToday && styles.dayNumToday, isSelected && styles.dayNumSelected]}>
+                      {day}
                     </Text>
-                  </View>
-                  <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-                </TouchableOpacity>
-              ))
-            )}
+                    {hasOutfit && (
+                      <View style={styles.dotRow}>
+                        {Array.from({ length: Math.min(outfitCount, 3) }).map((_, i) => (
+                          <View key={i} style={[styles.dot, isSelected && styles.dotSelected]} />
+                        ))}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        )}
 
-        {/* Recent outfits if no day selected */}
-        {!selectedDay && monthTotal === 0 && !loading && (
-          <View style={styles.emptyMonth}>
-            <MaterialCommunityIcons name="hanger" size={44} color={Colors.walnut2} style={styles.emptyMonthIcon} />
-            <Text style={styles.emptyMonthTitle}>这个月还没有搭配记录</Text>
-            <Text style={styles.emptyMonthSubtitle}>去穿搭 Tab 生成推荐，点击「就这么穿」即可保存</Text>
-          </View>
-        )}
-      </ScrollView>
+          {/* Selected day outfits */}
+          {selectedDay ? (
+            <View style={styles.dayDetail}>
+              <Text style={styles.dayDetailTitle}>
+                {viewMonth + 1}月{selectedDay}日
+                {isCurrentMonth && selectedDay === today.getDate() ? '（今天）' : ''}
+              </Text>
+              {selectedOutfits.length === 0 ? (
+                <View style={styles.emptyDay}>
+                  <Feather name="calendar" size={28} color={Colors.walnut2} />
+                  <Text style={styles.emptyDayText}>这天没有保存搭配</Text>
+                </View>
+              ) : (
+                selectedOutfits.map(outfit => (
+                  <TouchableOpacity
+                    key={outfit.outfit_id}
+                    style={styles.outfitCard}
+                    onPress={() => openDetail(outfit)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.outfitCardLeft}>
+                      <MaterialCommunityIcons name="hanger" size={22} color={Colors.walnut2} />
+                    </View>
+                    <View style={styles.outfitCardInfo}>
+                      <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
+                      {outfit.ai_comment ? (
+                        <Text style={styles.outfitComment} numberOfLines={2}>{outfit.ai_comment}</Text>
+                      ) : null}
+                      <Text style={styles.outfitTime}>
+                        {new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={16} color={Colors.walnut2} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          ) : monthTotal === 0 && !loading ? (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptyEmoji}>👗</Text>
+              <Text style={styles.emptyTitle}>穿过的搭配会自动记录在这里</Text>
+              <Text style={styles.emptySub}>每次确认穿搭后，都会自动保存到这里</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {favorites.length === 0 ? (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptyEmoji}>🧷</Text>
+              <Text style={styles.emptyTitle}>还没有收藏搭配</Text>
+              <Text style={styles.emptySub}>在推荐结果页点击「收藏此搭配」即可保存灵感</Text>
+            </View>
+          ) : (
+            favorites.map(outfit => (
+              <TouchableOpacity
+                key={outfit.outfit_id}
+                style={styles.outfitCard}
+                onPress={() => openDetail(outfit)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.outfitCardLeft}>
+                  <Feather name="heart" size={20} color={Colors.terracotta} />
+                </View>
+                <View style={styles.outfitCardInfo}>
+                  <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
+                  {outfit.ai_comment ? (
+                    <Text style={styles.outfitComment} numberOfLines={2}>{outfit.ai_comment}</Text>
+                  ) : null}
+                  <Text style={styles.outfitTime}>
+                    {new Date(outfit.created_at).toLocaleDateString('zh-CN')} 收藏
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={Colors.walnut2} />
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      {loading && <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: Spacing.two }} />}
 
       {/* Outfit Detail Modal */}
       <Modal
@@ -305,7 +364,6 @@ export default function RecordTab() {
           </View>
 
           <ScrollView contentContainerStyle={styles.modalContent}>
-            {/* Date info */}
             {detailOutfit && (
               <Text style={styles.modalDate}>
                 保存于 {new Date(detailOutfit.created_at).toLocaleDateString('zh-CN', {
@@ -315,7 +373,6 @@ export default function RecordTab() {
               </Text>
             )}
 
-            {/* AI Comment */}
             {detailOutfit?.ai_comment && (
               <View style={styles.commentCard}>
                 <Text style={styles.commentLabel}>AI 搭配点评</Text>
@@ -323,7 +380,6 @@ export default function RecordTab() {
               </View>
             )}
 
-            {/* Items list */}
             <Text style={styles.itemsTitle}>搭配单品</Text>
             {loadingItems ? (
               <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: 16 }} />
@@ -337,9 +393,7 @@ export default function RecordTab() {
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemMeta}>{item.color} · {item.category}</Text>
                   </View>
-                  {item.role && (
-                    <Text style={styles.itemRole}>{item.role}</Text>
-                  )}
+                  {item.role && <Text style={styles.itemRole}>{item.role}</Text>}
                 </View>
               ))
             ) : (
@@ -356,197 +410,117 @@ const CELL_SIZE = 44;
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
-
-  // 方正悠宋 — page title
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two,
+  },
   pageTitle: { ...T.pageTitle },
+  headerStats: { ...T.micro, color: Colors.walnut },
+
+  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 
   // Month nav
   monthNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderWidth: 1, borderColor: Colors.line,
-    ...Shadow.one,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    paddingVertical: Spacing.two, paddingHorizontal: Spacing.three,
+    borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  // navArrow removed — now uses Feather chevron icons
-  // 方正悠宋 — month label
   monthLabel: { ...T.subTitle, fontSize: 17 },
 
-  // Summary
-  summaryRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 2,
+  // Tabs
+  tabRow: {
+    flexDirection: 'row', gap: Spacing.one,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.xl,
+    padding: 3, borderWidth: 1, borderColor: Colors.line,
   },
-  summaryText: { ...T.micro },
-  // Playfair Italic — the count number
-  summaryNum: { ...T.numInline, color: Colors.terracotta },
+  tab: {
+    flex: 1, paddingVertical: Spacing.two - 2,
+    borderRadius: Radius.xl, alignItems: 'center',
+  },
+  tabActive: { backgroundColor: Colors.ink },
+  tabText: { ...T.tag, color: Colors.walnut },
+  tabTextActive: { ...T.tag, color: Colors.paper },
 
   // Calendar
   calendar: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    padding: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
-    ...Shadow.one,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
-  weekRow: {
-    flexDirection: 'row', marginBottom: Spacing.one,
-  },
-  weekDay: {
-    ...T.micro,
-    flex: 1, textAlign: 'center',
-    fontWeight: '600',
-    paddingVertical: 4,
-  },
-  daysGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-  },
-  dayCell: {
-    width: `${100 / 7}%`,
-    height: CELL_SIZE,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 6,
-    borderRadius: Radius.sm,
-  },
-  dayCellToday: {
-    // subtle background for today when not selected
-  },
-  dayCellSelected: {
-    backgroundColor: Colors.ink,
-    borderRadius: Radius.md,
-  },
-  dayNum: {
-    fontFamily: T.tag.fontFamily,
-    fontSize: 14, color: Colors.ink, fontWeight: '400',
-  },
-  dayNumToday: {
-    color: Colors.terracotta, fontWeight: '700',
-  },
-  dayNumSelected: {
-    color: Colors.paper, fontWeight: '700',
-  },
-  dotRow: {
-    flexDirection: 'row', gap: 2, marginTop: 2,
-  },
-  dot: {
-    width: 4, height: 4, borderRadius: 2,
-    backgroundColor: Colors.sage,
-  },
-  dotSelected: {
-    backgroundColor: Colors.paper,
-  },
+  weekRow: { flexDirection: 'row', marginBottom: Spacing.one },
+  weekDay: { ...T.micro, flex: 1, textAlign: 'center', fontWeight: '600', paddingVertical: 4 },
+  daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  dayCell: { width: `${100 / 7}%`, height: CELL_SIZE, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 6, borderRadius: Radius.sm },
+  dayCellToday: {},
+  dayCellSelected: { backgroundColor: Colors.ink, borderRadius: Radius.md },
+  dayNum: { fontFamily: T.tag.fontFamily, fontSize: 14, color: Colors.ink, fontWeight: '400' },
+  dayNumToday: { color: Colors.terracotta, fontWeight: '700' },
+  dayNumSelected: { color: Colors.paper, fontWeight: '700' },
+  dotRow: { flexDirection: 'row', gap: 2, marginTop: 2 },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.sage },
+  dotSelected: { backgroundColor: Colors.paper },
 
-  // Selected day detail
-  dayDetail: {
-    gap: Spacing.two,
-  },
-  // 方正悠宋 — section title
+  // Day detail
+  dayDetail: { gap: Spacing.two },
   dayDetailTitle: { ...T.subTitle },
   emptyDay: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    padding: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.one,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.four, alignItems: 'center', gap: Spacing.one,
     borderWidth: 1, borderColor: Colors.line,
   },
-  // emptyDayEmoji removed — now uses Feather calendar icon
-  // 汇文明朝体 — soul voice empty text
   emptyDayText: { ...T.emptyTitle, fontSize: 14 },
 
   outfitCard: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
-    ...Shadow.one,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, flexDirection: 'row', alignItems: 'center',
+    gap: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   outfitCardLeft: {
-    width: 48, height: 48,
-    backgroundColor: Colors.vintageCream,
-    borderRadius: Radius.md,
-    alignItems: 'center', justifyContent: 'center',
+    width: 48, height: 48, backgroundColor: Colors.vintageCream,
+    borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center',
   },
-  // outfitEmoji removed — now uses MaterialCommunityIcons hanger
   outfitCardInfo: { flex: 1, gap: 2 },
-  // 方正悠宋 — outfit name
   outfitName: { ...T.itemName, fontSize: 15 },
-  // 方正悠宋 — AI comment preview
   outfitComment: { ...T.itemDesc, fontSize: 12, lineHeight: 18 },
-  // 苹方 Light — time metadata
   outfitTime: { ...T.micro },
-  // outfitArrow removed — now uses Feather chevron-right
 
-  // Empty month
-  emptyMonth: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    padding: Spacing.five,
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
-  },
-  emptyMonthIcon: { marginBottom: Spacing.one },
-  // 汇文明朝体 — soul voice empty state
-  emptyMonthTitle: { ...T.emptyTitle },
-  emptyMonthSubtitle: { ...T.itemDesc, textAlign: 'center', lineHeight: 22 },
+  // Empty sections
+  emptySection: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.six, marginTop: Spacing.three },
+  emptyEmoji: { fontSize: 40 },
+  emptyTitle: { ...T.emptyTitle },
+  emptySub: { ...T.itemDesc, textAlign: 'center', lineHeight: 22 },
 
   // Modal
   modalSafe: { flex: 1, backgroundColor: Colors.paper },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: Spacing.four,
-    borderBottomWidth: 1, borderBottomColor: Colors.line,
+    padding: Spacing.four, borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
-  // 方正悠宋 — modal title
   modalTitle: { ...T.sectionTitle },
   modalClose: { ...T.buttonSecondary, color: Colors.terracotta },
   modalContent: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
-  // 苹方 Light — date caption
   modalDate: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
-
   commentCard: {
-    backgroundColor: Colors.vintageCream,
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderColor: Colors.linen,
+    backgroundColor: Colors.vintageCream, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.one, borderWidth: 1, borderColor: Colors.linen,
   },
   commentLabel: { ...T.formLabel },
-  // 方正悠宋 — AI comment body text
   commentText: { ...T.bodyText, fontSize: 14 },
-
-  // 方正悠宋 — items section title
   itemsTitle: { ...T.subTitle },
   itemRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.md,
-    padding: Spacing.two + 2,
-    gap: Spacing.two,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
+    padding: Spacing.two + 2, gap: Spacing.two,
     borderWidth: 1, borderColor: Colors.line,
   },
   itemIconWrap: {
     width: 40, height: 40, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream,
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
   },
-  // itemIcon removed — now uses CategoryIcon component
   itemInfo: { flex: 1 },
-  // 方正悠宋 — item name
   itemName: { ...T.itemName },
-  // 苹方 Light — item meta
   itemMeta: { ...T.micro },
   itemRole: { ...T.micro, backgroundColor: Colors.paper, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm },
-  // 汇文明朝体 — empty soul voice
   noItems: { ...T.emptyTitle, fontSize: 14, textAlign: 'center', marginTop: 8 },
 });
