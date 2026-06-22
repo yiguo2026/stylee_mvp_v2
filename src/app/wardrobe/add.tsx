@@ -100,6 +100,7 @@ export default function AddWardrobeItem() {
       brand: brand || undefined,
       image_url: finalImageUrl ?? undefined,
       source_type: imageUri ? 'photo_ai' : 'manual',
+      source_label: imageUri ? '拍照识别' : '手动添加',
       status: 'active',
     });
     setSaving(false);

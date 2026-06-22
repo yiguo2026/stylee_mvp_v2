@@ -19,7 +19,7 @@ export function CategoryIcon({ category, size = 32, color = Colors.walnut2 }: Pr
     case '下装':
       // MaterialCommunityIcons "hanger" — generic garment on hanger
       return <MaterialCommunityIcons name="hanger" size={size} color={color} />;
-    case '连衣裙':
+    case '连体装':
       return <Ionicons name="female-outline" size={size} color={color} />;
     case '外套':
       return <Ionicons name="layers-outline" size={size} color={color} />;
@@ -27,8 +27,10 @@ export function CategoryIcon({ category, size = 32, color = Colors.walnut2 }: Pr
       return <MaterialCommunityIcons name="shoe-formal" size={size} color={color} />;
     case '包':
       return <Ionicons name="bag-outline" size={size} color={color} />;
-    case '配饰':
-      return <Ionicons name="diamond-outline" size={size} color={color} />;
+    case '帽子':
+      return <MaterialCommunityIcons name="hat-fedora" size={size} color={color} />;
+    case '围巾':
+      return <MaterialCommunityIcons name="scarf" size={size} color={color} />;
     default:
       return <MaterialCommunityIcons name="hanger" size={size} color={color} />;
   }

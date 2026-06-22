@@ -38,6 +38,7 @@ export default function BatchImportScreen() {
           category: '上装',
           color: '未知',
           source_type: 'album_ai',
+          source_label: '批量导入',
           status: 'active',
           image_url: asset.uri,
         });

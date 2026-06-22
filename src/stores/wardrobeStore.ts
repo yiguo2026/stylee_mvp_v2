@@ -11,6 +11,7 @@ interface WardrobeState {
   addItem: (item: Omit<WardrobeItem, 'item_id' | 'created_at' | 'updated_at'>) => Promise<WardrobeItem | null>;
   updateItem: (itemId: string, updates: Partial<WardrobeItem>) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
+  incrementWearCount: (itemId: string) => Promise<void>;
   setItems: (items: WardrobeItem[]) => void;
 }
 
@@ -82,6 +83,24 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
         .eq('item_id', itemId);
       if (error) throw error;
       set(state => ({ items: state.items.filter(i => i.item_id !== itemId) }));
+    } catch (e: any) {
+      set({ error: e.message });
+    }
+  },
+
+  incrementWearCount: async (itemId) => {
+    const item = get().items.find(i => i.item_id === itemId);
+    if (!item) return;
+    const newCount = (item.wear_count ?? 0) + 1;
+    try {
+      const { error } = await supabase
+        .from('wardrobe_items')
+        .update({ wear_count: newCount, last_worn_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('item_id', itemId);
+      if (error) throw error;
+      set(state => ({
+        items: state.items.map(i => i.item_id === itemId ? { ...i, wear_count: newCount, last_worn_at: new Date().toISOString() } : i),
+      }));
     } catch (e: any) {
       set({ error: e.message });
     }
