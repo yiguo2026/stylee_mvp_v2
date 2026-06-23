@@ -5,7 +5,7 @@ import {
   ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase, confirmUser } from '@/lib/supabase';
+import { supabase, supabaseAdmin, confirmUser } from '@/lib/supabase';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
 function usernameToEmail(username: string) {
@@ -77,9 +77,11 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const { data, error: authError } = await supabase.auth.signUp({
+      // Use admin API to create user directly (bypasses email domain validation)
+      const { data, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: usernameToEmail(username),
         password,
+        email_confirm: true,
       });
 
       if (authError) {
@@ -90,9 +92,6 @@ export default function RegisterScreen() {
 
       // Create profile with username
       if (data.user) {
-        // Auto-confirm user (bypass email verification)
-        await confirmUser(data.user.id);
-
         const { error: profileError } = await supabase
           .from('users')
           .insert({
