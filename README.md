@@ -2,15 +2,15 @@
 
 基于 Expo (React Native) + Supabase 的智能穿搭推荐应用，支持 Web / iOS / Android。
 
-**在线体验：** [https://styleeamazingmvp.vercel.app](https://styleeamazingmvp.vercel.app)
+**本地体验：** `npx expo start --web` 后访问 http://localhost:8081
 
 ## 技术栈
 
 - **前端**：Expo SDK 55 + TypeScript + Expo Router（文件路由）
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
 - **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动 fallback 到本地 mock）
-- **AI**：DeepSeek API（意图识别、穿搭推荐、穿搭理由，JSON mode，自动 fallback 到 mock）
-- **部署**：Vercel（静态 SPA）+ EAS Build（iOS）
+- **AI**：DeepSeek API（意图识别、穿搭推荐、穿搭理由，JSON mode）+ 火山方舟 Seed 2.0 Pro（多模态衣物识别、试穿建议，自动 fallback 到 mock）
+- **部署**：Vercel（静态 SPA，暂不可用）+ EAS Build（iOS）
 - **状态管理**：Zustand
 - **样式**：全局设计规范（三字体体系 / 暖色配色 / 图标系统）
 
@@ -50,17 +50,23 @@
 
 ## 数据库
 
-7 张表 + Storage bucket，全部启用 RLS：
+11 张表 + 2 个 Storage bucket，全部启用 RLS：
 
 | 表 | 用途 |
 |---|---|
-| `users` | 用户资料（含 avatar_url） |
-| `tags` | 风格标签 |
+| `users` | 用户资料（含 avatar_url、body_shape） |
+| `tags` | 风格标签（v2: 6场合+14喜欢+14不喜欢+8色系） |
 | `user_style_preferences` | 用户风格偏好（like/dislike） |
-| `wardrobe_items` | 衣橱单品 |
-| `outfits` | 穿搭组合 |
+| `wardrobe_items` | 衣橱单品（v2: 多图、季节、场合、版型、购买日期） |
+| `outfits` | 穿搭组合（v2: 风格标签、场合、温度范围、试穿图） |
 | `outfit_items` | 穿搭-衣橱关联 |
-| Storage `wardrobe-images` | 衣物/头像图片 |
+| `outfit_favorites` | 收藏搭配 |
+| `wishlist_items` | 心愿单 |
+| `inspiration_cards` | 穿搭灵感卡片 |
+| `user_body_models` | AI试穿身体信息 |
+| `wear_events` | 穿着记录 |
+| Storage `wardrobe-images` | 衣物/头像图片（公开读） |
+| Storage `body-photos` | AI试穿照片（私有） |
 
 ## 快速开始
 
@@ -80,6 +86,8 @@ npx expo start
 | `EXPO_PUBLIC_QWEATHER_HOST` | 和风天气 API Host（商业版需自定义） | QWeather 控制台 |
 | `EXPO_PUBLIC_DEEPSEEK_KEY` | DeepSeek API Key（可选） | [platform.deepseek.com](https://platform.deepseek.com/) |
 | `EXPO_PUBLIC_DEEPSEEK_HOST` | DeepSeek API Host（可选，默认 api.deepseek.com） | — |
+| `EXPO_PUBLIC_ARK_API_KEY` | 火山方舟 API Key（可选，已内置默认值） | [console.volcengine.com/ark](https://console.volcengine.com/ark) |
+| `EXPO_PUBLIC_ARK_ENDPOINT_ID` | 火山方舟推理接入点 ID（可选，AI识别功能需配置） | 火山方舟控制台 |
 
 > 不配置 `EXPO_PUBLIC_QWEATHER_KEY` 时，天气数据将使用本地 mock 数据；不配置 `EXPO_PUBLIC_DEEPSEEK_KEY` 时，AI 功能将使用本地 mock 数据，均不影响其他功能。
 
@@ -95,7 +103,8 @@ npx expo run:ios          # 本地模拟器运行
 
 ```bash
 npm run build:web        # 构建到 dist/
-vercel build --prod --yes && vercel deploy --prebuilt --prod   # 部署到 Vercel
+# Vercel 部署（网络恢复后可用）：
+vercel --yes
 ```
 
 选择 Web / iOS 模拟器 / Android 模拟器运行。
@@ -141,7 +150,7 @@ src/
     wardrobe/       # 添加衣物 / 单品详情 / 单品编辑 / 批量导入
   components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon
   constants/        # theme（配色、字体、间距、圆角、阴影）
-  lib/              # supabase / deepseek（AI API封装） / ai（AI业务层） / weather（和风天气API） / uploadImage / mock（天气、推荐、识别）
-  stores/           # userStore / wardrobeStore
+  lib/              # supabase / deepseek / ark（火山方舟多模态API） / ai（AI业务层） / weather（和风天气API） / uploadImage / mock（天气、推荐、识别）
+  stores/           # userStore / wardrobeStore / wishlistStore
   types/            # TypeScript 类型 + 统一标签定义（TAG_DISPLAY / PRESET_STYLE_PREFERENCES / PRESET_STYLE_DISLIKES / FilterTags）
 ```

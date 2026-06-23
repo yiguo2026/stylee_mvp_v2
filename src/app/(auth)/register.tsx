@@ -9,7 +9,7 @@ import { supabase, confirmUser } from '@/lib/supabase';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
 function usernameToEmail(username: string) {
-  return `${username.toLowerCase().trim()}@stylee.local`;
+  return `${username.toLowerCase().trim()}@users.stylee.app`;
 }
 
 function translateRegisterError(msg: string): string {

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://pdgocqjvncxkwfrcdhtj.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZ29jcWp2bmN4a3dmcmNkaHRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjc4ODYsImV4cCI6MjA5NDg0Mzg4Nn0.4-fS0LhF1YpA5cF-T7Jd0eST5j1-SHMqDQWl0XmMFSY';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZ29jcWp2bmN4a3dmcmNkaHRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjc4ODYsImV4cCI6MjA5NDg0Mzg4Nn0.fNMaLc9X2V0VaHYiG2NUeOO-PLyR5x0N37vdkb5LJ4k';
 const supabaseServiceKey = process.env.EXPO_PUBLIC_SUPABASE_SERVICE_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZ29jcWp2bmN4a3dmcmNkaHRqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTI2Nzg4NiwiZXhwIjoyMDk0ODQzODg2fQ.GAODsJvb_0Mxuj5PZztF8fhb9D7RrRTcPD7_F7UHmg8';
 
 if (!supabaseUrl) {

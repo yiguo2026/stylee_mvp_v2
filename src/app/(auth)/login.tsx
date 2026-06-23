@@ -11,7 +11,7 @@ import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
 // Supabase Auth only supports email/phone, so we use username@stylee.local as virtual email
 function usernameToEmail(username: string) {
-  return `${username.toLowerCase().trim()}@stylee.local`;
+  return `${username.toLowerCase().trim()}@users.stylee.app`;
 }
 
 function translateLoginError(msg: string): string {
