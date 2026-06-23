@@ -14,6 +14,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, PRESET_BASIC_ITEMS } from '@/types';
+import { aiExtractProductFromLink } from '@/lib/ai';
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
@@ -135,12 +136,15 @@ export default function WardrobeTab() {
     if (!linkUrl.trim() || !user) return;
     setLinkImporting(true);
     try {
+      const product = await aiExtractProductFromLink(linkUrl.trim());
       const { addItem } = useWardrobeStore.getState();
       await addItem({
         user_id: user.id,
-        name: '链接导入商品',
-        category: '上装',
-        color: '未知',
+        name: product?.name ?? '链接导入商品',
+        category: product?.category ?? '上装',
+        color: product?.color ?? '未知',
+        material: product?.material || undefined,
+        brand: product?.brand || undefined,
         source_type: 'link',
         source_label: linkUrl.trim(),
         status: 'active',

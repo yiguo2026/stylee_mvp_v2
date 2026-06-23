@@ -323,7 +323,7 @@ export default function OutfitTab() {
             <Text style={styles.tryOnLabel}>AI试穿</Text>
             <Text style={styles.tryOnDesc}>真人建模·场景化氛围感生图</Text>
           </View>
-          <TouchableOpacity style={styles.tryOnBtn}>
+          <TouchableOpacity style={styles.tryOnBtn} onPress={() => router.push('/outfit/try-on')}>
             <Text style={styles.tryOnBtnText}>生成图像</Text>
           </TouchableOpacity>
         </View>

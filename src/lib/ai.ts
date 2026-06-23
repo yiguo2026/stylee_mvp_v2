@@ -1,12 +1,42 @@
 import { WardrobeItem, Outfit, OutfitItem, ClothingCategory, RecommendedItem, RecognitionResult } from '@/types';
 import { deepseekChat } from '@/lib/deepseek';
+import { arkVision, isAvailable as isArkAvailable } from '@/lib/ark';
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 
 // ─── 衣服识别 ───────────────────────────────────────────
-// DeepSeek 不支持 Vision，暂时保留 mock；架构统一方便后续接入 Vision 模型
+// 优先使用 Ark Vision 多模态模型，不可用时降级到 mock
+
+const RECOGNIZE_PROMPT = `请识别这件衣物的属性，返回JSON格式：
+{
+  "category": "上装/下装/连体装/外套/鞋/包/帽子/围巾",
+  "color": "颜色",
+  "material": "材质",
+  "style": "风格",
+  "sleeve_length": "无袖/短袖/长袖（仅上装需要）",
+  "fit_type": "紧身/修身/宽松/标准/oversize",
+  "brand": "品牌（可见的话）"
+}
+只返回JSON，不要其他文字。`;
 
 export const aiRecognizeClothing = async (imageUri: string): Promise<RecognitionResult> => {
+  if (isArkAvailable()) {
+    try {
+      const raw = await arkVision(imageUri, RECOGNIZE_PROMPT, { jsonMode: true, temperature: 0.3 });
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          category: parsed.category || '上装',
+          color: parsed.color || '未知',
+          material: parsed.material || '',
+          style: parsed.style || '',
+          brand: parsed.brand || '',
+        };
+      }
+    } catch (e) {
+      console.warn('[AI] Ark vision recognition failed, falling back to mock:', e);
+    }
+  }
   return mockRecognizeClothing(imageUri);
 };
 
@@ -245,4 +275,112 @@ export async function aiGetOutfitReason(
   } catch {
     return null;
   }
+}
+
+// ─── 链接导入商品识别 ──────────────────────────────────────
+
+export interface ProductExtraction {
+  name: string;
+  category: ClothingCategory;
+  color: string;
+  material?: string;
+  brand?: string;
+  price?: number;
+  description?: string;
+}
+
+const LINK_EXTRACT_PROMPT = `根据以下商品链接URL，推断商品信息并返回JSON：
+{
+  "name": "商品名称",
+  "category": "上装/下装/连体装/外套/鞋/包/帽子/围巾",
+  "color": "颜色",
+  "material": "材质（可选）",
+  "brand": "品牌（可选）",
+  "price": 价格数字（可选）,
+  "description": "简短描述（可选）"
+}
+只返回JSON。如果无法确定某字段，留空字符串。`;
+
+export async function aiExtractProductFromLink(url: string): Promise<ProductExtraction | null> {
+  // 尝试用 DeepSeek 从 URL 文本推断
+  try {
+    const raw = await deepseekChat(
+      [
+        { role: 'system', content: LINK_EXTRACT_PROMPT },
+        { role: 'user', content: `商品链接：${url}` },
+      ],
+      { jsonMode: true, temperature: 0.3, maxTokens: 512 },
+    );
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        name: parsed.name || '链接导入商品',
+        category: parsed.category || '上装',
+        color: parsed.color || '未知',
+        material: parsed.material || undefined,
+        brand: parsed.brand || undefined,
+        price: parsed.price || undefined,
+        description: parsed.description || undefined,
+      };
+    }
+  } catch {}
+
+  // Mock fallback
+  return {
+    name: '链接导入商品',
+    category: '上装',
+    color: '未知',
+    description: `来自 ${url.split('/')[2] ?? '未知网站'}`,
+  };
+}
+
+// ─── AI 试穿建议 ──────────────────────────────────────────
+
+export interface TryOnSuggestion {
+  suggestion: string;
+  compatibility_score: number;
+  tips: string[];
+}
+
+export async function aiGenerateTryOnSuggestion(
+  outfitItems: WardrobeItem[],
+  bodyShape?: string,
+): Promise<TryOnSuggestion | null> {
+  const itemsDesc = outfitItems.map(i => `${i.name || i.category}（${i.color}）`).join('、');
+
+  const systemPrompt = `你是一个专业穿搭顾问。根据搭配单品和用户体型，给出试穿建议。
+返回JSON：
+{
+  "suggestion": "2-3句试穿效果描述，具体提到颜色搭配和风格",
+  "compatibility_score": 85,
+  "tips": ["穿搭小贴士1", "穿搭小贴士2", "穿搭小贴士3"]
+}`;
+
+  const bodyInfo = bodyShape ? `\n用户体型：${bodyShape}` : '';
+  const userMsg = `搭配单品：${itemsDesc}${bodyInfo}`;
+
+  try {
+    const raw = await deepseekChat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMsg },
+      ],
+      { jsonMode: true, temperature: 0.8, maxTokens: 1024 },
+    );
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        suggestion: parsed.suggestion ?? '这套搭配整体协调，适合日常穿着。',
+        compatibility_score: parsed.compatibility_score ?? 80,
+        tips: Array.isArray(parsed.tips) ? parsed.tips : ['搭配和谐', '颜色协调'],
+      };
+    }
+  } catch {}
+
+  // Mock fallback
+  return {
+    suggestion: '这套搭配色彩协调，风格统一，整体效果不错。单品质感搭配合理，适合多种场合。',
+    compatibility_score: 82,
+    tips: ['可以加一条围巾增加层次感', '建议搭配简约配饰', '适合日常通勤和休闲场景'],
+  };
 }

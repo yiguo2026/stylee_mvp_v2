@@ -497,6 +497,25 @@ export default function OutfitResultScreen() {
             <Text style={styles.aiCommentText}>{currentOutfit.ai_comment}</Text>
           </View>
         )}
+
+        {/* ── Try-on Button ── */}
+        <TouchableOpacity
+          style={styles.tryOnEntry}
+          onPress={() => {
+            const items = (currentOutfit.items ?? []).map(i => ({
+              item_id: i.item_id,
+              name: i.item?.name ?? '单品',
+              category: i.item?.category ?? '',
+              color: i.item?.color ?? '',
+              image_url: i.item?.image_url,
+            }));
+            router.push({ pathname: '/outfit/try-on', params: { items: JSON.stringify(items) } });
+          }}
+        >
+          <Ionicons name="person-outline" size={18} color="#6C5CE7" />
+          <Text style={styles.tryOnEntryText}>AI 试穿看看</Text>
+          <Feather name="chevron-right" size={14} color="#6C5CE7" />
+        </TouchableOpacity>
       </ScrollView>
 
       {/* ── 5. Decision Bar ── */}
@@ -640,6 +659,13 @@ const styles = StyleSheet.create({
   allOwnedText: { ...T.bodyText, color: Colors.sage, fontSize: 13 },
 
   aiCommentCard: { marginHorizontal: Spacing.two, padding: Spacing.three, backgroundColor: Colors.paperRaised, borderRadius: 14, ...Shadow.two, position: 'relative', marginTop: Spacing.one },
+  tryOnEntry: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginHorizontal: Spacing.two, paddingVertical: Spacing.two + 4,
+    backgroundColor: '#F0EDFF', borderRadius: Radius.md, gap: Spacing.one,
+    borderWidth: 1, borderColor: '#E0D8FF',
+  },
+  tryOnEntryText: { ...T.bodyText, fontSize: 14, color: '#6C5CE7', fontWeight: '600' },
   aiBadge: { position: 'absolute', top: -8, left: 14, backgroundColor: Colors.ink, paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: 6 },
   aiBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   aiCommentText: { fontSize: 13, lineHeight: 22, color: '#636E72', marginTop: Spacing.one },
