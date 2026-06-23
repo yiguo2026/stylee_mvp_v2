@@ -1,6 +1,6 @@
 import { WardrobeItem, Outfit, OutfitItem, ClothingCategory, RecommendedItem, RecognitionResult } from '@/types';
 import { deepseekChat } from '@/lib/deepseek';
-import { arkVision, isAvailable as isArkAvailable } from '@/lib/ark';
+import { arkVision, arkGenerateImage, isAvailable as isArkAvailable } from '@/lib/ark';
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 
@@ -383,4 +383,25 @@ export async function aiGenerateTryOnSuggestion(
     compatibility_score: 82,
     tips: ['可以加一条围巾增加层次感', '建议搭配简约配饰', '适合日常通勤和休闲场景'],
   };
+}
+
+// ─── AI 试穿图生成 ──────────────────────────────────────────
+
+export async function aiGenerateTryOnImage(
+  outfitItems: WardrobeItem[],
+  bodyShape?: string,
+): Promise<string | null> {
+  const itemsDesc = outfitItems.map(i => `${i.color}${i.name || i.category}`).join('、');
+  const bodyDesc = bodyShape ? `，${bodyShape}身材` : '';
+
+  const prompt = `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}，站在城市街头，自然光线，全身照，时尚杂志风格，高质量摄影`;
+
+  try {
+    const imageUrl = await arkGenerateImage(prompt);
+    if (imageUrl) return imageUrl;
+  } catch (e) {
+    console.warn('[AI] Try-on image generation failed:', e);
+  }
+
+  return null;
 }

@@ -8,7 +8,7 @@ import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
-import { aiGenerateTryOnSuggestion, TryOnSuggestion } from '@/lib/ai';
+import { aiGenerateTryOnSuggestion, aiGenerateTryOnImage, TryOnSuggestion } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 
 export default function TryOnScreen() {
@@ -17,6 +17,8 @@ export default function TryOnScreen() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [suggestion, setSuggestion] = useState<TryOnSuggestion | null>(null);
+  const [tryOnImage, setTryOnImage] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   useEffect(() => {
     loadItems();
@@ -48,6 +50,7 @@ export default function TryOnScreen() {
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setTryOnImage(null);
     try {
       const result = await aiGenerateTryOnSuggestion(outfitItems);
       setSuggestion(result);
@@ -55,6 +58,22 @@ export default function TryOnScreen() {
       Alert.alert('生成失败', '请稍后重试');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    setGeneratingImage(true);
+    try {
+      const imageUrl = await aiGenerateTryOnImage(outfitItems);
+      if (imageUrl) {
+        setTryOnImage(imageUrl);
+      } else {
+        Alert.alert('生成失败', 'AI 试穿图生成暂不可用，请稍后重试');
+      }
+    } catch {
+      Alert.alert('生成失败', '请稍后重试');
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -131,11 +150,27 @@ export default function TryOnScreen() {
               </View>
             ))}
 
-            {/* Placeholder for try-on image */}
-            <View style={styles.tryOnImagePlaceholder}>
-              <Ionicons name="image-outline" size={48} color={Colors.walnut2} />
-              <Text style={styles.tryOnImageHint}>AI 试穿效果图</Text>
-              <Text style={styles.tryOnImageSub}>接入图片生成模型后即可生成真人试穿图</Text>
+            {/* Try-on image generation */}
+            <View style={styles.tryOnImageSection}>
+              <Text style={styles.tipsTitle}>AI 试穿效果图</Text>
+              {tryOnImage ? (
+                <Image source={{ uri: tryOnImage }} style={styles.tryOnImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.tryOnImagePlaceholder}>
+                  <Ionicons name="image-outline" size={48} color={Colors.walnut2} />
+                  <Text style={styles.tryOnImageHint}>点击下方按钮生成试穿效果图</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[styles.generateBtn, generatingImage && styles.disabled]}
+                onPress={handleGenerateImage}
+                disabled={generatingImage}
+              >
+                {generatingImage
+                  ? <ActivityIndicator color={Colors.paper} />
+                  : <Text style={styles.generateBtnText}>✨ 生成试穿效果图</Text>
+                }
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -210,14 +245,18 @@ const styles = StyleSheet.create({
   tipDot: { ...T.bodyText, color: Colors.sage, fontWeight: '700' },
   tipText: { ...T.bodyText, fontSize: 13, color: Colors.walnut, flex: 1, lineHeight: 20 },
 
+  tryOnImageSection: { gap: Spacing.two, marginTop: Spacing.one },
   tryOnImagePlaceholder: {
     alignItems: 'center', justifyContent: 'center', gap: Spacing.one,
     paddingVertical: Spacing.five, backgroundColor: Colors.vintageCream,
-    borderRadius: Radius.lg, marginTop: Spacing.two,
+    borderRadius: Radius.lg,
     borderWidth: 1, borderColor: Colors.linen, borderStyle: 'dashed',
   },
+  tryOnImage: {
+    width: '100%', aspectRatio: 1, borderRadius: Radius.lg,
+    backgroundColor: Colors.vintageCream,
+  },
   tryOnImageHint: { ...T.bodyText, fontSize: 13, color: Colors.walnut, fontWeight: '600' },
-  tryOnImageSub: { ...T.micro, color: Colors.walnut2 },
 
   emptyText: { ...T.bodyText, color: Colors.walnut2, textAlign: 'center', marginTop: Spacing.three },
   emptyState: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five, marginTop: Spacing.three },

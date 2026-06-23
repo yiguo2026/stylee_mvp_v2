@@ -1,5 +1,6 @@
 const ARK_API_KEY = process.env.EXPO_PUBLIC_ARK_API_KEY ?? 'ark-437e1a36-ea95-44dd-9f95-4a9091c0b287-d6c81';
-const ARK_ENDPOINT_ID = process.env.EXPO_PUBLIC_ARK_ENDPOINT_ID ?? '';
+const ARK_VLM_MODEL = 'doubao-seed-2-0-pro-260215';
+const ARK_IMAGE_MODEL = 'doubao-seedream-5-0-260128';
 const ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 
 export interface ArkMessage {
@@ -18,6 +19,7 @@ export interface ArkOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  responseFormat?: Record<string, unknown>;
 }
 
 function isAvailable(): boolean {
@@ -35,8 +37,7 @@ export async function arkChat(
 
   try {
     const body: Record<string, unknown> = {
-      // model 填 endpoint_id（推理接入点ID），不是模型名
-      model: options.model || ARK_ENDPOINT_ID,
+      model: options.model || ARK_VLM_MODEL,
       messages,
       stream: false,
       temperature: options.temperature ?? 0.5,
@@ -44,6 +45,8 @@ export async function arkChat(
     };
     if (options.jsonMode) {
       body.response_format = { type: 'json_object' };
+    } else if (options.responseFormat) {
+      body.response_format = options.responseFormat;
     }
 
     const res = await fetch(`${ARK_BASE_URL}/chat/completions`, {
@@ -115,6 +118,50 @@ export async function arkVision(
   ];
 
   return arkChat(messages, options);
+}
+
+export async function arkGenerateImage(
+  prompt: string,
+  options?: { size?: string; imageUrl?: string },
+): Promise<string | null> {
+  if (!isAvailable()) {
+    console.warn('[Ark] API Key not set, skipping image generation');
+    return null;
+  }
+
+  try {
+    const body: Record<string, unknown> = {
+      model: ARK_IMAGE_MODEL,
+      prompt,
+      size: options?.size || '2048x2048',
+    };
+    // Reference image for image-to-image
+    if (options?.imageUrl) {
+      body.image_url = options.imageUrl;
+    }
+
+    const res = await fetch(`${ARK_BASE_URL}/images/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ARK_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      console.warn('[Ark] Image gen error:', res.status, await res.text().catch(() => ''));
+      return null;
+    }
+
+    const data = await res.json();
+    const url = data.data?.[0]?.url;
+    if (typeof url !== 'string' || !url.trim()) return null;
+    return url.trim();
+  } catch (e) {
+    console.warn('[Ark] Image gen failed:', e);
+    return null;
+  }
 }
 
 export { isAvailable };
