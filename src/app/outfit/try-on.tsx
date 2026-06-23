@@ -20,11 +20,11 @@ const TRYON_SCENES = [
 ];
 
 const SCENE_IMAGES: Record<string, any> = {
-  casual: require('@/../../assets/tryon/casual.png'),
-  street: require('@/../../assets/tryon/street.png'),
-  office: require('@/../../assets/tryon/office.png'),
-  layered: require('@/../../assets/tryon/layered.png'),
-  home: require('@/../../assets/tryon/home.png'),
+  casual: require('../../../assets/tryon/casual.png'),
+  street: require('../../../assets/tryon/street.png'),
+  office: require('../../../assets/tryon/office.png'),
+  layered: require('../../../assets/tryon/layered.png'),
+  home: require('../../../assets/tryon/home.png'),
 };
 
 export default function TryOnScreen() {
