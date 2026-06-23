@@ -387,14 +387,24 @@ export async function aiGenerateTryOnSuggestion(
 
 // ─── AI 试穿图生成 ──────────────────────────────────────────
 
+const SCENE_PROMPTS: Record<string, string> = {
+  cafe: '坐在咖啡馆里，暖色调灯光，悠闲氛围',
+  street: '站在城市街头，自然光线，都市感',
+  office: '在办公室内，专业场景，干净光线',
+  park: '在公园草地旁，自然阳光，绿意盎然',
+  home: '在家中沙发上，温馨居家氛围，柔和光线',
+};
+
 export async function aiGenerateTryOnImage(
   outfitItems: WardrobeItem[],
   bodyShape?: string,
+  scene?: string,
 ): Promise<string | null> {
   const itemsDesc = outfitItems.map(i => `${i.color}${i.name || i.category}`).join('、');
   const bodyDesc = bodyShape ? `，${bodyShape}身材` : '';
+  const sceneDesc = scene && SCENE_PROMPTS[scene] ? `，${SCENE_PROMPTS[scene]}` : '，站在城市街头，自然光线';
 
-  const prompt = `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}，站在城市街头，自然光线，全身照，时尚杂志风格，高质量摄影`;
+  const prompt = `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`;
 
   try {
     const imageUrl = await arkGenerateImage(prompt);

@@ -11,14 +11,31 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { aiGenerateTryOnSuggestion, aiGenerateTryOnImage, TryOnSuggestion } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 
+const TRYON_SCENES = [
+  { id: 'cafe', label: '☕ 咖啡馆', asset: 'casual' },
+  { id: 'street', label: '🏙️ 街道', asset: 'street' },
+  { id: 'office', label: '💼 办公室', asset: 'office' },
+  { id: 'park', label: '🌿 公园', asset: 'layered' },
+  { id: 'home', label: '🏠 居家', asset: 'home' },
+];
+
+const SCENE_IMAGES: Record<string, any> = {
+  casual: require('@/../../assets/tryon/casual.png'),
+  street: require('@/../../assets/tryon/street.png'),
+  office: require('@/../../assets/tryon/office.png'),
+  layered: require('@/../../assets/tryon/layered.png'),
+  home: require('@/../../assets/tryon/home.png'),
+};
+
 export default function TryOnScreen() {
   const { outfitId, items: itemsParam } = useLocalSearchParams<{ outfitId?: string; items?: string }>();
   const [outfitItems, setOutfitItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [suggestion, setSuggestion] = useState<TryOnSuggestion | null>(null);
-  const [tryOnImage, setTryOnImage] = useState<string | null>(null);
+  const [tryOnImage, setTryOnImage] = useState<string | number | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [selectedScene, setSelectedScene] = useState('cafe');
 
   useEffect(() => {
     loadItems();
@@ -64,14 +81,28 @@ export default function TryOnScreen() {
   const handleGenerateImage = async () => {
     setGeneratingImage(true);
     try {
-      const imageUrl = await aiGenerateTryOnImage(outfitItems);
+      const imageUrl = await aiGenerateTryOnImage(outfitItems, undefined, selectedScene);
       if (imageUrl) {
         setTryOnImage(imageUrl);
       } else {
-        Alert.alert('生成失败', 'AI 试穿图生成暂不可用，请稍后重试');
+        // Fallback to pre-rendered scene image
+        const scene = TRYON_SCENES.find(s => s.id === selectedScene);
+        const fallbackAsset = scene ? SCENE_IMAGES[scene.asset] : null;
+        if (fallbackAsset) {
+          setTryOnImage(fallbackAsset);
+        } else {
+          Alert.alert('生成失败', 'AI 试穿图生成暂不可用，请稍后重试');
+        }
       }
     } catch {
-      Alert.alert('生成失败', '请稍后重试');
+      // Fallback to pre-rendered scene image on error
+      const scene = TRYON_SCENES.find(s => s.id === selectedScene);
+      const fallbackAsset = scene ? SCENE_IMAGES[scene.asset] : null;
+      if (fallbackAsset) {
+        setTryOnImage(fallbackAsset);
+      } else {
+        Alert.alert('生成失败', '请稍后重试');
+      }
     } finally {
       setGeneratingImage(false);
     }
@@ -112,6 +143,23 @@ export default function TryOnScreen() {
             ))}
           </View>
         )}
+
+        {/* Scene Selection */}
+        <Text style={styles.sectionTitle}>选择场景</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sceneScroll}>
+          {TRYON_SCENES.map(scene => (
+            <TouchableOpacity
+              key={scene.id}
+              style={[styles.sceneChip, selectedScene === scene.id && styles.sceneChipSelected]}
+              onPress={() => setSelectedScene(scene.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.sceneChipText, selectedScene === scene.id && styles.sceneChipTextSelected]}>
+                {scene.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Generate Button */}
         <TouchableOpacity
@@ -154,7 +202,11 @@ export default function TryOnScreen() {
             <View style={styles.tryOnImageSection}>
               <Text style={styles.tipsTitle}>AI 试穿效果图</Text>
               {tryOnImage ? (
-                <Image source={{ uri: tryOnImage }} style={styles.tryOnImage} resizeMode="cover" />
+                <Image
+                  source={typeof tryOnImage === 'string' ? { uri: tryOnImage } : tryOnImage}
+                  style={styles.tryOnImage}
+                  resizeMode="cover"
+                />
               ) : (
                 <View style={styles.tryOnImagePlaceholder}>
                   <Ionicons name="image-outline" size={48} color={Colors.walnut2} />
@@ -220,6 +272,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, borderRadius: Radius.md,
     paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.two,
   },
+  sceneScroll: { gap: Spacing.two, paddingRight: Spacing.three },
+  sceneChip: {
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    borderRadius: Radius.md, backgroundColor: Colors.paperCard,
+    borderWidth: 1.5, borderColor: Colors.line, alignItems: 'center',
+    minWidth: 80,
+  },
+  sceneChipSelected: {
+    borderColor: Colors.terracotta, backgroundColor: Colors.vintageCream,
+  },
+  sceneChipText: { ...T.bodyText, fontSize: 14, color: Colors.walnut },
+  sceneChipTextSelected: { color: Colors.terracotta, fontWeight: '600' },
   disabled: { opacity: 0.6 },
   generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 16 },
 

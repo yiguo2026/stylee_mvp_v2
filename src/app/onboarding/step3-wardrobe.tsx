@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { useWishlistStore } from '@/stores/wishlistStore';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
@@ -19,6 +20,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function OnboardingStep3() {
   const { user } = useUserStore();
   const { addItem } = useWardrobeStore();
+  const { addItem: addWishItem } = useWishlistStore();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
   const [albumImages, setAlbumImages] = useState<string[]>([]);
@@ -82,6 +84,17 @@ export default function OnboardingStep3() {
           image_url: uri,
         });
       }
+
+      // Insert preset wishlist items
+      const presetWishlist = [
+        { name: '焦糖色羊绒围巾', category: '围巾' as const, color: '焦糖', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cead0e2?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
+        { name: '驼色大衣', category: '外套' as const, color: '驼色', image_url: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
+        { name: '黑色乐福鞋', category: '鞋' as const, color: '黑色', image_url: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
+      ];
+      for (const wish of presetWishlist) {
+        await addWishItem({ user_id: user.id, ...wish });
+      }
+
       router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('添加失败', e.message || '请稍后重试');

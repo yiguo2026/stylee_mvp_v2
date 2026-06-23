@@ -210,11 +210,12 @@ export interface OutfitFavorite {
 
 export interface InspirationCard {
   card_id: string;
+  title?: string;
   image_url: string;
   style_tags: string[];
   comment: string;
   occasion?: string;
-  sort_order: number;
+  sort_order?: number;
 }
 
 export interface BodyModel {
@@ -338,45 +339,49 @@ export interface PresetWardrobeItem {
   name: string;
   category: ClothingCategory;
   color: string;
+  material?: string;
+  image_url?: string;
+  desc?: string;
 }
 
 export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
   // 上装
-  { name: '白色T恤', category: '上装', color: '白色' },
-  { name: '黑色T恤', category: '上装', color: '黑色' },
-  { name: '白衬衫', category: '上装', color: '白色' },
-  { name: '灰色卫衣', category: '上装', color: '灰色' },
-  { name: '黑色卫衣', category: '上装', color: '黑色' },
-  { name: '条纹T恤', category: '上装', color: '条纹' },
-  { name: '针织衫', category: '上装', color: '米色' },
+  { name: '白色T恤', category: '上装', color: '白色', material: '纯棉', image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&h=600&fit=crop', desc: '百搭必备·四季' },
+  { name: '黑色T恤', category: '上装', color: '黑色', material: '纯棉', image_url: 'https://images.unsplash.com/photo-1503341504253-dff4855ab667?w=800&h=600&fit=crop', desc: '酷感基础·四季' },
+  { name: '白衬衫', category: '上装', color: '白色', material: '棉', image_url: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=800&h=600&fit=crop', desc: '通勤百搭·四季' },
+  { name: '灰色卫衣', category: '上装', color: '灰色', material: '棉混纺', image_url: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800&h=600&fit=crop', desc: '休闲舒适·秋冬' },
+  { name: '黑色卫衣', category: '上装', color: '黑色', material: '棉混纺', image_url: 'https://images.unsplash.com/photo-1578768079052-aa76e52ff62e?w=800&h=600&fit=crop', desc: '百搭休闲·秋冬' },
+  { name: '条纹T恤', category: '上装', color: '条纹', material: '纯棉', image_url: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&h=600&fit=crop', desc: '法式经典·春夏' },
+  { name: '针织衫', category: '上装', color: '米色', material: '针织', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cda3a7a?w=800&h=600&fit=crop', desc: '温柔质感·秋冬' },
   // 下装
-  { name: '蓝色牛仔裤', category: '下装', color: '蓝色' },
-  { name: '黑色长裤', category: '下装', color: '黑色' },
-  { name: '运动裤', category: '下装', color: '黑色' },
-  { name: '短裤', category: '下装', color: '蓝色' },
+  { name: '蓝色牛仔裤', category: '下装', color: '蓝色', material: '牛仔布', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&h=600&fit=crop', desc: '经典百搭·四季' },
+  { name: '黑色长裤', category: '下装', color: '黑色', material: '棉混纺', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=800&h=600&fit=crop', desc: '显瘦百搭·四季' },
+  { name: '运动裤', category: '下装', color: '黑色', material: '涤纶', image_url: 'https://images.unsplash.com/photo-1515586838455-8f8f940d6853?w=800&h=600&fit=crop', desc: '舒适自在·四季' },
+  { name: '短裤', category: '下装', color: '卡其', material: '棉', image_url: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800&h=600&fit=crop', desc: '清爽夏日·春夏' },
   // 连体装
-  { name: '白色连衣裙', category: '连体装', color: '白色' },
-  { name: '黑色连衣裙', category: '连体装', color: '黑色' },
+  { name: '白色连衣裙', category: '连体装', color: '白色', material: '棉混纺', image_url: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&h=600&fit=crop', desc: '清新优雅·春夏' },
+  { name: '黑色连衣裙', category: '连体装', color: '黑色', material: '棉混纺', image_url: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&h=600&fit=crop', desc: '经典小黑裙·四季' },
   // 外套
-  { name: '黑色羽绒服', category: '外套', color: '黑色' },
-  { name: '牛仔外套', category: '外套', color: '蓝色' },
-  { name: '黑色西服外套', category: '外套', color: '黑色' },
-  { name: '针织开衫', category: '外套', color: '米色' },
-  { name: '米色风衣', category: '外套', color: '米色' },
+  { name: '黑色羽绒服', category: '外套', color: '黑色', material: '尼龙', image_url: 'https://images.unsplash.com/photo-1544923246-77307dd270b5?w=800&h=600&fit=crop', desc: '保暖必备·秋冬' },
+  { name: '牛仔外套', category: '外套', color: '浅蓝', material: '牛仔布', image_url: 'https://images.unsplash.com/photo-1544022613-e87ca75a784a?w=800&h=600&fit=crop', desc: '休闲利器·春秋' },
+  { name: '黑色西服外套', category: '外套', color: '黑色', material: '西装料', image_url: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&h=600&fit=crop', desc: '干练通勤·四季' },
+  { name: '针织开衫', category: '外套', color: '米色', material: '针织', image_url: 'https://images.unsplash.com/photo-1583744946564-b53ac1efb997?w=800&h=600&fit=crop', desc: '温柔外搭·春秋' },
+  { name: '米色风衣', category: '外套', color: '米色', material: '棉混纺', image_url: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800&h=600&fit=crop', desc: '气质优雅·春秋' },
   // 鞋
-  { name: '小白鞋', category: '鞋', color: '白色' },
-  { name: '帆布鞋', category: '鞋', color: '白色' },
-  { name: '白色运动鞋', category: '鞋', color: '白色' },
-  { name: '马丁靴', category: '鞋', color: '黑色' },
+  { name: '小白鞋', category: '鞋', color: '白色', material: '合成革', image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800&h=600&fit=crop', desc: '休闲万能·四季' },
+  { name: '帆布鞋', category: '鞋', color: '白色', material: '帆布', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=800&h=600&fit=crop', desc: '青春活力·春夏' },
+  { name: '白色运动鞋', category: '鞋', color: '白色', material: '网面', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&h=600&fit=crop', desc: '活力百搭·四季' },
+  { name: '马丁靴', category: '鞋', color: '黑色', material: '真皮', image_url: 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=800&h=600&fit=crop', desc: '酷帅有型·秋冬' },
   // 帽子
-  { name: '棒球帽', category: '帽子', color: '黑色' },
-  { name: '渔夫帽', category: '帽子', color: '米色' },
-  { name: '针织冷帽', category: '帽子', color: '灰色' },
+  { name: '棒球帽', category: '帽子', color: '黑色', material: '棉', image_url: 'https://images.unsplash.com/photo-1588850561407-ed78c334e67a?w=800&h=600&fit=crop', desc: '休闲运动·四季' },
+  { name: '渔夫帽', category: '帽子', color: '米色', material: '棉', image_url: 'https://images.unsplash.com/photo-1572307480813-ceb0e59d8325?w=800&h=600&fit=crop', desc: '遮阳利器·春夏' },
+  { name: '针织冷帽', category: '帽子', color: '黑色', material: '针织', image_url: 'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?w=800&h=600&fit=crop', desc: '保暖有型·秋冬' },
   // 围巾
-  { name: '纯色针织围巾', category: '围巾', color: '灰色' },
+  { name: '纯色针织围巾', category: '围巾', color: '灰色', material: '针织', image_url: 'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=800&h=600&fit=crop', desc: '温暖配饰·秋冬' },
+  { name: '腰带', category: '围巾', color: '黑色', material: '真皮', image_url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&h=600&fit=crop', desc: '基础配件·四季' },
   // 包
-  { name: '双肩包', category: '包', color: '黑色' },
-  { name: '帆布包', category: '包', color: '米色' },
+  { name: '双肩包', category: '包', color: '黑色', material: '尼龙', image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&h=600&fit=crop', desc: '通勤实用·四季' },
+  { name: '帆布包', category: '包', color: '白色', material: '帆布', image_url: 'https://images.unsplash.com/photo-1601924921557-45e8e0e9c5e0?w=800&h=600&fit=crop', desc: '日常休闲·四季' },
 ];
 
 // ── Category options for pickers ────────────────────────

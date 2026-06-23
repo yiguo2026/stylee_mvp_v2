@@ -24,9 +24,38 @@ const SCREEN_W = Dimensions.get('window').width;
 
 // Mock inspiration data (will be replaced by DB content)
 const MOCK_INSPIRATIONS: InspirationCard[] = [
-  { card_id: '1', image_url: '', style_tags: ['french', 'artsy'], comment: '法式慵懒——白衬衫+高腰牛仔裤，永不过时的优雅', occasion: '休闲', sort_order: 1 },
-  { card_id: '2', image_url: '', style_tags: ['commute_style', 'city_chic'], comment: '都市通勤——西装外套+直筒裤，干练又温柔', occasion: '职场', sort_order: 2 },
-  { card_id: '3', image_url: '', style_tags: ['korean', 'sweet'], comment: '韩系甜美——针织开衫+百褶裙，温柔满分', occasion: '约会', sort_order: 3 },
+  {
+    card_id: 'insp-1',
+    title: '法式温柔风',
+    image_url: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=600&h=800&fit=crop',
+    style_tags: ['french', 'artsy'],
+    comment: '巴黎街头的慵懒与精致',
+    occasion: '约会',
+  },
+  {
+    card_id: 'insp-2',
+    title: '通勤简约风',
+    image_url: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=600&h=800&fit=crop',
+    style_tags: ['commute_style', 'city_chic'],
+    comment: '用基本款穿出高级感',
+    occasion: '职场',
+  },
+  {
+    card_id: 'insp-3',
+    title: '韩系甜美风',
+    image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&h=800&fit=crop',
+    style_tags: ['korean', 'sweet'],
+    comment: '清新温柔的日常穿搭',
+    occasion: '休闲',
+  },
+  {
+    card_id: 'insp-4',
+    title: '新中式雅韵',
+    image_url: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&h=800&fit=crop',
+    style_tags: ['new_chinese'],
+    comment: '东方美学的现代表达',
+    occasion: '约会',
+  },
 ];
 
 type InputMode = 'description' | 'tags';
@@ -293,9 +322,13 @@ export default function OutfitTab() {
             <View style={styles.inspirationRow}>
               {inspirations.map(card => (
                 <View key={card.card_id} style={styles.inspirationCard}>
-                  <View style={styles.inspirationImage}>
-                    <MaterialCommunityIcons name="hanger" size={32} color={Colors.walnut2} />
-                  </View>
+                  {card.image_url ? (
+                    <Image source={{ uri: card.image_url }} style={styles.inspirationImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.inspirationImage}>
+                      <MaterialCommunityIcons name="hanger" size={32} color={Colors.walnut2} />
+                    </View>
+                  )}
                   <View style={styles.inspirationTags}>
                     {card.style_tags.slice(0, 2).map((tag, i) => (
                       <View key={i} style={styles.inspirationTag}>
@@ -479,7 +512,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   inspirationImage: {
-    width: '100%', height: 120, backgroundColor: Colors.vintageCream,
+    width: '100%', height: 160, backgroundColor: Colors.vintageCream,
     alignItems: 'center', justifyContent: 'center',
   },
   inspirationTags: { flexDirection: 'row', gap: 4, paddingVertical: Spacing.one, paddingHorizontal: Spacing.two },
