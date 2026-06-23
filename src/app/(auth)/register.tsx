@@ -5,7 +5,7 @@ import {
   ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { supabase, confirmUser } from '@/lib/supabase';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
 function usernameToEmail(username: string) {
@@ -90,6 +90,9 @@ export default function RegisterScreen() {
 
       // Create profile with username
       if (data.user) {
+        // Auto-confirm user (bypass email verification)
+        await confirmUser(data.user.id);
+
         const { error: profileError } = await supabase
           .from('users')
           .insert({
