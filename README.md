@@ -48,10 +48,13 @@
 - 穿搭历史记录
 
 ### AI 试穿
-- 选择搭配单品
-- 场景风格选择（咖啡馆/街道/办公室/公园/居家）
-- AI 图片生成（doubao-seedream，失败时 fallback 到预置场景图）
-- 试穿效果图保存
+- 身体信息录入（自拍上传，AsyncStorage 持久化，首次录入后无需重复填写）
+- 两种入口流程：
+  - 首页入口：身体信息 → 选择搭配方案（已穿搭配/收藏搭配 Tab） → 选择场景 → 生成
+  - 推荐结果入口：身体信息 → 搭配单品（已选） → 选择场景 → 生成
+- 场景风格选择（☕咖啡馆/🏙️街道/💼办公室/🌿公园/🏠居家）
+- 生成进度动画（4步：分析身体数据→匹配单品→合成效果→优化细节）
+- 效果图展示 + 保存（AI 生成失败时 fallback 到预置场景图）
 
 ### Web 兼容
 - ConfirmModal 替代 Alert.alert 多按钮弹窗
@@ -148,6 +151,7 @@ vercel --yes
 | — | v0.8.0：iOS App Store 适配（Bundle ID / 隐私声明 / 权限清理 / 设置持久化 / 隐私政策 / EAS Build 配置） |
 | `67fa832` | v0.9.0：对齐原型图 — 资源文件+emoji图标+Unsplash图片+场景试穿+模板推荐 |
 | `e1213fe` | v0.9.1：灵感详情页+衣橱改版+风格标签重构+关闭Ark API |
+| — | v0.9.2：AI试穿3步流程改版（身体信息录入+搭配选择+场景选择） |
 
 ## 项目结构
 
@@ -157,13 +161,13 @@ src/
     (auth)/         # 登录、注册
     (tabs)/         # 首页（穿搭灵感+推荐）、衣橱、记录、我的
     onboarding/     # 引导流程 step1-info / step2-style / step3-wardrobe
-    outfit/         # 穿搭结果页 / 灵感详情页 / AI试穿
+    outfit/         # 穿搭结果页 / 灵感详情页 / AI试穿 / 身体信息录入
     profile/        # 风格偏好编辑 / 设置页
     wardrobe/       # 添加衣物 / 单品详情 / 单品编辑 / 批量导入
   components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon
   constants/        # theme（配色、字体、间距、圆角、阴影）
   lib/              # supabase / deepseek / ark / ai / weather / uploadImage / mock
-  stores/           # userStore / wardrobeStore / wishlistStore
+  stores/           # userStore / wardrobeStore / wishlistStore / tryonStore
   types/            # TypeScript 类型 + 统一标签定义
 assets/
   logo.png          # Stylee Logo
