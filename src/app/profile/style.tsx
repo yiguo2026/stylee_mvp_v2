@@ -7,27 +7,16 @@ import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
-import {
-  PRESET_STYLE_PREFERENCES, PRESET_STYLE_DISLIKES,
-  TAG_DISPLAY, StyleTag,
-} from '@/types';
+import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
 
 const isWeb = Platform.OS === 'web';
 
 export default function StylePreferencePage() {
   const { user, stylePreferences, fetchProfile } = useUserStore();
 
-  // Pre-populate from existing preferences
   const [liked, setLiked] = useState<Set<string>>(() => {
     const ids = stylePreferences
       .filter(p => p.preference_type === 'like')
-      .map(p => p.tag_id);
-    return new Set(ids);
-  });
-
-  const [disliked, setDisliked] = useState<Set<string>>(() => {
-    const ids = stylePreferences
-      .filter(p => p.preference_type === 'dislike')
       .map(p => p.tag_id);
     return new Set(ids);
   });
@@ -36,39 +25,21 @@ export default function StylePreferencePage() {
 
   const toggleLike = (tagId: string) => {
     const next = new Set(liked);
-    const nextDislike = new Set(disliked);
     if (next.has(tagId)) {
       next.delete(tagId);
     } else {
       next.add(tagId);
-      nextDislike.delete(tagId);
     }
     setLiked(next);
-    setDisliked(nextDislike);
-  };
-
-  const toggleDislike = (tagId: string) => {
-    const next = new Set(disliked);
-    const nextLike = new Set(liked);
-    if (next.has(tagId)) {
-      next.delete(tagId);
-    } else {
-      next.add(tagId);
-      nextLike.delete(tagId);
-    }
-    setDisliked(next);
-    setLiked(nextLike);
   };
 
   const handleSave = async () => {
     if (!user?.id) return;
     setSaving(true);
     try {
-      // Ensure all selected tags exist in the tags table (foreign key requirement)
-      const allSelectedTags = [
-        ...Array.from(liked).map(id => PRESET_STYLE_PREFERENCES.find(t => t.tag_id === id)),
-        ...Array.from(disliked).map(id => PRESET_STYLE_DISLIKES.find(t => t.tag_id === id)),
-      ].filter(Boolean) as StyleTag[];
+      const allSelectedTags = Array.from(liked)
+        .map(id => PRESET_STYLE_PREFERENCES.find(t => t.tag_id === id))
+        .filter(Boolean) as StyleTag[];
 
       for (const tag of allSelectedTags) {
         await supabase
@@ -83,18 +54,11 @@ export default function StylePreferencePage() {
 
       await supabase.from('user_style_preferences').delete().eq('user_id', user.id);
 
-      const allPrefs: { user_id: string; tag_id: string; preference_type: string }[] = [
-        ...Array.from(liked).map(id => ({
-          user_id: user.id,
-          tag_id: id,
-          preference_type: 'like',
-        })),
-        ...Array.from(disliked).map(id => ({
-          user_id: user.id,
-          tag_id: id,
-          preference_type: 'dislike',
-        })),
-      ];
+      const allPrefs = Array.from(liked).map(id => ({
+        user_id: user.id,
+        tag_id: id,
+        preference_type: 'like',
+      }));
       for (const pref of allPrefs) {
         const { error: upsertError } = await supabase
           .from('user_style_preferences')
@@ -132,7 +96,6 @@ export default function StylePreferencePage() {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
-        {/* Like section */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>😍 点击选择喜欢的风格</Text>
           <View style={styles.tagsWrap}>
@@ -153,28 +116,7 @@ export default function StylePreferencePage() {
           </View>
         </View>
 
-        {/* Dislike section */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>🙅 点击选择不喜欢的风格</Text>
-          <View style={styles.tagsWrap}>
-            {PRESET_STYLE_DISLIKES.map(tag => {
-              const isDisliked = disliked.has(tag.tag_id);
-              return (
-                <TouchableOpacity
-                  key={tag.tag_id}
-                  style={[styles.tag, isDisliked && styles.tagDisliked]}
-                  onPress={() => toggleDislike(tag.tag_id)}
-                >
-                  <Text style={[styles.tagText, isDisliked && styles.tagTextDisliked]}>
-                    {tag.tag_name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <Text style={styles.footerHint}>绿色 = 喜欢，红色 = 不喜欢，灰色 = 未选择</Text>
+        <Text style={styles.footerHint}>绿色 = 喜欢，灰色 = 未选择</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -210,7 +152,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.two,
   },
-  tagWrapper: {},
   tag: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
@@ -220,19 +161,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard,
   },
   tagLiked: { backgroundColor: '#34C759', borderColor: '#34C759' },
-  tagDisliked: { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
   tagText: { ...T.tag, color: Colors.walnut },
   tagTextLiked: { ...T.tag, color: Colors.paper },
-  tagTextDisliked: { ...T.tag, color: Colors.paper },
-  dislikeBtn: {
-    width: 20, height: 20, borderRadius: 10,
-    backgroundColor: Colors.paperCard,
-    borderWidth: 1, borderColor: Colors.line,
-    alignItems: 'center', justifyContent: 'center',
-    position: 'absolute', top: -6, right: -6,
-  },
-  dislikeBtnActive: { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
-  dislikeBtnText: { fontSize: 10, color: Colors.walnut2, lineHeight: 12 },
-  dislikeBtnTextActive: { color: Colors.paper },
   footerHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2 },
 });

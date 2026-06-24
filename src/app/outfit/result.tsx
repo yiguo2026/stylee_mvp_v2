@@ -309,13 +309,13 @@ export default function OutfitResultScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>← 返回</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          推荐方案 <Text style={styles.headerIdx}>{currentIndex + 1}</Text>
-          <Text style={styles.headerTotal}>/{outfits.length}</Text>
-        </Text>
+        <Text style={styles.headerTitle}>推荐方案</Text>
         <TouchableOpacity style={styles.favBtn} onPress={handleFavorite}>
           <Text style={[styles.favIcon, isFavorited && styles.favIconActive]}>
             {isFavorited ? '♥' : '♡'}
+          </Text>
+          <Text style={[styles.favLabel, isFavorited && styles.favLabelActive]}>
+            {isFavorited ? '已收藏' : '收藏此搭配'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -385,15 +385,6 @@ export default function OutfitResultScreen() {
           ) : (
             <View style={styles.flatlayEmpty}><Text style={styles.flatlayEmptyText}>暂无搭配单品</Text></View>
           )}
-        </View>
-
-        {/* Dot indicator */}
-        <View style={styles.dotIndicator}>
-          {outfits.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => { setCurrentIndex(i); setSavedId(null); setIsFavorited(false); setAdjustMode(false); }}>
-              <View style={[styles.dot, i === currentIndex && styles.dotActive]} />
-            </TouchableOpacity>
-          ))}
         </View>
 
         {/* ── 2. Owned Items ── */}
@@ -490,14 +481,6 @@ export default function OutfitResultScreen() {
           </View>
         )}
 
-        {/* ── 4. AI Comment ── */}
-        {currentOutfit.ai_comment && (
-          <View style={styles.aiCommentCard}>
-            <View style={styles.aiBadge}><Text style={styles.aiBadgeText}>AI</Text></View>
-            <Text style={styles.aiCommentText}>{currentOutfit.ai_comment}</Text>
-          </View>
-        )}
-
         {/* ── Try-on Button ── */}
         <TouchableOpacity
           style={styles.tryOnEntry}
@@ -520,20 +503,22 @@ export default function OutfitResultScreen() {
 
       {/* ── 5. Decision Bar ── */}
       <View style={styles.decisionBar}>
-        <TouchableOpacity style={styles.decisionBtnAdjust} onPress={handleAdjustToggle}>
-          <Text style={[styles.decisionBtnAdjustText, adjustMode && { color: Colors.terracotta }]}>
-            {adjustMode ? '完成调整' : '稍作调整'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.decisionBtnSwap} onPress={handleSwap}>
-          <Text style={styles.decisionBtnSwapText}>换一套看看</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.decisionBtnConfirm, !!savedId && styles.decisionBtnSaved]}
           onPress={handleWear} disabled={saving || !!savedId}
         >
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? '✓ 已保存' : '就这么穿'}</Text>}
         </TouchableOpacity>
+        <View style={styles.decisionBtnRow}>
+          <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleSwap}>
+            <Text style={styles.decisionBtnSwapText}>换一套看看</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleAdjustToggle}>
+            <Text style={[styles.decisionBtnAdjustText, adjustMode && { color: Colors.terracotta }]}>
+              {adjustMode ? '完成调整' : '稍作调整'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Swap Modal */}
@@ -590,9 +575,11 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.ink },
   headerIdx: { color: Colors.terracotta },
   headerTotal: { color: Colors.walnut2 },
-  favBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  favIcon: { fontSize: 20, color: Colors.walnut2 },
+  favBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 },
+  favIcon: { fontSize: 18, color: Colors.walnut2 },
   favIconActive: { color: '#FF3B30' },
+  favLabel: { fontSize: 12, color: Colors.walnut2, fontWeight: '500' },
+  favLabelActive: { color: '#FF3B30' },
 
   content: { padding: Spacing.three, gap: Spacing.two, paddingBottom: 100 },
   contextRow: { gap: 2 },
@@ -670,12 +657,12 @@ const styles = StyleSheet.create({
   aiBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   aiCommentText: { fontSize: 13, lineHeight: 22, color: '#636E72', marginTop: Spacing.one },
 
-  decisionBar: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three, backgroundColor: Colors.paperRaised, borderTopWidth: 1, borderTopColor: Colors.line },
-  decisionBtnAdjust: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.line, backgroundColor: Colors.paperCard },
+  decisionBar: { gap: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three, backgroundColor: Colors.paperRaised, borderTopWidth: 1, borderTopColor: Colors.line },
+  decisionBtnRow: { flexDirection: 'row', gap: 8 },
+  decisionBtnSecondary: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.line, backgroundColor: Colors.paperCard },
   decisionBtnAdjustText: { fontSize: 13, fontWeight: '600', color: Colors.walnut },
-  decisionBtnSwap: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.line, backgroundColor: Colors.paperCard },
   decisionBtnSwapText: { fontSize: 13, fontWeight: '600', color: Colors.ink },
-  decisionBtnConfirm: { flex: 1.3, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.ink, ...Shadow.two },
+  decisionBtnConfirm: { paddingVertical: 14, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.ink, ...Shadow.two },
   decisionBtnSaved: { backgroundColor: Colors.sage },
   decisionBtnConfirmText: { fontSize: 14, fontWeight: '600', color: Colors.paper },
 

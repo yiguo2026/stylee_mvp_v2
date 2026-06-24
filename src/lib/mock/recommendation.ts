@@ -162,34 +162,46 @@ export const mockGetOutfitRecommendations = async (
   // Need at least some items to build outfits
   if (activeItems.length === 0) return [];
 
-  const outfits: Outfit[] = [];
-  for (let i = 0; i < 3; i++) {
-    outfits.push(buildOutfit(userId, sessionId, activeItems, i));
-  }
-
-  return outfits;
+  return [buildOutfit(userId, sessionId, activeItems, 0)];
 };
 
 export const MOCK_NLP_KEYWORDS: Record<string, string[]> = {
   '约会': ['date', 'sweet', 'warm'],
-  '工作': ['commute', 'commute_style', 'morandi'],
-  '通勤': ['commute', 'commute_style', 'morandi'],
-  '周末': ['casual', 'korean', 'warm'],
+  '工作': ['commute', 'commute_style', 'minimalist'],
+  '通勤': ['commute', 'commute_style', 'minimalist'],
+  '职场': ['work', 'commute_style', 'quiet_luxury'],
+  '周末': ['casual', 'sweet', 'warm'],
   '运动': ['sport', 'sporty_casual'],
-  '旅行': ['travel', 'casual'],
-  '出游': ['travel', 'french'],
-  '休闲': ['casual', 'korean'],
-  '法式': ['french', 'sweet'],
-  '韩系': ['korean', 'sweet'],
-  '日系': ['japanese', 'morandi'],
-  '商务': ['business', 'british'],
-  '英伦': ['british', 'business'],
-  '美拉德': ['maillard', 'warm'],
-  '新中式': ['new_chinese', 'morandi'],
-  '学院': ['preppy', 'korean'],
-  '都市': ['city_chic', 'commute_style'],
-  '文艺': ['artsy', 'japanese'],
-  '美式': ['american', 'casual'],
+  '旅行': ['travel', 'bohemian'],
+  '出游': ['travel', 'bohemian'],
+  '休闲': ['casual', 'french'],
+  '法式': ['french', 'romantic'],
+  '老钱': ['quiet_luxury', 'minimalist'],
+  '静奢': ['quiet_luxury', 'minimalist'],
+  '极简': ['minimalist', 'quiet_luxury'],
+  '日系': ['wabi_sabi', 'minimalist'],
+  '侘寂': ['wabi_sabi', 'minimalist'],
+  '学院': ['preppy', 'commute_style'],
+  '猎装': ['safari', 'utility'],
+  '复古': ['vintage', 'romantic'],
+  '街头': ['street', 'urban_cool'],
+  '机能': ['sporty_casual', 'utility'],
+  '摇滚': ['rock', 'urban_cool'],
+  '机车': ['rock', 'urban_cool'],
+  '哥特': ['goth', 'rock'],
+  '暗黑': ['goth', 'rock'],
+  '甜美': ['sweet', 'romantic'],
+  '少女': ['sweet', 'romantic'],
+  '浪漫': ['romantic', 'french'],
+  '田园': ['romantic', 'bohemian'],
+  '波西米亚': ['bohemian', 'romantic'],
+  '度假': ['bohemian', 'romantic'],
+  '牛仔': ['western', 'street'],
+  '工装': ['utility', 'street'],
+  '先锋': ['avantgarde', 'urban_cool'],
+  '都市': ['urban_cool', 'commute_style'],
+  '酷': ['urban_cool', 'rock'],
+  '莫兰迪': ['morandi', 'quiet_luxury'],
 };
 
 export const extractTagsFromQuery = (query: string): string[] => {

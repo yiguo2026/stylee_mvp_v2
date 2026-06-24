@@ -49,7 +49,6 @@ export default function ProfileTab() {
   }, [user?.id]);
 
   const liked = stylePreferences.filter(p => p.preference_type === 'like');
-  const disliked = stylePreferences.filter(p => p.preference_type === 'dislike');
   const favStyle = liked.length > 0 ? getTagName(liked[0].tag_id, liked[0].tag?.tag_name) : '—';
   const utilization = items.length > 0 ? Math.min(Math.round((savedOutfitCount / items.length) * 100), 100) : 0;
 
@@ -122,13 +121,7 @@ export default function ProfileTab() {
               <View key={p.preference_id} style={[styles.stylePill, styles.stylePillLiked]}>
                 <Text style={styles.stylePillText}>{getTagName(p.tag_id, p.tag?.tag_name)}</Text>
               </View>
-            )) : null}
-            {disliked.length > 0 ? disliked.map(p => (
-              <View key={p.preference_id} style={[styles.stylePill, styles.stylePillDisliked]}>
-                <Text style={styles.stylePillText}>{getTagName(p.tag_id, p.tag?.tag_name)}</Text>
-              </View>
-            )) : null}
-            {liked.length === 0 && disliked.length === 0 && (
+            )) : (
               <Text style={styles.stylePillEmpty}>点击设置你喜欢的风格 →</Text>
             )}
           </View>
@@ -237,7 +230,6 @@ const styles = StyleSheet.create({
   styleTags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
   stylePill: { paddingHorizontal: Spacing.two, paddingVertical: 4, borderRadius: Radius.xl },
   stylePillLiked: { backgroundColor: Colors.sage },
-  stylePillDisliked: { backgroundColor: '#FF3B30' },
   stylePillText: { ...T.tag, color: Colors.paper },
   stylePillEmpty: { ...T.tag, color: Colors.walnut2, fontStyle: 'italic' },
 

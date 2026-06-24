@@ -7,17 +7,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
-import { PRESET_STYLE_PREFERENCES, PRESET_STYLE_DISLIKES, StyleTag } from '@/types';
+import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
 
 const LIKE_COLOR = '#34C759';
-const DISLIKE_COLOR = '#FF3B30';
 
-// v2: 看图选风格 — 14种风格配代表emoji（图片资源后续替换）
 const STYLE_EMOJIS: Record<string, string> = {
-  korean: '🇰🇷', sweet: '🍰', new_chinese: '🏮', preppy: '🎓',
-  city_chic: '🏙️', artsy: '🎨', sporty_casual: '🏃', commute_style: '💼',
-  french: '🥐', maillard: '🍂', japanese: '🇯🇵', business: '👔',
-  american: '🇺🇸', british: '🇬🇧',
+  quiet_luxury: '💎', minimalist: '◻️', commute_style: '💼', french: '🥐',
+  preppy: '🎓', safari: '🦒', vintage: '📻', street: '🛹',
+  sporty_casual: '🏃', rock: '🎸', goth: '🦇', sweet: '🍰',
+  romantic: '🌸', bohemian: '🏜️', western: '🤠', utility: '🔧',
+  wabi_sabi: '🍵', avantgarde: '📐', urban_cool: '🌃',
 };
 
 export default function OnboardingStep2() {
@@ -26,27 +25,13 @@ export default function OnboardingStep2() {
   const [liked, setLiked] = useState<Set<string>>(
     new Set(stylePreferences.filter(p => p.preference_type === 'like').map(p => p.tag_id))
   );
-  const [disliked, setDisliked] = useState<Set<string>>(
-    new Set(stylePreferences.filter(p => p.preference_type === 'dislike').map(p => p.tag_id))
-  );
   const [loading, setLoading] = useState(false);
 
   const toggleLike = (tag: StyleTag) => {
     const next = new Set(liked);
-    const nextDislike = new Set(disliked);
     if (next.has(tag.tag_id)) { next.delete(tag.tag_id); }
-    else { next.add(tag.tag_id); nextDislike.delete(tag.tag_id); }
+    else { next.add(tag.tag_id); }
     setLiked(next);
-    setDisliked(nextDislike);
-  };
-
-  const toggleDislike = (tag: StyleTag) => {
-    const next = new Set(disliked);
-    const nextLike = new Set(liked);
-    if (next.has(tag.tag_id)) { next.delete(tag.tag_id); }
-    else { next.add(tag.tag_id); nextLike.delete(tag.tag_id); }
-    setDisliked(next);
-    setLiked(nextLike);
   };
 
   const handleNext = async () => {
@@ -54,10 +39,9 @@ export default function OnboardingStep2() {
     setLoading(true);
     try {
       await supabase.from('user_style_preferences').delete().eq('user_id', user.id);
-      const allPrefs = [
-        ...Array.from(liked).map(id => ({ user_id: user.id, tag_id: id, preference_type: 'like' })),
-        ...Array.from(disliked).map(id => ({ user_id: user.id, tag_id: id, preference_type: 'dislike' })),
-      ];
+      const allPrefs = Array.from(liked).map(id => ({
+        user_id: user.id, tag_id: id, preference_type: 'like',
+      }));
       for (const pref of allPrefs) {
         await supabase.from('user_style_preferences').upsert(pref as any, { onConflict: 'user_id,tag_id' });
       }
@@ -85,13 +69,11 @@ export default function OnboardingStep2() {
       </View>
 
       <Text style={styles.title}>你的风格偏好</Text>
-      <Text style={styles.subtitle}>标记喜欢和不喜欢，让我们更懂你的审美</Text>
+      <Text style={styles.subtitle}>选择你喜欢的风格，让我们更懂你的审美</Text>
 
       <View style={styles.legend}>
         <View style={[styles.legendDot, { backgroundColor: LIKE_COLOR }]} />
         <Text style={styles.legendText}>喜欢</Text>
-        <View style={[styles.legendDot, { backgroundColor: DISLIKE_COLOR }]} />
-        <Text style={styles.legendText}>不喜欢</Text>
       </View>
 
       {/* Like section — 看图选风格，双列 */}
@@ -117,39 +99,12 @@ export default function OnboardingStep2() {
         })}
       </View>
 
-      {/* Dislike section */}
-      <Text style={styles.sectionLabel}>🙅 点击选择不喜欢的风格</Text>
-      <View style={styles.tagsGrid}>
-        {PRESET_STYLE_DISLIKES.map(tag => {
-          const isDisliked = disliked.has(tag.tag_id);
-          return (
-            <TouchableOpacity
-              key={tag.tag_id}
-              style={[styles.tag, isDisliked && styles.tagDisliked]}
-              onPress={() => toggleDislike(tag)}
-            >
-              <Text style={[styles.tagText, isDisliked && styles.tagTextDisliked]}>
-                {tag.tag_name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
       {/* Preview */}
       <View style={styles.previewRow}>
-        <Text style={styles.previewLabel}>喜欢：</Text>
+        <Text style={styles.previewLabel}>已选：</Text>
         <Text style={styles.previewValue}>
           {liked.size > 0
             ? Array.from(liked).map(id => PRESET_STYLE_PREFERENCES.find(t => t.tag_id === id)?.tag_name).join('、')
-            : '—'}
-        </Text>
-      </View>
-      <View style={styles.previewRow}>
-        <Text style={styles.previewLabel}>不喜欢：</Text>
-        <Text style={styles.previewValue}>
-          {disliked.size > 0
-            ? Array.from(disliked).map(id => PRESET_STYLE_DISLIKES.find(t => t.tag_id === id)?.tag_name).join('、')
             : '—'}
         </Text>
       </View>
@@ -189,7 +144,6 @@ const styles = StyleSheet.create({
   sectionLabel: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 14 },
   tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 
-  // Style cards (看图选风格)
   styleCard: {
     width: '47%',
     alignItems: 'center',
@@ -210,17 +164,6 @@ const styles = StyleSheet.create({
     fontSize: 14, color: LIKE_COLOR, fontWeight: '700',
   },
 
-  // Dislike tags (compact)
-  tag: {
-    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
-    borderRadius: Radius.xl, borderWidth: 1,
-    borderColor: Colors.line, backgroundColor: Colors.paperCard,
-  },
-  tagDisliked: { backgroundColor: DISLIKE_COLOR, borderColor: DISLIKE_COLOR },
-  tagText: { ...T.tag, color: Colors.walnut },
-  tagTextDisliked: { ...T.tag, color: '#fff' },
-
-  // Preview
   previewRow: { flexDirection: 'row', gap: Spacing.one },
   previewLabel: { ...T.formLabel },
   previewValue: { ...T.bodyText, fontSize: 13, flex: 1 },

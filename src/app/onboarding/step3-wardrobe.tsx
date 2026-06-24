@@ -67,6 +67,8 @@ export default function OnboardingStep3() {
           name: item.name,
           category: item.category,
           color: item.color,
+          material: item.material || undefined,
+          image_url: item.image_url || undefined,
           source_type: 'manual',
           source_label: '手动添加',
           status: 'active',

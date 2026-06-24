@@ -6,20 +6,14 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
-import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, PRESET_BASIC_ITEMS } from '@/types';
+import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { aiExtractProductFromLink } from '@/lib/ai';
-
-const CATEGORY_EMOJIS: Record<string, string> = {
-  '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
-  '外套': '🧥', '鞋': '👟', '包': '👜', '帽子': '🧢', '围巾': '🧣',
-};
 
 function ItemCard({ item, cardWidth }: { item: WardrobeItem; cardWidth: number }) {
   return (
@@ -99,6 +93,7 @@ export default function WardrobeTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showWishlist, setShowWishlist] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkImporting, setLinkImporting] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
@@ -130,7 +125,21 @@ export default function WardrobeTab() {
 
   const filtered = items
     .filter(i => selectedCategory === '全部' || i.category === selectedCategory)
-    .filter(i => !searchText || i.name.includes(searchText) || i.color.includes(searchText) || (i.brand ?? '').includes(searchText));
+    .filter(i => {
+      if (!searchText) return true;
+      const q = searchText.trim();
+      const SEARCH_ALIASES: Record<string, string[]> = {
+        '裤子': ['裤', '下装'],
+        '上衣': ['上装', '衬衫', 'T恤', '卫衣', '针织', '开衫'],
+        '衣服': ['上装', '外套', '衬衫', 'T恤', '卫衣'],
+        '裙子': ['裙', '连体装'],
+        '鞋': ['鞋', '靴'],
+        '包': ['包', '挎', '背包'],
+      };
+      const terms = [q, ...(SEARCH_ALIASES[q] ?? [])];
+      const haystack = [i.name, i.category, i.color, i.brand ?? '', i.material ?? ''].join(' ');
+      return terms.some(t => haystack.includes(t));
+    });
 
   const handleLinkImport = async () => {
     if (!linkUrl.trim() || !user) return;
@@ -169,136 +178,57 @@ export default function WardrobeTab() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>衣橱</Text>
-        <TouchableOpacity onPress={() => {}}>
-          <Ionicons name="heart-outline" size={22} color={Colors.ink} />
-        </TouchableOpacity>
       </View>
 
       {/* Search */}
-      <View style={styles.searchBar}>
-        <Feather name="search" size={15} color={Colors.walnut2} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="搜索名称、颜色、品牌…"
-          placeholderTextColor={Colors.walnut2}
-          value={searchText}
-          onChangeText={setSearchText}
-          clearButtonMode="while-editing"
-        />
+      <View style={styles.searchRow}>
+        <View style={styles.searchBar}>
+          <Feather name="search" size={15} color={Colors.walnut2} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="搜索单品..."
+            placeholderTextColor={Colors.walnut2}
+            value={searchText}
+            onChangeText={setSearchText}
+            clearButtonMode="while-editing"
+          />
+        </View>
       </View>
 
-      {/* Category Filter with Count Badges */}
+      {/* Category Pills — text only, count badge, fixed height */}
       <FlatList
         data={CLOTHING_CATEGORIES_WITH_ALL}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={c => c}
         contentContainerStyle={styles.categoryList}
-        renderItem={({ item: cat }) => (
-          <TouchableOpacity
-            style={[styles.catBtn, selectedCategory === cat && styles.catBtnActive]}
-            onPress={() => setSelectedCategory(cat)}
-          >
-            <Text style={styles.catEmoji}>{CATEGORY_EMOJIS[cat]}</Text>
-            <Text style={[styles.catText, selectedCategory === cat && styles.catTextActive]}>
-              {cat}
-            </Text>
-            <View style={[styles.catBadge, selectedCategory === cat && styles.catBadgeActive]}>
-              <Text style={[styles.catBadgeText, selectedCategory === cat && styles.catBadgeTextActive]}>
-                {counts[cat] ?? 0}
+        renderItem={({ item: cat }) => {
+          const count = counts[cat] ?? 0;
+          return (
+            <TouchableOpacity
+              style={[styles.catPill, selectedCategory === cat && styles.catPillActive]}
+              onPress={() => setSelectedCategory(cat)}
+            >
+              <Text style={[styles.catPillText, selectedCategory === cat && styles.catPillTextActive]}>
+                {cat}
               </Text>
-            </View>
-          </TouchableOpacity>
-        )}
+              {count > 0 && (
+                <View style={[styles.catCount, selectedCategory === cat && styles.catCountActive]}>
+                  <Text style={[styles.catCountText, selectedCategory === cat && styles.catCountTextActive]}>
+                    {count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        }}
       />
 
       <ScrollView
         style={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Quick Add Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Text style={styles.sectionTitle}>✨ 快速添加推荐单品</Text>
-              <Text style={styles.sectionSub}>从热门基础款中一键补充衣橱</Text>
-            </View>
-            <TouchableOpacity onPress={() => router.push('/wardrobe/add')}>
-              <Text style={styles.sectionMore}>›</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={[...PRESET_BASIC_ITEMS.slice(0, 9), null]}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(_, i) => String(i)}
-            contentContainerStyle={styles.quickAddList}
-            renderItem={({ item, index }) => {
-              if (item === null) {
-                return (
-                  <TouchableOpacity
-                    style={styles.quickAddPlus}
-                    onPress={() => router.push('/wardrobe/add')}
-                  >
-                    <Feather name="plus" size={24} color={Colors.walnut2} />
-                    <Text style={styles.quickAddPlusText}>添加</Text>
-                  </TouchableOpacity>
-                );
-              }
-              return (
-                <TouchableOpacity
-                  style={styles.quickAddCard}
-                  onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: `rec_${index}` } })}
-                >
-                  <View style={styles.quickAddImage}>
-                    <CategoryIcon category={item.category} size={28} color={Colors.walnut2} />
-                  </View>
-                  <Text style={styles.quickAddName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.quickAddMeta}>{item.category} · 衣橱</Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-
-        {/* Wishlist Section */}
-        {wishlistItems.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>心愿单</Text>
-              <Text style={styles.wishlistCount}>{wishlistItems.length} 件想要的</Text>
-            </View>
-            <FlatList
-              data={wishlistItems}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={i => i.wish_id}
-              contentContainerStyle={styles.wishlistList}
-              renderItem={({ item: wish }) => (
-                <View style={styles.wishCard}>
-                  <View style={styles.wishImage}>
-                    {wish.image_url
-                      ? <Image source={{ uri: wish.image_url }} style={styles.image} resizeMode="cover" />
-                      : <View style={styles.wishImagePlaceholder}><CategoryIcon category={wish.category} size={36} color={Colors.walnut2} /></View>
-                    }
-                  </View>
-                  <Text style={styles.wishName} numberOfLines={1}>{wish.name}</Text>
-                  <Text style={styles.wishMeta}>{wish.category} · {wish.color} · {wish.source === 'ai_recommended' ? 'AI推荐' : '手动'}</Text>
-                  <View style={styles.wishActions}>
-                    <TouchableOpacity style={styles.wishMoveBtn} onPress={() => handleMoveToWardrobe(wish.wish_id)}>
-                      <Text style={styles.wishMoveText}>转入衣橱</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeItem(wish.wish_id)}>
-                      <Text style={styles.wishRemoveText}>移除</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            />
-          </View>
-        )}
-
-        {/* Wardrobe Grid */}
+        {/* My Wardrobe Grid (first) */}
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="hanger" size={56} color={Colors.walnut2} />
@@ -314,6 +244,34 @@ export default function WardrobeTab() {
             ))}
           </View>
         )}
+
+        {/* Wishlist Entry (bottom of page) */}
+        <View style={styles.wishlistEntry}>
+          <TouchableOpacity style={styles.wishlistEntryBtn} onPress={() => setShowWishlist(true)}>
+            <Text style={styles.wishlistEntryIcon}>♡</Text>
+            <Text style={styles.wishlistEntryLabel}>心愿单</Text>
+            {wishlistItems.length > 0 && (
+              <View style={styles.wishlistEntryBadge}>
+                <Text style={styles.wishlistEntryBadgeText}>{wishlistItems.length}</Text>
+              </View>
+            )}
+            <Text style={styles.wishlistEntryArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Add Section */}
+        <View style={styles.quickAddEntry}>
+          <TouchableOpacity style={styles.quickAddEntryBtn} onPress={() => router.push('/wardrobe/add')}>
+            <View style={styles.quickAddEntryIcon}>
+              <Text style={styles.quickAddEntryIconText}>✨</Text>
+            </View>
+            <View style={styles.quickAddEntryInfo}>
+              <Text style={styles.quickAddEntryTitle}>快速添加推荐单品</Text>
+              <Text style={styles.quickAddEntrySub}>从热门基础款中一键补充衣橱</Text>
+            </View>
+            <Text style={styles.quickAddEntryArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -364,6 +322,49 @@ export default function WardrobeTab() {
         onImport={handleLinkImport}
         onClose={() => setShowLinkModal(false)}
       />
+
+      {/* Wishlist Overlay (slide-in full page) */}
+      <Modal visible={showWishlist} animationType="slide">
+        <SafeAreaView style={styles.wishlistOverlay}>
+          <View style={styles.wishlistHeader}>
+            <TouchableOpacity onPress={() => setShowWishlist(false)} hitSlop={12}>
+              <Text style={styles.wishlistBack}>← 返回</Text>
+            </TouchableOpacity>
+            <Text style={styles.wishlistTitle}>心愿单</Text>
+            <Text style={styles.wishlistCountText}>{wishlistItems.length} 件想要的</Text>
+          </View>
+          <ScrollView style={styles.wishlistBody} contentContainerStyle={{ paddingBottom: 40 }}>
+            {wishlistItems.length === 0 ? (
+              <View style={styles.wishlistEmpty}>
+                <Text style={styles.wishlistEmptyText}>还没有心愿单哦{'\n'}AI 推荐时会自动加入</Text>
+              </View>
+            ) : (
+              wishlistItems.map(wish => (
+                <View key={wish.wish_id} style={styles.wishItem}>
+                  <View style={styles.wishItemImg}>
+                    {wish.image_url
+                      ? <Image source={{ uri: wish.image_url }} style={styles.image} resizeMode="cover" />
+                      : <View style={styles.wishImgPlaceholder}><CategoryIcon category={wish.category} size={32} color={Colors.walnut2} /></View>
+                    }
+                  </View>
+                  <View style={styles.wishItemInfo}>
+                    <Text style={styles.wishItemName} numberOfLines={1}>{wish.name}</Text>
+                    <Text style={styles.wishItemMeta}>{wish.category} · {wish.color} · {wish.source === 'ai_recommended' ? '来自AI推荐' : '手动添加'}</Text>
+                  </View>
+                  <View style={styles.wishItemActions}>
+                    <TouchableOpacity style={styles.wishAddBtn} onPress={() => handleMoveToWardrobe(wish.wish_id)}>
+                      <Text style={styles.wishAddBtnText}>转入衣橱</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => removeItem(wish.wish_id)}>
+                      <Text style={styles.wishRemoveText}>移除</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -375,79 +376,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two,
   },
   title: { ...T.pageTitle },
-  headerActions: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
 
-  searchBar: {
+  // Search
+  searchRow: {
     flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.four, marginBottom: Spacing.two,
+  },
+  searchBar: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    marginHorizontal: Spacing.four, marginBottom: Spacing.two,
     paddingHorizontal: Spacing.two, borderWidth: 1, borderColor: Colors.line,
   },
   searchIcon: { marginRight: Spacing.one },
   searchInput: { ...T.inputText, flex: 1, paddingVertical: Spacing.two, color: Colors.ink },
 
+  // Category pills — fixed 32px height, text only, count badge
   categoryList: { paddingHorizontal: Spacing.four, gap: Spacing.one, paddingBottom: Spacing.two },
-  catBtn: {
-    paddingHorizontal: Spacing.two, paddingVertical: Spacing.one + 2,
-    borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.line,
-    backgroundColor: Colors.paperCard, alignItems: 'center', gap: 2,
+  catPill: {
+    position: 'relative',
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 16, borderWidth: 1, borderColor: '#E8E6E3',
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  catBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  catEmoji: { fontSize: 14 },
-  catText: { ...T.tag, fontSize: 11, color: Colors.walnut },
-  catTextActive: { ...T.tag, fontSize: 11, color: Colors.paper },
-  catBadge: {
-    minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+  catPillActive: { backgroundColor: '#2C2C2C', borderColor: '#2C2C2C' },
+  catPillText: { fontSize: 12, fontWeight: '500', color: '#1A1A1A' },
+  catPillTextActive: { color: '#fff' },
+  catCount: {
+    position: 'absolute', top: -5, right: -5,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#E8E6E3', alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  catBadgeActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  catBadgeText: { fontSize: 10, fontWeight: '600', color: Colors.walnut },
-  catBadgeTextActive: { color: Colors.paper },
+  catCountActive: { backgroundColor: '#D4D2CF' },
+  catCountText: { fontSize: 10, fontWeight: '600', color: '#8A8A8A' },
+  catCountTextActive: { color: '#666' },
 
   scrollContent: { flex: 1 },
 
-  section: {
-    marginHorizontal: Spacing.four, marginBottom: Spacing.three,
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.three, borderWidth: 1, borderColor: Colors.line,
-  },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.two },
-  sectionHeaderLeft: { flex: 1, gap: 2 },
-  sectionTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  sectionSub: { ...T.micro, color: Colors.walnut },
-  sectionMore: { ...T.bodyText, fontSize: 22, color: Colors.walnut2, marginTop: Spacing.one },
-
-  quickAddList: { gap: Spacing.two },
-  quickAddCard: { width: 120, gap: Spacing.one },
-  quickAddImage: {
-    width: 120, height: 120, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
-  },
-  quickAddName: { ...T.tag, fontSize: 12, color: Colors.ink, fontWeight: '500' },
-  quickAddMeta: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
-  quickAddPlus: {
-    width: 120, height: 120, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
-    alignItems: 'center', justifyContent: 'center', gap: 4,
-  },
-  quickAddPlusText: { ...T.micro, color: Colors.walnut2 },
-
-  wishlistCount: { ...T.tag, fontSize: 12, color: '#6C5CE7', fontWeight: '500' },
-  wishlistList: { gap: Spacing.two },
-  wishCard: { width: 200, gap: Spacing.one, backgroundColor: Colors.paper, borderRadius: Radius.md, padding: Spacing.two, borderWidth: 1, borderColor: Colors.line },
-  wishImage: { width: '100%', height: 140, borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
-  wishImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  wishName: { ...T.tag, fontSize: 13, color: Colors.ink, fontWeight: '600' },
-  wishMeta: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
-  wishActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one },
-  wishMoveBtn: {
-    paddingHorizontal: Spacing.two, paddingVertical: Spacing.one,
-    backgroundColor: Colors.ink, borderRadius: Radius.sm,
-  },
-  wishMoveText: { ...T.micro, fontSize: 11, color: Colors.paper, fontWeight: '600' },
-  wishRemoveText: { ...T.micro, fontSize: 11, color: Colors.terracotta },
-
+  // Wardrobe grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.four, gap: Spacing.two },
   card: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
@@ -463,6 +430,40 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.six, marginTop: Spacing.six },
   emptyTitle: { ...T.emptyTitle },
   emptySub: { ...T.itemDesc, textAlign: 'center' },
+
+  // Wishlist entry (bottom of page)
+  wishlistEntry: { paddingHorizontal: Spacing.four, marginTop: Spacing.three },
+  wishlistEntryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 14, backgroundColor: '#FFF0F5', borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(232,67,147,0.15)',
+  },
+  wishlistEntryIcon: { fontSize: 20, color: '#E84393' },
+  wishlistEntryLabel: { fontSize: 14, fontWeight: '600', color: '#E84393' },
+  wishlistEntryBadge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#E84393', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  wishlistEntryBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  wishlistEntryArrow: { marginLeft: 'auto', fontSize: 16, color: '#E84393' },
+
+  // Quick add entry
+  quickAddEntry: { paddingHorizontal: Spacing.four, marginTop: Spacing.two, marginBottom: Spacing.four },
+  quickAddEntryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 14, backgroundColor: '#FAFAFA', borderRadius: 14,
+    borderWidth: 1.5, borderColor: '#E0E0E0', borderStyle: 'dashed',
+  },
+  quickAddEntryIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: '#667eea', alignItems: 'center', justifyContent: 'center',
+  },
+  quickAddEntryIconText: { fontSize: 18 },
+  quickAddEntryInfo: { flex: 1 },
+  quickAddEntryTitle: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
+  quickAddEntrySub: { fontSize: 11, color: '#8A8A8A', marginTop: 2 },
+  quickAddEntryArrow: { fontSize: 14, color: '#8A8A8A' },
 
   fab: {
     position: 'absolute', bottom: Spacing.four + 60, right: Spacing.four,
@@ -501,4 +502,35 @@ const styles = StyleSheet.create({
   },
   linkImportBtnText: { ...T.buttonPrimary, color: Colors.paper },
   disabled: { opacity: 0.6 },
+
+  // Wishlist overlay (full page)
+  wishlistOverlay: { flex: 1, backgroundColor: Colors.paper },
+  wishlistHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
+    borderBottomWidth: 1, borderBottomColor: Colors.line,
+  },
+  wishlistBack: { fontSize: 16, fontWeight: '600', color: Colors.ink },
+  wishlistTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
+  wishlistCountText: { fontSize: 13, color: Colors.walnut2, marginLeft: 'auto' },
+  wishlistBody: { flex: 1, padding: Spacing.four },
+  wishlistEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
+  wishlistEmptyText: { fontSize: 14, color: Colors.walnut2, textAlign: 'center', lineHeight: 24 },
+  wishItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 12,
+    ...Shadow.one,
+  },
+  wishItemImg: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.vintageCream },
+  wishImgPlaceholder: { width: 64, height: 64, borderRadius: 12, backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
+  wishItemInfo: { flex: 1, minWidth: 0 },
+  wishItemName: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 4 },
+  wishItemMeta: { fontSize: 12, color: Colors.walnut2 },
+  wishItemActions: { flexDirection: 'column', gap: 6, flexShrink: 0 },
+  wishAddBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: '#2C2C2C',
+  },
+  wishAddBtnText: { fontSize: 11, fontWeight: '600', color: '#fff' },
+  wishRemoveText: { fontSize: 11, color: '#FF3B30', textAlign: 'center' },
 });

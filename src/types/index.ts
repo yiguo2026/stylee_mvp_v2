@@ -216,6 +216,14 @@ export interface InspirationCard {
   comment: string;
   occasion?: string;
   sort_order?: number;
+  items?: InspirationItem[];
+}
+
+export interface InspirationItem {
+  name: string;
+  category: string;
+  color: string;
+  image_url?: string;
 }
 
 export interface BodyModel {
@@ -241,20 +249,25 @@ export const OCCASION_TAGS: FilterTag[] = [
 ];
 
 export const STYLE_TAGS: FilterTag[] = [
-  { id: 'korean', label: '韩系风', type: 'style', selected: false },
-  { id: 'sweet', label: '甜美风', type: 'style', selected: false },
-  { id: 'new_chinese', label: '新中式', type: 'style', selected: false },
+  { id: 'quiet_luxury', label: '静奢/老钱', type: 'style', selected: false },
+  { id: 'minimalist', label: '极简', type: 'style', selected: false },
+  { id: 'commute_style', label: '通勤职场', type: 'style', selected: false },
+  { id: 'french', label: '法式慵懒', type: 'style', selected: false },
   { id: 'preppy', label: '学院风', type: 'style', selected: false },
-  { id: 'city_chic', label: '都市风', type: 'style', selected: false },
-  { id: 'artsy', label: '文艺风', type: 'style', selected: false },
-  { id: 'sporty_casual', label: '运动休闲', type: 'style', selected: false },
-  { id: 'commute_style', label: '通勤风', type: 'style', selected: false },
-  { id: 'french', label: '法式', type: 'style', selected: false },
-  { id: 'maillard', label: '美拉德风', type: 'style', selected: false },
-  { id: 'japanese', label: '日系风', type: 'style', selected: false },
-  { id: 'business', label: '商务风', type: 'style', selected: false },
-  { id: 'american', label: '美式', type: 'style', selected: false },
-  { id: 'british', label: '英伦风', type: 'style', selected: false },
+  { id: 'safari', label: '猎装风', type: 'style', selected: false },
+  { id: 'vintage', label: '复古年代', type: 'style', selected: false },
+  { id: 'street', label: '街头潮流', type: 'style', selected: false },
+  { id: 'sporty_casual', label: '运动机能', type: 'style', selected: false },
+  { id: 'rock', label: '摇滚机车', type: 'style', selected: false },
+  { id: 'goth', label: '哥特暗黑', type: 'style', selected: false },
+  { id: 'sweet', label: '甜美少女', type: 'style', selected: false },
+  { id: 'romantic', label: '浪漫田园', type: 'style', selected: false },
+  { id: 'bohemian', label: '波西米亚/度假', type: 'style', selected: false },
+  { id: 'western', label: '西部牛仔', type: 'style', selected: false },
+  { id: 'utility', label: '工装实用', type: 'style', selected: false },
+  { id: 'wabi_sabi', label: '日系侘寂', type: 'style', selected: false },
+  { id: 'avantgarde', label: '先锋设计师', type: 'style', selected: false },
+  { id: 'urban_cool', label: '都市酷感', type: 'style', selected: false },
 ];
 
 export const COLOR_TAGS: FilterTag[] = [
@@ -283,22 +296,7 @@ export const PRESET_STYLE_PREFERENCES: StyleTag[] = STYLE_TAGS.map(t => ({
   tag_type: 'style' as TagType,
 }));
 
-export const PRESET_STYLE_DISLIKES: StyleTag[] = [
-  { tag_id: 'punk', tag_name: '朋克', tag_type: 'style' },
-  { tag_id: 'oversize', tag_name: 'Oversize', tag_type: 'style' },
-  { tag_id: 'dark', tag_name: '暗黑', tag_type: 'style' },
-  { tag_id: 'hiphop', tag_name: '嘻哈', tag_type: 'style' },
-  { tag_id: 'sexy', tag_name: '性感', tag_type: 'style' },
-  { tag_id: 'avantgarde', tag_name: '前卫', tag_type: 'style' },
-  { tag_id: 'ethnic', tag_name: '民族', tag_type: 'style' },
-  { tag_id: 'luxury', tag_name: '奢华', tag_type: 'style' },
-  { tag_id: 'logo_mania', tag_name: '大Logo', tag_type: 'style' },
-  { tag_id: 'neon', tag_name: '荧光色', tag_type: 'style' },
-  { tag_id: 'sheer', tag_name: '透视', tag_type: 'style' },
-  { tag_id: 'crop', tag_name: '露脐', tag_type: 'style' },
-  { tag_id: 'matchy', tag_name: '成套穿', tag_type: 'style' },
-  { tag_id: 'childlike', tag_name: '幼稚', tag_type: 'style' },
-];
+export const PRESET_STYLE_DISLIKES: StyleTag[] = [];
 
 // ── Tag Display Mapping (v2) ───────────────────────────
 
@@ -307,16 +305,13 @@ export const TAG_DISPLAY: Record<string, string> = {
   commute: '通勤', date: '约会', travel: '出游', casual: '休闲',
   work: '职场', sport: '运动',
   // Style
-  korean: '韩系风', sweet: '甜美风', new_chinese: '新中式',
-  preppy: '学院风', city_chic: '都市风', artsy: '文艺风',
-  sporty_casual: '运动休闲', commute_style: '通勤风',
-  french: '法式', maillard: '美拉德风', japanese: '日系风',
-  business: '商务风', american: '美式', british: '英伦风',
-  // Dislike styles
-  punk: '朋克', oversize: 'Oversize', dark: '暗黑', hiphop: '嘻哈',
-  sexy: '性感', avantgarde: '前卫', ethnic: '民族', luxury: '奢华',
-  logo_mania: '大Logo', neon: '荧光色', sheer: '透视', crop: '露脐',
-  matchy: '成套穿', childlike: '幼稚',
+  quiet_luxury: '静奢/老钱', minimalist: '极简', commute_style: '通勤职场',
+  french: '法式慵懒', preppy: '学院风', safari: '猎装风',
+  vintage: '复古年代', street: '街头潮流', sporty_casual: '运动机能',
+  rock: '摇滚机车', goth: '哥特暗黑', sweet: '甜美少女',
+  romantic: '浪漫田园', bohemian: '波西米亚/度假', western: '西部牛仔',
+  utility: '工装实用', wabi_sabi: '日系侘寂', avantgarde: '先锋设计师',
+  urban_cool: '都市酷感',
   // Color system
   black: '黑色系', white: '白色系', gray: '灰色系',
   blue: '蓝色系', green: '绿色系', warm: '暖色系',
@@ -326,9 +321,8 @@ export const TAG_DISPLAY: Record<string, string> = {
   // Legacy compatibility
   daily: '日常', party: '派对', interview: '面试',
   ceremony: '典礼', holiday: '度假', gathering: '聚会',
-  elegant: '优雅', street: '街头', minimalist: '极简',
-  vintage: '复古', old_money: '老钱风', bohemian: '波西米亚',
-  cool: '酷帅', romantic: '浪漫', neutral: '中性',
+  elegant: '优雅', cool: '酷帅', neutral: '中性',
+  old_money: '老钱风',
   black_white: '黑白', pastel: '马卡龙', earth: '大地色',
   jewel: '宝石色', monochrome: '单色系',
 };

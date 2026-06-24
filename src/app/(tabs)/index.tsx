@@ -28,33 +28,54 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
     card_id: 'insp-1',
     title: '法式温柔风',
     image_url: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=600&h=800&fit=crop',
-    style_tags: ['french', 'artsy'],
+    style_tags: ['french', 'romantic'],
     comment: '巴黎街头的慵懒与精致',
     occasion: '约会',
+    items: [
+      { name: '针织开衫', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1583744946564-b53ac1efb997?w=300&h=300&fit=crop' },
+      { name: '白色T恤', category: '上装', color: '白色', image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop' },
+      { name: '蓝色牛仔裤', category: '下装', color: '蓝色', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop' },
+      { name: '帆布鞋', category: '鞋', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
+    ],
   },
   {
     card_id: 'insp-2',
     title: '通勤简约风',
     image_url: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=600&h=800&fit=crop',
-    style_tags: ['commute_style', 'city_chic'],
+    style_tags: ['commute_style', 'minimalist'],
     comment: '用基本款穿出高级感',
     occasion: '职场',
+    items: [
+      { name: '白衬衫', category: '上装', color: '白色', image_url: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=300&h=300&fit=crop' },
+      { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
+      { name: '小白鞋', category: '鞋', color: '白色', image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=300&fit=crop' },
+    ],
   },
   {
     card_id: 'insp-3',
-    title: '韩系甜美风',
+    title: '甜美少女风',
     image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&h=800&fit=crop',
-    style_tags: ['korean', 'sweet'],
+    style_tags: ['sweet', 'romantic'],
     comment: '清新温柔的日常穿搭',
     occasion: '休闲',
+    items: [
+      { name: '白色连衣裙', category: '连体装', color: '白色', image_url: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=300&h=300&fit=crop' },
+      { name: '帆布鞋', category: '鞋', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
+    ],
   },
   {
     card_id: 'insp-4',
-    title: '新中式雅韵',
+    title: '静奢老钱风',
     image_url: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&h=800&fit=crop',
-    style_tags: ['new_chinese'],
-    comment: '东方美学的现代表达',
-    occasion: '约会',
+    style_tags: ['quiet_luxury', 'minimalist'],
+    comment: '低调质感的从容优雅',
+    occasion: '职场',
+    items: [
+      { name: '针织衫', category: '上装', color: '米色', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cda3a7a?w=300&h=300&fit=crop' },
+      { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
+      { name: '米色风衣', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=300&h=300&fit=crop' },
+      { name: '双肩包', category: '包', color: '黑色', image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=300&h=300&fit=crop' },
+    ],
   },
 ];
 
@@ -132,15 +153,18 @@ export default function OutfitTab() {
   };
 
   const handleInspire = (card: InspirationCard) => {
+    const tagStr = card.occasion ? `${card.style_tags[0] ?? ''} · ${card.occasion}` : card.style_tags.join(' · ');
+    const itemsStr = card.items ? encodeURIComponent(JSON.stringify(card.items)) : '';
     router.push({
-      pathname: '/outfit/result',
+      pathname: '/outfit/inspiration',
       params: {
-        city: weather.city,
-        temp: weather.temp,
-        weather: weather.condition,
-        query: '',
-        tags: card.style_tags.join(','),
-        inputMode: 'tags',
+        title: encodeURIComponent(card.title || ''),
+        tag: encodeURIComponent(tagStr),
+        desc: encodeURIComponent(card.comment || ''),
+        image_url: encodeURIComponent(card.image_url || ''),
+        style_tags: encodeURIComponent(card.style_tags.join(',')),
+        occasion_tags: encodeURIComponent(card.occasion || ''),
+        items: itemsStr,
       },
     });
   };
@@ -321,7 +345,9 @@ export default function OutfitTab() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.inspirationRow}>
               {inspirations.map(card => (
-                <View key={card.card_id} style={styles.inspirationCard}>
+                <TouchableOpacity key={card.card_id} style={styles.inspirationCard}
+                  onPress={() => handleInspire(card)} activeOpacity={0.8}
+                >
                   {card.image_url ? (
                     <Image source={{ uri: card.image_url }} style={styles.inspirationImage} resizeMode="cover" />
                   ) : (
@@ -329,21 +355,17 @@ export default function OutfitTab() {
                       <MaterialCommunityIcons name="hanger" size={32} color={Colors.walnut2} />
                     </View>
                   )}
-                  <View style={styles.inspirationTags}>
-                    {card.style_tags.slice(0, 2).map((tag, i) => (
-                      <View key={i} style={styles.inspirationTag}>
-                        <Text style={styles.inspirationTagText}>{tag}</Text>
-                      </View>
-                    ))}
+                  <View style={styles.inspirationInfo}>
+                    <View style={styles.inspirationTags}>
+                      {card.style_tags.slice(0, 2).map((tag, i) => (
+                        <View key={i} style={styles.inspirationTag}>
+                          <Text style={styles.inspirationTagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <Text style={styles.inspirationComment} numberOfLines={2}>{card.comment}</Text>
                   </View>
-                  <Text style={styles.inspirationComment} numberOfLines={2}>{card.comment}</Text>
-                  <TouchableOpacity
-                    style={styles.inspireBtn}
-                    onPress={() => handleInspire(card)}
-                  >
-                    <Text style={styles.inspireBtnText}>以此推荐</Text>
-                  </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </ScrollView>
@@ -507,15 +529,16 @@ const styles = StyleSheet.create({
   inspirationTitle: { ...T.subTitle },
   inspirationRow: { flexDirection: 'row', gap: Spacing.two },
   inspirationCard: {
-    width: SCREEN_W * 0.6, backgroundColor: Colors.paperCard,
+    width: SCREEN_W * 0.38, backgroundColor: Colors.paperCard,
     borderRadius: Radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.line,
   },
   inspirationImage: {
-    width: '100%', height: 160, backgroundColor: Colors.vintageCream,
+    width: '100%', aspectRatio: 3 / 4, backgroundColor: Colors.vintageCream,
     alignItems: 'center', justifyContent: 'center',
   },
-  inspirationTags: { flexDirection: 'row', gap: 4, paddingVertical: Spacing.one, paddingHorizontal: Spacing.two },
+  inspirationInfo: { padding: Spacing.two, gap: 4 },
+  inspirationTags: { flexDirection: 'row', gap: 4 },
   inspirationTag: {
     backgroundColor: Colors.ink, borderRadius: Radius.sm,
     paddingHorizontal: 6, paddingVertical: 2,
@@ -523,14 +546,8 @@ const styles = StyleSheet.create({
   inspirationTagText: { ...T.micro, color: Colors.paper, fontSize: 10 },
   inspirationComment: {
     ...T.bodyText, fontSize: 12, lineHeight: 18,
-    paddingHorizontal: Spacing.two, color: Colors.walnut,
+    color: Colors.walnut,
   },
-  inspireBtn: {
-    margin: Spacing.two, backgroundColor: Colors.terracotta,
-    borderRadius: Radius.sm, paddingVertical: Spacing.one + 2,
-    alignItems: 'center',
-  },
-  inspireBtnText: { ...T.tag, color: Colors.paper, fontSize: 12 },
 
   // ── AI Try-on (P2) ──
   tryOnSection: {

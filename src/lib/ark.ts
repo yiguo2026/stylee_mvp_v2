@@ -1,4 +1,5 @@
-const ARK_API_KEY = process.env.EXPO_PUBLIC_ARK_API_KEY ?? 'ark-437e1a36-ea95-44dd-9f95-4a9091c0b287-d6c81';
+// 省钱模式：清空 key 即跳过所有 Ark API 调用，恢复时填回原 key
+const ARK_API_KEY = process.env.EXPO_PUBLIC_ARK_API_KEY ?? '';
 const ARK_VLM_MODEL = 'doubao-seed-2-0-pro-260215';
 const ARK_IMAGE_MODEL = 'doubao-seedream-5-0-260128';
 const ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
