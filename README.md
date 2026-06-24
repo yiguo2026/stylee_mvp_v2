@@ -9,10 +9,10 @@
 - **前端**：Expo SDK 55 + TypeScript + Expo Router（文件路由）
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
 - **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动 fallback 到本地 mock）
-- **AI**：DeepSeek API（意图识别、穿搭推荐、穿搭理由，JSON mode）+ 火山方舟 Seed 2.0 Pro（多模态衣物识别、试穿建议，自动 fallback 到 mock）
-- **部署**：Vercel（静态 SPA，暂不可用）+ EAS Build（iOS）
+- **AI**：DeepSeek API（意图识别、穿搭推荐、穿搭理由，JSON mode）；火山方舟 API 已关闭（节省成本）
+- **部署**：Vercel（静态 SPA）+ EAS Build（iOS）
 - **状态管理**：Zustand
-- **样式**：全局设计规范（三字体体系 / 暖色配色 / 图标系统）
+- **样式**：全局设计规范（三字体体系 / 暖色配色 / emoji 图标系统）
 
 ## 功能
 
@@ -23,23 +23,35 @@
 
 ### Onboarding 引导（3步）
 - Step1：个人信息（昵称、性别、年龄、职业、城市搜索选择）
-- Step2：风格偏好（26个喜欢标签 + 14个不喜欢标签，Web端支持不喜欢按钮）
+- Step2：风格偏好（19个喜欢标签，点击选择）
 - Step3：初始化衣橱（15件AI推荐基础款 + 相册批量导入，可同时选择两类，真实服装图片）
 
+### 首页
+- 穿搭灵感卡片（竖版图片，点击进入灵感详情页）
+- 灵感详情页（大图展示 + 风格标签 + 单品拆解模块）
+- 天气信息 + 快捷穿搭入口
+
 ### 衣橱管理
-- 添加衣物（拍照 / 相册选择，Supabase Storage 上传）
-- 批量导入（从相册多选一键导入）
-- 衣橱搜索（名称、颜色、品牌）
+- 紧凑分类标签（上装/下装/连体装/外套/鞋/包/帽子/围巾，带数量角标）
+- 模糊搜索（支持同义词匹配，如"裤子"→下装/阔腿裤/短裤）
 - 单品详情查看 + 编辑（照片、名称、分类、颜色、材质、品牌、价格）
 - 单品删除（自定义 ConfirmModal，Web 兼容）
+- 心愿单（页面底部粉色入口卡片，全屏弹窗展示）
+- 快速添加入口（虚线边框卡片）
 
 ### 穿搭推荐
 - 实时天气卡片（和风天气 API，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动匹配温度标签）
 - 自然语言输入（DeepSeek 意图识别，自动匹配标签）
-- 场合/风格/色系/温度标签筛选（场合10个、风格14个、色系8个、温度4个）
+- 场合/风格/色系/温度标签筛选（场合10个、风格19个、色系8个、温度4个）
 - AI 穿搭推荐（DeepSeek 生成搭配方案 + AI评论）
 - 穿搭结果：方案展示、AI点评、收藏、单品替换
 - 穿搭历史记录
+
+### AI 试穿
+- 选择搭配单品
+- 场景风格选择（咖啡馆/街道/办公室/公园/居家）
+- AI 图片生成（doubao-seedream，失败时 fallback 到预置场景图）
+- 试穿效果图保存
 
 ### Web 兼容
 - ConfirmModal 替代 Alert.alert 多按钮弹窗
@@ -55,10 +67,10 @@
 | 表 | 用途 |
 |---|---|
 | `users` | 用户资料（含 avatar_url、body_shape） |
-| `tags` | 风格标签（v2: 6场合+14喜欢+14不喜欢+8色系） |
-| `user_style_preferences` | 用户风格偏好（like/dislike） |
-| `wardrobe_items` | 衣橱单品（v2: 多图、季节、场合、版型、购买日期） |
-| `outfits` | 穿搭组合（v2: 风格标签、场合、温度范围、试穿图） |
+| `tags` | 风格标签（19个风格偏好标签） |
+| `user_style_preferences` | 用户风格偏好（仅 like） |
+| `wardrobe_items` | 衣橱单品（多图、季节、场合、版型、购买日期） |
+| `outfits` | 穿搭组合（风格标签、场合、温度范围、试穿图） |
 | `outfit_items` | 穿搭-衣橱关联 |
 | `outfit_favorites` | 收藏搭配 |
 | `wishlist_items` | 心愿单 |
@@ -86,8 +98,6 @@ npx expo start
 | `EXPO_PUBLIC_QWEATHER_HOST` | 和风天气 API Host（商业版需自定义） | QWeather 控制台 |
 | `EXPO_PUBLIC_DEEPSEEK_KEY` | DeepSeek API Key（可选） | [platform.deepseek.com](https://platform.deepseek.com/) |
 | `EXPO_PUBLIC_DEEPSEEK_HOST` | DeepSeek API Host（可选，默认 api.deepseek.com） | — |
-| `EXPO_PUBLIC_ARK_API_KEY` | 火山方舟 API Key（可选，已内置默认值） | [console.volcengine.com/ark](https://console.volcengine.com/ark) |
-| `EXPO_PUBLIC_ARK_ENDPOINT_ID` | 火山方舟推理接入点 ID（可选，AI识别功能需配置） | 火山方舟控制台 |
 
 > 不配置 `EXPO_PUBLIC_QWEATHER_KEY` 时，天气数据将使用本地 mock 数据；不配置 `EXPO_PUBLIC_DEEPSEEK_KEY` 时，AI 功能将使用本地 mock 数据，均不影响其他功能。
 
@@ -103,7 +113,7 @@ npx expo run:ios          # 本地模拟器运行
 
 ```bash
 npm run build:web        # 构建到 dist/
-# Vercel 部署（网络恢复后可用）：
+# Vercel 部署：
 vercel --yes
 ```
 
@@ -136,6 +146,8 @@ vercel --yes
 | `e6be990` | v0.7.0：穿搭结果页改版 + 首页/个人页精简 + 天气增强 + pg依赖 |
 | `87806db` | v0.7.1：接入真实和风天气API（55城市本地ID映射，修复GeoAPI 403 fallback mock问题） |
 | — | v0.8.0：iOS App Store 适配（Bundle ID / 隐私声明 / 权限清理 / 设置持久化 / 隐私政策 / EAS Build 配置） |
+| `67fa832` | v0.9.0：对齐原型图 — 资源文件+emoji图标+Unsplash图片+场景试穿+模板推荐 |
+| `e1213fe` | v0.9.1：灵感详情页+衣橱改版+风格标签重构+关闭Ark API |
 
 ## 项目结构
 
@@ -143,14 +155,17 @@ vercel --yes
 src/
   app/
     (auth)/         # 登录、注册
-    (tabs)/         # 首页（穿搭推荐）、衣橱、记录、我的
+    (tabs)/         # 首页（穿搭灵感+推荐）、衣橱、记录、我的
     onboarding/     # 引导流程 step1-info / step2-style / step3-wardrobe
-    outfit/         # 穿搭结果页
+    outfit/         # 穿搭结果页 / 灵感详情页 / AI试穿
     profile/        # 风格偏好编辑 / 设置页
     wardrobe/       # 添加衣物 / 单品详情 / 单品编辑 / 批量导入
   components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon
   constants/        # theme（配色、字体、间距、圆角、阴影）
-  lib/              # supabase / deepseek / ark（火山方舟多模态API） / ai（AI业务层） / weather（和风天气API） / uploadImage / mock（天气、推荐、识别）
+  lib/              # supabase / deepseek / ark / ai / weather / uploadImage / mock
   stores/           # userStore / wardrobeStore / wishlistStore
-  types/            # TypeScript 类型 + 统一标签定义（TAG_DISPLAY / PRESET_STYLE_PREFERENCES / PRESET_STYLE_DISLIKES / FilterTags）
+  types/            # TypeScript 类型 + 统一标签定义
+assets/
+  logo.png          # Stylee Logo
+  tryon/            # AI试穿预置场景图（7张）
 ```
