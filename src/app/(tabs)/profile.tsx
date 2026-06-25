@@ -49,7 +49,6 @@ export default function ProfileTab() {
   }, [user?.id]);
 
   const liked = stylePreferences.filter(p => p.preference_type === 'like');
-  const favStyle = liked.length > 0 ? getTagName(liked[0].tag_id, liked[0].tag?.tag_name) : '—';
   const utilization = items.length > 0 ? Math.min(Math.round((savedOutfitCount / items.length) * 100), 100) : 0;
 
   return (
@@ -79,16 +78,6 @@ export default function ProfileTab() {
                 <Text style={styles.editBtn}>编辑资料</Text>
               </TouchableOpacity>
             </View>
-          </View>
-          <View style={styles.profileMeta}>
-            <Text style={styles.profileMetaTag}>
-              入驻 {profile?.created_at
-                ? Math.max(1, Math.ceil((Date.now() - new Date(profile.created_at).getTime()) / 86400000))
-                : 1} 天
-            </Text>
-            <Text style={styles.profileMetaTag}>
-              {liked.length > 0 ? getTagName(liked[0].tag_id, liked[0].tag?.tag_name) + '风' : '风格探索中'}
-            </Text>
           </View>
         </View>
 
@@ -198,11 +187,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three, paddingVertical: 4,
     borderRadius: Radius.xl, backgroundColor: '#F0EDFF',
     overflow: 'hidden', marginTop: 4, alignSelf: 'flex-start',
-  },
-  profileMeta: { flexDirection: 'row', gap: Spacing.two },
-  profileMetaTag: {
-    ...T.micro, paddingHorizontal: Spacing.two, paddingVertical: 2,
-    borderRadius: Radius.sm, backgroundColor: Colors.vintageCream, overflow: 'hidden',
   },
 
   // Stats
