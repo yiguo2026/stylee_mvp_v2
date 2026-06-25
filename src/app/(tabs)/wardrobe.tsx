@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  FlatList, Image, SafeAreaView, RefreshControl,
+  Image, SafeAreaView, RefreshControl,
   useWindowDimensions, TextInput, Modal, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -195,39 +195,39 @@ export default function WardrobeTab() {
         </View>
       </View>
 
-      {/* Category Pills — text only, count badge, fixed height */}
-      <FlatList
-        data={CLOTHING_CATEGORIES_WITH_ALL}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={c => c}
-        contentContainerStyle={styles.categoryList}
-        renderItem={({ item: cat }) => {
-          const count = counts[cat] ?? 0;
-          return (
-            <TouchableOpacity
-              style={[styles.catPill, selectedCategory === cat && styles.catPillActive]}
-              onPress={() => setSelectedCategory(cat)}
-            >
-              <Text style={[styles.catPillText, selectedCategory === cat && styles.catPillTextActive]}>
-                {cat}
-              </Text>
-              {count > 0 && (
-                <View style={[styles.catCount, selectedCategory === cat && styles.catCountActive]}>
-                  <Text style={[styles.catCountText, selectedCategory === cat && styles.catCountTextActive]}>
-                    {count}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        }}
-      />
-
       <ScrollView
         style={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {/* Category Pills — text only, count badge, fixed height */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryList}
+        >
+          {CLOTHING_CATEGORIES_WITH_ALL.map(cat => {
+            const count = counts[cat] ?? 0;
+            return (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.catPill, selectedCategory === cat && styles.catPillActive]}
+                onPress={() => setSelectedCategory(cat)}
+              >
+                <Text style={[styles.catPillText, selectedCategory === cat && styles.catPillTextActive]}>
+                  {cat}
+                </Text>
+                {count > 0 && (
+                  <View style={[styles.catCount, selectedCategory === cat && styles.catCountActive]}>
+                    <Text style={[styles.catCountText, selectedCategory === cat && styles.catCountTextActive]}>
+                      {count}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
         {/* My Wardrobe Grid (first) */}
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
@@ -261,7 +261,7 @@ export default function WardrobeTab() {
 
         {/* Quick Add Section */}
         <View style={styles.quickAddEntry}>
-          <TouchableOpacity style={styles.quickAddEntryBtn} onPress={() => router.push('/wardrobe/add')}>
+          <TouchableOpacity style={styles.quickAddEntryBtn} onPress={() => router.push('/wardrobe/quick-add')}>
             <View style={styles.quickAddEntryIcon}>
               <Text style={styles.quickAddEntryIconText}>✨</Text>
             </View>

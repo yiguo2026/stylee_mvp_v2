@@ -87,10 +87,15 @@ export default function OutfitResultScreen() {
 
   const currentOutfit = outfits[currentIndex];
 
-  const handleWear = async () => {
-    if (!currentOutfit || !user) return;
+  const handleWear = async (): Promise<string | null> => {
+    if (!currentOutfit || !user) return null;
     setSaving(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert('登录已过期', '请重新登录后再保存');
+        return null;
+      }
       const { data, error } = await supabase
         .from('outfits')
         .insert({
@@ -102,16 +107,24 @@ export default function OutfitResultScreen() {
         })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        console.warn('[handleWear] insert error:', error.code, error.message);
+        throw error;
+      }
       const outfitId = data.outfit_id;
       const itemRows = (currentOutfit.items ?? []).map((oi, idx) => ({
         outfit_id: outfitId, item_id: oi.item_id, display_order: idx,
       }));
-      if (itemRows.length > 0) await supabase.from('outfit_items').insert(itemRows);
+      if (itemRows.length > 0) {
+        const { error: itemsError } = await supabase.from('outfit_items').insert(itemRows);
+        if (itemsError) console.warn('[handleWear] outfit_items insert error:', itemsError.message);
+      }
       setSavedId(outfitId);
       setShowSavedConfirm(true);
+      return outfitId;
     } catch (e: any) {
       Alert.alert('保存失败', e.message);
+      return null;
     } finally {
       setSaving(false);
     }
@@ -119,19 +132,27 @@ export default function OutfitResultScreen() {
 
   const handleFavorite = async () => {
     if (!currentOutfit || !user) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      Alert.alert('登录已过期', '请重新登录后再操作');
+      return;
+    }
     if (isFavorited) {
-      // Unfavorite
       await supabase.from('outfit_favorites').delete()
         .eq('user_id', user.id)
         .eq('outfit_id', currentOutfit.outfit_id);
       setIsFavorited(false);
     } else {
-      // Need to save outfit first if not saved
-      if (!savedId) await handleWear();
-      const outfitId = savedId ?? currentOutfit.outfit_id;
-      await supabase.from('outfit_favorites').insert({
+      // Save outfit first if not saved, get real DB outfit_id
+      let outfitId = savedId;
+      if (!outfitId) {
+        outfitId = await handleWear();
+        if (!outfitId) return;
+      }
+      const { error: favError } = await supabase.from('outfit_favorites').insert({
         user_id: user.id, outfit_id: outfitId,
       });
+      if (favError) console.warn('[handleFavorite] insert error:', favError.message);
       setIsFavorited(true);
     }
   };

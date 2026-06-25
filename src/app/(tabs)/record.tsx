@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
   Modal, FlatList,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
@@ -19,9 +21,6 @@ interface SavedOutfit {
   source: string;
   created_at: string;
   is_favorited?: boolean;
-  occasion_tag?: string;
-  temp_range?: string;
-  style_tags?: string[];
   items?: OutfitItemDetail[];
 }
 
@@ -53,6 +52,7 @@ type RecordTab = 'worn' | 'favorite';
 // ── Main Component ────────────────────────────────────────
 export default function RecordTab() {
   const { user } = useUserStore();
+  const params = useLocalSearchParams<{ tab?: string }>();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -74,9 +74,9 @@ export default function RecordTab() {
     const start = new Date(viewYear, viewMonth, 1).toISOString();
     const end = new Date(viewYear, viewMonth + 1, 0, 23, 59, 59).toISOString();
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('outfits')
-      .select('outfit_id, name, ai_comment, source, created_at, occasion_tag, temp_range, style_tags')
+      .select('outfit_id, name, ai_comment, source, created_at')
       .eq('user_id', user.id)
       .gte('created_at', start)
       .lte('created_at', end)
@@ -84,6 +84,7 @@ export default function RecordTab() {
 
     setLoading(false);
 
+    if (error) { console.warn('[Record] fetchMonthOutfits error:', error.message); return; }
     if (!data) return;
     const grouped: Record<string, SavedOutfit[]> = {};
     data.forEach((o: SavedOutfit) => {
@@ -97,15 +98,17 @@ export default function RecordTab() {
   // Fetch favorited outfits
   const fetchFavorites = useCallback(async () => {
     if (!user?.id) return;
-    const { data } = await supabase
+    const { data, error: favError } = await supabase
       .from('outfit_favorites')
       .select(`
         favorite_id,
         outfit_id,
-        outfits ( outfit_id, name, ai_comment, source, created_at, occasion_tag, temp_range, style_tags )
+        outfits ( outfit_id, name, ai_comment, source, created_at )
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
+
+    if (favError) { console.warn('[Record] fetchFavorites error:', favError.message); return; }
 
     if (data) {
       const favs: SavedOutfit[] = data
@@ -118,18 +121,19 @@ export default function RecordTab() {
           source: o.source,
           created_at: o.created_at,
           is_favorited: true,
-          occasion_tag: o.occasion_tag,
-          temp_range: o.temp_range,
-          style_tags: o.style_tags,
         }));
       setFavorites(favs);
     }
   }, [user?.id]);
 
-  useEffect(() => {
-    fetchMonthOutfits();
-    fetchFavorites();
-  }, [fetchMonthOutfits, fetchFavorites]);
+  useFocusEffect(
+    useCallback(() => {
+      if (params.tab === 'favorite') setActiveTab('favorite');
+      else if (params.tab === 'worn') setActiveTab('worn');
+      fetchMonthOutfits();
+      fetchFavorites();
+    }, [fetchMonthOutfits, fetchFavorites, params.tab])
+  );
 
   const openDetail = async (outfit: SavedOutfit) => {
     setDetailOutfit(outfit);

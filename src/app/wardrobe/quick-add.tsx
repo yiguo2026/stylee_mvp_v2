@@ -1,0 +1,239 @@
+import { useState } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet, Image,
+  ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
+} from 'react-native';
+import { router } from 'expo-router';
+import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { useUserStore } from '@/stores/userStore';
+import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
+import { CategoryIcon } from '@/components/CategoryIcon';
+
+const isWeb = Platform.OS === 'web';
+
+const CATEGORY_ICONS: Record<string, string> = {
+  '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
+  '外套': '🧥', '鞋': '👟', '包': '👜', '帽子': '🧢', '围巾': '🧣',
+};
+
+export default function QuickAddPage() {
+  const { user } = useUserStore();
+  const { addItem, fetchItems } = useWardrobeStore();
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
+  const [loading, setLoading] = useState(false);
+
+  const filteredItems = filterCategory === '全部'
+    ? PRESET_BASIC_ITEMS
+    : PRESET_BASIC_ITEMS.filter(i => i.category === filterCategory);
+
+  const toggleItem = (index: number) => {
+    const next = new Set(selected);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setSelected(next);
+  };
+
+  const selectAll = () => {
+    if (selected.size === filteredItems.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filteredItems.map((_, i) => PRESET_BASIC_ITEMS.indexOf(filteredItems[i]))));
+    }
+  };
+
+  const handleAdd = async () => {
+    if (!user?.id || selected.size === 0) return;
+    setLoading(true);
+    try {
+      for (const index of selected) {
+        const item = PRESET_BASIC_ITEMS[index];
+        await addItem({
+          user_id: user.id,
+          name: item.name,
+          category: item.category,
+          color: item.color,
+          material: item.material || undefined,
+          image_url: item.image_url || undefined,
+          source_type: 'manual',
+          source_label: '快速添加',
+          status: 'active',
+        });
+      }
+      await fetchItems(user.id);
+      if (isWeb) {
+        window.alert(`已添加 ${selected.size} 件单品到衣橱`);
+      } else {
+        Alert.alert('添加成功', `已添加 ${selected.size} 件单品到衣橱`);
+      }
+      if (router.canGoBack()) router.back();
+    } catch (e: any) {
+      if (isWeb) { window.alert('添加失败：' + (e.message || '请稍后重试')); } else { Alert.alert('添加失败', e.message || '请稍后重试'); }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => { if (router.canGoBack()) router.back(); }} hitSlop={12}>
+          <Text style={styles.headerBack}>← 返回</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>快速添加单品</Text>
+        <View style={{ width: 60 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.subtitle}>精选热销基础款，点击即可一键加入衣橱</Text>
+
+        <View style={styles.builtinSection}>
+          <View style={styles.builtinHeader}>
+            <Text style={styles.builtinHeaderTitle}>🧠 AI为你推荐</Text>
+            <TouchableOpacity onPress={selectAll}>
+              <Text style={styles.builtinSelectAll}>
+                {selected.size === filteredItems.length ? '取消全选' : '全选添加'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Category filter */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.categoryRow}>
+              {CLOTHING_CATEGORIES_WITH_ALL.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.catBtn, filterCategory === cat && styles.catBtnActive]}
+                  onPress={() => setFilterCategory(cat)}
+                >
+                  <Text style={styles.catEmoji}>{CATEGORY_ICONS[cat]}</Text>
+                  <Text style={[styles.catText, filterCategory === cat && styles.catTextActive]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          <View style={styles.builtinGrid}>
+            {filteredItems.map((item, i) => {
+              const realIndex = PRESET_BASIC_ITEMS.indexOf(item);
+              const isSelected = selected.has(realIndex);
+              return (
+                <TouchableOpacity
+                  key={realIndex}
+                  style={[styles.builtinItem, isSelected && styles.builtinItemSelected]}
+                  onPress={() => toggleItem(realIndex)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.builtinIcon, isSelected && styles.builtinIconSelected]}>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.builtinImg} resizeMode="cover" />
+                    ) : (
+                      <CategoryIcon category={item.category} size={24} color={isSelected ? '#6C5CE7' : Colors.walnut2} />
+                    )}
+                    {isSelected && (
+                      <View style={styles.builtinCheck}>
+                        <Text style={styles.builtinCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.builtinInfo}>
+                    <Text style={[styles.builtinName, isSelected && styles.builtinNameSelected]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.builtinDesc} numberOfLines={1}>{item.color} · {item.category}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.selectedCount}>
+            已选 {selected.size} 件
+          </Text>
+        </View>
+
+        {/* Add Button */}
+        <TouchableOpacity
+          style={[styles.addBtn, (selected.size === 0 || loading) && styles.addBtnDisabled]}
+          onPress={handleAdd}
+          disabled={selected.size === 0 || loading}
+        >
+          {loading
+            ? <ActivityIndicator color={Colors.paper} />
+            : <Text style={styles.addBtnText}>加入衣橱 ({selected.size})</Text>
+          }
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.paper },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
+    borderBottomWidth: 1, borderBottomColor: Colors.line,
+  },
+  headerBack: { ...T.bodyText, color: Colors.ink, width: 60 },
+  headerTitle: { ...T.sectionTitle },
+  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+  subtitle: { ...T.bodyText, fontSize: 14, color: Colors.walnut, lineHeight: 22 },
+
+  builtinSection: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  builtinHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
+  builtinSelectAll: { ...T.tag, color: '#6C5CE7', fontWeight: '600' },
+
+  categoryRow: { flexDirection: 'row', gap: Spacing.one },
+  catBtn: {
+    paddingHorizontal: Spacing.two, paddingVertical: Spacing.one + 2,
+    borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.line,
+    backgroundColor: Colors.paper, alignItems: 'center', gap: 2,
+  },
+  catBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  catEmoji: { fontSize: 14 },
+  catText: { ...T.tag, fontSize: 11, color: Colors.walnut },
+  catTextActive: { ...T.tag, fontSize: 11, color: Colors.paper },
+
+  builtinGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  builtinItem: {
+    width: '47%', flexDirection: 'row', alignItems: 'center',
+    gap: Spacing.one + 2, backgroundColor: Colors.paper,
+    borderRadius: Radius.md, padding: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  builtinItemSelected: { borderColor: '#6C5CE7', backgroundColor: '#F0EDFF' },
+  builtinIcon: {
+    width: 44, height: 44, borderRadius: Radius.md,
+    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', position: 'relative',
+  },
+  builtinIconSelected: { backgroundColor: '#E8E0FF' },
+  builtinImg: { width: 44, height: 44, borderRadius: Radius.md },
+  builtinCheck: {
+    position: 'absolute', bottom: -4, right: -4,
+    width: 16, height: 16, borderRadius: 8, backgroundColor: '#34C759',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  builtinCheckText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  builtinInfo: { flex: 1, gap: 2 },
+  builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontWeight: '600' },
+  builtinNameSelected: { color: '#6C5CE7' },
+  builtinDesc: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
+  selectedCount: { ...T.tag, fontSize: 12, color: '#6C5CE7', textAlign: 'center', fontWeight: '500' },
+
+  addBtn: {
+    backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.two,
+  },
+  addBtnDisabled: { opacity: 0.4 },
+  addBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 16 },
+});

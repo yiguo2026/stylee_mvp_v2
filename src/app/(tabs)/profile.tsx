@@ -99,15 +99,15 @@ export default function ProfileTab() {
             <Text style={styles.statLabel}>衣橱单品</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
+          <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/(tabs)/record', params: { tab: 'worn' } })}>
             <Text style={styles.statNum}>{savedOutfitCount}</Text>
             <Text style={styles.statLabel}>已穿搭配</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
+          <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/(tabs)/record', params: { tab: 'favorite' } })}>
             <Text style={styles.statNum}>{favoriteCount}</Text>
             <Text style={styles.statLabel}>收藏搭配</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Style Preference */}
