@@ -2,6 +2,8 @@
 
 基于 Expo (React Native) + Supabase 的智能穿搭推荐应用，支持 Web / iOS / Android。
 
+**在线体验：** https://yiguo2026.github.io/
+
 **本地体验：** `npx expo start --web` 后访问 http://localhost:8081
 
 ## 技术栈
