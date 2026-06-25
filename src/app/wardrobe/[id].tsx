@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, Image, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView,
+  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -10,6 +10,8 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { WardrobeItem, RecommendedItem, OCCASION_TAGS } from '@/types';
+
+const isWeb = Platform.OS === 'web';
 
 const SEASON_LABELS: Record<string, string> = { spring: '春', summer: '夏', autumn: '秋', winter: '冬', all_season: '四季' };
 
@@ -91,8 +93,13 @@ export default function ItemDetailScreen() {
     setShowDeleteConfirm(false);
     if (!item) return;
     setDeleting(true);
-    await deleteItem(item.item_id);
-    router.back();
+    try {
+      await deleteItem(item.item_id);
+      router.back();
+    } catch (e: any) {
+      setDeleting(false);
+      if (isWeb) { window.alert('删除失败：' + (e.message || '请稍后重试')); } else { Alert.alert('删除失败', e.message || '请稍后重试'); }
+    }
   };
 
   const ATTR_LABELS = [
