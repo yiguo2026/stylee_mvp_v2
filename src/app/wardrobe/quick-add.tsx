@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
   ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
@@ -19,16 +19,41 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 export default function QuickAddPage() {
   const { user } = useUserStore();
-  const { addItem, fetchItems } = useWardrobeStore();
+  const { items, addItem, fetchItems } = useWardrobeStore();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
   const [loading, setLoading] = useState(false);
+
+  // Build set of (name+category) already in wardrobe
+  const existingKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const item of items) {
+      keys.add(`${item.name}||${item.category}`);
+    }
+    return keys;
+  }, [items]);
+
+  const isAdded = (index: number) => {
+    const item = PRESET_BASIC_ITEMS[index];
+    return existingKeys.has(`${item.name}||${item.category}`);
+  };
 
   const filteredItems = filterCategory === '全部'
     ? PRESET_BASIC_ITEMS
     : PRESET_BASIC_ITEMS.filter(i => i.category === filterCategory);
 
+  const filteredIndices = useMemo(() =>
+    filteredItems.map(item => PRESET_BASIC_ITEMS.indexOf(item)),
+    [filteredItems]
+  );
+
+  const addableIndices = useMemo(() =>
+    filteredIndices.filter(i => !isAdded(i)),
+    [filteredIndices, existingKeys]
+  );
+
   const toggleItem = (index: number) => {
+    if (isAdded(index)) return;
     const next = new Set(selected);
     if (next.has(index)) next.delete(index);
     else next.add(index);
@@ -36,10 +61,12 @@ export default function QuickAddPage() {
   };
 
   const selectAll = () => {
-    if (selected.size === filteredItems.length) {
+    if (addableIndices.every(i => selected.has(i)) && addableIndices.length > 0) {
+      // All addable are selected → deselect all
       setSelected(new Set());
     } else {
-      setSelected(new Set(filteredItems.map((_, i) => PRESET_BASIC_ITEMS.indexOf(filteredItems[i]))));
+      // Select all addable items
+      setSelected(new Set(addableIndices));
     }
   };
 
@@ -93,7 +120,7 @@ export default function QuickAddPage() {
             <Text style={styles.builtinHeaderTitle}>🧠 AI为你推荐</Text>
             <TouchableOpacity onPress={selectAll}>
               <Text style={styles.builtinSelectAll}>
-                {selected.size === filteredItems.length ? '取消全选' : '全选添加'}
+                {addableIndices.length > 0 && addableIndices.every(i => selected.has(i)) ? '取消全选' : '全选添加'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -120,14 +147,19 @@ export default function QuickAddPage() {
             {filteredItems.map((item, i) => {
               const realIndex = PRESET_BASIC_ITEMS.indexOf(item);
               const isSelected = selected.has(realIndex);
+              const alreadyAdded = isAdded(realIndex);
               return (
                 <TouchableOpacity
                   key={realIndex}
-                  style={[styles.builtinItem, isSelected && styles.builtinItemSelected]}
+                  style={[
+                    styles.builtinItem,
+                    isSelected && styles.builtinItemSelected,
+                    alreadyAdded && styles.builtinItemDisabled,
+                  ]}
                   onPress={() => toggleItem(realIndex)}
-                  activeOpacity={0.7}
+                  activeOpacity={alreadyAdded ? 1 : 0.7}
                 >
-                  <View style={[styles.builtinIcon, isSelected && styles.builtinIconSelected]}>
+                  <View style={[styles.builtinIcon, isSelected && styles.builtinIconSelected, alreadyAdded && styles.builtinIconDisabled]}>
                     {item.image_url ? (
                       <Image source={{ uri: item.image_url }} style={styles.builtinImg} resizeMode="cover" />
                     ) : (
@@ -138,12 +170,17 @@ export default function QuickAddPage() {
                         <Text style={styles.builtinCheckText}>✓</Text>
                       </View>
                     )}
+                    {alreadyAdded && (
+                      <View style={styles.builtinAddedBadge}>
+                        <Text style={styles.builtinAddedText}>已添加</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.builtinInfo}>
-                    <Text style={[styles.builtinName, isSelected && styles.builtinNameSelected]} numberOfLines={1}>
+                    <Text style={[styles.builtinName, isSelected && styles.builtinNameSelected, alreadyAdded && styles.builtinNameDisabled]} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <Text style={styles.builtinDesc} numberOfLines={1}>{item.color} · {item.category}</Text>
+                    <Text style={[styles.builtinDesc, alreadyAdded && styles.builtinDescDisabled]} numberOfLines={1}>{item.color} · {item.category}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -151,7 +188,7 @@ export default function QuickAddPage() {
           </View>
 
           <Text style={styles.selectedCount}>
-            已选 {selected.size} 件
+            已选 {selected.size} 件可添加
           </Text>
         </View>
 
@@ -211,12 +248,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   builtinItemSelected: { borderColor: '#6C5CE7', backgroundColor: '#F0EDFF' },
+  builtinItemDisabled: { opacity: 0.45, borderColor: Colors.lineSoft },
+
   builtinIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
     backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden', position: 'relative',
   },
   builtinIconSelected: { backgroundColor: '#E8E0FF' },
+  builtinIconDisabled: { backgroundColor: Colors.lineSoft },
   builtinImg: { width: 44, height: 44, borderRadius: Radius.md },
   builtinCheck: {
     position: 'absolute', bottom: -4, right: -4,
@@ -224,10 +264,19 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   builtinCheckText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  builtinAddedBadge: {
+    position: 'absolute', bottom: 0, right: 0, left: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 1,
+  },
+  builtinAddedText: { fontSize: 9, color: '#fff', fontWeight: '600' },
+
   builtinInfo: { flex: 1, gap: 2 },
   builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontWeight: '600' },
   builtinNameSelected: { color: '#6C5CE7' },
+  builtinNameDisabled: { color: Colors.walnut2 },
   builtinDesc: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
+  builtinDescDisabled: { color: Colors.lineStrong },
   selectedCount: { ...T.tag, fontSize: 12, color: '#6C5CE7', textAlign: 'center', fontWeight: '500' },
 
   addBtn: {
