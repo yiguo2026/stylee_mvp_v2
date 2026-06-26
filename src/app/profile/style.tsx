@@ -10,6 +10,15 @@ import { supabase } from '@/lib/supabase';
 import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
 
 const isWeb = Platform.OS === 'web';
+const LIKE_COLOR = '#34C759';
+
+const STYLE_EMOJIS: Record<string, string> = {
+  quiet_luxury: '💎', minimalist: '◻️', commute_style: '💼', french: '🥐',
+  preppy: '🎓', safari: '🦒', vintage: '📻', street: '🛹',
+  sporty_casual: '🏃', rock: '🎸', goth: '🦇', sweet: '🍰',
+  romantic: '🌸', bohemian: '🏜️', western: '🤠', utility: '🔧',
+  wabi_sabi: '🍵', avantgarde: '📐', urban_cool: '🌃',
+};
 
 export default function StylePreferencePage() {
   const { user, stylePreferences, fetchProfile } = useUserStore();
@@ -23,12 +32,12 @@ export default function StylePreferencePage() {
 
   const [saving, setSaving] = useState(false);
 
-  const toggleLike = (tagId: string) => {
+  const toggleLike = (tag: StyleTag) => {
     const next = new Set(liked);
-    if (next.has(tagId)) {
-      next.delete(tagId);
+    if (next.has(tag.tag_id)) {
+      next.delete(tag.tag_id);
     } else {
-      next.add(tagId);
+      next.add(tag.tag_id);
     }
     setLiked(next);
   };
@@ -96,27 +105,43 @@ export default function StylePreferencePage() {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>😍 点击选择喜欢的风格</Text>
-          <View style={styles.tagsWrap}>
-            {PRESET_STYLE_PREFERENCES.map(tag => {
-              const isLiked = liked.has(tag.tag_id);
-              return (
-                <TouchableOpacity
-                  key={tag.tag_id}
-                  style={[styles.tag, isLiked && styles.tagLiked]}
-                  onPress={() => toggleLike(tag.tag_id)}
-                >
-                  <Text style={[styles.tagText, isLiked && styles.tagTextLiked]}>
-                    {tag.tag_name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        <Text style={styles.subtitle}>选择你喜欢的风格，让我们更懂你的审美</Text>
+
+        <View style={styles.legend}>
+          <View style={[styles.legendDot, { backgroundColor: LIKE_COLOR }]} />
+          <Text style={styles.legendText}>喜欢</Text>
         </View>
 
-        <Text style={styles.footerHint}>绿色 = 喜欢，灰色 = 未选择</Text>
+        <Text style={styles.sectionLabel}>😍 点击选择喜欢的风格</Text>
+        <View style={styles.tagsGrid}>
+          {PRESET_STYLE_PREFERENCES.map(tag => {
+            const isLiked = liked.has(tag.tag_id);
+            const emoji = STYLE_EMOJIS[tag.tag_id] ?? '✨';
+            return (
+              <TouchableOpacity
+                key={tag.tag_id}
+                style={[styles.styleCard, isLiked && styles.styleCardLiked]}
+                onPress={() => toggleLike(tag)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.styleEmoji}>{emoji}</Text>
+                <Text style={[styles.styleName, isLiked && styles.styleNameLiked]}>
+                  {tag.tag_name}
+                </Text>
+                {isLiked && <Text style={styles.styleCheck}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.previewRow}>
+          <Text style={styles.previewLabel}>已选：</Text>
+          <Text style={styles.previewValue}>
+            {liked.size > 0
+              ? Array.from(liked).map(id => PRESET_STYLE_PREFERENCES.find(t => t.tag_id === id)?.tag_name).join('、')
+              : '—'}
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -125,43 +150,44 @@ export default function StylePreferencePage() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.line,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
+    borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
   headerBack: { ...T.bodyText, color: Colors.ink },
   headerTitle: { ...T.sectionTitle },
   headerSave: { ...T.bodyText, color: '#6C5CE7', fontWeight: '600' },
   container: { flex: 1 },
-  inner: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.six },
-  card: {
-    backgroundColor: Colors.paperCard,
+  inner: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+
+  subtitle: { ...T.bodyText, fontSize: 14, lineHeight: 22 },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { ...T.tag, color: Colors.walnut },
+  sectionLabel: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 14 },
+  tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+
+  styleCard: {
+    width: '47%',
+    alignItems: 'center',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.two,
     borderRadius: Radius.lg,
-    padding: Spacing.three,
-    gap: Spacing.two,
-    borderWidth: 1,
-    borderColor: Colors.line,
-  },
-  cardTitle: { ...T.bodyText, fontWeight: '600', color: Colors.ink },
-  tagsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  tag: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.xl,
     borderWidth: 1,
     borderColor: Colors.line,
     backgroundColor: Colors.paperCard,
+    gap: Spacing.one,
   },
-  tagLiked: { backgroundColor: '#34C759', borderColor: '#34C759' },
-  tagText: { ...T.tag, color: Colors.walnut },
-  tagTextLiked: { ...T.tag, color: Colors.paper },
-  footerHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2 },
+  styleCardLiked: { borderColor: LIKE_COLOR, backgroundColor: '#E8F5E9' },
+  styleEmoji: { fontSize: 32 },
+  styleName: { ...T.tag, color: Colors.ink, fontWeight: '500' },
+  styleNameLiked: { color: '#1B7D32', fontWeight: '600' },
+  styleCheck: {
+    position: 'absolute', top: 6, right: 8,
+    fontSize: 14, color: LIKE_COLOR, fontWeight: '700',
+  },
+
+  previewRow: { flexDirection: 'row', gap: Spacing.one },
+  previewLabel: { ...T.formLabel },
+  previewValue: { ...T.bodyText, fontSize: 13, flex: 1 },
 });
