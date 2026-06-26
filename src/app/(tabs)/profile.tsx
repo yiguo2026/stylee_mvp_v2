@@ -120,7 +120,9 @@ export default function ProfileTab() {
         <View style={styles.menuCard}>
           <View style={styles.menuCardHeader}>
             <Text style={styles.menuCardTitle}>👗 试穿记录</Text>
-            <Text style={styles.tryOnLabel}>去试穿 ›</Text>
+            <TouchableOpacity onPress={() => router.push('/outfit/try-on')}>
+              <Text style={styles.tryOnLabel}>去试穿 ›</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.tryOnEmpty}>
             <Text style={styles.tryOnEmptyIcon}>✨</Text>
