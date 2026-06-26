@@ -106,13 +106,6 @@ export default function StylePreferencePage() {
 
       <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
         <Text style={styles.subtitle}>选择你喜欢的风格，让我们更懂你的审美</Text>
-
-        <View style={styles.legend}>
-          <View style={[styles.legendDot, { backgroundColor: LIKE_COLOR }]} />
-          <Text style={styles.legendText}>喜欢</Text>
-        </View>
-
-        <Text style={styles.sectionLabel}>😍 点击选择喜欢的风格</Text>
         <View style={styles.tagsGrid}>
           {PRESET_STYLE_PREFERENCES.map(tag => {
             const isLiked = liked.has(tag.tag_id);
