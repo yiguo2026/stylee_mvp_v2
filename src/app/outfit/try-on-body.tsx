@@ -71,30 +71,21 @@ export default function TryOnBodyPage() {
         {/* Selfie Upload */}
         <Text style={styles.fieldLabel}>上传面部自拍 *</Text>
 
-        <View style={styles.photoRow}>
-          <TouchableOpacity style={styles.photoCard} onPress={pickImage} activeOpacity={0.7}>
-            {localUri ? (
-              <Image source={{ uri: localUri }} style={styles.photoPreview} resizeMode="cover" />
-            ) : (
-              <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoEmoji}>🤳</Text>
-                <Text style={styles.photoLabel}>上传自拍照</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.photoCard} onPress={takePhoto} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.photoCard} onPress={pickImage} activeOpacity={0.7}>
+          {localUri ? (
+            <Image source={{ uri: localUri }} style={styles.photoPreview} resizeMode="cover" />
+          ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoEmoji}>📷</Text>
-              <Text style={styles.photoLabel}>拍照上传</Text>
+              <Text style={styles.photoEmoji}>🤳</Text>
+              <Text style={styles.photoLabel}>点击上传自拍照</Text>
             </View>
-          </TouchableOpacity>
-        </View>
+          )}
+        </TouchableOpacity>
 
         {/* Photo Tips */}
         <View style={styles.tipsCard}>
           <Text style={styles.tipsTitle}>📸 拍摄建议</Text>
-          <Text style={styles.tipItem}>• 自拍照：面部正面清晰可见，光线充足均匀</Text>
-          <Text style={styles.tipItem}>• 全身照：正面站立拍摄，确保头部到脚部完整入镜</Text>
+          <Text style={styles.tipItem}>• 面部正面清晰可见，光线充足均匀</Text>
         </View>
 
         {/* Privacy Note */}
@@ -136,7 +127,7 @@ const styles = StyleSheet.create({
 
   photoRow: { flexDirection: 'row', gap: Spacing.three },
   photoCard: {
-    flex: 1, aspectRatio: 3 / 4, borderRadius: Radius.lg,
+    aspectRatio: 3 / 4, borderRadius: Radius.lg,
     overflow: 'hidden', borderWidth: 1.5, borderColor: Colors.line,
     borderStyle: 'dashed', backgroundColor: Colors.paperCard,
   },
