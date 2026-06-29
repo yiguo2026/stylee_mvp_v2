@@ -13,7 +13,8 @@ const SCENE_IMAGES: Record<string, any> = {
 };
 
 export default function TryOnDetailScreen() {
-  const { recordId } = useLocalSearchParams<{ recordId: string }>();
+  const params = useLocalSearchParams();
+  const recordId = params.recordId as string | undefined;
   const { records } = useTryOnStore();
 
   const record: TryOnRecord | undefined = records.find(r => r.id === recordId);
@@ -21,8 +22,17 @@ export default function TryOnDetailScreen() {
   if (!record) {
     return (
       <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
+            <Text style={styles.headerBack}>← 返回</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>试穿详情</Text>
+          <View style={{ width: 60 }} />
+        </View>
         <View style={styles.center}>
-          <Text style={styles.emptyText}>记录不存在</Text>
+          <Text style={styles.emptyText}>
+            记录不存在{recordId ? ` (${recordId})` : ''}，共 {records.length} 条
+          </Text>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backLink}>← 返回</Text>
           </TouchableOpacity>
@@ -109,7 +119,7 @@ export default function TryOnDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
-  emptyText: { ...T.bodyText, color: Colors.walnut2 },
+  emptyText: { ...T.bodyText, color: Colors.walnut2, textAlign: 'center', paddingHorizontal: Spacing.four },
   backLink: { ...T.buttonSecondary, color: Colors.terracotta },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
