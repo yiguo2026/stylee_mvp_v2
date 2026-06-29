@@ -10,9 +10,32 @@ import { useTryOnStore } from '@/stores/tryonStore';
 
 const isWeb = Platform.OS === 'web';
 
+async function uriToBase64(uri: string): Promise<string> {
+  if (isWeb) {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  // Native: read as base64 via fetch
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function TryOnBodyPage() {
   const { selfieUri, setSelfie } = useTryOnStore();
   const [localUri, setLocalUri] = useState<string | null>(selfieUri);
+  const [saving, setSaving] = useState(false);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -24,26 +47,24 @@ export default function TryOnBodyPage() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [3, 4],
-      quality: 0.8,
+      quality: 0.7,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setLocalUri(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      if (isWeb) { window.alert('需要相机权限才能拍照'); } else { Alert.alert('提示', '需要相机权限才能拍照'); }
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setLocalUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      // Prefer base64 data URL for persistence, fallback to URI
+      if (asset.base64) {
+        const mimeType = asset.uri?.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        setLocalUri(`data:${mimeType};base64,${asset.base64}`);
+      } else {
+        // Convert blob URI to base64 data URL
+        try {
+          const dataUrl = await uriToBase64(asset.uri);
+          setLocalUri(dataUrl);
+        } catch {
+          setLocalUri(asset.uri);
+        }
+      }
     }
   };
 
@@ -125,7 +146,6 @@ const styles = StyleSheet.create({
     ...T.formLabel, fontSize: 15, fontWeight: '600', color: Colors.ink,
   },
 
-  photoRow: { flexDirection: 'row', gap: Spacing.three },
   photoCard: {
     aspectRatio: 3 / 4, borderRadius: Radius.lg,
     overflow: 'hidden', borderWidth: 1.5, borderColor: Colors.line,
