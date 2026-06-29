@@ -15,11 +15,20 @@ const webStorage = {
   },
 };
 
+export interface TryOnRecordItem {
+  name: string;
+  category: string;
+  color?: string;
+  image_url?: string;
+}
+
 export interface TryOnRecord {
   id: string;
   scene: string;
+  sceneEmoji: string;
   sceneLabel: string;
   outfitName: string;
+  items: TryOnRecordItem[];
   createdAt: string;
   selfieUri: string | null;
 }

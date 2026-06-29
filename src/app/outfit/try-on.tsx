@@ -151,10 +151,15 @@ export default function TryOnScreen() {
     const outfitName = isFromResult
       ? resultItems.map(i => i.name).join(' + ')
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.name ?? '自定义搭配');
+    const recordItems = isFromResult
+      ? resultItems.map(i => ({ name: i.name, category: i.category ?? '', color: i.color, image_url: i.image_url }))
+      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []);
     addRecord({
       scene: selectedScene,
+      sceneEmoji: sceneObj?.emoji ?? '✨',
       sceneLabel: sceneObj?.label ?? selectedScene,
       outfitName,
+      items: recordItems,
       selfieUri,
     });
   };

@@ -21,6 +21,17 @@ function getTagName(tagId: string, fallback?: string): string {
   return found ? found.label : (fallback ?? tagId);
 }
 
+const TRYON_SCENE_IMAGES: Record<string, any> = {
+  cafe: require('../../../assets/tryon/casual.png'),
+  street: require('../../../assets/tryon/street.png'),
+  office: require('../../../assets/tryon/office.png'),
+  park: require('../../../assets/tryon/layered.png'),
+  home: require('../../../assets/tryon/home.png'),
+};
+function tryOnSceneImageUri(scene: string) {
+  return TRYON_SCENE_IMAGES[scene] ?? TRYON_SCENE_IMAGES.cafe;
+}
+
 export default function ProfileTab() {
   const { profile, stylePreferences, signOut, user, fetchProfile } = useUserStore();
   const { items } = useWardrobeStore();
@@ -133,19 +144,24 @@ export default function ProfileTab() {
               <Text style={styles.tryOnEmptySub}>使用AI试穿功能后，效果图会展示在这里</Text>
             </View>
           ) : (
-            <View style={styles.tryOnList}>
-              {tryOnRecords.slice(0, 5).map(record => (
-                <View key={record.id} style={styles.tryOnItem}>
-                  <Text style={styles.tryOnItemScene}>{record.sceneLabel}</Text>
-                  <Text style={styles.tryOnItemName} numberOfLines={1}>{record.outfitName}</Text>
-                  <Text style={styles.tryOnItemDate}>
-                    {new Date(record.createdAt).toLocaleDateString('zh-CN')}
-                  </Text>
-                </View>
+            <View style={styles.tryOnGrid}>
+              {tryOnRecords.slice(0, 6).map(record => (
+                <TouchableOpacity
+                  key={record.id}
+                  style={styles.tryOnPhotoCard}
+                  onPress={() => router.push({ pathname: '/outfit/try-on-detail', params: { recordId: record.id } })}
+                  activeOpacity={0.7}
+                >
+                  <Image source={{ uri: tryOnSceneImageUri(record.scene) }} style={styles.tryOnPhoto} resizeMode="cover" />
+                  <View style={styles.tryOnPhotoOverlay}>
+                    <Text style={styles.tryOnPhotoScene}>{record.sceneEmoji} {record.sceneLabel}</Text>
+                    <Text style={styles.tryOnPhotoStyle} numberOfLines={1}>{record.outfitName}</Text>
+                    <Text style={styles.tryOnPhotoDate}>
+                      {new Date(record.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               ))}
-              {tryOnRecords.length > 5 && (
-                <Text style={styles.tryOnMore}>共 {tryOnRecords.length} 条记录</Text>
-              )}
             </View>
           )}
         </View>
@@ -238,23 +254,24 @@ const styles = StyleSheet.create({
   stylePillText: { ...T.tag, color: Colors.paper },
   stylePillEmpty: { ...T.tag, color: Colors.walnut2, fontStyle: 'italic' },
 
-  // Try-on P2
+  // Try-on
   tryOnLabel: { ...T.tag, color: '#6C5CE7', fontWeight: '600' },
   tryOnEmpty: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   tryOnEmptyIcon: { fontSize: 28 },
   tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
   tryOnEmptySub: { ...T.micro, color: Colors.walnut2, textAlign: 'center', lineHeight: 18 },
 
-  // Try-on records
-  tryOnList: { gap: Spacing.one },
-  tryOnItem: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
-    paddingVertical: Spacing.one + 2, borderBottomWidth: 1, borderBottomColor: Colors.lineSoft,
+  // Try-on photo grid
+  tryOnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  tryOnPhotoCard: {
+    width: '48%', borderRadius: Radius.md, overflow: 'hidden',
+    backgroundColor: Colors.vintageCream, borderWidth: 1, borderColor: Colors.line,
   },
-  tryOnItemScene: { ...T.tag, color: '#6C5CE7', backgroundColor: '#F0EDFF', paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: Radius.sm, overflow: 'hidden' },
-  tryOnItemName: { ...T.bodyText, fontSize: 13, flex: 1, color: Colors.ink },
-  tryOnItemDate: { ...T.micro, color: Colors.walnut2 },
-  tryOnMore: { ...T.micro, color: Colors.walnut2, textAlign: 'center', paddingTop: Spacing.one },
+  tryOnPhoto: { width: '100%', aspectRatio: 3 / 4 },
+  tryOnPhotoOverlay: { padding: Spacing.one + 2, gap: 1 },
+  tryOnPhotoScene: { ...T.tag, fontSize: 11, color: Colors.ink, fontWeight: '600' },
+  tryOnPhotoStyle: { ...T.micro, fontSize: 10, color: Colors.walnut },
+  tryOnPhotoDate: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
 
   // Settings entry
   settingsEntry: {
