@@ -144,8 +144,8 @@ export default function ProfileTab() {
               <Text style={styles.tryOnEmptySub}>使用AI试穿功能后，效果图会展示在这里</Text>
             </View>
           ) : (
-            <View style={styles.tryOnGrid}>
-              {tryOnRecords.slice(0, 9).map(record => (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tryOnScroll}>
+              {tryOnRecords.map(record => (
                 <TouchableOpacity
                   key={record.id}
                   style={styles.tryOnPhotoCard}
@@ -159,7 +159,7 @@ export default function ProfileTab() {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
         </View>
 
@@ -258,13 +258,13 @@ const styles = StyleSheet.create({
   tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
   tryOnEmptySub: { ...T.micro, color: Colors.walnut2, textAlign: 'center', lineHeight: 18 },
 
-  // Try-on photo grid
-  tryOnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  // Try-on photo scroll
+  tryOnScroll: { gap: Spacing.two, paddingRight: Spacing.four },
   tryOnPhotoCard: {
-    width: '31%', borderRadius: Radius.sm, overflow: 'hidden',
+    width: 100, borderRadius: Radius.sm, overflow: 'hidden',
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
-  tryOnPhoto: { width: '100%', aspectRatio: 1 },
+  tryOnPhoto: { width: 100, height: 100 },
   tryOnPhotoScene: { ...T.micro, fontSize: 10, color: Colors.ink, fontWeight: '600', paddingHorizontal: Spacing.one, paddingTop: 2 },
   tryOnPhotoDate: { ...T.micro, fontSize: 9, color: Colors.walnut2, paddingHorizontal: Spacing.one, paddingBottom: Spacing.one },
 
