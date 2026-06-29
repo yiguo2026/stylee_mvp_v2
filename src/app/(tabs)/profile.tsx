@@ -10,6 +10,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { useTryOnStore } from '@/stores/tryonStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +24,7 @@ function getTagName(tagId: string, fallback?: string): string {
 export default function ProfileTab() {
   const { profile, stylePreferences, signOut, user, fetchProfile } = useUserStore();
   const { items } = useWardrobeStore();
+  const { records: tryOnRecords } = useTryOnStore();
   const [savedOutfitCount, setSavedOutfitCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [showSignOut, setShowSignOut] = useState(false);
@@ -116,7 +118,7 @@ export default function ProfileTab() {
           </View>
         </TouchableOpacity>
 
-        {/* AI Try-on P2 */}
+        {/* AI Try-on */}
         <View style={styles.menuCard}>
           <View style={styles.menuCardHeader}>
             <Text style={styles.menuCardTitle}>👗 试穿记录</Text>
@@ -124,11 +126,28 @@ export default function ProfileTab() {
               <Text style={styles.tryOnLabel}>去试穿 ›</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.tryOnEmpty}>
-            <Text style={styles.tryOnEmptyIcon}>✨</Text>
-            <Text style={styles.tryOnEmptyTitle}>还没有试穿记录</Text>
-            <Text style={styles.tryOnEmptySub}>使用AI试穿功能后，效果图会展示在这里</Text>
-          </View>
+          {tryOnRecords.length === 0 ? (
+            <View style={styles.tryOnEmpty}>
+              <Text style={styles.tryOnEmptyIcon}>✨</Text>
+              <Text style={styles.tryOnEmptyTitle}>还没有试穿记录</Text>
+              <Text style={styles.tryOnEmptySub}>使用AI试穿功能后，效果图会展示在这里</Text>
+            </View>
+          ) : (
+            <View style={styles.tryOnList}>
+              {tryOnRecords.slice(0, 5).map(record => (
+                <View key={record.id} style={styles.tryOnItem}>
+                  <Text style={styles.tryOnItemScene}>{record.sceneLabel}</Text>
+                  <Text style={styles.tryOnItemName} numberOfLines={1}>{record.outfitName}</Text>
+                  <Text style={styles.tryOnItemDate}>
+                    {new Date(record.createdAt).toLocaleDateString('zh-CN')}
+                  </Text>
+                </View>
+              ))}
+              {tryOnRecords.length > 5 && (
+                <Text style={styles.tryOnMore}>共 {tryOnRecords.length} 条记录</Text>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Settings */}
@@ -225,6 +244,17 @@ const styles = StyleSheet.create({
   tryOnEmptyIcon: { fontSize: 28 },
   tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
   tryOnEmptySub: { ...T.micro, color: Colors.walnut2, textAlign: 'center', lineHeight: 18 },
+
+  // Try-on records
+  tryOnList: { gap: Spacing.one },
+  tryOnItem: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
+    paddingVertical: Spacing.one + 2, borderBottomWidth: 1, borderBottomColor: Colors.lineSoft,
+  },
+  tryOnItemScene: { ...T.tag, color: '#6C5CE7', backgroundColor: '#F0EDFF', paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: Radius.sm, overflow: 'hidden' },
+  tryOnItemName: { ...T.bodyText, fontSize: 13, flex: 1, color: Colors.ink },
+  tryOnItemDate: { ...T.micro, color: Colors.walnut2 },
+  tryOnMore: { ...T.micro, color: Colors.walnut2, textAlign: 'center', paddingTop: Spacing.one },
 
   // Settings entry
   settingsEntry: {

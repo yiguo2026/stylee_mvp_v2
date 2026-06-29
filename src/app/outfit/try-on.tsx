@@ -45,7 +45,7 @@ export default function TryOnScreen() {
   const { items: itemsParam } = useLocalSearchParams<{ items?: string; outfitId?: string }>();
   const isFromResult = !!itemsParam;
 
-  const { selfieUri, selectedScene, setSelectedScene } = useTryOnStore();
+  const { selfieUri, selectedScene, setSelectedScene, addRecord } = useTryOnStore();
   const { user } = useUserStore();
 
   // Outfit selection (for home entry)
@@ -145,6 +145,18 @@ export default function TryOnScreen() {
     const fallbackAsset = SCENE_IMAGES[assetKey];
     setTryOnImage(fallbackAsset || SCENE_IMAGES.casual);
     setGenerating(false);
+
+    // Save try-on record
+    const sceneObj = TRYON_SCENES.find(s => s.id === selectedScene);
+    const outfitName = isFromResult
+      ? resultItems.map(i => i.name).join(' + ')
+      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.name ?? '自定义搭配');
+    addRecord({
+      scene: selectedScene,
+      sceneLabel: sceneObj?.label ?? selectedScene,
+      outfitName,
+      selfieUri,
+    });
   };
 
   return (
