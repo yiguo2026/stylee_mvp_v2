@@ -72,11 +72,21 @@ const loadRecords = (): TryOnRecord[] => {
 const persistState = (state: Partial<TryOnState>) => {
   if (!isWeb) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    const data = JSON.stringify({
       selfieUri: state.selfieUri,
       selectedScene: state.selectedScene,
-    }));
-  } catch {}
+    });
+    localStorage.setItem(STORAGE_KEY, data);
+  } catch (e) {
+    console.warn('[TryOnStore] persistState failed:', e);
+    // If selfieUri is too large, try saving without it
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        selfieUri: null,
+        selectedScene: state.selectedScene,
+      }));
+    } catch {}
+  }
 };
 
 const persistRecords = (records: TryOnRecord[]) => {

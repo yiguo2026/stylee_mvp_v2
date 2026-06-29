@@ -10,32 +10,32 @@ import { useTryOnStore } from '@/stores/tryonStore';
 
 const isWeb = Platform.OS === 'web';
 
-async function uriToBase64(uri: string): Promise<string> {
+// Compress image to a small data URL for localStorage persistence
+async function compressToDataUrl(uri: string, maxWidth = 200): Promise<string> {
   if (isWeb) {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+    return new Promise((resolve) => {
+      const img = new (window as any).Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = () => resolve(uri);
+      img.src = uri;
     });
   }
-  // Native: read as base64 via fetch
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  // Native: use ImageManipulator or just return base64 from picker
+  return uri;
 }
 
 export default function TryOnBodyPage() {
   const { selfieUri, setSelfie } = useTryOnStore();
   const [localUri, setLocalUri] = useState<string | null>(selfieUri);
-  const [saving, setSaving] = useState(false);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -52,15 +52,21 @@ export default function TryOnBodyPage() {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      // Prefer base64 data URL for persistence, fallback to URI
+      // Build a display URI and a compressed version for storage
       if (asset.base64) {
         const mimeType = asset.uri?.endsWith('.png') ? 'image/png' : 'image/jpeg';
-        setLocalUri(`data:${mimeType};base64,${asset.base64}`);
-      } else {
-        // Convert blob URI to base64 data URL
+        const fullDataUrl = `data:${mimeType};base64,${asset.base64}`;
+        // Compress for localStorage
         try {
-          const dataUrl = await uriToBase64(asset.uri);
-          setLocalUri(dataUrl);
+          const compressed = await compressToDataUrl(fullDataUrl);
+          setLocalUri(compressed);
+        } catch {
+          setLocalUri(fullDataUrl);
+        }
+      } else {
+        try {
+          const compressed = await compressToDataUrl(asset.uri);
+          setLocalUri(compressed);
         } catch {
           setLocalUri(asset.uri);
         }
