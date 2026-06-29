@@ -145,21 +145,18 @@ export default function ProfileTab() {
             </View>
           ) : (
             <View style={styles.tryOnGrid}>
-              {tryOnRecords.slice(0, 6).map(record => (
+              {tryOnRecords.slice(0, 9).map(record => (
                 <TouchableOpacity
                   key={record.id}
                   style={styles.tryOnPhotoCard}
                   onPress={() => router.push({ pathname: '/outfit/try-on-detail', params: { recordId: record.id } })}
                   activeOpacity={0.7}
                 >
-                  <Image source={{ uri: tryOnSceneImageUri(record.scene) }} style={styles.tryOnPhoto} resizeMode="cover" />
-                  <View style={styles.tryOnPhotoOverlay}>
-                    <Text style={styles.tryOnPhotoScene}>{record.sceneEmoji} {record.sceneLabel}</Text>
-                    <Text style={styles.tryOnPhotoStyle} numberOfLines={1}>{record.outfitName}</Text>
-                    <Text style={styles.tryOnPhotoDate}>
-                      {new Date(record.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
-                    </Text>
-                  </View>
+                  <Image source={tryOnSceneImageUri(record.scene)} style={styles.tryOnPhoto} resizeMode="cover" />
+                  <Text style={styles.tryOnPhotoScene}>{record.sceneEmoji} {record.sceneLabel}</Text>
+                  <Text style={styles.tryOnPhotoDate} numberOfLines={1}>
+                    {record.outfitName}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -264,14 +261,12 @@ const styles = StyleSheet.create({
   // Try-on photo grid
   tryOnGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   tryOnPhotoCard: {
-    width: '48%', borderRadius: Radius.md, overflow: 'hidden',
-    backgroundColor: Colors.vintageCream, borderWidth: 1, borderColor: Colors.line,
+    width: '31%', borderRadius: Radius.sm, overflow: 'hidden',
+    backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
-  tryOnPhoto: { width: '100%', aspectRatio: 3 / 4 },
-  tryOnPhotoOverlay: { padding: Spacing.one + 2, gap: 1 },
-  tryOnPhotoScene: { ...T.tag, fontSize: 11, color: Colors.ink, fontWeight: '600' },
-  tryOnPhotoStyle: { ...T.micro, fontSize: 10, color: Colors.walnut },
-  tryOnPhotoDate: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
+  tryOnPhoto: { width: '100%', aspectRatio: 1 },
+  tryOnPhotoScene: { ...T.micro, fontSize: 10, color: Colors.ink, fontWeight: '600', paddingHorizontal: Spacing.one, paddingTop: 2 },
+  tryOnPhotoDate: { ...T.micro, fontSize: 9, color: Colors.walnut2, paddingHorizontal: Spacing.one, paddingBottom: Spacing.one },
 
   // Settings entry
   settingsEntry: {
