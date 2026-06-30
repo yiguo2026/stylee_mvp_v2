@@ -1,5 +1,5 @@
-const DEEPSEEK_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_KEY ?? 'sk-bd81616b19584a9a99dd757f93521591';
-const DEEPSEEK_HOST = process.env.EXPO_PUBLIC_DEEPSEEK_HOST ?? 'api.deepseek.com';
+import { DEEPSEEK_KEY, DEEPSEEK_HOST } from './secrets';
+
 const DEEPSEEK_URL = `https://${DEEPSEEK_HOST}/chat/completions`;
 
 export interface DeepSeekMessage {

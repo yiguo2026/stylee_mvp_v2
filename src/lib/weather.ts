@@ -1,8 +1,6 @@
 import { WeatherData, WeatherCondition } from '@/types';
 import { getMockWeather, searchCities, getTempTag, getConditionIcon, AVAILABLE_CITIES } from '@/lib/mock/weather';
-
-const QWEATHER_KEY = process.env.EXPO_PUBLIC_QWEATHER_KEY ?? '';
-const QWEATHER_HOST = process.env.EXPO_PUBLIC_QWEATHER_HOST ?? 'devapi.qweather.com';
+import { QWEATHER_KEY, QWEATHER_HOST } from './secrets';
 const WEATHER_API = `https://${QWEATHER_HOST}/v7/weather/now`;
 const GEO_API = `https://${QWEATHER_HOST}/geo/v2/city/lookup`;
 const CACHE_TTL = 15 * 60 * 1000;

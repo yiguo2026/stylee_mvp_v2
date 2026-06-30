@@ -1,13 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY } from './secrets';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://pdgocqjvncxkwfrcdhtj.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZ29jcWp2bmN4a3dmcmNkaHRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjc4ODYsImV4cCI6MjA5NDg0Mzg4Nn0.fNMaLc9X2V0VaHYiG2NUeOO-PLyR5x0N37vdkb5LJ4k';
-const supabaseServiceKey = process.env.EXPO_PUBLIC_SUPABASE_SERVICE_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZ29jcWp2bmN4a3dmcmNkaHRqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTI2Nzg4NiwiZXhwIjoyMDk0ODQzODg2fQ.GAODsJvb_0Mxuj5PZztF8fhb9D7RrRTcPD7_F7UHmg8';
-
-if (!supabaseUrl) {
+if (!SUPABASE_URL) {
   console.error('[Supabase] ⚠️ URL is EMPTY — .env not loaded. Restart Metro with: npx expo start --clear');
 } else {
-  console.log('[Supabase] ✅ URL:', supabaseUrl.slice(0, 40) + '...');
+  console.log('[Supabase] ✅ URL:', SUPABASE_URL.slice(0, 40) + '...');
 }
 
 const isWeb = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -28,7 +25,7 @@ if (isWeb) {
   }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     ...(authStorage ? { storage: authStorage } : {}),
     autoRefreshToken: true,
@@ -41,7 +38,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 // Admin client with service_role key — used to auto-confirm users (bypass email verification)
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
