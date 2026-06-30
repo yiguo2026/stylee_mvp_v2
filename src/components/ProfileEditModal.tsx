@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  StyleSheet, Modal, ScrollView, ActivityIndicator, Alert,
+  StyleSheet, Modal, ScrollView, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
+import { useTryOnStore } from '@/stores/tryonStore';
 import { supabase } from '@/lib/supabase';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
-import { Gender, BodyShape } from '@/types';
+import { Gender } from '@/types';
+
+const isWeb = Platform.OS === 'web';
 
 const GENDERS: { label: string; value: Gender }[] = [
   { label: '👩 女士', value: 'female' },
@@ -17,13 +20,27 @@ const GENDERS: { label: string; value: Gender }[] = [
   { label: '保密', value: 'private' },
 ];
 
-const BODY_SHAPES: { label: string; value: BodyShape }[] = [
-  { label: '🍐 梨形', value: '梨形' },
-  { label: '⏳ 沙漏形', value: '沙漏形' },
-  { label: '🍎 苹果形', value: '苹果形' },
-  { label: '📏 矩形', value: '矩形' },
-  { label: '🔺 倒三角', value: '倒三角' },
-];
+// Compress image to small data URL for localStorage
+async function compressToDataUrl(uri: string, maxWidth = 200): Promise<string> {
+  if (isWeb) {
+    return new Promise((resolve) => {
+      const img = new (window as any).Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = () => resolve(uri);
+      img.src = uri;
+    });
+  }
+  return uri;
+}
 
 interface Props {
   visible: boolean;
@@ -32,13 +49,14 @@ interface Props {
 
 export function ProfileEditModal({ visible, onClose }: Props) {
   const { user, profile, fetchProfile } = useUserStore();
+  const { selfieUri, setSelfie } = useTryOnStore();
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
   const [gender, setGender] = useState<Gender>(profile?.gender ?? 'female');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
   const [city, setCity] = useState(profile?.permanent_city ?? '');
   const [profession, setProfession] = useState(profile?.profession ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
-  const [bodyShape, setBodyShape] = useState<BodyShape | ''>(profile?.body_shape ?? '');
+  const [localSelfieUri, setLocalSelfieUri] = useState<string | null>(selfieUri);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -59,12 +77,47 @@ export function ProfileEditModal({ visible, onClose }: Props) {
       if (uploadedUrl) {
         setAvatarUrl(uploadedUrl);
       } else {
-        Alert.alert('上传失败', '头像上传失败，请重试');
+        if (isWeb) { window.alert('头像上传失败，请重试'); } else { Alert.alert('上传失败', '头像上传失败，请重试'); }
       }
     } catch {
-      Alert.alert('上传失败', '头像上传失败，请重试');
+      if (isWeb) { window.alert('头像上传失败，请重试'); } else { Alert.alert('上传失败', '头像上传失败，请重试'); }
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleSelfiePick = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      if (isWeb) { window.alert('需要相册权限才能选择照片'); } else { Alert.alert('提示', '需要相册权限才能选择照片'); }
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.7,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (asset.base64) {
+        const mimeType = asset.uri?.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        const fullDataUrl = `data:${mimeType};base64,${asset.base64}`;
+        try {
+          const compressed = await compressToDataUrl(fullDataUrl);
+          setLocalSelfieUri(compressed);
+        } catch {
+          setLocalSelfieUri(fullDataUrl);
+        }
+      } else {
+        try {
+          const compressed = await compressToDataUrl(asset.uri);
+          setLocalSelfieUri(compressed);
+        } catch {
+          setLocalSelfieUri(asset.uri);
+        }
+      }
     }
   };
 
@@ -81,20 +134,21 @@ export function ProfileEditModal({ visible, onClose }: Props) {
           profession: profession.trim() || null,
           permanent_city: city.trim() || null,
           avatar_url: avatarUrl || null,
-          body_shape: bodyShape || null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
       );
       if (error) throw error;
+      // Save selfie to tryon store
+      if (localSelfieUri !== selfieUri) {
+        setSelfie(localSelfieUri);
+      }
       try {
         await fetchProfile();
-      } catch {
-        // fetchProfile failure shouldn't block the UI — data was saved
-      }
+      } catch {}
       onClose();
     } catch (e: any) {
-      Alert.alert('保存失败', e.message || '请稍后重试');
+      if (isWeb) { window.alert('保存失败：' + (e.message || '请稍后重试')); } else { Alert.alert('保存失败', e.message || '请稍后重试'); }
     } finally {
       setSaving(false);
     }
@@ -202,29 +256,27 @@ export function ProfileEditModal({ visible, onClose }: Props) {
               />
             </View>
 
-            {/* Body Info for AI Try-on */}
+            {/* Selfie for AI Try-on */}
             <View style={styles.bodyInfoSection}>
               <Text style={styles.bodyInfoTitle}>身体信息（AI试穿）</Text>
               <Text style={styles.bodyInfoStatus}>
-                {bodyShape ? '已录入' : '未录入'}
+                {localSelfieUri ? '已录入' : '未录入'}
               </Text>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>体型</Text>
-              <View style={styles.genderRow}>
-                {BODY_SHAPES.map(b => (
-                  <TouchableOpacity
-                    key={b.value}
-                    style={[styles.genderBtn, bodyShape === b.value && styles.genderBtnActive]}
-                    onPress={() => setBodyShape(bodyShape === b.value ? '' : b.value)}
-                  >
-                    <Text style={[styles.genderText, bodyShape === b.value && styles.genderTextActive]}>
-                      {b.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <Text style={styles.fieldLabel}>面部自拍</Text>
+              <TouchableOpacity style={styles.selfieCard} onPress={handleSelfiePick} activeOpacity={0.7}>
+                {localSelfieUri ? (
+                  <Image source={{ uri: localSelfieUri }} style={styles.selfieImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.selfiePlaceholder}>
+                    <Text style={styles.selfieEmoji}>🤳</Text>
+                    <Text style={styles.selfieLabel}>点击上传自拍照</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.selfieHint}>面部正面清晰可见，光线充足均匀</Text>
             </View>
           </ScrollView>
 
@@ -305,7 +357,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 2,
     color: Colors.ink,
   },
-  genderRow: { flexDirection: 'row', gap: Spacing.two },
+  genderRow: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
   genderBtn: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
@@ -327,6 +379,21 @@ const styles = StyleSheet.create({
   },
   bodyInfoTitle: { ...T.bodyText, fontWeight: '600', fontSize: 13, color: Colors.walnut },
   bodyInfoStatus: { ...T.micro, color: Colors.walnut2 },
+
+  // Selfie upload
+  selfieCard: {
+    aspectRatio: 3 / 4, borderRadius: Radius.lg, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: Colors.line,
+    borderStyle: 'dashed', backgroundColor: Colors.paperCard,
+  },
+  selfieImage: { width: '100%', height: '100%' },
+  selfiePlaceholder: {
+    width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: Spacing.one,
+  },
+  selfieEmoji: { fontSize: 36 },
+  selfieLabel: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
+  selfieHint: { ...T.micro, color: Colors.walnut2, marginTop: 2 },
+
   footer: {
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
