@@ -3,6 +3,8 @@ import { deepseekChat } from '@/lib/deepseek';
 import { arkVision, arkGenerateImage, isAvailable as isArkAvailable } from '@/lib/ark';
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
+import { uriToBase64, serviceRecognize, serviceStandardize, serviceRecommend } from '@/lib/styleeService';
+import { recognizeRespToResult, toRecommendRequest, outfitsRespToApp } from '@/lib/styleeMapping';
 
 // ─── 衣服识别 ───────────────────────────────────────────
 // 优先使用 Ark Vision 多模态模型，不可用时降级到 mock
@@ -20,6 +22,11 @@ const RECOGNIZE_PROMPT = `请识别这件衣物的属性，返回JSON格式：
 只返回JSON，不要其他文字。`;
 
 export const aiRecognizeClothing = async (imageUri: string): Promise<RecognitionResult> => {
+  const enc = await uriToBase64(imageUri);
+  if (enc) {
+    const resp = await serviceRecognize(enc.b64, enc.mime);
+    if (resp) return recognizeRespToResult(resp);
+  }
   if (isArkAvailable()) {
     try {
       const raw = await arkVision(imageUri, RECOGNIZE_PROMPT, { jsonMode: true, temperature: 0.3 });
@@ -38,6 +45,15 @@ export const aiRecognizeClothing = async (imageUri: string): Promise<Recognition
     }
   }
   return mockRecognizeClothing(imageUri);
+};
+
+export const aiStandardizeGarment = async (
+  imageUri: string, category: string, photoType: string,
+): Promise<string | null> => {
+  const enc = await uriToBase64(imageUri);
+  if (!enc) return null;
+  const resp = await serviceStandardize(enc.b64, enc.mime, photoType || 'flat', category);
+  return resp?.image_ref ?? null;
 };
 
 // Re-export static option lists used by pickers
@@ -146,6 +162,12 @@ export async function aiRecommendOutfits(
     if (!hasTop) missing.push('上装');
     if (!hasBottom) missing.push('下装或连体装');
     return { outfits: [], error: `衣橱中缺少${missing.join('和')}，建议先添加` };
+  }
+
+  const svcResp = await serviceRecommend(toRecommendRequest(wardrobeItems, context));
+  if (svcResp && Array.isArray(svcResp.outfits) && svcResp.outfits.length > 0) {
+    const mapped = outfitsRespToApp(svcResp.outfits, wardrobeItems, userId, sessionId);
+    if (mapped.length > 0) return { outfits: mapped };
   }
 
   const contextParts: string[] = [];
