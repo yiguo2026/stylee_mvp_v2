@@ -8,9 +8,9 @@ const MOCK_RESULTS: RecognitionResult[] = [
   { category: '下装', color: '深蓝', material: '牛仔', style: '休闲', brand: '' },
   { category: '下装', color: '黑色', material: '西装料', style: '正式', brand: '' },
   { category: '外套', color: '卡其', material: '棉麻', style: '休闲', brand: '' },
-  { category: '鞋', color: '白色', material: '皮革', style: '休闲', brand: '' },
-  { category: '鞋', color: '黑色', material: '皮革', style: '正式', brand: '' },
-  { category: '包', color: '棕色', material: '皮革', style: '复古', brand: '' },
+  { category: '鞋履', color: '白色', material: '皮革', style: '休闲', brand: '' },
+  { category: '鞋履', color: '黑色', material: '皮革', style: '正式', brand: '' },
+  { category: '包袋', color: '棕色', material: '皮革', style: '复古', brand: '' },
 ];
 
 export const mockRecognizeClothing = async (imageUri: string): Promise<RecognitionResult> => {
@@ -19,7 +19,7 @@ export const mockRecognizeClothing = async (imageUri: string): Promise<Recogniti
   return { ...result };
 };
 
-export const CATEGORY_OPTIONS: ClothingCategory[] = ['上装', '下装', '连体装', '外套', '鞋', '包', '帽子', '围巾'];
+export const CATEGORY_OPTIONS: ClothingCategory[] = ['上装', '下装', '连体装', '外套', '鞋履', '包袋', '帽巾', '配饰'];
 
 export const COLOR_OPTIONS = [
   '白色', '黑色', '灰色', '米白', '米色',

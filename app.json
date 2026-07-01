@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Stylee",
-    "slug": "stylee-app",
+    "slug": "stylee-rd",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.stylee.app"
     },
     "android": {
+      "package": "com.stylee.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#FBF8F2"
@@ -44,6 +45,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fe3ec1ac-c96f-4541-ad12-9d1125f9e90d"
+      }
+    },
+    "owner": "stylee-rd"
   }
 }
