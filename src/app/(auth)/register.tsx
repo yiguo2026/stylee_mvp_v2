@@ -264,12 +264,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 4,
     color: Colors.ink,
   },
-  inputError: { borderColor: '#FF3B30' },
+  inputError: { borderColor: Colors.accent },
   fieldError: {
-    ...T.micro, color: '#FF3B30', fontSize: 12, marginTop: 4,
+    ...T.micro, color: Colors.accent, fontSize: 12, marginTop: 4,
   },
   errorText: {
-    ...T.micro, color: '#FF3B30', fontSize: 13, marginTop: -Spacing.one,
+    ...T.micro, color: Colors.accent, fontSize: 13, marginTop: -Spacing.one,
   },
   button: {
     backgroundColor: Colors.ink,

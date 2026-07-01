@@ -4,7 +4,18 @@ import { StatusBar } from 'expo-status-bar';
 import { Session } from '@supabase/supabase-js';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import { PlayfairDisplay_400Regular_Italic } from '@expo-google-fonts/playfair-display';
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_400Regular_Italic,
+  PlayfairDisplay_500Medium,
+  PlayfairDisplay_600SemiBold,
+} from '@expo-google-fonts/playfair-display';
+import {
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 
@@ -14,18 +25,23 @@ export default function RootLayout() {
   const { setSession, fetchProfile } = useUserStore();
 
   const [fontsLoaded, fontError] = useFonts({
-    // 数字 · Numeric — Playfair Display Italic (from Google Fonts)
+    PlayfairDisplay_400Regular,
     PlayfairDisplay_400Regular_Italic,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
   });
 
-  // Fonts are ready when loaded OR when an error occurred (degrade gracefully)
   const fontsReady = fontsLoaded || !!fontError;
 
   useEffect(() => {
     if (fontError) {
-      console.warn('[Fonts] ❌ Load error (graceful degradation):', fontError);
+      console.warn('[Fonts] load error (graceful degradation):', fontError);
     } else if (fontsLoaded) {
-      console.log('[Fonts] ✅ PlayfairDisplay loaded · HiraMinProN + STSong via system');
+      console.log('[Fonts] PlayfairDisplay + Inter loaded');
     }
     if (fontsReady) {
       SplashScreen.hideAsync();

@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   destructiveBtn: {
-    backgroundColor: '#C0392B',
+    backgroundColor: Colors.accent,
   },
   confirmText: {
     ...T.buttonPrimary,

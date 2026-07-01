@@ -174,11 +174,11 @@ const styles = StyleSheet.create({
 
   privacyCard: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
-    backgroundColor: '#F0EDFF', borderRadius: Radius.md,
+    backgroundColor: Colors.signalSoft, borderRadius: Radius.md,
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
   },
   privacyIcon: { fontSize: 16 },
-  privacyText: { ...T.micro, color: '#6C5CE7', flex: 1, lineHeight: 18 },
+  privacyText: { ...T.micro, color: Colors.ink, flex: 1, lineHeight: 18 },
 
   saveBtn: {
     backgroundColor: Colors.ink, borderRadius: Radius.md,

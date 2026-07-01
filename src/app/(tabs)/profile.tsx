@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   profileTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, width: '100%' },
   avatar: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#764ba2', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
   avatarText: { fontSize: 32, color: '#fff', fontWeight: '700' },
@@ -217,9 +217,9 @@ const styles = StyleSheet.create({
   profileNick: { ...T.sectionTitle, fontSize: 20 },
   profileId: { ...T.micro, color: Colors.walnut2 },
   editBtn: {
-    ...T.tag, color: '#6C5CE7',
+    ...T.tag, color: Colors.ink,
     paddingHorizontal: Spacing.three, paddingVertical: 4,
-    borderRadius: Radius.xl, backgroundColor: '#F0EDFF',
+    borderRadius: Radius.xl, backgroundColor: Colors.signalSoft,
     overflow: 'hidden', marginTop: 4, alignSelf: 'flex-start',
   },
 
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   stylePillEmpty: { ...T.tag, color: Colors.walnut2, fontStyle: 'italic' },
 
   // Try-on
-  tryOnLabel: { ...T.tag, color: '#6C5CE7', fontWeight: '600' },
+  tryOnLabel: { ...T.tag, color: Colors.ink, fontWeight: '600' },
   tryOnEmpty: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   tryOnEmptyIcon: { fontSize: 28 },
   tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },

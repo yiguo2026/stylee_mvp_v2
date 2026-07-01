@@ -1,213 +1,211 @@
 import { Platform } from 'react-native';
 
 // ─────────────────────────────────────────────────────────
-// Colors
+// Colors — v3.6 Editorial Mark: 冷调中性黑白体系
 // ─────────────────────────────────────────────────────────
 export const Colors = {
-  paper: '#FBF8F2',
-  paperCard: '#FFFEFA',
-  paperRaised: '#FFFFFF',
-  vintageCream: '#F5EDE2',
-  ink: '#2A1810',
-  inkSoft: '#3A2418',
-  walnut: '#5A4030',
-  walnut2: '#8B6F5A',
-  line: '#EFE7D8',
-  lineSoft: '#F4EEDF',
-  lineStrong: '#E0D3BA',
-  terracotta: '#B45A3C',
-  sage: '#6B8159',
-  linen: '#E8DDC8',
+  // 三层中性表面
+  paper: '#FFFFFF',         // L1 · App 主背景（纯白）
+  paperCard: '#FAFAFA',     // L2 · 卡片层（极浅灰）
+  paperRaised: '#F4F4F5',   // L3 · 输入 / 填充块
+  // 浮起层（Tab / Modal / Sheet）用纯白 + 阴影，见 Shadows
+
+  // 品牌资产专用（不进 App 界面骨架）
+  vintageCream: '#F5EDE2',  // 仅 Logo 底 / App Icon / 品牌物料
+
+  // 墨色
+  ink: '#0A0A0A',           // 主墨 — 主文本 / 主按钮 / 激活态
+  inkSoft: '#1C1C1E',       // 大字号 display 提亮
+
+  // 中性文本灰阶
+  gray1: '#6B6B6E',         // 二级文本
+  gray2: '#9A9AA0',         // 三级文本 / 占位
+
+  // 边线
+  line: '#ECECEE',          // 主分隔线
+  lineSoft: '#F4F4F5',      // 弱分隔线
+  lineStrong: '#DEDEE1',    // 卡片描边
+
+  // 低饱和编辑强调色
+  accent: '#7F3A34',        // Oxblood — CTA文字 / 收藏 / 关键提醒
+  accentSoft: '#F2EDEA',    // Oxblood Wash — 轻提醒背景
+  signal: '#555F50',        // Moss Graphite — 风格标签 / 正向标记
+  signalSoft: '#EFF1EC',    // Moss Wash — 低强调背景
+
+  // Legacy aliases (for gradual migration)
+  walnut: '#6B6B6E',        // = gray1
+  walnut2: '#9A9AA0',       // = gray2
+  terracotta: '#7F3A34',    // = accent
+  sage: '#555F50',          // = signal
+  linen: '#ECECEE',         // = line
 } as const;
 
 export type ColorKey = keyof typeof Colors;
 export type ThemeColor = ColorKey;
 
 // ─────────────────────────────────────────────────────────
-// Font Families
-// Three voices: Soul · Editorial Body · System Scaffold
+// Font Families — v3.6: Playfair Display + Inter
 // ─────────────────────────────────────────────────────────
-export const Fonts = Platform.select({
-  ios: {
-    soul: 'HiraMinProN-W3',
-    body: 'STSong',
-    ui: 'PingFang SC',
-    numeric: 'PlayfairDisplay_400Regular_Italic',
-  },
-  android: {
-    soul: 'serif',
-    body: 'serif',
-    ui: 'sans-serif',
-    numeric: 'PlayfairDisplay_400Regular_Italic',
-  },
-  web: {
-    soul: 'serif',
-    body: 'serif',
-    ui: 'sans-serif',
-    numeric: 'PlayfairDisplay_400Regular_Italic',
-  },
-  default: {
-    soul: 'serif',
-    body: 'serif',
-    ui: 'sans-serif',
-    numeric: 'PlayfairDisplay_400Regular_Italic',
-  },
-})!;
+export const Fonts = {
+  display: 'PlayfairDisplay_600SemiBold',
+  title: 'PlayfairDisplay_500Medium',
+  body: 'Inter_400Regular',
+  bodyMedium: 'Inter_500Medium',
+  ui: 'Inter_500Medium',
+  uiLight: 'Inter_300Light',
+  uiSemiBold: 'Inter_600SemiBold',
+  numeric: 'PlayfairDisplay_500Medium',
+  numericItalic: 'PlayfairDisplay_400Regular_Italic',
+};
 
 // ─────────────────────────────────────────────────────────
 // Typography tokens (T)
-// Each token is a ready-to-spread TextStyle object.
-// letterSpacing is in points (em × fontSize).
 // ─────────────────────────────────────────────────────────
 export const T = {
 
-  // ── 灵魂 Soul Voice · 汇文明朝体 ────────────────
-  // Empty-state headings & narrative copy (16–18px, +0.06em)
+  // ── Display · Playfair Display 600 — 页面主标题/大型编辑标题 ──
   emptyTitle: {
-    fontFamily: Fonts.soul,
-    fontSize: 17,
-    letterSpacing: 1.02,   // 17 × 0.06
-    lineHeight: 28,
+    fontFamily: Fonts.display,
+    fontSize: 30,
+    fontWeight: '600' as const,
+    letterSpacing: 0,
+    lineHeight: 36,
     color: Colors.ink,
   },
-  // OOTD / story large titles (24–28px, +0.06em)
   storyTitle: {
-    fontFamily: Fonts.soul,
-    fontSize: 26,
-    letterSpacing: 1.56,   // 26 × 0.06
+    fontFamily: Fonts.display,
+    fontSize: 34,
+    fontWeight: '600' as const,
+    letterSpacing: 0,
     lineHeight: 40,
     color: Colors.ink,
   },
 
-  // ── 主体 Editorial Body · STSong (方正悠宋 fallback) ─
-  // Page primary titles (24px, +0.02em, weight 600)
+  // ── Title · Playfair Display 500 — 卡片标题/模块标题/编辑强调 ──
   pageTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 24,
-    fontWeight: '600' as const,
-    letterSpacing: 0.48,   // 24 × 0.02
+    fontFamily: Fonts.title,
+    fontSize: 22,
+    fontWeight: '500' as const,
+    letterSpacing: 0,
+    lineHeight: 28,
     color: Colors.ink,
   },
-  // Section / card titles (18–20px, +0.02em, weight 500)
   sectionTitle: {
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.title,
     fontSize: 18,
     fontWeight: '500' as const,
-    letterSpacing: 0.36,   // 18 × 0.02
+    letterSpacing: 0,
+    lineHeight: 24,
     color: Colors.ink,
   },
-  // Sub-section labels (15–16px)
   subTitle: {
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.title,
     fontSize: 15,
     fontWeight: '500' as const,
-    letterSpacing: 0.3,
+    letterSpacing: 0,
+    lineHeight: 20,
     color: Colors.ink,
   },
-  // Body text / AI comments / recommendation reasons (14–15px, +0.04em)
+
+  // ── Body · Inter 400/500 — 列表/描述/说明 ──
   bodyText: {
     fontFamily: Fonts.body,
     fontSize: 15,
-    letterSpacing: 0.6,    // 15 × 0.04
-    lineHeight: 27,
-    color: Colors.walnut,
+    fontWeight: '400' as const,
+    letterSpacing: 0.3,
+    lineHeight: 24,
+    color: Colors.inkSoft,
   },
-  // Wardrobe item names / tags (14px, +0.05em)
   itemName: {
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.bodyMedium,
     fontSize: 14,
-    letterSpacing: 0.7,    // 14 × 0.05
+    fontWeight: '500' as const,
+    letterSpacing: 0.28,
     color: Colors.ink,
   },
-  // Secondary item description (13px)
   itemDesc: {
     fontFamily: Fonts.body,
     fontSize: 13,
-    letterSpacing: 0.52,
+    fontWeight: '400' as const,
+    letterSpacing: 0.26,
     lineHeight: 22,
-    color: Colors.walnut,
+    color: Colors.gray1,
   },
 
-  // ── 骨架 System Scaffold · PingFang SC ───────────
-  // Primary CTA buttons (16px, +0.06em, weight 600)
+  // ── UI · Inter 500/600 — 按钮/标签/用户名/日期 ──
   buttonPrimary: {
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.uiSemiBold,
     fontSize: 16,
     fontWeight: '600' as const,
-    letterSpacing: 0.96,   // 16 × 0.06
+    letterSpacing: 0.32,
   },
-  // Secondary buttons / links (14–15px)
   buttonSecondary: {
     fontFamily: Fonts.ui,
     fontSize: 14,
     fontWeight: '500' as const,
-    letterSpacing: 0.84,
+    letterSpacing: 0.28,
   },
-  // Form input text (16px)
   inputText: {
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     fontSize: 16,
+    fontWeight: '400' as const,
     letterSpacing: 0.32,
   },
-  // Form labels / select labels (13px, +0.06em)
   formLabel: {
     fontFamily: Fonts.ui,
     fontSize: 13,
     fontWeight: '500' as const,
-    letterSpacing: 0.78,   // 13 × 0.06
-    color: Colors.walnut2,
+    letterSpacing: 0.26,
+    color: Colors.gray1,
   },
-  // Tags / filter chips (12–13px)
   tag: {
     fontFamily: Fonts.ui,
     fontSize: 13,
-    letterSpacing: 0.78,
-    color: Colors.walnut,
+    fontWeight: '500' as const,
+    letterSpacing: 0.26,
+    color: Colors.ink,
   },
-  // Tab bar labels (11px)
   tabLabel: {
     fontFamily: Fonts.ui,
     fontSize: 11,
     fontWeight: '500' as const,
-    letterSpacing: 0.66,
+    letterSpacing: 0.88,
   },
-  // Weather / date / environmental metadata (12px, +0.18em, Light)
   caption: {
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.uiLight,
     fontSize: 12,
     fontWeight: '300' as const,
-    letterSpacing: 2.16,   // 12 × 0.18
-    color: Colors.walnut2,
+    letterSpacing: 0.96,
+    color: Colors.gray2,
   },
-  // Micro metadata / card dates (11px, Light)
   micro: {
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     fontSize: 11,
-    fontWeight: '300' as const,
-    letterSpacing: 1.65,   // 11 × 0.15
-    color: Colors.walnut2,
+    fontWeight: '400' as const,
+    letterSpacing: 0.88,
+    color: Colors.gray2,
   },
 
-  // ── Numeric · Playfair Display Italic ───────────
-  // Large temperature / hero numbers (24–28px)
+  // ── Numeric · Playfair Display 正体 — 等宽数字 ──
   tempLarge: {
     fontFamily: Fonts.numeric,
     fontSize: 26,
-    letterSpacing: -0.52,  // -0.02em
+    fontWeight: '500' as const,
+    letterSpacing: 0,
     color: Colors.ink,
   },
-  // Stats / counts (22px)
   statNum: {
     fontFamily: Fonts.numeric,
     fontSize: 22,
-    letterSpacing: -0.44,
+    fontWeight: '500' as const,
+    letterSpacing: 0,
     color: Colors.ink,
   },
-  // Inline small numbers (14–16px)
   numInline: {
     fontFamily: Fonts.numeric,
     fontSize: 15,
-    letterSpacing: -0.3,
+    fontWeight: '500' as const,
+    letterSpacing: 0,
     color: Colors.ink,
   },
 } as const;
@@ -236,27 +234,27 @@ export const Radius = {
 } as const;
 
 // ─────────────────────────────────────────────────────────
-// Shadows (warm-toned, not grey)
+// Shadows — 中性阴影 · 真灰 · 白盒景深
 // ─────────────────────────────────────────────────────────
 export const Shadow = {
   one: {
-    shadowColor: '#2A1810',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.06,
     shadowRadius: 2,
     elevation: 1,
   },
   two: {
-    shadowColor: '#2A1810',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
   three: {
-    shadowColor: '#2A1810',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.12,
     shadowRadius: 28,
     elevation: 6,
   },

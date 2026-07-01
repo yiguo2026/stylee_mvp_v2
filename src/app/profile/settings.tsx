@@ -102,7 +102,7 @@ export default function SettingsPage() {
             <Switch
               value={locationAccess}
               onValueChange={() => toggleAndSave('locationAccess', locationAccess, setLocationAccess)}
-              trackColor={{ false: '#e5e5ea', true: '#34C759' }}
+              trackColor={{ false: '#e5e5ea', true: Colors.signal }}
               thumbColor="#fff"
             />
           </View>
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   inner: { paddingVertical: Spacing.two, paddingBottom: Spacing.six },
 
   sectionLabel: {
-    fontSize: 13, color: '#8A8A8A',
+    fontSize: 13, color: Colors.gray1,
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.one + 2,
   },
   group: {
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   rowIcon: { fontSize: 18, width: 28, textAlign: 'center' },
   rowLabel: { ...T.bodyText, fontSize: 15, color: Colors.ink },
-  rowValue: { fontSize: 13, color: '#8A8A8A' },
+  rowValue: { fontSize: 13, color: Colors.gray1 },
 
   signOutGroup: { marginTop: Spacing.four, paddingHorizontal: Spacing.four },
   signOutBtn: {
@@ -234,5 +234,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three, alignItems: 'center',
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.line,
   },
-  signOutText: { ...T.bodyText, color: '#FF3B30', fontWeight: '600', fontSize: 15 },
+  signOutText: { ...T.bodyText, color: Colors.accent, fontWeight: '600', fontSize: 15 },
 });

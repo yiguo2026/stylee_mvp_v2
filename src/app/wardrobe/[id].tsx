@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: Spacing.two,
   },
-  attrsToggleText: { ...T.bodyText, fontSize: 14, color: '#6C5CE7', fontWeight: '500' },
+  attrsToggleText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontWeight: '500' },
 
   attrsCard: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,

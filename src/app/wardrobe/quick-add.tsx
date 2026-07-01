@@ -14,7 +14,7 @@ const isWeb = Platform.OS === 'web';
 
 const CATEGORY_ICONS: Record<string, string> = {
   '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
-  '外套': '🧥', '鞋': '👟', '包': '👜', '帽子': '🧢', '围巾': '🧣',
+  '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
 };
 
 export default function QuickAddPage() {
@@ -163,7 +163,7 @@ export default function QuickAddPage() {
                     {item.image_url ? (
                       <Image source={{ uri: item.image_url }} style={styles.builtinImg} resizeMode="cover" />
                     ) : (
-                      <CategoryIcon category={item.category} size={24} color={isSelected ? '#6C5CE7' : Colors.walnut2} />
+                      <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
                     )}
                     {isSelected && (
                       <View style={styles.builtinCheck}>
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   builtinHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  builtinSelectAll: { ...T.tag, color: '#6C5CE7', fontWeight: '600' },
+  builtinSelectAll: { ...T.tag, color: Colors.ink, fontWeight: '600' },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
   catBtn: {
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, padding: Spacing.two,
     borderWidth: 1, borderColor: Colors.line,
   },
-  builtinItemSelected: { borderColor: '#6C5CE7', backgroundColor: '#F0EDFF' },
+  builtinItemSelected: { borderColor: Colors.ink, backgroundColor: Colors.signalSoft },
   builtinItemDisabled: { opacity: 0.45, borderColor: Colors.lineSoft },
 
   builtinIcon: {
@@ -255,12 +255,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden', position: 'relative',
   },
-  builtinIconSelected: { backgroundColor: '#E8E0FF' },
+  builtinIconSelected: { backgroundColor: Colors.signalSoft },
   builtinIconDisabled: { backgroundColor: Colors.lineSoft },
   builtinImg: { width: 44, height: 44, borderRadius: Radius.md },
   builtinCheck: {
     position: 'absolute', bottom: -4, right: -4,
-    width: 16, height: 16, borderRadius: 8, backgroundColor: '#34C759',
+    width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
   builtinCheckText: { fontSize: 10, color: '#fff', fontWeight: '700' },
@@ -273,11 +273,11 @@ const styles = StyleSheet.create({
 
   builtinInfo: { flex: 1, gap: 2 },
   builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontWeight: '600' },
-  builtinNameSelected: { color: '#6C5CE7' },
+  builtinNameSelected: { color: Colors.ink },
   builtinNameDisabled: { color: Colors.walnut2 },
   builtinDesc: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
   builtinDescDisabled: { color: Colors.lineStrong },
-  selectedCount: { ...T.tag, fontSize: 12, color: '#6C5CE7', textAlign: 'center', fontWeight: '500' },
+  selectedCount: { ...T.tag, fontSize: 12, color: Colors.ink, textAlign: 'center', fontWeight: '500' },
 
   addBtn: {
     backgroundColor: Colors.ink, borderRadius: Radius.md,

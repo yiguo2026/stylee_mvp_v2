@@ -35,7 +35,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
       { name: '针织开衫', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1583744946564-b53ac1efb997?w=300&h=300&fit=crop' },
       { name: '白色T恤', category: '上装', color: '白色', image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop' },
       { name: '蓝色牛仔裤', category: '下装', color: '蓝色', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop' },
-      { name: '帆布鞋', category: '鞋', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
+      { name: '帆布鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
     ],
   },
   {
@@ -48,7 +48,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
     items: [
       { name: '白衬衫', category: '上装', color: '白色', image_url: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=300&h=300&fit=crop' },
       { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
-      { name: '小白鞋', category: '鞋', color: '白色', image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=300&fit=crop' },
+      { name: '小白鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=300&fit=crop' },
     ],
   },
   {
@@ -60,7 +60,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
     occasion: '休闲',
     items: [
       { name: '白色连衣裙', category: '连体装', color: '白色', image_url: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=300&h=300&fit=crop' },
-      { name: '帆布鞋', category: '鞋', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
+      { name: '帆布鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
     ],
   },
   {
@@ -74,7 +74,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
       { name: '针织衫', category: '上装', color: '米色', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cda3a7a?w=300&h=300&fit=crop' },
       { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
       { name: '米色风衣', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=300&h=300&fit=crop' },
-      { name: '双肩包', category: '包', color: '黑色', image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=300&h=300&fit=crop' },
+      { name: '双肩包', category: '包袋', color: '黑色', image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=300&h=300&fit=crop' },
     ],
   },
 ];
@@ -583,9 +583,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three,
     borderRadius: Radius.sm,
   },
-  cityRowActive: { backgroundColor: '#F0EDFF' },
+  cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
-  cityRowTextActive: { color: '#6C5CE7', fontWeight: '500' },
+  cityRowTextActive: { color: Colors.ink, fontWeight: '500' },
   modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

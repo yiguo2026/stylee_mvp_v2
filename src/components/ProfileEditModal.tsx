@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   avatarPlaceholder: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: '#764ba2',
+    backgroundColor: Colors.ink,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarEmoji: { fontSize: 32, color: '#fff' },
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   avatarCameraIcon: { fontSize: 14 },
-  avatarChange: { ...T.tag, color: '#6C5CE7' },
+  avatarChange: { ...T.tag, color: Colors.ink },
   field: { gap: Spacing.one },
   fieldLabel: { ...T.formLabel },
   fieldInput: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.line,
   },
   saveBtn: {
-    backgroundColor: '#6C5CE7',
+    backgroundColor: Colors.ink,
     borderRadius: Radius.md,
     paddingVertical: Spacing.two + 4,
     alignItems: 'center',

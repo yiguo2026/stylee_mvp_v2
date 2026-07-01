@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
 
   heroWrap: {
     width: '100%', aspectRatio: 3 / 4, position: 'relative',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: Colors.ink,
   },
   heroImage: { width: '100%', height: '100%' },
   heroPlaceholder: { width: '100%', height: '100%', backgroundColor: Colors.vintageCream },
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center', justifyContent: 'center',
   },
-  closeBtnText: { fontSize: 16, color: '#333' },
+  closeBtnText: { fontSize: 16, color: Colors.inkSoft },
 
   // Title section below image
   titleSection: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: 4 },
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
-  tagPillOccasion: { borderColor: Colors.terracotta, backgroundColor: '#FFFAF5' },
+  tagPillOccasion: { borderColor: Colors.terracotta, backgroundColor: Colors.accentSoft },
   tagPillText: { fontSize: 12, fontWeight: '500', color: Colors.ink },
   tagPillTextOccasion: { color: Colors.terracotta },
 

@@ -288,9 +288,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three,
     borderRadius: Radius.sm,
   },
-  cityRowActive: { backgroundColor: '#F0EDFF' },
+  cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
-  cityRowTextActive: { color: '#6C5CE7', fontWeight: '500' },
+  cityRowTextActive: { color: Colors.ink, fontWeight: '500' },
   modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

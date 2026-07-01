@@ -139,10 +139,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 4,
     color: Colors.ink,
   },
-  inputError: { borderColor: '#FF3B30' },
+  inputError: { borderColor: Colors.accent },
   errorText: {
     ...T.micro,
-    color: '#FF3B30',
+    color: Colors.accent,
     fontSize: 13,
     marginTop: -Spacing.one,
   },

@@ -95,7 +95,7 @@ export default function BatchImportScreen() {
 
         {importing && (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator color="#6C5CE7" size="large" />
+            <ActivityIndicator color={Colors.ink} size="large" />
             <Text style={styles.loadingText}>正在导入并识别...</Text>
           </View>
         )}
@@ -183,12 +183,12 @@ const styles = StyleSheet.create({
 
   // Loading
   loadingWrap: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.four },
-  loadingText: { ...T.bodyText, color: '#6C5CE7' },
+  loadingText: { ...T.bodyText, color: Colors.ink },
 
   // Result
   resultSection: { gap: Spacing.three },
   successBanner: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: Colors.signalSoft,
     borderRadius: Radius.lg,
     padding: Spacing.three,
     flexDirection: 'row',
@@ -197,11 +197,11 @@ const styles = StyleSheet.create({
   },
   successCheck: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#34C759',
+    backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
   successCheckText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  successText: { ...T.bodyText, fontWeight: '600', color: '#2E7D32', fontSize: 14 },
+  successText: { ...T.bodyText, fontWeight: '600', color: Colors.signal, fontSize: 14 },
   successSub: { ...T.micro, color: Colors.walnut2, marginTop: 2 },
   previewGrid: {
     flexDirection: 'row',
@@ -228,11 +228,11 @@ const styles = StyleSheet.create({
 
   // Tip
   tipCard: {
-    backgroundColor: '#F0EDFF',
+    backgroundColor: Colors.signalSoft,
     borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.one,
   },
-  tipTitle: { ...T.bodyText, fontWeight: '600', color: '#6C5CE7', fontSize: 14 },
+  tipTitle: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 14 },
   tipContent: { ...T.micro, color: Colors.walnut2, lineHeight: 20 },
 });

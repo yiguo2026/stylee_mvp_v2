@@ -84,7 +84,7 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.paperRaised,
+    backgroundColor: '#FFFFFF',
     borderTopColor: Colors.line,
     borderTopWidth: 1,
     paddingTop: Spacing.one,
@@ -102,6 +102,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapActive: {
-    backgroundColor: Colors.vintageCream,
+    backgroundColor: Colors.signalSoft,
   },
 });

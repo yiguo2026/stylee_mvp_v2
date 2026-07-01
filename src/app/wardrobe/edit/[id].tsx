@@ -23,7 +23,7 @@ const MATERIAL_OPTIONS = [
   '雪纺', '涤纶', '亚麻', '皮革/橡胶',
 ];
 
-const FIT_OPTIONS: FitType[] = ['修身', '宽松', '标准', 'oversize'];
+const FIT_OPTIONS: FitType[] = ['超紧身', '修身', '常规合身', '宽松', '廓形'];
 const SEASON_OPTIONS = [
   { id: 'spring', label: '春' },
   { id: 'summer', label: '夏' },
@@ -303,7 +303,7 @@ export default function EditItemScreen() {
 
         {/* Delete */}
         <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteConfirm(true)} disabled={deleting}>
-          {deleting ? <ActivityIndicator color="#FF3B30" /> : <Text style={styles.deleteText}>删除此单品</Text>}
+          {deleting ? <ActivityIndicator color={Colors.accent} /> : <Text style={styles.deleteText}>删除此单品</Text>}
         </TouchableOpacity>
       </ScrollView>
 
@@ -390,6 +390,6 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: Colors.ink, borderRadius: Radius.md, paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.two },
   disabled: { opacity: 0.6 },
   saveText: { ...T.buttonPrimary, color: Colors.paper },
-  deleteBtn: { borderWidth: 1.5, borderColor: '#FF3B30', borderRadius: Radius.md, paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.two },
-  deleteText: { ...T.buttonPrimary, color: '#FF3B30', fontWeight: '600', fontSize: 15 },
+  deleteBtn: { borderWidth: 1.5, borderColor: Colors.accent, borderRadius: Radius.md, paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.two },
+  deleteText: { ...T.buttonPrimary, color: Colors.accent, fontWeight: '600', fontSize: 15 },
 });

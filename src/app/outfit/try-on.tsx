@@ -266,7 +266,7 @@ export default function TryOnScreen() {
                         ) : (
                           <View style={styles.outfitThumbPlaceholder}>
                             <Text style={styles.outfitThumbEmoji}>
-                              {outfit.items[0]?.category === '上装' ? '👔' : outfit.items[0]?.category === '下装' ? '👖' : '👗'}
+                              {outfit.items[0]?.category === '上装' ? '👔' : outfit.items[0]?.category === '下装' ? '👖' : outfit.items[0]?.category === '外套' ? '🧥' : outfit.items[0]?.category === '鞋履' ? '👟' : '👗'}
                             </Text>
                           </View>
                         )}

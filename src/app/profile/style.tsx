@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
 
 const isWeb = Platform.OS === 'web';
-const LIKE_COLOR = '#34C759';
+const LIKE_COLOR = Colors.signal;
 
 const STYLE_EMOJIS: Record<string, string> = {
   quiet_luxury: '💎', minimalist: '◻️', commute_style: '💼', french: '🥐',
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   headerBack: { ...T.bodyText, color: Colors.ink },
   headerTitle: { ...T.sectionTitle },
-  headerSave: { ...T.bodyText, color: '#6C5CE7', fontWeight: '600' },
+  headerSave: { ...T.bodyText, color: Colors.ink, fontWeight: '600' },
   container: { flex: 1 },
   inner: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 
@@ -171,10 +171,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard,
     gap: Spacing.one,
   },
-  styleCardLiked: { borderColor: LIKE_COLOR, backgroundColor: '#E8F5E9' },
+  styleCardLiked: { borderColor: LIKE_COLOR, backgroundColor: Colors.signalSoft },
   styleEmoji: { fontSize: 32 },
   styleName: { ...T.tag, color: Colors.ink, fontWeight: '500' },
-  styleNameLiked: { color: '#1B7D32', fontWeight: '600' },
+  styleNameLiked: { color: Colors.signal, fontWeight: '600' },
   styleCheck: {
     position: 'absolute', top: 6, right: 8,
     fontSize: 14, color: LIKE_COLOR, fontWeight: '700',

@@ -14,7 +14,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 
 const CATEGORY_ICONS: Record<string, string> = {
   '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
-  '外套': '🧥', '鞋': '👟', '包': '👜', '帽子': '🧢', '围巾': '🧣',
+  '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
 };
 
 export default function OnboardingStep3() {
@@ -89,9 +89,9 @@ export default function OnboardingStep3() {
 
       // Insert preset wishlist items
       const presetWishlist = [
-        { name: '焦糖色羊绒围巾', category: '围巾' as const, color: '焦糖', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cead0e2?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
+        { name: '焦糖色羊绒围巾', category: '帽巾' as const, color: '焦糖', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cead0e2?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
         { name: '驼色大衣', category: '外套' as const, color: '驼色', image_url: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
-        { name: '黑色乐福鞋', category: '鞋' as const, color: '黑色', image_url: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
+        { name: '黑色乐福鞋', category: '鞋履' as const, color: '黑色', image_url: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=200&h=200&fit=crop', source: 'ai_recommended' as const },
       ];
       for (const wish of presetWishlist) {
         await addWishItem({ user_id: user.id, ...wish });
@@ -160,7 +160,7 @@ export default function OnboardingStep3() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.builtinIcon, isSelected && styles.builtinIconSelected]}>
-                    <CategoryIcon category={item.category} size={24} color={isSelected ? '#6C5CE7' : Colors.walnut2} />
+                    <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
                     {isSelected && (
                       <View style={styles.builtinCheck}>
                         <Text style={styles.builtinCheckText}>✓</Text>
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   builtinHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  builtinSelectAll: { ...T.tag, color: '#6C5CE7', fontWeight: '600' },
+  builtinSelectAll: { ...T.tag, color: Colors.ink, fontWeight: '600' },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
   catBtn: {
@@ -272,23 +272,23 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, padding: Spacing.two,
     borderWidth: 1, borderColor: Colors.line,
   },
-  builtinItemSelected: { borderColor: '#6C5CE7', backgroundColor: '#F0EDFF' },
+  builtinItemSelected: { borderColor: Colors.ink, backgroundColor: Colors.signalSoft },
   builtinIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
     backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
   },
-  builtinIconSelected: { backgroundColor: '#E8E0FF' },
+  builtinIconSelected: { backgroundColor: Colors.signalSoft },
   builtinCheck: {
     position: 'absolute', bottom: -4, right: -4,
-    width: 16, height: 16, borderRadius: 8, backgroundColor: '#34C759',
+    width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
   builtinCheckText: { fontSize: 10, color: '#fff', fontWeight: '700' },
   builtinInfo: { flex: 1, gap: 2 },
   builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontWeight: '600' },
-  builtinNameSelected: { color: '#6C5CE7' },
+  builtinNameSelected: { color: Colors.ink },
   builtinDesc: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
-  selectedCount: { ...T.tag, fontSize: 12, color: '#6C5CE7', textAlign: 'center', fontWeight: '500' },
+  selectedCount: { ...T.tag, fontSize: 12, color: Colors.ink, textAlign: 'center', fontWeight: '500' },
 
   batchSection: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
@@ -297,13 +297,13 @@ const styles = StyleSheet.create({
   },
   batchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   batchHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  batchAddBtn: { ...T.tag, color: '#6C5CE7', fontWeight: '600' },
+  batchAddBtn: { ...T.tag, color: Colors.ink, fontWeight: '600' },
   albumRow: { flexDirection: 'row', gap: Spacing.two },
   albumThumbWrap: { position: 'relative' },
   albumThumb: { width: 64, height: 64, borderRadius: Radius.md, backgroundColor: Colors.vintageCream },
   albumRemove: {
     position: 'absolute', top: -4, right: -4,
-    width: 18, height: 18, borderRadius: 9, backgroundColor: '#FF3B30',
+    width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent,
     alignItems: 'center', justifyContent: 'center',
   },
   albumRemoveText: { fontSize: 10, color: '#fff', fontWeight: '700' },

@@ -18,7 +18,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  '上装': '👔', '下装': '👖', '连体装': '👗', '外套': '🧥', '鞋': '👟', '包': '👜', '帽子': '🧢', '围巾': '🧣',
+  '上装': '👔', '下装': '👖', '连体装': '👗', '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
 };
 
 export default function OutfitResultScreen() {
@@ -236,10 +236,10 @@ export default function OutfitResultScreen() {
     if (['下装', '裤子', '牛仔裤', '阔腿裤', '短裤', '长裤', '半裙', '西裤', '运动裤', '休闲裤', '哈伦裤', '工装裤', '直筒裤', '喇叭裤'].some(k => s.includes(k))) return '下装';
     if (['连衣裙', '裙子', '长裙', '短裙', '裙装', 'onepiece', '连体装'].some(k => s.includes(k))) return '连体装';
     if (['外套', '夹克', '大衣', '风衣', '羽绒服', '棉服', '西装', '开衫', '皮衣', '冲锋衣', '棒球服', '皮草'].some(k => s.includes(k))) return '外套';
-    if (['鞋', '鞋子', '高跟鞋', '运动鞋', '靴子', '凉鞋', '皮鞋', '单鞋', '帆布鞋', '板鞋', '拖鞋', '乐福鞋', '短靴', '长靴', '老爹鞋', '马丁靴'].some(k => s.includes(k))) return '鞋';
-    if (['包', '包包', '手提包', '双肩包', '斜挎包', '手袋', '挎包', '托特包', '链条包', '腰包', '背包'].some(k => s.includes(k))) return '包';
-    if (['帽子', '帽', '棒球帽', '渔夫帽', '冷帽', '贝雷帽', '针织帽', '遮阳帽', '草帽'].some(k => s.includes(k))) return '帽子';
-    if (['围巾', '丝巾', '领巾', '披肩', '脖套'].some(k => s.includes(k))) return '围巾';
+    if (['鞋', '鞋子', '高跟鞋', '运动鞋', '靴子', '凉鞋', '皮鞋', '单鞋', '帆布鞋', '板鞋', '拖鞋', '乐福鞋', '短靴', '长靴', '老爹鞋', '马丁靴'].some(k => s.includes(k))) return '鞋履';
+    if (['包', '包包', '手提包', '双肩包', '斜挎包', '手袋', '挎包', '托特包', '链条包', '腰包', '背包'].some(k => s.includes(k))) return '包袋';
+    if (['帽子', '帽', '棒球帽', '渔夫帽', '冷帽', '贝雷帽', '针织帽', '遮阳帽', '草帽', '围巾', '丝巾', '领巾', '披肩', '脖套'].some(k => s.includes(k))) return '帽巾';
+    if (['配饰', '腰带', '领带', '胸针', '耳饰', '项链', '手链', '戒指', '手表', '眼镜', '墨镜'].some(k => s.includes(k))) return '配饰';
     if (CLOTHING_CATEGORIES.includes(s as ClothingCategory)) return s;
     return s;
   };
@@ -259,14 +259,14 @@ export default function OutfitResultScreen() {
       ]
     : [];
 
-  const MAIN_ORDER: Record<string, number> = { '外套': 0, '上装': 1, '下装': 2, '连体装': 2, '鞋': 3 };
+  const MAIN_ORDER: Record<string, number> = { '外套': 0, '上装': 1, '下装': 2, '连体装': 2, '鞋履': 3 };
   const mainItems = allFlatlayItems
     .filter(fi => fi.category in MAIN_ORDER)
     .sort((a, b) => (MAIN_ORDER[a.category] ?? 9) - (MAIN_ORDER[b.category] ?? 9));
-  const sideItems = allFlatlayItems.filter(fi => fi.category === '围巾' || fi.category === '帽子' || fi.category === '包');
+  const sideItems = allFlatlayItems.filter(fi => fi.category === '帽巾' || fi.category === '包袋' || fi.category === '配饰');
   const topItems = mainItems.filter(fi => fi.category === '上装' || fi.category === '外套');
   const bottomItems = mainItems.filter(fi => fi.category === '下装' || fi.category === '连体装');
-  const shoeItems = mainItems.filter(fi => fi.category === '鞋');
+  const shoeItems = mainItems.filter(fi => fi.category === '鞋履');
 
   const ownedItems = currentOutfit?.items ?? [];
   const recommendedItems = currentOutfit?.recommended_items ?? [];
@@ -309,7 +309,7 @@ export default function OutfitResultScreen() {
 
   const renderGarment = (fi: { id: string; name: string; category: string; image_url?: string }) => (
     <View key={fi.id} style={styles.flatlayTopWrap}>
-      <View style={[styles.flatlayTopShape, !fi.image_url && { backgroundColor: '#D4A574' }]}>
+      <View style={[styles.flatlayTopShape, !fi.image_url && { backgroundColor: Colors.paperCard }]}>
         {fi.image_url ? (
           <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
         ) : (
@@ -356,7 +356,7 @@ export default function OutfitResultScreen() {
                 {topItems.length > 0 && <View style={styles.flatlayTopsRow}>{topItems.map(renderGarment)}</View>}
                 {bottomItems.map((fi) => (
                   <View key={fi.id} style={styles.flatlayBottomWrap}>
-                    <View style={[styles.flatlayBottomShape, !fi.image_url && { backgroundColor: '#5C6B73' }]}>
+                    <View style={[styles.flatlayBottomShape, !fi.image_url && { backgroundColor: Colors.ink }]}>
                       {fi.image_url ? (
                         <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
                       ) : (
@@ -461,7 +461,7 @@ export default function OutfitResultScreen() {
                       style={[styles.itemCard, styles.itemCardRecommended]}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.itemThumbSmall, { backgroundColor: '#F0EDFF' }]}>
+                      <View style={[styles.itemThumbSmall, { backgroundColor: Colors.signalSoft }]}>
                         {rec.image_url ? (
                           <Image source={{ uri: rec.image_url }} style={styles.itemThumbImg} resizeMode="cover" />
                         ) : (
@@ -516,9 +516,9 @@ export default function OutfitResultScreen() {
             router.push({ pathname: '/outfit/try-on', params: { items: JSON.stringify(items) } });
           }}
         >
-          <Ionicons name="person-outline" size={18} color="#6C5CE7" />
+          <Ionicons name="person-outline" size={18} color={Colors.ink} />
           <Text style={styles.tryOnEntryText}>AI 试穿看看</Text>
-          <Feather name="chevron-right" size={14} color="#6C5CE7" />
+          <Feather name="chevron-right" size={14} color={Colors.ink} />
         </TouchableOpacity>
       </ScrollView>
 
@@ -598,16 +598,16 @@ const styles = StyleSheet.create({
   headerTotal: { color: Colors.walnut2 },
   favBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 },
   favIcon: { fontSize: 18, color: Colors.walnut2 },
-  favIconActive: { color: '#FF3B30' },
+  favIconActive: { color: Colors.accent },
   favLabel: { fontSize: 12, color: Colors.walnut2, fontWeight: '500' },
-  favLabelActive: { color: '#FF3B30' },
+  favLabelActive: { color: Colors.accent },
 
   content: { padding: Spacing.three, gap: Spacing.two, paddingBottom: 100 },
   contextRow: { gap: 2 },
   contextText: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   queryText: { ...T.itemDesc, color: Colors.walnut },
 
-  flatlayArea: { marginHorizontal: Spacing.two, minHeight: 280, borderRadius: Radius.xl, backgroundColor: '#FAFAFA', position: 'relative', overflow: 'hidden', padding: Spacing.three, alignItems: 'center', justifyContent: 'center' },
+  flatlayArea: { marginHorizontal: Spacing.two, minHeight: 280, borderRadius: Radius.xl, backgroundColor: Colors.paperCard, position: 'relative', overflow: 'hidden', padding: Spacing.three, alignItems: 'center', justifyContent: 'center' },
   flatlayRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three, width: '100%' },
   flatlayMain: { flex: 1, alignItems: 'center', gap: Spacing.two },
   flatlayTopsRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two },
@@ -622,11 +622,11 @@ const styles = StyleSheet.create({
   flatlayItemName: { fontSize: 11, color: Colors.walnut2, textAlign: 'center', maxWidth: 160 },
   flatlayShoesRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.three },
   flatlayShoeWrap: { alignItems: 'center', gap: 4 },
-  flatlayShoeShape: { width: 60, height: 36, borderRadius: 18, backgroundColor: '#F0F0F0', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  flatlayShoeShape: { width: 60, height: 36, borderRadius: 18, backgroundColor: Colors.paperCard, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlayShoeImg: { width: '100%', height: '100%' },
   flatlaySide: { width: 64, alignItems: 'center', gap: Spacing.three, paddingTop: Spacing.two },
   flatlaySideItem: { alignItems: 'center', gap: 4 },
-  flatlaySideCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#FFF8E1', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  flatlaySideCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.signalSoft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlaySideImg: { width: '100%', height: '100%', borderRadius: 26 },
   flatlaySideEmoji: { fontSize: 20, textAlign: 'center' },
   flatlaySideName: { fontSize: 10, color: Colors.walnut2, textAlign: 'center', maxWidth: 60 },
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
   flatlayEmptyText: { ...T.bodyText, color: Colors.walnut2, fontSize: 13 },
 
   dotIndicator: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: Spacing.two },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#DFE6E9' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.line },
   dotActive: { width: 20, borderRadius: 4, backgroundColor: Colors.terracotta },
 
   section: { gap: Spacing.two },
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
   itemsRow: { flexDirection: 'row', gap: 10, paddingVertical: Spacing.one },
   itemCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.two, backgroundColor: Colors.paperRaised, borderRadius: Radius.md, minWidth: 140, ...Shadow.one, position: 'relative' },
   itemCardAdjust: { opacity: 0.85 },
-  itemCardRecommended: { borderWidth: 2, borderColor: Colors.terracotta, borderStyle: 'dashed', backgroundColor: '#FFFAF5' },
+  itemCardRecommended: { borderWidth: 2, borderColor: Colors.terracotta, borderStyle: 'dashed', backgroundColor: Colors.accentSoft },
   itemThumbSmall: { width: 48, height: 48, borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   itemThumbImg: { width: '100%', height: '100%', borderRadius: 10 },
   itemThumbPlaceholder: { width: '100%', height: '100%', borderRadius: 10, backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
@@ -663,20 +663,20 @@ const styles = StyleSheet.create({
   recBadge: { position: 'absolute', top: -6, right: -4, backgroundColor: Colors.terracotta, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   recBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
 
-  allOwnedHint: { backgroundColor: '#E8F5E9', borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
+  allOwnedHint: { backgroundColor: Colors.signalSoft, borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
   allOwnedText: { ...T.bodyText, color: Colors.sage, fontSize: 13 },
 
   aiCommentCard: { marginHorizontal: Spacing.two, padding: Spacing.three, backgroundColor: Colors.paperRaised, borderRadius: 14, ...Shadow.two, position: 'relative', marginTop: Spacing.one },
   tryOnEntry: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     marginHorizontal: Spacing.two, paddingVertical: Spacing.two + 4,
-    backgroundColor: '#F0EDFF', borderRadius: Radius.md, gap: Spacing.one,
+    backgroundColor: Colors.signalSoft, borderRadius: Radius.md, gap: Spacing.one,
     borderWidth: 1, borderColor: '#E0D8FF',
   },
-  tryOnEntryText: { ...T.bodyText, fontSize: 14, color: '#6C5CE7', fontWeight: '600' },
+  tryOnEntryText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontWeight: '600' },
   aiBadge: { position: 'absolute', top: -8, left: 14, backgroundColor: Colors.ink, paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: 6 },
   aiBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  aiCommentText: { fontSize: 13, lineHeight: 22, color: '#636E72', marginTop: Spacing.one },
+  aiCommentText: { fontSize: 13, lineHeight: 22, color: Colors.gray1, marginTop: Spacing.one },
 
   decisionBar: { gap: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three, backgroundColor: Colors.paperRaised, borderTopWidth: 1, borderTopColor: Colors.line },
   decisionBtnRow: { flexDirection: 'row', gap: 8 },

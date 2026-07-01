@@ -133,8 +133,8 @@ export default function WardrobeTab() {
         '上衣': ['上装', '衬衫', 'T恤', '卫衣', '针织', '开衫'],
         '衣服': ['上装', '外套', '衬衫', 'T恤', '卫衣'],
         '裙子': ['裙', '连体装'],
-        '鞋': ['鞋', '靴'],
-        '包': ['包', '挎', '背包'],
+        '鞋': ['鞋', '靴', '鞋履'],
+        '包': ['包', '挎', '背包', '包袋'],
       };
       const terms = [q, ...(SEARCH_ALIASES[q] ?? [])];
       const haystack = [i.name, i.category, i.color, i.brand ?? '', i.material ?? ''].join(' ');
@@ -396,21 +396,21 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: 32,
     paddingHorizontal: 10,
-    borderRadius: 16, borderWidth: 1, borderColor: '#E8E6E3',
+    borderRadius: 16, borderWidth: 1, borderColor: Colors.line,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  catPillActive: { backgroundColor: '#2C2C2C', borderColor: '#2C2C2C' },
-  catPillText: { fontSize: 12, fontWeight: '500', color: '#1A1A1A' },
+  catPillActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  catPillText: { fontSize: 12, fontWeight: '500', color: Colors.ink },
   catPillTextActive: { color: '#fff' },
   catCount: {
     position: 'absolute', top: -5, right: -5,
     minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#E8E6E3', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.line, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,
   },
   catCountActive: { backgroundColor: '#D4D2CF' },
-  catCountText: { fontSize: 10, fontWeight: '600', color: '#8A8A8A' },
-  catCountTextActive: { color: '#666' },
+  catCountText: { fontSize: 10, fontWeight: '600', color: Colors.gray1 },
+  catCountTextActive: { color: Colors.gray1 },
 
   scrollContent: { flex: 1 },
 
@@ -453,17 +453,17 @@ const styles = StyleSheet.create({
   quickAddEntryBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 14, backgroundColor: '#FAFAFA', borderRadius: 14,
-    borderWidth: 1.5, borderColor: '#E0E0E0', borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: Colors.line, borderStyle: 'dashed',
   },
   quickAddEntryIcon: {
     width: 36, height: 36, borderRadius: 10,
-    backgroundColor: '#667eea', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.signal, alignItems: 'center', justifyContent: 'center',
   },
   quickAddEntryIconText: { fontSize: 18 },
   quickAddEntryInfo: { flex: 1 },
-  quickAddEntryTitle: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
-  quickAddEntrySub: { fontSize: 11, color: '#8A8A8A', marginTop: 2 },
-  quickAddEntryArrow: { fontSize: 14, color: '#8A8A8A' },
+  quickAddEntryTitle: { fontSize: 13, fontWeight: '600', color: Colors.ink },
+  quickAddEntrySub: { fontSize: 11, color: Colors.gray1, marginTop: 2 },
+  quickAddEntryArrow: { fontSize: 14, color: Colors.gray1 },
 
   fab: {
     position: 'absolute', bottom: Spacing.four + 60, right: Spacing.four,
@@ -529,8 +529,8 @@ const styles = StyleSheet.create({
   wishItemActions: { flexDirection: 'column', gap: 6, flexShrink: 0 },
   wishAddBtn: {
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    backgroundColor: '#2C2C2C',
+    backgroundColor: Colors.ink,
   },
   wishAddBtnText: { fontSize: 11, fontWeight: '600', color: '#fff' },
-  wishRemoveText: { fontSize: 11, color: '#FF3B30', textAlign: 'center' },
+  wishRemoveText: { fontSize: 11, color: Colors.accent, textAlign: 'center' },
 });
