@@ -21,12 +21,10 @@ jobs:
 
       - run: npm ci
 
-      - name: Find expo CLI path
-        id: expo-cli
-        run: echo "path=$(node -e "console.log(require.resolve('@expo/cli'))")" >> $GITHUB_OUTPUT
-
       - name: Build web
-        run: node ${{ steps.expo-cli.outputs.path }} export --platform web
+        run: |
+          EXPO_CLI=$(node -e "console.log(require.resolve('@expo/cli'))")
+          node "$EXPO_CLI" export --platform web
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
