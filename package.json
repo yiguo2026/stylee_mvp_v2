@@ -10,7 +10,6 @@
     "ios": "expo run:ios",
     "prebuild:ios": "npx expo prebuild --platform ios && node ./scripts/patch-privacy.js",
     "web": "expo start --web",
-    "build:web": "npx expo export --platform web",
     "lint": "expo lint"
   },
   "dependencies": {
