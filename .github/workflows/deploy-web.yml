@@ -16,12 +16,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
-      - run: npm run build:web
+      - name: Build web
+        run: node node_modules/@expo/cli/build/bin/cli export --platform web
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
