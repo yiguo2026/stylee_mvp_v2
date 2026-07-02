@@ -21,17 +21,17 @@ jobs:
 
       - run: npm ci
 
-      - name: Build web
+      - name: Debug - check expo location
         run: |
-          CLI=$(find node_modules -path "*/expo/bin/cli" -type f | head -1)
-          if [ -z "$CLI" ]; then
-            CLI=$(find node_modules -path "*/@expo/cli/build/bin/cli" -type f | head -1)
-          fi
-          if [ -z "$CLI" ]; then
-            echo "Cannot find expo CLI" && exit 1
-          fi
-          echo "Using CLI: $CLI"
-          node "$CLI" export --platform web
+          echo "=== ls node_modules/expo ==="
+          ls -la node_modules/expo/ 2>&1 || echo "NOT FOUND"
+          echo "=== ls node_modules/@expo ==="
+          ls node_modules/@expo/ 2>&1 || echo "NOT FOUND"
+          echo "=== npm ls expo ==="
+          npx --no-install npm ls expo 2>&1 || true
+
+      - name: Build web
+        run: npx --no-install expo export --platform web
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
