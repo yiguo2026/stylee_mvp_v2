@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Image, ActivityIndicator, Alert, Modal,
@@ -11,7 +11,8 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { aiRecognizeClothing, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS } from '@/lib/ai';
+import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS } from '@/lib/ai';
+import { subscribeServiceUnavailable } from '@/lib/styleeService';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { ClothingCategory } from '@/types';
 
@@ -32,6 +33,19 @@ export default function AddWardrobeItem() {
   const [recognizing, setRecognizing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pickerField, setPickerField] = useState<PickerField | null>(null);
+
+  // Standardization state
+  const [photoType, setPhotoType] = useState<string>('flat');
+  const [standardizedUri, setStandardizedUri] = useState<string | null>(null);
+  const [stdState, setStdState] = useState<'idle' | 'generating' | 'done' | 'failed'>('idle');
+  const [useStandardized, setUseStandardized] = useState(true);
+  const [serviceDown, setServiceDown] = useState(false);
+
+  // Monotonic token — incremented on every new image pick; stale async results
+  // whose token no longer matches the current value are discarded.
+  const reqTokenRef = useRef(0);
+
+  useEffect(() => { subscribeServiceUnavailable(() => setServiceDown(true)); }, []);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,16 +76,30 @@ export default function AddWardrobeItem() {
     }
   };
 
+  const runStandardize = async (uri: string, cat: string, pt: string, token: number) => {
+    setStdState('generating');
+    const std = await aiStandardizeGarment(uri, cat, pt);
+    if (reqTokenRef.current !== token) return;
+    if (std) { setStandardizedUri(std); setUseStandardized(true); setStdState('done'); }
+    else { setStdState('failed'); }
+  };
+
   const runRecognition = async (uri: string) => {
+    const token = ++reqTokenRef.current;
     setRecognizing(true);
+    setStandardizedUri(null); setStdState('idle');
     try {
       const result = await aiRecognizeClothing(uri);
+      if (reqTokenRef.current !== token) return;
       setCategory(result.category);
       setColor(result.color);
       if (result.material) setMaterial(result.material);
       if (!name) setName(`${result.color}${result.category}`);
+      const pt = result.photo_type || photoType;
+      setPhotoType(pt);
+      void runStandardize(uri, result.category, pt, token);
     } finally {
-      setRecognizing(false);
+      if (reqTokenRef.current === token) setRecognizing(false);
     }
   };
 
@@ -83,12 +111,14 @@ export default function AddWardrobeItem() {
     if (!user) return;
     setSaving(true);
 
-    // Try to upload image to Supabase Storage; fall back to local URI if not set up yet
+    // Upload the chosen image (standardized or original) to Supabase Storage;
+    // fall back to the local original URI if not set up yet or upload fails.
     let finalImageUrl = imageUri;
-    if (imageUri) {
-      const uploaded = await uploadWardrobeImage(imageUri, user.id);
+    const chosen = (useStandardized && standardizedUri) ? standardizedUri : imageUri;
+    if (chosen) {
+      const uploaded = await uploadWardrobeImage(chosen, user.id);
       if (uploaded) finalImageUrl = uploaded;
-      // If upload fails, keep the local URI (works on same device)
+      else finalImageUrl = imageUri; // upload failed → keep local original
     }
 
     const saved = await addItem({
@@ -149,16 +179,32 @@ export default function AddWardrobeItem() {
         </TouchableOpacity>
       </View>
 
+      {serviceDown && (
+        <View style={styles.serviceDownBanner}>
+          <Text style={styles.serviceDownBannerText}>未连接本地模型服务，已用备用方案</Text>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.content}>
         {/* Image Section */}
         <View style={styles.imageSection}>
           {imageUri ? (
             <View style={styles.imageContainer}>
-              <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+              <Image
+                source={{ uri: useStandardized && standardizedUri ? standardizedUri : imageUri }}
+                style={styles.image}
+                resizeMode="cover"
+              />
               {recognizing && (
                 <View style={styles.recognizingOverlay}>
                   <ActivityIndicator color={Colors.paper} />
                   <Text style={styles.recognizingText}>AI 识别中…</Text>
+                </View>
+              )}
+              {stdState === 'generating' && (
+                <View style={styles.stdBadge}>
+                  <ActivityIndicator size="small" color={Colors.paper} />
+                  <Text style={styles.stdBadgeText}>标准化中…</Text>
                 </View>
               )}
             </View>
@@ -168,6 +214,28 @@ export default function AddWardrobeItem() {
               <Text style={styles.placeholderText}>添加图片</Text>
             </View>
           )}
+
+          {stdState === 'done' && (
+            <View style={styles.stdToggleRow}>
+              <TouchableOpacity
+                style={[styles.stdToggleBtn, !useStandardized && styles.stdToggleBtnActive]}
+                onPress={() => setUseStandardized(false)}
+              >
+                <Text style={[styles.stdToggleBtnText, !useStandardized && styles.stdToggleBtnTextActive]}>原图</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.stdToggleBtn, useStandardized && styles.stdToggleBtnActive]}
+                onPress={() => setUseStandardized(true)}
+              >
+                <Text style={[styles.stdToggleBtnText, useStandardized && styles.stdToggleBtnTextActive]}>标准图</Text>
+              </TouchableOpacity>
+              <Text style={styles.stdDoneCaption}>✓ 已生成标准图</Text>
+            </View>
+          )}
+          {stdState === 'failed' && (
+            <Text style={styles.stdFailedCaption}>标准图生成失败，用原图</Text>
+          )}
+
           <View style={styles.imageActions}>
             {!isWeb && (
               <TouchableOpacity style={styles.imageBtn} onPress={takePhoto}>
@@ -322,6 +390,48 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   recognizingText: { color: Colors.paper, fontSize: 14 },
+  stdBadge: {
+    position: 'absolute',
+    bottom: Spacing.two,
+    right: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+  },
+  stdBadgeText: { color: Colors.paper, fontSize: 12 },
+  stdToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  stdToggleBtn: {
+    paddingHorizontal: Spacing.two + 2,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.line,
+    backgroundColor: Colors.paperCard,
+  },
+  stdToggleBtnActive: {
+    backgroundColor: Colors.terracotta,
+    borderColor: Colors.terracotta,
+  },
+  stdToggleBtnText: { ...T.itemDesc, color: Colors.walnut },
+  stdToggleBtnTextActive: { ...T.itemDesc, color: Colors.vintageCream },
+  stdDoneCaption: { ...T.itemDesc, color: Colors.walnut2, flex: 1, textAlign: 'right' },
+  stdFailedCaption: { ...T.itemDesc, color: Colors.walnut2 },
+  serviceDownBanner: {
+    backgroundColor: Colors.vintageCream,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.one + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.linen,
+  },
+  serviceDownBannerText: { ...T.itemDesc, color: Colors.walnut, textAlign: 'center' },
   imagePlaceholder: {
     height: 240, borderRadius: Radius.lg,
     backgroundColor: Colors.vintageCream,

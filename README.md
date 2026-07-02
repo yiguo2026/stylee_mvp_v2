@@ -177,3 +177,37 @@ assets/
   logo.png          # Stylee Logo
   tryon/            # AI试穿预置场景图（7张）
 ```
+
+## 接入本地模型服务
+
+本应用支持接入本地 AI 推理服务（如穿搭识别、标准化、推荐等功能）。
+
+### 启动本地服务
+
+在模型仓库（`style05`）执行：
+
+```bash
+python3 serve.py --provider dashscope
+```
+
+服务默认运行在 `http://127.0.0.1:8000`。
+
+### 配置环境变量
+
+在 `.env` 文件中设置：
+
+```bash
+EXPO_PUBLIC_STYLEE_API=http://127.0.0.1:8000
+```
+
+或直接复制 `.env.example` 并填入相关配置：
+
+```bash
+cp .env.example .env
+```
+
+### 自动回落机制
+
+当本地服务不可达时，App 会自动回落到默认行为（如使用 mock 数据），不影响其他功能的正常使用。
+
+可通过 `node scripts/styleeSmoke.ts` 验证服务连接状态（需先启动本地服务）。

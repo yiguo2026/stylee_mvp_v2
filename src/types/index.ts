@@ -197,6 +197,9 @@ export interface RecognitionResult {
   brand?: string;
   sleeve_length?: SleeveLength;
   fit_type?: FitType;
+  photo_type?: string;      // 服务返回：on_body|flat|product
+  needs_review?: boolean;   // 服务返回：低置信需人工确认
+  confidence?: number;      // 服务返回：0-1
 }
 
 // ── v2 New Types ───────────────────────────────────────
