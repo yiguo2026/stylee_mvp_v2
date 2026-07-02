@@ -23,8 +23,15 @@ jobs:
 
       - name: Build web
         run: |
-          EXPO_CLI=$(node -e "console.log(require.resolve('@expo/cli'))")
-          node "$EXPO_CLI" export --platform web
+          CLI=$(find node_modules -path "*/expo/bin/cli" -type f | head -1)
+          if [ -z "$CLI" ]; then
+            CLI=$(find node_modules -path "*/@expo/cli/build/bin/cli" -type f | head -1)
+          fi
+          if [ -z "$CLI" ]; then
+            echo "Cannot find expo CLI" && exit 1
+          fi
+          echo "Using CLI: $CLI"
+          node "$CLI" export --platform web
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
