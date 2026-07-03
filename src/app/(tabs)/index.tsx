@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal,
-  Image, Dimensions, Platform,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T, Fonts, MaxContentWidth } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { fetchWeather, getMockWeather, searchCitiesOnline, getTempTag, CityResult } from '@/lib/weather';
@@ -20,8 +20,6 @@ import {
   OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS, TEMP_TAGS,
 } from '@/types';
 
-const SCREEN_RAW = Dimensions.get('window').width;
-const SCREEN_W = Platform.OS === 'web' ? Math.min(SCREEN_RAW, MaxContentWidth) : SCREEN_RAW;
 
 // Mock inspiration data (will be replaced by DB content)
 const MOCK_INSPIRATIONS: InspirationCard[] = [
@@ -530,7 +528,7 @@ const styles = StyleSheet.create({
   inspirationTitle: { ...T.subTitle },
   inspirationRow: { flexDirection: 'row', gap: Spacing.two },
   inspirationCard: {
-    width: SCREEN_W * 0.38, backgroundColor: Colors.paperCard,
+    width: '47%', backgroundColor: Colors.paperCard,
     borderRadius: Radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.line,
   },

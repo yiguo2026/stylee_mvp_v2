@@ -2,13 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, SafeAreaView, RefreshControl,
-  useWindowDimensions, TextInput, Modal, ScrollView, ActivityIndicator, Alert,
-  Platform,
+  TextInput, Modal, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Fonts, Spacing, Radius, Shadow, T, MaxContentWidth } from '@/constants/theme';
+import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
@@ -16,10 +15,10 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { aiExtractProductFromLink } from '@/lib/ai';
 
-function ItemCard({ item, cardWidth }: { item: WardrobeItem; cardWidth: number }) {
+function ItemCard({ item }: { item: WardrobeItem }) {
   return (
     <TouchableOpacity
-      style={[styles.card, { width: cardWidth }]}
+      style={styles.card}
       onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
     >
       <View style={styles.cardImage}>
@@ -97,9 +96,6 @@ export default function WardrobeTab() {
   const [showWishlist, setShowWishlist] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkImporting, setLinkImporting] = useState(false);
-  const { width: screenW } = useWindowDimensions();
-  const screenWidth = Platform.OS === 'web' ? Math.min(screenW, MaxContentWidth) : screenW;
-  const cardWidth = (screenWidth - Spacing.four * 2 - Spacing.two) / 2;
 
   useEffect(() => {
     if (user) {
@@ -242,7 +238,7 @@ export default function WardrobeTab() {
         ) : (
           <View style={styles.grid}>
             {filtered.map(item => (
-              <ItemCard key={item.item_id} item={item} cardWidth={cardWidth} />
+              <ItemCard key={item.item_id} item={item} />
             ))}
           </View>
         )}
@@ -419,6 +415,7 @@ const styles = StyleSheet.create({
   // Wardrobe grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.four, gap: Spacing.two },
   card: {
+    width: '47.5%',
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
     overflow: 'hidden', borderWidth: 1, borderColor: Colors.lineStrong, ...Shadow.one,
   },
