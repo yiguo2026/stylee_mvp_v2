@@ -44,7 +44,7 @@ const fontFaceStyle = fontFaceCSS
 
 // ── 2. Web shell: iPhone 14 Pro frame on desktop ──
 const shellStyle = `<style>
-@media (min-width: 430px) {
+@media (min-width: 430px) and (min-height: 900px) {
   body {
     background-color: #f4f4f5 !important;
     display: flex !important;
