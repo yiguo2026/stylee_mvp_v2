@@ -246,7 +246,7 @@ export default function WardrobeTab() {
         {/* Wishlist Entry (bottom of page) */}
         <View style={styles.wishlistEntry}>
           <TouchableOpacity style={styles.wishlistEntryBtn} onPress={() => setShowWishlist(true)}>
-            <Text style={styles.wishlistEntryIcon}>查看</Text>
+            <Feather name="heart" size={18} color={Colors.accent} />
             <Text style={styles.wishlistEntryLabel}>心愿单</Text>
             {wishlistItems.length > 0 && (
               <View style={styles.wishlistEntryBadge}>
@@ -261,7 +261,7 @@ export default function WardrobeTab() {
         <View style={styles.quickAddEntry}>
           <TouchableOpacity style={styles.quickAddEntryBtn} onPress={() => router.push('/wardrobe/quick-add')}>
             <View style={styles.quickAddEntryIcon}>
-              <Text style={styles.quickAddEntryIconText}>AI</Text>
+              <Feather name="zap" size={18} color={Colors.paper} />
             </View>
             <View style={styles.quickAddEntryInfo}>
               <Text style={styles.quickAddEntryTitle}>快速添加推荐单品</Text>
