@@ -23,6 +23,8 @@ jobs:
 
       - name: Build web
         run: npm run build:web
+        env:
+          EXPO_PUBLIC_DASHSCOPE_API_KEY: ${{ secrets.EXPO_PUBLIC_DASHSCOPE_API_KEY }}
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
