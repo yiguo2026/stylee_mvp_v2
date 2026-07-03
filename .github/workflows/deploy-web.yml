@@ -21,17 +21,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Debug - check expo location
-        run: |
-          echo "=== ls node_modules/expo ==="
-          ls -la node_modules/expo/ 2>&1 || echo "NOT FOUND"
-          echo "=== ls node_modules/@expo ==="
-          ls node_modules/@expo/ 2>&1 || echo "NOT FOUND"
-          echo "=== npm ls expo ==="
-          npx --no-install npm ls expo 2>&1 || true
-
       - name: Build web
-        run: npx --no-install expo export --platform web
+        run: npx expo export --platform web
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
