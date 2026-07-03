@@ -406,7 +406,7 @@ export default function OutfitResultScreen() {
         <Text style={styles.headerTitle}>推荐方案</Text>
         <TouchableOpacity style={styles.favBtn} onPress={handleFavorite}>
           <Text style={[styles.favIcon, isFavorited && styles.favIconActive]}>
-            {isFavorited ? '已收藏' : '收藏'}
+            {isFavorited ? '♥' : '♡'}
           </Text>
           <Text style={[styles.favLabel, isFavorited && styles.favLabelActive]}>
             {isFavorited ? '已收藏' : '收藏此搭配'}
@@ -556,7 +556,7 @@ export default function OutfitResultScreen() {
                           disabled={isWishlisted}
                         >
                           <Text style={[styles.wishlistBtnText, isWishlisted && styles.wishlistBtnTextDone]}>
-                            {isWishlisted ? '已收藏' : '收藏'}
+                            {isWishlisted ? '已收藏' : '♡ 收藏'}
                           </Text>
                         </TouchableOpacity>
                       </View>
