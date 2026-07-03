@@ -1,16 +1,15 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, ActivityIndicator, Alert, Image, Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Feather from '@expo/vector-icons/Feather';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
+import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 
 const isWeb = Platform.OS === 'web';
 
@@ -63,6 +62,8 @@ export default function TryOnScreen() {
   const [genStep, setGenStep] = useState(0);
   const [tryOnImage, setTryOnImage] = useState<string | number | null>(null);
 
+  const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
+
   // Load outfit items from result
   useEffect(() => {
     if (itemsParam) {
@@ -70,12 +71,12 @@ export default function TryOnScreen() {
     }
   }, [itemsParam]);
 
-  // Load outfits from Supabase (for home entry)
   useEffect(() => {
-    if (!isFromResult && user?.id) loadOutfits();
-  }, [isFromResult, user?.id]);
+    if (!user?.id) return;
+    getQuota(user.id, 'tryon').then(q => setQuota({ used: q.used, limit: q.limit, remaining: q.remaining }));
+  }, [user?.id]);
 
-  const loadOutfits = async () => {
+  const loadOutfits = useCallback(async () => {
     if (!user?.id) return;
     setLoadingOutfits(true);
     try {
@@ -122,7 +123,12 @@ export default function TryOnScreen() {
       console.warn('[TryOn] load outfits failed:', e);
     }
     setLoadingOutfits(false);
-  };
+  }, [user?.id]);
+
+  // Load outfits from Supabase (for home entry)
+  useEffect(() => {
+    if (!isFromResult && user?.id) void loadOutfits();
+  }, [isFromResult, user?.id, loadOutfits]);
 
   const currentOutfits = activeTab === 'worn' ? wornOutfits : favOutfits;
 
@@ -130,6 +136,18 @@ export default function TryOnScreen() {
 
   const handleGenerate = async () => {
     if (!canGenerate) return;
+    if (!user?.id) {
+      Alert.alert('提示', '请先登录后再使用 AI 试穿');
+      return;
+    }
+
+    const q = await consumeQuota(user.id, 'tryon');
+    setQuota({ used: q.used, limit: q.limit, remaining: q.remaining });
+    if (!q.ok) {
+      Alert.alert('今日试穿次数已用完', `AI 试穿每日 ${q.limit} 次，明天再来`);
+      return;
+    }
+
     setGenerating(true);
     setTryOnImage(null);
     setGenStep(0);
@@ -204,8 +222,8 @@ export default function TryOnScreen() {
               <Text style={styles.emptyText}>暂无搭配单品</Text>
             ) : (
               <View style={styles.itemsList}>
-                {resultItems.map((item, i) => (
-                  <View key={item.item_id ?? i} style={styles.itemRow}>
+                {resultItems.map((item) => (
+                  <View key={item.item_id ?? `${item.name}-${item.category}-${item.color}-${item.image_url ?? ''}`} style={styles.itemRow}>
                     <View style={styles.itemIcon}>
                       {item.image_url
                         ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
@@ -270,11 +288,11 @@ export default function TryOnScreen() {
                             </Text>
                           </View>
                         )}
-                        {outfit.items.length > 1 && (
+                        {outfit.items.length > 1 ? (
                           <View style={styles.outfitCount}>
                             <Text style={styles.outfitCountText}>{outfit.items.length}件</Text>
                           </View>
-                        )}
+                        ) : null}
                       </View>
                       <Text style={styles.outfitName} numberOfLines={1}>{outfit.name}</Text>
                       <Text style={styles.outfitItems} numberOfLines={1}>
@@ -325,9 +343,12 @@ export default function TryOnScreen() {
           )}
         </TouchableOpacity>
         <Text style={styles.generateHint}>AI 将结合身体信息 + 搭配方案 + 场景氛围生成效果图</Text>
+        {quota ? (
+          <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
+        ) : null}
 
         {/* ── Generating Progress ── */}
-        {generating && (
+        {generating ? (
           <View style={styles.progressCard}>
             <Text style={styles.progressEmoji}>✨</Text>
             <Text style={styles.progressTitle}>AI 正在生成试穿效果...</Text>
@@ -338,10 +359,10 @@ export default function TryOnScreen() {
               <View style={[styles.progressFill, { width: `${(genStep + 1) * 25}%` }]} />
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* ── Result ── */}
-        {tryOnImage && !generating && (
+        {tryOnImage !== null && !generating ? (
           <View style={styles.resultCard}>
             <Image
               source={typeof tryOnImage === 'string' ? { uri: tryOnImage } : tryOnImage}
@@ -357,7 +378,7 @@ export default function TryOnScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -474,6 +495,7 @@ const styles = StyleSheet.create({
   generateBtnDisabled: { opacity: 0.4 },
   generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 16 },
   generateHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: Spacing.one },
+  quotaHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: 2 },
   generatingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
 
   // ── Progress ──

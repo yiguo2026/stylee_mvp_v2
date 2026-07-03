@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Image, ActivityIndicator, Alert, Modal,
@@ -179,11 +179,11 @@ export default function AddWardrobeItem() {
         </TouchableOpacity>
       </View>
 
-      {serviceDown && (
+      {serviceDown ? (
         <View style={styles.serviceDownBanner}>
           <Text style={styles.serviceDownBannerText}>未连接本地模型服务，已用备用方案</Text>
         </View>
-      )}
+      ) : null}
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Image Section */}
@@ -195,18 +195,18 @@ export default function AddWardrobeItem() {
                 style={styles.image}
                 resizeMode="cover"
               />
-              {recognizing && (
+              {recognizing ? (
                 <View style={styles.recognizingOverlay}>
                   <ActivityIndicator color={Colors.paper} />
                   <Text style={styles.recognizingText}>AI 识别中…</Text>
                 </View>
-              )}
-              {stdState === 'generating' && (
+              ) : null}
+              {stdState === 'generating' ? (
                 <View style={styles.stdBadge}>
                   <ActivityIndicator size="small" color={Colors.paper} />
                   <Text style={styles.stdBadgeText}>标准化中…</Text>
                 </View>
-              )}
+              ) : null}
             </View>
           ) : (
             <View style={styles.imagePlaceholder}>
@@ -215,7 +215,7 @@ export default function AddWardrobeItem() {
             </View>
           )}
 
-          {stdState === 'done' && (
+          {stdState === 'done' ? (
             <View style={styles.stdToggleRow}>
               <TouchableOpacity
                 style={[styles.stdToggleBtn, !useStandardized && styles.stdToggleBtnActive]}
@@ -231,18 +231,18 @@ export default function AddWardrobeItem() {
               </TouchableOpacity>
               <Text style={styles.stdDoneCaption}>✓ 已生成标准图</Text>
             </View>
-          )}
-          {stdState === 'failed' && (
+          ) : null}
+          {stdState === 'failed' ? (
             <Text style={styles.stdFailedCaption}>标准图生成失败，用原图</Text>
-          )}
+          ) : null}
 
           <View style={styles.imageActions}>
-            {!isWeb && (
+            {!isWeb ? (
               <TouchableOpacity style={styles.imageBtn} onPress={takePhoto}>
                 <Feather name="camera" size={15} color={Colors.ink} />
                 <Text style={styles.imageBtnText}>拍照</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
             <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
               <Feather name="image" size={15} color={Colors.ink} />
               <Text style={styles.imageBtnText}>{isWeb ? '选择图片' : '相册'}</Text>
@@ -250,12 +250,12 @@ export default function AddWardrobeItem() {
           </View>
         </View>
 
-        {recognizing && (
+        {recognizing ? (
           <View style={styles.recognizingBanner}>
             <ActivityIndicator size="small" color={Colors.terracotta} />
             <Text style={styles.recognizingBannerText}>AI 正在识别衣物属性…</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Form */}
         <View style={styles.form}>
@@ -321,6 +321,14 @@ export default function AddWardrobeItem() {
         </View>
       </ScrollView>
 
+      {saving ? (
+        <View style={styles.savingOverlay}>
+          <ActivityIndicator color={Colors.paper} />
+          <Text style={styles.savingTitle}>正在导入单品…</Text>
+          <Text style={styles.savingSub}>上传图片并保存到衣橱</Text>
+        </View>
+      ) : null}
+
       {/* Picker Modal */}
       <Modal visible={pickerField !== null} transparent animationType="slide">
         <TouchableOpacity
@@ -337,7 +345,7 @@ export default function AddWardrobeItem() {
             </TouchableOpacity>
           </View>
           <ScrollView>
-            {pickerField && pickerOptions[pickerField].map(opt => (
+            {pickerField ? pickerOptions[pickerField].map(opt => (
               <TouchableOpacity
                 key={opt}
                 style={[styles.pickerOption, opt === currentPickerValue && styles.pickerOptionActive]}
@@ -349,9 +357,9 @@ export default function AddWardrobeItem() {
                 ]}>
                   {opt}
                 </Text>
-                {opt === currentPickerValue && <Feather name="check" size={16} color={Colors.sage} />}
+                {opt === currentPickerValue ? <Feather name="check" size={16} color={Colors.sage} /> : null}
               </TouchableOpacity>
-            ))}
+            )) : null}
           </ScrollView>
         </View>
       </Modal>
@@ -390,6 +398,16 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   recognizingText: { color: Colors.paper, fontSize: 14 },
+  savingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10,10,10,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.four,
+  },
+  savingTitle: { ...T.bodyText, color: Colors.paper, fontFamily: 'Inter_500Medium', textAlign: 'center' },
+  savingSub: { ...T.micro, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
   stdBadge: {
     position: 'absolute',
     bottom: Spacing.two,

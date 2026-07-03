@@ -1,23 +1,24 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, SafeAreaView, Modal,
+  StyleSheet, ScrollView, SafeAreaView, Modal, Alert,
   Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { fetchWeather, getMockWeather, searchCitiesOnline, getTempTag, CityResult } from '@/lib/weather';
 import { supabase } from '@/lib/supabase';
+import { getQuota } from '@/lib/dailyQuota';
 import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import {
-  WeatherData, FilterTag, Outfit, InspirationCard,
-  OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS, TEMP_TAGS,
+  WeatherData, FilterTag, InspirationCard,
+  OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS,
 } from '@/types';
 
 
@@ -94,6 +95,8 @@ export default function OutfitTab() {
   const [inputMode, setInputMode] = useState<InputMode>('description');
   const [query, setQuery] = useState('');
 
+  const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
+
   // Tags
   const [allTags, setAllTags] = useState<FilterTag[]>([
     ...OCCASION_TAGS, ...STYLE_TAGS, ...COLOR_TAGS,
@@ -103,8 +106,13 @@ export default function OutfitTab() {
   const [inspirations, setInspirations] = useState<InspirationCard[]>(MOCK_INSPIRATIONS);
 
   useEffect(() => {
-    if (user) fetchItems(user.id);
-  }, [user]);
+    if (user?.id) fetchItems(user.id);
+  }, [user?.id, fetchItems]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getQuota(user.id, 'recommend').then(q => setQuota({ remaining: q.remaining, limit: q.limit }));
+  }, [user?.id]);
 
   useEffect(() => {
     fetchWeather(defaultCity).then(setWeather);
@@ -135,7 +143,19 @@ export default function OutfitTab() {
     ));
   };
 
-  const handleGenerate = (modeOverride?: InputMode) => {
+  const handleGenerate = async (modeOverride?: InputMode) => {
+    if (!user?.id) {
+      Alert.alert('提示', '请先登录后再生成搭配');
+      return;
+    }
+
+    const q = await getQuota(user.id, 'recommend');
+    setQuota({ remaining: q.remaining, limit: q.limit });
+    if (q.remaining <= 0) {
+      Alert.alert('今日推荐次数已用完', `AI 推荐每日 ${q.limit} 次，明天再来`);
+      return;
+    }
+
     const mode = modeOverride ?? inputMode;
     const selectedTagIds = allTags.filter(t => t.selected).map(t => t.id);
     router.push({
@@ -249,6 +269,9 @@ export default function OutfitTab() {
                 <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
                 <Text style={styles.generateBtnText}>生成穿搭</Text>
               </TouchableOpacity>
+              {quota ? (
+                <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
+              ) : null}
             </View>
           )}
 
@@ -283,6 +306,9 @@ export default function OutfitTab() {
                 <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
                 <Text style={styles.generateBtnText}>生成穿搭</Text>
               </TouchableOpacity>
+              {quota ? (
+                <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
+              ) : null}
             </View>
           )}
         </View>
@@ -356,8 +382,8 @@ export default function OutfitTab() {
                   )}
                   <View style={styles.inspirationInfo}>
                     <View style={styles.inspirationTags}>
-                      {card.style_tags.slice(0, 2).map((tag, i) => (
-                        <View key={i} style={styles.inspirationTag}>
+                      {card.style_tags.slice(0, 2).map((tag) => (
+                        <View key={`${card.card_id}:${tag}`} style={styles.inspirationTag}>
                           <Text style={styles.inspirationTagText}>{tag}</Text>
                         </View>
                       ))}
@@ -492,6 +518,7 @@ const styles = StyleSheet.create({
   },
   generateBtnDisabled: { opacity: 0.4 },
   generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
+  quotaHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: Spacing.one },
 
   // ── Wardrobe Preview ──
   wardrobeSection: { gap: Spacing.two },

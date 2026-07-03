@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, ScrollView, ActivityIndicator, SafeAreaView, Alert,
-  Animated, Modal, FlatList, Dimensions,
+  Animated, Modal, FlatList,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -15,6 +15,7 @@ import { aiRecommendOutfits } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -25,7 +26,7 @@ export default function OutfitResultScreen() {
   const params = useLocalSearchParams<{
     city: string; temp: string; weather: string; query: string; tags: string; inputMode?: string;
   }>();
-  const { user, stylePreferences } = useUserStore();
+  const { user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
 
   const [loading, setLoading] = useState(true);
@@ -41,15 +42,73 @@ export default function OutfitResultScreen() {
   // Wishlist states per recommended item
   const [wishlistedRecs, setWishlistedRecs] = useState<Set<number>>(new Set());
 
+  const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
+
   const dotAnim = useRef(new Animated.Value(0)).current;
+
+  const generateOutfits = useCallback(async () => {
+    setLoading(true);
+    setSavedId(null);
+    setIsFavorited(false);
+    setCurrentIndex(0);
+    setErrorMessage(null);
+    setWishlistedRecs(new Set());
+
+    const userId = useUserStore.getState().user?.id;
+    if (!userId) {
+      setOutfits([]);
+      setErrorMessage('请先登录后再生成搭配');
+      setLoading(false);
+      return;
+    }
+
+    const q = await consumeQuota(userId, 'recommend');
+    setQuota({ used: q.used, limit: q.limit, remaining: q.remaining });
+    if (!q.ok) {
+      setOutfits([]);
+      setErrorMessage(`今日 AI 推荐次数已用完（${q.limit} 次），明天再来`);
+      setLoading(false);
+      return;
+    }
+
+    const sessionId = `session_${Date.now()}`;
+    const freshItems = useWardrobeStore.getState().items;
+    const freshPrefs = useUserStore.getState().stylePreferences;
+    const likedStyleNames = freshPrefs
+      ?.filter(p => p.preference_type === 'like')
+      .map(p => p.tag?.tag_name)
+      .filter((name): name is string => Boolean(name))
+      .join('、') ?? '';
+
+    const { outfits: results, error } = await aiRecommendOutfits(
+      freshItems,
+      userId,
+      sessionId,
+      {
+        weather: params.weather,
+        temp: params.temp,
+        city: params.city,
+        query: params.query,
+        tags: params.tags,
+        stylePreferences: likedStyleNames,
+      },
+    );
+
+    setOutfits(results);
+    if (error) setErrorMessage(error);
+    setLoading(false);
+  }, [params.city, params.query, params.tags, params.temp, params.weather]);
 
   useEffect(() => {
     const init = async () => {
-      if (user?.id) await fetchItems(user.id);
-      generateOutfits();
+      if (user?.id) {
+        await fetchItems(user.id);
+        setQuota(await getQuota(user.id, 'recommend'));
+      }
+      await generateOutfits();
     };
-    init();
-  }, []);
+    void init();
+  }, [user?.id, fetchItems, generateOutfits]);
 
   useEffect(() => {
     if (loading) {
@@ -60,30 +119,7 @@ export default function OutfitResultScreen() {
         ])
       ).start();
     } else { dotAnim.stopAnimation(); }
-  }, [loading]);
-
-  const generateOutfits = async () => {
-    setLoading(true);
-    setSavedId(null);
-    setIsFavorited(false);
-    setCurrentIndex(0);
-    setErrorMessage(null);
-    setWishlistedRecs(new Set());
-    const sessionId = `session_${Date.now()}`;
-    const freshItems = useWardrobeStore.getState().items;
-    const freshPrefs = useUserStore.getState().stylePreferences;
-    const likedStyleNames = freshPrefs
-      ?.filter(p => p.preference_type === 'like' && p.tag?.tag_name)
-      .map(p => p.tag!.tag_name)
-      .join('、') ?? '';
-    const { outfits: results, error } = await aiRecommendOutfits(
-      freshItems, user?.id ?? '', sessionId,
-      { weather: params.weather, temp: params.temp, city: params.city, query: params.query, tags: params.tags, stylePreferences: likedStyleNames },
-    );
-    setOutfits(results);
-    if (error) setErrorMessage(error);
-    setLoading(false);
-  };
+  }, [loading, dotAnim]);
 
   const currentOutfit = outfits[currentIndex];
 
@@ -279,6 +315,9 @@ export default function OutfitResultScreen() {
           <Ionicons name="sparkles-outline" size={52} color={Colors.walnut2} style={styles.loadingIconView} />
           <Text style={styles.loadingTitle}>AI 正在为你搭配…</Text>
           <Text style={styles.loadingSubtitle}>从你的衣橱里挑选最合适的单品</Text>
+          {quota ? (
+            <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
+          ) : null}
           <ActivityIndicator color={Colors.terracotta} style={{ marginTop: Spacing.three }} />
         </View>
       </SafeAreaView>
@@ -353,7 +392,7 @@ export default function OutfitResultScreen() {
           {allFlatlayItems.length > 0 ? (
             <View style={styles.flatlayRow}>
               <View style={styles.flatlayMain}>
-                {topItems.length > 0 && <View style={styles.flatlayTopsRow}>{topItems.map(renderGarment)}</View>}
+                {topItems.length > 0 ? <View style={styles.flatlayTopsRow}>{topItems.map(renderGarment)}</View> : null}
                 {bottomItems.map((fi) => (
                   <View key={fi.id} style={styles.flatlayBottomWrap}>
                     <View style={[styles.flatlayBottomShape, !fi.image_url && { backgroundColor: Colors.ink }]}>
@@ -369,7 +408,7 @@ export default function OutfitResultScreen() {
                     <Text style={styles.flatlayItemName} numberOfLines={1}>{fi.name}</Text>
                   </View>
                 ))}
-                {shoeItems.length > 0 && (
+                {shoeItems.length > 0 ? (
                   <View style={styles.flatlayShoesRow}>
                     {shoeItems.map((fi) => (
                       <View key={fi.id} style={styles.flatlayShoeWrap}>
@@ -384,9 +423,9 @@ export default function OutfitResultScreen() {
                       </View>
                     ))}
                   </View>
-                )}
+                ) : null}
               </View>
-              {sideItems.length > 0 && (
+              {sideItems.length > 0 ? (
                 <View style={styles.flatlaySide}>
                   {sideItems.map((fi) => (
                     <View key={fi.id} style={styles.flatlaySideItem}>
@@ -401,7 +440,7 @@ export default function OutfitResultScreen() {
                     </View>
                   ))}
                 </View>
-              )}
+              ) : null}
             </View>
           ) : (
             <View style={styles.flatlayEmpty}><Text style={styles.flatlayEmptyText}>暂无搭配单品</Text></View>
@@ -409,7 +448,7 @@ export default function OutfitResultScreen() {
         </View>
 
         {/* ── 2. Owned Items ── */}
-        {ownedItems.length > 0 && (
+        {ownedItems.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>👕 已有单品</Text>
@@ -435,18 +474,18 @@ export default function OutfitResultScreen() {
                       <Text style={styles.itemCardName} numberOfLines={1}>{oi.item?.name ?? oi.item?.category}</Text>
                       <Text style={styles.itemCardOwned}>✓ 已有</Text>
                     </View>
-                    {adjustMode && (
+                    {adjustMode ? (
                       <View style={styles.swapBadge}><Feather name="refresh-cw" size={10} color={Colors.paper} /></View>
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
           </View>
-        )}
+        ) : null}
 
         {/* ── 3. Recommended Items ── */}
-        {recommendedItems.length > 0 && (
+        {recommendedItems.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>✨ 推荐单品</Text>
@@ -456,8 +495,9 @@ export default function OutfitResultScreen() {
               <View style={styles.itemsRow}>
                 {recommendedItems.map((rec, idx) => {
                   const isWishlisted = wishlistedRecs.has(idx);
+                  const recKey = `${rec.name}-${rec.category}-${rec.color}-${rec.image_url ?? ''}`;
                   return (
-                    <TouchableOpacity key={`rec_${idx}`}
+                    <TouchableOpacity key={recKey}
                       style={[styles.itemCard, styles.itemCardRecommended]}
                       activeOpacity={0.7}
                     >
@@ -493,14 +533,14 @@ export default function OutfitResultScreen() {
               </View>
             </ScrollView>
           </View>
-        )}
+        ) : null}
 
         {/* All owned hint */}
-        {recommendedItems.length === 0 && ownedItems.length > 0 && (
+        {recommendedItems.length === 0 && ownedItems.length > 0 ? (
           <View style={styles.allOwnedHint}>
             <Text style={styles.allOwnedText}>🎉 太棒了！这套搭配所需单品你都有</Text>
           </View>
-        )}
+        ) : null}
 
         {/* ── Try-on Button ── */}
         <TouchableOpacity
@@ -574,7 +614,7 @@ export default function OutfitResultScreen() {
         </View>
       </Modal>
 
-      <ConfirmModal visible={showSavedConfirm && !!savedId} title="已保存"
+      <ConfirmModal visible={showSavedConfirm ? Boolean(savedId) : false} title="已保存"
         message="这套搭配已保存到你的穿搭记录 🎉" confirmText="好的" singleButton
         onConfirm={() => { setShowSavedConfirm(false); router.back(); }}
         onCancel={() => setShowSavedConfirm(false)}
@@ -590,6 +630,7 @@ const styles = StyleSheet.create({
   loadingIconView: { marginBottom: Spacing.one },
   loadingTitle: { ...T.storyTitle, fontSize: 22 },
   loadingSubtitle: { ...T.bodyText, textAlign: 'center' },
+  quotaHint: { ...T.micro, color: Colors.walnut2, textAlign: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: Colors.line, backgroundColor: Colors.paperRaised },
   back: { ...T.buttonSecondary, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
