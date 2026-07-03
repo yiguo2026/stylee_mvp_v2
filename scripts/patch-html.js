@@ -44,30 +44,167 @@ const fontFaceStyle = fontFaceCSS
 
 // ── 2. Web shell: iPhone 14 Pro frame on desktop ──
 const shellStyle = `<style>
-@media (min-width: 430px) and (min-height: 900px) {
+@media (min-width: 960px) {
   body {
-    background-color: #f4f4f5 !important;
+    background: #f4f4f5 !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
-    overflow: hidden !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 32px !important;
+    box-sizing: border-box !important;
+    overflow: auto !important;
+  }
+  .desktop-phone-stage {
+    --phone-scale: min(1, calc((100vw - 96px) / 393), calc((100vh - 64px) / 852));
+    width: calc(393px * var(--phone-scale));
+    height: calc(852px * var(--phone-scale));
+    flex: none;
+  }
+  .desktop-phone-frame {
+    position: relative;
+    width: 393px;
+    height: 852px;
+    transform: scale(var(--phone-scale));
+    transform-origin: top left;
+  }
+  .desktop-phone-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 48px;
+    background: #ffffff;
+    box-shadow: 0 18px 56px rgba(16, 24, 40, 0.18), 0 0 0 1px rgba(10, 10, 10, 0.06);
+  }
+  .desktop-phone-statusbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    height: 52px;
+    padding: 14px 28px 0;
+    box-sizing: border-box;
+    color: #0a0a0a;
+    font-family: Inter_600SemiBold, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    pointer-events: none;
+  }
+  .desktop-phone-time {
+    position: absolute;
+    left: 28px;
+    top: 15px;
+    font-size: 15px;
+    letter-spacing: -0.2px;
+  }
+  .desktop-phone-island {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    width: 126px;
+    height: 34px;
+    margin-left: -63px;
+    border-radius: 18px;
+    background: #0a0a0a;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .desktop-phone-system {
+    position: absolute;
+    right: 28px;
+    top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .desktop-phone-signal {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+  }
+  .desktop-phone-signal i {
+    display: block;
+    width: 2px;
+    background: #0a0a0a;
+    border-radius: 999px;
+  }
+  .desktop-phone-signal i:nth-child(1) { height: 4px; opacity: 0.55; }
+  .desktop-phone-signal i:nth-child(2) { height: 6px; opacity: 0.7; }
+  .desktop-phone-signal i:nth-child(3) { height: 8px; opacity: 0.85; }
+  .desktop-phone-signal i:nth-child(4) { height: 10px; }
+  .desktop-phone-wifi {
+    position: relative;
+    width: 14px;
+    height: 10px;
+  }
+  .desktop-phone-wifi::before,
+  .desktop-phone-wifi::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 1.6px solid #0a0a0a;
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-radius: 50%;
+  }
+  .desktop-phone-wifi::before {
+    bottom: 1px;
+    width: 14px;
+    height: 10px;
+  }
+  .desktop-phone-wifi::after {
+    bottom: 2px;
+    width: 8px;
+    height: 6px;
+  }
+  .desktop-phone-battery {
+    position: relative;
+    width: 24px;
+    height: 12px;
+    border: 1.6px solid #0a0a0a;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  .desktop-phone-battery::after {
+    content: "";
+    position: absolute;
+    right: -3px;
+    top: 3px;
+    width: 2px;
+    height: 4px;
+    border-radius: 1px;
+    background: #0a0a0a;
+  }
+  .desktop-phone-battery-fill {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    bottom: 2px;
+    width: 14px;
+    border-radius: 2px;
+    background: #0a0a0a;
   }
   #root {
-    width: 393px !important;
-    height: 852px !important;
+    width: 100% !important;
+    height: 100% !important;
     flex: none !important;
-    max-width: 393px !important;
-    max-height: 852px !important;
-    border-radius: 20px !important;
     overflow: hidden !important;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05) !important;
+    border-radius: 48px !important;
+    background: #ffffff !important;
   }
 }
 </style>`;
 
+const shellMarkup = `<div class="desktop-phone-stage"><div class="desktop-phone-frame"><div class="desktop-phone-screen"><div class="desktop-phone-statusbar" aria-hidden="true"><span class="desktop-phone-time">9:41</span><span class="desktop-phone-island"></span><div class="desktop-phone-system"><span class="desktop-phone-network">5G</span><span class="desktop-phone-signal"><i></i><i></i><i></i><i></i></span><span class="desktop-phone-wifi"></span><span class="desktop-phone-battery"><span class="desktop-phone-battery-fill"></span></span></div></div><div id="root"></div></div></div></div>`;
+
 // ── 3. Apply patches ──
 html = html.replace('<html lang="en">', '<html lang="zh">');
 html = html.replace('</head>', fontFaceStyle + shellStyle + '\n</head>');
+html = html.replace('<div id="root"></div>', shellMarkup);
 
 fs.writeFileSync(htmlPath, html);
 
