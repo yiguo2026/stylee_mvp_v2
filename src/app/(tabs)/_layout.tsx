@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -24,14 +25,19 @@ const ICON_SIZE = 22;
 const color = (focused: boolean) => (focused ? Colors.ink : Colors.walnut2);
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const paddingBottom = Math.max(Spacing.one, insets.bottom);
+  const height = 56 + paddingBottom;
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [{ ...styles.tabBar, paddingBottom, height }],
         tabBarActiveTintColor: Colors.ink,
         tabBarInactiveTintColor: Colors.walnut2,
         tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem,
       }}
     >
       <Tabs.Screen
@@ -84,14 +90,20 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.paper,
     borderTopColor: Colors.line,
     borderTopWidth: 1,
     paddingTop: Spacing.one,
     ...Shadow.two,
   },
+  tabItem: {
+    paddingTop: 2,
+    paddingBottom: 2,
+  },
   tabLabel: {
     fontSize: 11,
+    lineHeight: 14,
+    marginBottom: 2,
     fontFamily: Fonts.ui,
   },
   iconWrap: {
