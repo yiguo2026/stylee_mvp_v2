@@ -67,7 +67,6 @@ export const T = {
   emptyTitle: {
     fontFamily: Fonts.display,
     fontSize: 30,
-    fontWeight: '600' as const,
     letterSpacing: 0,
     lineHeight: 36,
     color: Colors.ink,
@@ -75,7 +74,6 @@ export const T = {
   storyTitle: {
     fontFamily: Fonts.display,
     fontSize: 34,
-    fontWeight: '600' as const,
     letterSpacing: 0,
     lineHeight: 40,
     color: Colors.ink,
@@ -85,7 +83,6 @@ export const T = {
   pageTitle: {
     fontFamily: Fonts.title,
     fontSize: 22,
-    fontWeight: '500' as const,
     letterSpacing: 0,
     lineHeight: 28,
     color: Colors.ink,
@@ -93,7 +90,6 @@ export const T = {
   sectionTitle: {
     fontFamily: Fonts.title,
     fontSize: 18,
-    fontWeight: '500' as const,
     letterSpacing: 0,
     lineHeight: 24,
     color: Colors.ink,
@@ -101,7 +97,6 @@ export const T = {
   subTitle: {
     fontFamily: Fonts.title,
     fontSize: 15,
-    fontWeight: '500' as const,
     letterSpacing: 0,
     lineHeight: 20,
     color: Colors.ink,
@@ -111,7 +106,6 @@ export const T = {
   bodyText: {
     fontFamily: Fonts.body,
     fontSize: 15,
-    fontWeight: '400' as const,
     letterSpacing: 0.3,
     lineHeight: 24,
     color: Colors.inkSoft,
@@ -119,14 +113,12 @@ export const T = {
   itemName: {
     fontFamily: Fonts.bodyMedium,
     fontSize: 14,
-    fontWeight: '500' as const,
     letterSpacing: 0.28,
     color: Colors.ink,
   },
   itemDesc: {
     fontFamily: Fonts.body,
     fontSize: 13,
-    fontWeight: '400' as const,
     letterSpacing: 0.26,
     lineHeight: 22,
     color: Colors.gray1,
@@ -136,52 +128,44 @@ export const T = {
   buttonPrimary: {
     fontFamily: Fonts.uiSemiBold,
     fontSize: 16,
-    fontWeight: '600' as const,
     letterSpacing: 0.32,
   },
   buttonSecondary: {
     fontFamily: Fonts.ui,
     fontSize: 14,
-    fontWeight: '500' as const,
     letterSpacing: 0.28,
   },
   inputText: {
     fontFamily: Fonts.body,
     fontSize: 16,
-    fontWeight: '400' as const,
     letterSpacing: 0.32,
   },
   formLabel: {
     fontFamily: Fonts.ui,
     fontSize: 13,
-    fontWeight: '500' as const,
     letterSpacing: 0.26,
     color: Colors.gray1,
   },
   tag: {
     fontFamily: Fonts.ui,
     fontSize: 13,
-    fontWeight: '500' as const,
     letterSpacing: 0.26,
     color: Colors.ink,
   },
   tabLabel: {
     fontFamily: Fonts.ui,
     fontSize: 11,
-    fontWeight: '500' as const,
     letterSpacing: 0.88,
   },
   caption: {
     fontFamily: Fonts.uiLight,
     fontSize: 12,
-    fontWeight: '300' as const,
     letterSpacing: 0.96,
     color: Colors.gray2,
   },
   micro: {
     fontFamily: Fonts.body,
     fontSize: 11,
-    fontWeight: '400' as const,
     letterSpacing: 0.88,
     color: Colors.gray2,
   },
@@ -190,21 +174,18 @@ export const T = {
   tempLarge: {
     fontFamily: Fonts.numeric,
     fontSize: 26,
-    fontWeight: '500' as const,
     letterSpacing: 0,
     color: Colors.ink,
   },
   statNum: {
     fontFamily: Fonts.numeric,
     fontSize: 22,
-    fontWeight: '500' as const,
     letterSpacing: 0,
     color: Colors.ink,
   },
   numInline: {
     fontFamily: Fonts.numeric,
     fontSize: 15,
-    fontWeight: '500' as const,
     letterSpacing: 0,
     color: Colors.ink,
   },
