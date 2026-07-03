@@ -19,6 +19,7 @@
         "backgroundColor": "#FBF8F2"
       }
     },
+    "homepage": "https://yiguo2026.github.io/stylee_mvp_v2",
     "web": {
       "bundler": "metro",
       "output": "single",

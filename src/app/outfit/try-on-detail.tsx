@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, SafeAreaView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useTryOnStore, TryOnRecord } from '@/stores/tryonStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
@@ -144,10 +144,10 @@ const styles = StyleSheet.create({
   infoItem: { flex: 1, alignItems: 'center', gap: 2 },
   infoDivider: { width: 1, backgroundColor: Colors.line },
   infoLabel: { ...T.micro, color: Colors.walnut2 },
-  infoValue: { ...T.tag, color: Colors.ink, fontWeight: '600', fontSize: 12, textAlign: 'center' },
+  infoValue: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold, fontSize: 12, textAlign: 'center' },
 
   section: { gap: Spacing.two },
-  sectionTitle: { ...T.bodyText, fontWeight: '600', fontSize: 15, color: Colors.ink },
+  sectionTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.ink },
 
   selfieCard: {
     width: 80, height: 106, borderRadius: Radius.md, overflow: 'hidden',

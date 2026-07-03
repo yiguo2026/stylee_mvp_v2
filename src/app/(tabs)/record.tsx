@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { supabase } from '@/lib/supabase';
@@ -453,14 +453,14 @@ const styles = StyleSheet.create({
     padding: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   weekRow: { flexDirection: 'row', marginBottom: Spacing.one },
-  weekDay: { ...T.micro, flex: 1, textAlign: 'center', fontWeight: '600', paddingVertical: 4 },
+  weekDay: { ...T.micro, flex: 1, textAlign: 'center', fontFamily: Fonts.uiSemiBold, paddingVertical: 4 },
   daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: `${100 / 7}%`, height: CELL_SIZE, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 6, borderRadius: Radius.sm },
   dayCellToday: {},
   dayCellSelected: { backgroundColor: Colors.ink, borderRadius: Radius.md },
-  dayNum: { fontFamily: T.tag.fontFamily, fontSize: 14, color: Colors.ink, fontWeight: '400' },
-  dayNumToday: { color: Colors.terracotta, fontWeight: '700' },
-  dayNumSelected: { color: Colors.paper, fontWeight: '700' },
+  dayNum: { fontFamily: T.tag.fontFamily, fontSize: 14, color: Colors.ink },
+  dayNumToday: { color: Colors.terracotta, fontFamily: Fonts.uiSemiBold },
+  dayNumSelected: { color: Colors.paper, fontFamily: Fonts.uiSemiBold },
   dotRow: { flexDirection: 'row', gap: 2, marginTop: 2 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.sage },
   dotSelected: { backgroundColor: Colors.paper },

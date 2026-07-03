@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useTryOnStore } from '@/stores/tryonStore';
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  avatarText: { fontSize: 32, color: '#fff', fontWeight: '700' },
+  avatarText: { fontSize: 32, color: '#fff', fontFamily: Fonts.title },
   avatarEmoji: { fontSize: 32, color: '#fff' },
   avatarImage: { width: 72, height: 72, borderRadius: 36 },
   editBadge: {
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   menuCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  menuCardTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
+  menuCardTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 16, color: Colors.ink },
   menuCardArrow: { color: Colors.walnut2, fontSize: 16 },
 
   // Style tags
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   stylePillEmpty: { ...T.tag, color: Colors.walnut2, fontStyle: 'italic' },
 
   // Try-on
-  tryOnLabel: { ...T.tag, color: Colors.ink, fontWeight: '600' },
+  tryOnLabel: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   tryOnEmpty: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   tryOnEmptyIcon: { fontSize: 28 },
   tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
   tryOnPhoto: { width: 100, height: 100 },
-  tryOnPhotoScene: { ...T.micro, fontSize: 10, color: Colors.ink, fontWeight: '600', paddingHorizontal: Spacing.one, paddingTop: 2 },
+  tryOnPhotoScene: { ...T.micro, fontSize: 10, color: Colors.ink, fontFamily: Fonts.uiSemiBold, paddingHorizontal: Spacing.one, paddingTop: 2 },
   tryOnPhotoDate: { ...T.micro, fontSize: 9, color: Colors.walnut2, paddingHorizontal: Spacing.one, paddingBottom: Spacing.one },
 
   // Settings entry

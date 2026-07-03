@@ -4,7 +4,7 @@ import {
   ScrollView, SafeAreaView, Switch, Alert, Linking, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import Constants from 'expo-constants';
@@ -234,5 +234,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three, alignItems: 'center',
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.line,
   },
-  signOutText: { ...T.bodyText, color: Colors.accent, fontWeight: '600', fontSize: 15 },
+  signOutText: { ...T.bodyText, color: Colors.accent, fontFamily: Fonts.uiSemiBold, fontSize: 15 },
 });

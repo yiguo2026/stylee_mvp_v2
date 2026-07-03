@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useTryOnStore } from '@/stores/tryonStore';
 
 const isWeb = Platform.OS === 'web';
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     ...T.bodyText, fontSize: 13, color: Colors.walnut, lineHeight: 22,
   },
   fieldLabel: {
-    ...T.formLabel, fontSize: 15, fontWeight: '600', color: Colors.ink,
+    ...T.formLabel, fontSize: 15, fontFamily: Fonts.uiSemiBold, color: Colors.ink,
   },
 
   photoCard: {
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     padding: Spacing.three, gap: Spacing.one,
     borderWidth: 1, borderColor: Colors.line,
   },
-  tipsTitle: { ...T.bodyText, fontWeight: '600', fontSize: 14, color: Colors.ink },
+  tipsTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
   tipItem: { ...T.bodyText, fontSize: 13, color: Colors.walnut, lineHeight: 22 },
 
   privacyCard: {

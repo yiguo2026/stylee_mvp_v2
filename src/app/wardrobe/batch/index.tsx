@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   batchIcon: { fontSize: 24 },
   batchInfo: { flex: 1, gap: 2 },
-  batchTitle: { ...T.bodyText, fontWeight: '600', fontSize: 15, color: Colors.ink },
+  batchTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.ink },
   batchDesc: { ...T.micro, color: Colors.walnut2 },
   batchArrow: { color: Colors.walnut2, fontSize: 16 },
 
@@ -200,8 +200,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
-  successCheckText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  successText: { ...T.bodyText, fontWeight: '600', color: Colors.signal, fontSize: 14 },
+  successCheckText: { color: '#fff', fontFamily: Fonts.uiSemiBold, fontSize: 14 },
+  successText: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.signal, fontSize: 14 },
   successSub: { ...T.micro, color: Colors.walnut2, marginTop: 2 },
   previewGrid: {
     flexDirection: 'row',
@@ -233,6 +233,6 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.one,
   },
-  tipTitle: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 14 },
+  tipTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.ink, fontSize: 14 },
   tipContent: { ...T.micro, color: Colors.walnut2, lineHeight: 20 },
 });

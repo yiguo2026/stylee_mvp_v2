@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: Spacing.two,
   },
-  attrsToggleText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontWeight: '500' },
+  attrsToggleText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontFamily: Fonts.ui },
 
   attrsCard: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
@@ -310,14 +310,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg, padding: Spacing.three,
     borderWidth: 1, borderColor: Colors.line,
   },
-  wearTitle: { ...T.bodyText, fontWeight: '600', fontSize: 14, color: Colors.ink },
+  wearTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
   wearCount: { ...T.micro, color: Colors.walnut, marginTop: Spacing.one },
 
   outfitSection: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg, padding: Spacing.three,
     borderWidth: 1, borderColor: Colors.line,
   },
-  outfitTitle: { ...T.bodyText, fontWeight: '600', fontSize: 14, color: Colors.ink },
+  outfitTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
   outfitEmpty: { ...T.micro, color: Colors.walnut2, marginTop: Spacing.one },
 
   meta: { ...T.micro, textAlign: 'center' },

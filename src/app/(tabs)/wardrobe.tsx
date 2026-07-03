@@ -7,7 +7,7 @@ import {
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
   catPillActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  catPillText: { fontSize: 12, fontWeight: '500', color: Colors.ink },
+  catPillText: { fontSize: 12, fontFamily: Fonts.ui, color: Colors.ink },
   catPillTextActive: { color: '#fff' },
   catCount: {
     position: 'absolute', top: -5, right: -5,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   catCountActive: { backgroundColor: '#D4D2CF' },
-  catCountText: { fontSize: 10, fontWeight: '600', color: Colors.gray1 },
+  catCountText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: Colors.gray1 },
   catCountTextActive: { color: Colors.gray1 },
 
   scrollContent: { flex: 1 },
@@ -439,13 +439,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(232,67,147,0.15)',
   },
   wishlistEntryIcon: { fontSize: 20, color: '#E84393' },
-  wishlistEntryLabel: { fontSize: 14, fontWeight: '600', color: '#E84393' },
+  wishlistEntryLabel: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: '#E84393' },
   wishlistEntryBadge: {
     minWidth: 18, height: 18, borderRadius: 9,
     backgroundColor: '#E84393', alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  wishlistEntryBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  wishlistEntryBadgeText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: '#fff' },
   wishlistEntryArrow: { marginLeft: 'auto', fontSize: 16, color: '#E84393' },
 
   // Quick add entry
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   },
   quickAddEntryIconText: { fontSize: 18 },
   quickAddEntryInfo: { flex: 1 },
-  quickAddEntryTitle: { fontSize: 13, fontWeight: '600', color: Colors.ink },
+  quickAddEntryTitle: { fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
   quickAddEntrySub: { fontSize: 11, color: Colors.gray1, marginTop: 2 },
   quickAddEntryArrow: { fontSize: 14, color: Colors.gray1 },
 
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   modalCancelText: { ...T.bodyText, fontSize: 16, color: Colors.walnut },
 
   linkHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two },
-  linkTitle: { ...T.bodyText, fontWeight: '700', fontSize: 18, color: Colors.ink },
+  linkTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 18, color: Colors.ink },
   linkClose: { fontSize: 18, color: Colors.walnut2 },
   linkLabel: { ...T.tag, fontSize: 12, color: Colors.walnut, marginBottom: Spacing.one },
   linkInput: {
@@ -510,8 +510,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
     borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
-  wishlistBack: { fontSize: 16, fontWeight: '600', color: Colors.ink },
-  wishlistTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
+  wishlistBack: { fontSize: 16, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
+  wishlistTitle: { fontSize: 18, fontFamily: Fonts.title, color: Colors.ink },
   wishlistCountText: { fontSize: 13, color: Colors.walnut2, marginLeft: 'auto' },
   wishlistBody: { flex: 1, padding: Spacing.four },
   wishlistEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
@@ -524,13 +524,13 @@ const styles = StyleSheet.create({
   wishItemImg: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.vintageCream },
   wishImgPlaceholder: { width: 64, height: 64, borderRadius: 12, backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
   wishItemInfo: { flex: 1, minWidth: 0 },
-  wishItemName: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 4 },
+  wishItemName: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.ink, marginBottom: 4 },
   wishItemMeta: { fontSize: 12, color: Colors.walnut2 },
   wishItemActions: { flexDirection: 'column', gap: 6, flexShrink: 0 },
   wishAddBtn: {
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
     backgroundColor: Colors.ink,
   },
-  wishAddBtnText: { fontSize: 11, fontWeight: '600', color: '#fff' },
+  wishAddBtnText: { fontSize: 11, fontFamily: Fonts.uiSemiBold, color: '#fff' },
   wishRemoveText: { fontSize: 11, color: Colors.accent, textAlign: 'center' },
 });

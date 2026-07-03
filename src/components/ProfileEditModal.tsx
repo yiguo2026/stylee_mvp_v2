@@ -4,7 +4,7 @@ import {
   StyleSheet, Modal, ScrollView, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { supabase } from '@/lib/supabase';
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two, paddingTop: Spacing.two,
     borderTopWidth: 1, borderTopColor: Colors.line,
   },
-  bodyInfoTitle: { ...T.bodyText, fontWeight: '600', fontSize: 13, color: Colors.walnut },
+  bodyInfoTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.walnut },
   bodyInfoStatus: { ...T.micro, color: Colors.walnut2 },
 
   // Selfie upload

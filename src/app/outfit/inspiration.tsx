@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
 export default function InspirationDetailScreen() {
@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
   // Title section below image
   titleSection: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: 4 },
   heroTag: {
-    fontSize: 11, color: Colors.terracotta, fontWeight: '600',
+    fontSize: 11, color: Colors.terracotta, fontFamily: Fonts.uiSemiBold,
   },
-  heroTitle: { fontSize: 22, fontWeight: '700', color: Colors.ink },
+  heroTitle: { fontSize: 22, fontFamily: Fonts.title, color: Colors.ink },
   heroDesc: { fontSize: 14, color: Colors.walnut, lineHeight: 22 },
 
   // Tags
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
   tagPillOccasion: { borderColor: Colors.terracotta, backgroundColor: Colors.accentSoft },
-  tagPillText: { fontSize: 12, fontWeight: '500', color: Colors.ink },
+  tagPillText: { fontSize: 12, fontFamily: Fonts.ui, color: Colors.ink },
   tagPillTextOccasion: { color: Colors.terracotta },
 
   // Item Breakdown
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     padding: Spacing.three, gap: Spacing.two,
     borderWidth: 1, borderColor: Colors.line,
   },
-  breakdownTitle: { fontSize: 15, fontWeight: '700', color: Colors.ink, marginBottom: Spacing.one },
+  breakdownTitle: { fontSize: 15, fontFamily: Fonts.uiSemiBold, color: Colors.ink, marginBottom: Spacing.one },
   breakdownItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: Spacing.two,
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center',
   },
   breakdownInfo: { flex: 1, gap: 2 },
-  breakdownName: { fontSize: 14, fontWeight: '600', color: Colors.ink },
+  breakdownName: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
   breakdownMeta: { fontSize: 12, color: Colors.walnut2 },
   breakdownArrow: { fontSize: 16, color: Colors.walnut2 },
 });

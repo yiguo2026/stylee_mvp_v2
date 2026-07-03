@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   },
   cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
-  cityRowTextActive: { color: Colors.ink, fontWeight: '500' },
+  cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
   modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

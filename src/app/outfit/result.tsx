@@ -8,7 +8,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiRecommendOutfits } from '@/lib/ai';
@@ -592,14 +592,14 @@ const styles = StyleSheet.create({
   loadingSubtitle: { ...T.bodyText, textAlign: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: Colors.line, backgroundColor: Colors.paperRaised },
-  back: { ...T.buttonSecondary, color: Colors.ink, fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.ink },
+  back: { ...T.buttonSecondary, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.title, color: Colors.ink },
   headerIdx: { color: Colors.terracotta },
   headerTotal: { color: Colors.walnut2 },
   favBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 },
   favIcon: { fontSize: 18, color: Colors.walnut2 },
   favIconActive: { color: Colors.accent },
-  favLabel: { fontSize: 12, color: Colors.walnut2, fontWeight: '500' },
+  favLabel: { fontSize: 12, color: Colors.walnut2, fontFamily: Fonts.ui },
   favLabelActive: { color: Colors.accent },
 
   content: { padding: Spacing.three, gap: Spacing.two, paddingBottom: 100 },
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { ...T.bodyText, fontWeight: '600', fontSize: 13, color: Colors.ink },
+  sectionTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink },
   sectionSubOwned: { ...T.micro, color: Colors.sage },
   sectionSubRec: { ...T.micro, color: Colors.terracotta },
 
@@ -651,17 +651,17 @@ const styles = StyleSheet.create({
   itemThumbImg: { width: '100%', height: '100%', borderRadius: 10 },
   itemThumbPlaceholder: { width: '100%', height: '100%', borderRadius: 10, backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center' },
   itemCardInfo: { flexDirection: 'column', flex: 1 },
-  itemCardName: { fontWeight: '500', fontSize: 12, color: Colors.ink },
+  itemCardName: { fontFamily: Fonts.ui, fontSize: 12, color: Colors.ink },
   itemCardOwned: { fontSize: 10, color: Colors.sage, marginTop: 1 },
   addToWardrobeBtn: { marginTop: 4, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: Colors.ink, alignSelf: 'flex-start' },
-  addToWardrobeBtnText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  addToWardrobeBtnText: { color: '#fff', fontSize: 11, fontFamily: Fonts.uiSemiBold },
   wishlistBtn: { marginTop: 2, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: Colors.terracotta, alignSelf: 'flex-start' },
   wishlistBtnDone: { borderColor: Colors.line, backgroundColor: Colors.paperCard },
-  wishlistBtnText: { fontSize: 10, color: Colors.terracotta, fontWeight: '500' },
+  wishlistBtnText: { fontSize: 10, color: Colors.terracotta, fontFamily: Fonts.ui },
   wishlistBtnTextDone: { fontSize: 10, color: Colors.walnut2 },
   swapBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.terracotta, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   recBadge: { position: 'absolute', top: -6, right: -4, backgroundColor: Colors.terracotta, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  recBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  recBadgeText: { color: '#fff', fontSize: 9, fontFamily: Fonts.uiSemiBold },
 
   allOwnedHint: { backgroundColor: Colors.signalSoft, borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
   allOwnedText: { ...T.bodyText, color: Colors.sage, fontSize: 13 },
@@ -673,19 +673,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.signalSoft, borderRadius: Radius.md, gap: Spacing.one,
     borderWidth: 1, borderColor: '#E0D8FF',
   },
-  tryOnEntryText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontWeight: '600' },
+  tryOnEntryText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   aiBadge: { position: 'absolute', top: -8, left: 14, backgroundColor: Colors.ink, paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: 6 },
-  aiBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  aiBadgeText: { color: '#fff', fontSize: 10, fontFamily: Fonts.uiSemiBold },
   aiCommentText: { fontSize: 13, lineHeight: 22, color: Colors.gray1, marginTop: Spacing.one },
 
   decisionBar: { gap: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three, backgroundColor: Colors.paperRaised, borderTopWidth: 1, borderTopColor: Colors.line },
   decisionBtnRow: { flexDirection: 'row', gap: 8 },
   decisionBtnSecondary: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.line, backgroundColor: Colors.paperCard },
-  decisionBtnAdjustText: { fontSize: 13, fontWeight: '600', color: Colors.walnut },
-  decisionBtnSwapText: { fontSize: 13, fontWeight: '600', color: Colors.ink },
+  decisionBtnAdjustText: { fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.walnut },
+  decisionBtnSwapText: { fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
   decisionBtnConfirm: { paddingVertical: 14, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.ink, ...Shadow.two },
   decisionBtnSaved: { backgroundColor: Colors.sage },
-  decisionBtnConfirmText: { fontSize: 14, fontWeight: '600', color: Colors.paper },
+  decisionBtnConfirmText: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   modalSheet: { backgroundColor: Colors.paperRaised, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '60%' },

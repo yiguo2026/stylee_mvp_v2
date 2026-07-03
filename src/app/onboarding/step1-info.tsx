@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { Gender } from '@/types';
 import { searchCitiesOnline, CityResult } from '@/lib/weather';
 
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
-  cityRowTextActive: { color: Colors.ink, fontWeight: '500' },
+  cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
   modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

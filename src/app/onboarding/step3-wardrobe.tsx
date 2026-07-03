@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
@@ -251,8 +251,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  builtinHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  builtinSelectAll: { ...T.tag, color: Colors.ink, fontWeight: '600' },
+  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 16, color: Colors.ink },
+  builtinSelectAll: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
   catBtn: {
@@ -283,12 +283,12 @@ const styles = StyleSheet.create({
     width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
-  builtinCheckText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  builtinCheckText: { fontSize: 10, color: '#fff', fontFamily: Fonts.uiSemiBold },
   builtinInfo: { flex: 1, gap: 2 },
-  builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontWeight: '600' },
+  builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontFamily: Fonts.uiSemiBold },
   builtinNameSelected: { color: Colors.ink },
   builtinDesc: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
-  selectedCount: { ...T.tag, fontSize: 12, color: Colors.ink, textAlign: 'center', fontWeight: '500' },
+  selectedCount: { ...T.tag, fontSize: 12, color: Colors.ink, textAlign: 'center', fontFamily: Fonts.ui },
 
   batchSection: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
@@ -296,8 +296,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   batchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  batchHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  batchAddBtn: { ...T.tag, color: Colors.ink, fontWeight: '600' },
+  batchHeaderTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 16, color: Colors.ink },
+  batchAddBtn: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   albumRow: { flexDirection: 'row', gap: Spacing.two },
   albumThumbWrap: { position: 'relative' },
   albumThumb: { width: 64, height: 64, borderRadius: Radius.md, backgroundColor: Colors.vintageCream },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent,
     alignItems: 'center', justifyContent: 'center',
   },
-  albumRemoveText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  albumRemoveText: { fontSize: 10, color: '#fff', fontFamily: Fonts.uiSemiBold },
   batchCardEmpty: {
     alignItems: 'center', backgroundColor: Colors.paper,
     borderRadius: Radius.md, padding: Spacing.three,

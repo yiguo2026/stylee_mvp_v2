@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Shadow } from '@/constants/theme';
+import { Colors, Spacing, Shadow, Fonts } from '@/constants/theme';
 
 // ── Tab icon wrapper ──────────────────────────────────────
 function TabIcon({
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: Fonts.ui,
   },
   iconWrap: {
     width: 40,

@@ -6,7 +6,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
@@ -388,13 +388,13 @@ const styles = StyleSheet.create({
   bodyInfoThumbImg: { width: 48, height: 48, borderRadius: 24 },
   bodyInfoEmoji: { fontSize: 24 },
   bodyInfoText: { flex: 1, gap: 2 },
-  bodyInfoTitle: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 15 },
+  bodyInfoTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.ink, fontSize: 15 },
   bodyInfoSub: { ...T.micro, color: Colors.walnut2 },
   bodyInfoArrow: { ...T.tag, color: Colors.walnut2 },
 
   // ── Section ──
   section: { gap: Spacing.two },
-  sectionTitle: { ...T.bodyText, fontWeight: '600', fontSize: 15, color: Colors.ink },
+  sectionTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.ink },
   emptyText: { ...T.bodyText, color: Colors.walnut2, textAlign: 'center', paddingVertical: Spacing.three },
 
   // ── Items List (from result) ──
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2,
   },
   outfitCountText: { ...T.micro, color: Colors.paper, fontSize: 10 },
-  outfitName: { ...T.bodyText, fontSize: 13, fontWeight: '600', color: Colors.ink, paddingHorizontal: Spacing.two, paddingTop: Spacing.two },
+  outfitName: { ...T.bodyText, fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.ink, paddingHorizontal: Spacing.two, paddingTop: Spacing.two },
   outfitItems: { ...T.micro, paddingHorizontal: Spacing.two, paddingBottom: Spacing.two },
 
   emptyOutfits: { paddingVertical: Spacing.four, alignItems: 'center' },
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   sceneOptSelected: { borderColor: Colors.ink, backgroundColor: Colors.vintageCream },
   sceneEmoji: { fontSize: 24 },
   sceneLabel: { ...T.micro, color: Colors.walnut },
-  sceneLabelSelected: { color: Colors.ink, fontWeight: '600' },
+  sceneLabelSelected: { color: Colors.ink, fontFamily: Fonts.uiSemiBold },
 
   // ── Generate Button ──
   generateBtn: {
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   progressEmoji: { fontSize: 40 },
-  progressTitle: { ...T.bodyText, fontWeight: '600', color: Colors.ink },
+  progressTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
   progressStep: { ...T.micro, color: Colors.walnut },
   progressBar: { width: '100%', height: 6, borderRadius: 3, backgroundColor: Colors.line, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.terracotta },

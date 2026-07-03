@@ -4,7 +4,7 @@ import {
   ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
@@ -226,8 +226,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  builtinHeaderTitle: { ...T.bodyText, fontWeight: '700', fontSize: 16, color: Colors.ink },
-  builtinSelectAll: { ...T.tag, color: Colors.ink, fontWeight: '600' },
+  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 16, color: Colors.ink },
+  builtinSelectAll: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
   catBtn: {
@@ -263,21 +263,21 @@ const styles = StyleSheet.create({
     width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
-  builtinCheckText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  builtinCheckText: { fontSize: 10, color: '#fff', fontFamily: Fonts.uiSemiBold },
   builtinAddedBadge: {
     position: 'absolute', bottom: 0, right: 0, left: 0,
     backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center',
     paddingVertical: 1,
   },
-  builtinAddedText: { fontSize: 9, color: '#fff', fontWeight: '600' },
+  builtinAddedText: { fontSize: 9, color: '#fff', fontFamily: Fonts.uiSemiBold },
 
   builtinInfo: { flex: 1, gap: 2 },
-  builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontWeight: '600' },
+  builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontFamily: Fonts.uiSemiBold },
   builtinNameSelected: { color: Colors.ink },
   builtinNameDisabled: { color: Colors.walnut2 },
   builtinDesc: { ...T.micro, fontSize: 10, color: Colors.walnut2 },
   builtinDescDisabled: { color: Colors.lineStrong },
-  selectedCount: { ...T.tag, fontSize: 12, color: Colors.ink, textAlign: 'center', fontWeight: '500' },
+  selectedCount: { ...T.tag, fontSize: 12, color: Colors.ink, textAlign: 'center', fontFamily: Fonts.ui },
 
   addBtn: {
     backgroundColor: Colors.ink, borderRadius: Radius.md,

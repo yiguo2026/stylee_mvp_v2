@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
   },
-  removePhotoText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  removePhotoText: { color: '#fff', fontSize: 14, fontFamily: Fonts.uiSemiBold },
   photoEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.vintageCream },
   photoAddSlot: { alignItems: 'center', gap: 2 },
   photoPlus: { fontSize: 20, color: Colors.walnut2 },
@@ -391,5 +391,5 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.6 },
   saveText: { ...T.buttonPrimary, color: Colors.paper },
   deleteBtn: { borderWidth: 1.5, borderColor: Colors.accent, borderRadius: Radius.md, paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.two },
-  deleteText: { ...T.buttonPrimary, color: Colors.accent, fontWeight: '600', fontSize: 15 },
+  deleteText: { ...T.buttonPrimary, color: Colors.accent, fontFamily: Fonts.uiSemiBold, fontSize: 15 },
 });

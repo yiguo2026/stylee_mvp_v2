@@ -4,7 +4,7 @@ import {
   ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   headerBack: { ...T.bodyText, color: Colors.ink },
   headerTitle: { ...T.sectionTitle },
-  headerSave: { ...T.bodyText, color: Colors.ink, fontWeight: '600' },
+  headerSave: { ...T.bodyText, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   container: { flex: 1 },
   inner: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   legend: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { ...T.tag, color: Colors.walnut },
-  sectionLabel: { ...T.bodyText, fontWeight: '600', color: Colors.ink, fontSize: 14 },
+  sectionLabel: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.ink, fontSize: 14 },
   tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 
   styleCard: {
@@ -173,11 +173,11 @@ const styles = StyleSheet.create({
   },
   styleCardLiked: { borderColor: LIKE_COLOR, backgroundColor: Colors.signalSoft },
   styleEmoji: { fontSize: 32 },
-  styleName: { ...T.tag, color: Colors.ink, fontWeight: '500' },
-  styleNameLiked: { color: Colors.signal, fontWeight: '600' },
+  styleName: { ...T.tag, color: Colors.ink, fontFamily: Fonts.ui },
+  styleNameLiked: { color: Colors.signal, fontFamily: Fonts.uiSemiBold },
   styleCheck: {
     position: 'absolute', top: 6, right: 8,
-    fontSize: 14, color: LIKE_COLOR, fontWeight: '700',
+    fontSize: 14, color: LIKE_COLOR, fontFamily: Fonts.uiSemiBold,
   },
 
   previewRow: { flexDirection: 'row', gap: Spacing.one },
