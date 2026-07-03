@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -27,14 +27,21 @@ const color = (focused: boolean) => (focused ? Colors.ink : Colors.walnut2);
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const paddingBottom = Math.max(Spacing.one, insets.bottom);
-  const height = 56 + paddingBottom;
+
+  const paddingBottom = Math.max(Spacing.two, insets.bottom);
+  const height = 60 + paddingBottom;
+
+  // Web/内嵌浏览器常见底部工具栏会覆盖可视区域，需要把 TabBar 上移
+  const webBottomOffset = Platform.OS === 'web' ? Spacing.four : 0;
+  const tabBarStyle = Platform.OS === 'web'
+    ? [{ ...styles.tabBar, paddingBottom, height, position: 'absolute', left: 0, right: 0, bottom: webBottomOffset }]
+    : [{ ...styles.tabBar, paddingBottom, height }];
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [{ ...styles.tabBar, paddingBottom, height }],
+        tabBarStyle,
         tabBarActiveTintColor: Colors.ink,
         tabBarInactiveTintColor: Colors.walnut2,
         tabBarLabelStyle: styles.tabLabel,
