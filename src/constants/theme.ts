@@ -44,18 +44,26 @@ export type ColorKey = keyof typeof Colors;
 export type ThemeColor = ColorKey;
 
 // ─────────────────────────────────────────────────────────
-// Font Families — v3.6: Playfair Display + Inter
+// Font Families — v3.6: Playfair Display (英文衬线) + Inter / PingFang SC (中文无衬线)
+// 规则：英文标题用 Playfair Display；中文正文/标题一律用 Inter / 苹方等无衬线
 // ─────────────────────────────────────────────────────────
 export const Fonts = {
-  display: 'PlayfairDisplay_600SemiBold',
-  title: 'PlayfairDisplay_500Medium',
+  // 英文衬线 — Playfair Display
+  display: 'PlayfairDisplay_600SemiBold',      // 英文大标题 / 品牌
+  displayItalic: 'PlayfairDisplay_600SemiBold_Italic',
+  title: 'PlayfairDisplay_500Medium',          // 英文次级标题
+  titleItalic: 'PlayfairDisplay_500Medium_Italic',
+  numeric: 'PlayfairDisplay_500Medium',
+  numericItalic: 'PlayfairDisplay_400Regular_Italic',
+  // 中文 / 无衬线 — Inter + PingFang SC
   body: 'Inter_400Regular',
   bodyMedium: 'Inter_500Medium',
   ui: 'Inter_500Medium',
   uiLight: 'Inter_300Light',
   uiSemiBold: 'Inter_600SemiBold',
-  numeric: 'PlayfairDisplay_500Medium',
-  numericItalic: 'PlayfairDisplay_400Regular_Italic',
+  // 中文一级标题（字重与 display 对应，但用无衬线）
+  cnDisplay: 'Inter_600SemiBold',
+  cnTitle: 'Inter_500Medium',
 };
 
 // ─────────────────────────────────────────────────────────
@@ -63,9 +71,9 @@ export const Fonts = {
 // ─────────────────────────────────────────────────────────
 export const T = {
 
-  // ── Display · Playfair Display 600 — 页面主标题/大型编辑标题 ──
+  // ── Display · Playfair Display 600 — 英文大标题 / 品牌字标 ──
   emptyTitle: {
-    fontFamily: Fonts.display,
+    fontFamily: Fonts.cnDisplay,
     fontSize: 30,
     letterSpacing: 0,
     lineHeight: 36,
@@ -79,23 +87,23 @@ export const T = {
     color: Colors.ink,
   },
 
-  // ── Title · Playfair Display 500 — 卡片标题/模块标题/编辑强调 ──
+  // ── Title · 中文用 Inter 500/600；英文用 Playfair Display 500 ──
   pageTitle: {
-    fontFamily: Fonts.title,
+    fontFamily: Fonts.cnDisplay,
     fontSize: 22,
     letterSpacing: 0,
     lineHeight: 28,
     color: Colors.ink,
   },
   sectionTitle: {
-    fontFamily: Fonts.title,
+    fontFamily: Fonts.cnTitle,
     fontSize: 18,
     letterSpacing: 0,
     lineHeight: 24,
     color: Colors.ink,
   },
   subTitle: {
-    fontFamily: Fonts.title,
+    fontFamily: Fonts.cnTitle,
     fontSize: 15,
     letterSpacing: 0,
     lineHeight: 20,

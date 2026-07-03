@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  avatarText: { fontSize: 32, color: '#fff', fontFamily: Fonts.title },
+  avatarText: { fontSize: 32, color: '#fff', fontFamily: Fonts.cnDisplay },
   avatarEmoji: { fontSize: 32, color: '#fff' },
   avatarImage: { width: 72, height: 72, borderRadius: 36 },
   editBadge: {
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   menuCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  menuCardTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 16, color: Colors.ink },
+  menuCardTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
   menuCardArrow: { color: Colors.walnut2, fontSize: 16 },
 
   // Style tags

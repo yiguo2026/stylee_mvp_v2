@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   heroTag: {
     fontSize: 11, color: Colors.terracotta, fontFamily: Fonts.uiSemiBold,
   },
-  heroTitle: { fontSize: 22, fontFamily: Fonts.title, color: Colors.ink },
+  heroTitle: { fontSize: 22, fontFamily: Fonts.cnDisplay, color: Colors.ink },
   heroDesc: { fontSize: 14, color: Colors.walnut, lineHeight: 22 },
 
   // Tags

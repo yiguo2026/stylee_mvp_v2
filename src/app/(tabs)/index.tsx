@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   brandText: {
-    fontFamily: Fonts.numeric,
+    fontFamily: Fonts.displayItalic,
     fontSize: 28,
     letterSpacing: 0,
     color: Colors.ink,

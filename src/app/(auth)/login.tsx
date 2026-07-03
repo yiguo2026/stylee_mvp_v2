@@ -115,9 +115,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four, gap: Spacing.two,
   },
   logo: {
-    fontFamily: Fonts.numeric,
+    fontFamily: Fonts.displayItalic,
     fontSize: 44,
-    letterSpacing: -0.88,
+    letterSpacing: 0,
     color: Colors.ink,
     marginBottom: Spacing.one,
   },

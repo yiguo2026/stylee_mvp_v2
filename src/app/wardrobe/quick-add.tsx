@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 16, color: Colors.ink },
+  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
   builtinSelectAll: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },

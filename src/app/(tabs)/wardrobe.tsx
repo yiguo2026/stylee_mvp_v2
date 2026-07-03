@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   modalCancelText: { ...T.bodyText, fontSize: 16, color: Colors.walnut },
 
   linkHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two },
-  linkTitle: { ...T.bodyText, fontFamily: Fonts.title, fontSize: 18, color: Colors.ink },
+  linkTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 18, color: Colors.ink },
   linkClose: { fontSize: 18, color: Colors.walnut2 },
   linkLabel: { ...T.tag, fontSize: 12, color: Colors.walnut, marginBottom: Spacing.one },
   linkInput: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
   wishlistBack: { fontSize: 16, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
-  wishlistTitle: { fontSize: 18, fontFamily: Fonts.title, color: Colors.ink },
+  wishlistTitle: { fontSize: 18, fontFamily: Fonts.cnTitle, color: Colors.ink },
   wishlistCountText: { fontSize: 13, color: Colors.walnut2, marginLeft: 'auto' },
   wishlistBody: { flex: 1, padding: Spacing.four },
   wishlistEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },

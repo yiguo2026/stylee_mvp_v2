@@ -8,7 +8,9 @@ import {
   PlayfairDisplay_400Regular,
   PlayfairDisplay_400Regular_Italic,
   PlayfairDisplay_500Medium,
+  PlayfairDisplay_500Medium_Italic,
   PlayfairDisplay_600SemiBold,
+  PlayfairDisplay_600SemiBold_Italic,
 } from '@expo-google-fonts/playfair-display';
 import {
   Inter_300Light,
@@ -29,7 +31,9 @@ export default function RootLayout() {
     PlayfairDisplay_400Regular,
     PlayfairDisplay_400Regular_Italic,
     PlayfairDisplay_500Medium,
+    PlayfairDisplay_500Medium_Italic,
     PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_600SemiBold_Italic,
     Inter_300Light,
     Inter_400Regular,
     Inter_500Medium,
