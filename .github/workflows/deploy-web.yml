@@ -22,7 +22,7 @@ jobs:
       - run: npm ci
 
       - name: Build web
-        run: npx expo export --platform web
+        run: npm run build:web
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
