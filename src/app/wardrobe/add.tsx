@@ -12,7 +12,6 @@ import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS } from '@/lib/ai';
-import { subscribeServiceUnavailable } from '@/lib/styleeService';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { ClothingCategory } from '@/types';
 
@@ -39,13 +38,10 @@ export default function AddWardrobeItem() {
   const [standardizedUri, setStandardizedUri] = useState<string | null>(null);
   const [stdState, setStdState] = useState<'idle' | 'generating' | 'done' | 'failed'>('idle');
   const [useStandardized, setUseStandardized] = useState(true);
-  const [serviceDown, setServiceDown] = useState(false);
 
   // Monotonic token — incremented on every new image pick; stale async results
   // whose token no longer matches the current value are discarded.
   const reqTokenRef = useRef(0);
-
-  useEffect(() => { subscribeServiceUnavailable(() => setServiceDown(true)); }, []);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -178,12 +174,6 @@ export default function AddWardrobeItem() {
           }
         </TouchableOpacity>
       </View>
-
-      {serviceDown ? (
-        <View style={styles.serviceDownBanner}>
-          <Text style={styles.serviceDownBannerText}>未连接本地模型服务，已用备用方案</Text>
-        </View>
-      ) : null}
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Image Section */}
@@ -442,14 +432,6 @@ const styles = StyleSheet.create({
   stdToggleBtnTextActive: { ...T.itemDesc, color: Colors.ink },
   stdDoneCaption: { ...T.itemDesc, color: Colors.walnut2, flex: 1, textAlign: 'right' },
   stdFailedCaption: { ...T.itemDesc, color: Colors.walnut2 },
-  serviceDownBanner: {
-    backgroundColor: Colors.signalSoft,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.one + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.linen,
-  },
-  serviceDownBannerText: { ...T.itemDesc, color: Colors.walnut, textAlign: 'center' },
   imagePlaceholder: {
     height: 240, borderRadius: Radius.lg,
     backgroundColor: Colors.paperCard,
