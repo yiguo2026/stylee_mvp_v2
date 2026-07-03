@@ -180,34 +180,28 @@ assets/
 
 ## 接入本地模型服务
 
-本应用支持接入本地 AI 推理服务（如穿搭识别、标准化、推荐等功能）。
+三个 AI 能力（服饰识别 / 标准化生图 / 搭配推荐）由**仓内自带**的本地推理服务提供，代码在 [`model-service/`](model-service/)（纯 Python 标准库，零 pip 依赖，clone 即完整功能）。
 
 ### 启动本地服务
 
-在模型仓库（`style05`）执行：
-
 ```bash
-python3 serve.py --provider dashscope
+cd model-service
+DEEPSEEK_API_KEY=<key> DASHSCOPE_API_KEY=<key> python3 serve.py --provider deepseek
 ```
 
-服务默认运行在 `http://127.0.0.1:8000`。
+服务默认运行在 `http://127.0.0.1:8000`。key 找 fitzw 拿；不带 key 也可 `python3 serve.py` 起 mock 模式联调。
+详细说明（端点、测试、重建索引）见 [`model-service/README.md`](model-service/README.md)。
 
 ### 配置环境变量
 
-在 `.env` 文件中设置：
+App 侧默认就是 `http://127.0.0.1:8000`，通常**无需配置**。如需改地址，在 `.env` 设：
 
 ```bash
 EXPO_PUBLIC_STYLEE_API=http://127.0.0.1:8000
 ```
 
-或直接复制 `.env.example` 并填入相关配置：
-
-```bash
-cp .env.example .env
-```
-
 ### 自动回落机制
 
-当本地服务不可达时，App 会自动回落到默认行为（如使用 mock 数据），不影响其他功能的正常使用。
+当本地服务不可达时，App 会自动回落到默认行为（mock 识别 / 客户端直连 DeepSeek / 用原图），不影响其他功能的正常使用。
 
 可通过 `node scripts/styleeSmoke.ts` 验证服务连接状态（需先启动本地服务）。
