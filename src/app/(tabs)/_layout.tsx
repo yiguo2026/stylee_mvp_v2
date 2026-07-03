@@ -28,8 +28,8 @@ const color = (focused: boolean) => (focused ? Colors.ink : Colors.walnut2);
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
 
-  const paddingBottom = Math.max(Spacing.two, insets.bottom);
-  const height = 60 + paddingBottom;
+  const paddingBottom = Math.max(Spacing.three, insets.bottom);
+  const height = 66 + paddingBottom;
   const tabBarStyle = [{ ...styles.tabBar, paddingBottom, height }];
 
   return (
@@ -96,21 +96,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
     borderTopColor: Colors.line,
     borderTopWidth: 1,
-    paddingTop: Spacing.one,
+    paddingTop: Spacing.one + 2,
   },
   tabItem: {
-    paddingTop: 2,
-    paddingBottom: 2,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   tabLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    marginBottom: 2,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 0,
     fontFamily: Fonts.ui,
   },
   iconWrap: {
     width: 40,
-    height: 36,
+    height: 32,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
