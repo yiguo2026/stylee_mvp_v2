@@ -46,7 +46,7 @@ const fontFaceStyle = fontFaceCSS
 const shellStyle = `<style>
 @media (min-width: 960px) {
   body {
-    background: #f4f4f5 !important;
+    background: linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%) !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
@@ -57,17 +57,22 @@ const shellStyle = `<style>
     overflow: auto !important;
   }
   .desktop-phone-stage {
-    --phone-scale: min(1, calc((100vw - 96px) / 393), calc((100vh - 64px) / 852));
-    width: calc(393px * var(--phone-scale));
-    height: calc(852px * var(--phone-scale));
+    --phone-scale: min(1, calc((100vw - 96px) / 425), calc((100vh - 64px) / 884));
+    width: calc(425px * var(--phone-scale));
+    height: calc(884px * var(--phone-scale));
     flex: none;
   }
   .desktop-phone-frame {
     position: relative;
-    width: 393px;
-    height: 852px;
+    width: 425px;
+    height: 884px;
     transform: scale(var(--phone-scale));
     transform-origin: top left;
+    padding: 14px;
+    box-sizing: border-box;
+    border-radius: 60px;
+    background: linear-gradient(180deg, #2f3136 0%, #111216 22%, #09090b 100%);
+    box-shadow: 0 32px 80px rgba(15, 23, 42, 0.22), 0 10px 24px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
   }
   .desktop-phone-screen {
     position: relative;
@@ -76,15 +81,25 @@ const shellStyle = `<style>
     overflow: hidden;
     border-radius: 48px;
     background: #ffffff;
-    box-shadow: 0 18px 56px rgba(16, 24, 40, 0.18), 0 0 0 1px rgba(10, 10, 10, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.06);
+    isolation: isolate;
+  }
+  .desktop-phone-screen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    pointer-events: none;
+    z-index: 3;
   }
   .desktop-phone-statusbar {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 20;
-    height: 52px;
+    z-index: 9999;
+    height: 60px;
     padding: 14px 28px 0;
     box-sizing: border-box;
     color: #0a0a0a;
@@ -107,7 +122,7 @@ const shellStyle = `<style>
     margin-left: -63px;
     border-radius: 18px;
     background: #0a0a0a;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   }
   .desktop-phone-system {
     position: absolute;
@@ -117,6 +132,10 @@ const shellStyle = `<style>
     align-items: center;
     gap: 6px;
     font-size: 11px;
+  }
+  .desktop-phone-network {
+    font-size: 11px;
+    line-height: 1;
   }
   .desktop-phone-signal {
     display: flex;
@@ -189,12 +208,16 @@ const shellStyle = `<style>
     background: #0a0a0a;
   }
   #root {
+    position: relative !important;
+    z-index: 1 !important;
     width: 100% !important;
     height: 100% !important;
     flex: none !important;
     overflow: hidden !important;
     border-radius: 48px !important;
     background: #ffffff !important;
+    padding-top: 60px !important;
+    box-sizing: border-box !important;
   }
 }
 </style>`;
