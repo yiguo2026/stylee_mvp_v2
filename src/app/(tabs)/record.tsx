@@ -436,15 +436,15 @@ const styles = StyleSheet.create({
   // Tabs
   tabRow: {
     flexDirection: 'row', gap: Spacing.one,
-    backgroundColor: Colors.paperCard, borderRadius: Radius.xl,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
     padding: 3, borderWidth: 1, borderColor: Colors.line,
   },
   tab: {
     flex: 1, paddingVertical: Spacing.two - 2,
-    borderRadius: Radius.xl, alignItems: 'center',
+    borderRadius: 10, alignItems: 'center',
   },
   tabActive: { backgroundColor: Colors.ink },
-  tabText: { ...T.tag, color: Colors.walnut },
+  tabText: { ...T.tag, color: Colors.ink },
   tabTextActive: { ...T.tag, color: Colors.paper },
 
   // Calendar
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   outfitCardLeft: {
-    width: 48, height: 48, backgroundColor: Colors.vintageCream,
+    width: 48, height: 48, backgroundColor: Colors.paperCard,
     borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center',
   },
   outfitCardInfo: { flex: 1, gap: 2 },
@@ -506,8 +506,8 @@ const styles = StyleSheet.create({
   modalContent: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
   modalDate: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   commentCard: {
-    backgroundColor: Colors.vintageCream, borderRadius: Radius.lg,
-    padding: Spacing.three, gap: Spacing.one, borderWidth: 1, borderColor: Colors.linen,
+    backgroundColor: Colors.signalSoft, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.one, borderWidth: 1, borderColor: Colors.line,
   },
   commentLabel: { ...T.formLabel },
   commentText: { ...T.bodyText, fontSize: 14 },
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   },
   itemIconWrap: {
     width: 40, height: 40, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
   },
   itemInfo: { flex: 1 },
   itemName: { ...T.itemName },

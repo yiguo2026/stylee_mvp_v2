@@ -435,14 +435,14 @@ const styles = StyleSheet.create({
   brandText: {
     fontFamily: Fonts.numeric,
     fontSize: 28,
-    letterSpacing: -0.56,
+    letterSpacing: 0,
     color: Colors.ink,
   },
   weatherBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.paperCard, borderRadius: Radius.xl,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
     paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.one + 2,
-    borderWidth: 1, borderColor: Colors.line,
+    borderWidth: 1, borderColor: Colors.lineStrong,
   },
   weatherBtnText: { ...T.tag, color: Colors.ink },
 
@@ -478,11 +478,11 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', gap: Spacing.one },
   tag: {
     paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.one + 2,
-    borderRadius: Radius.xl, borderWidth: 1,
-    borderColor: Colors.line, backgroundColor: Colors.paperCard,
+    borderRadius: 10, borderWidth: 1,
+    borderColor: Colors.lineStrong, backgroundColor: Colors.paper,
   },
   tagSelected: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  tagText: { ...T.tag, color: Colors.walnut },
+  tagText: { ...T.tag, color: Colors.ink },
   tagTextSelected: { ...T.tag, color: Colors.paper },
 
   generateBtn: {
@@ -509,8 +509,8 @@ const styles = StyleSheet.create({
   wardrobeRow: { flexDirection: 'row', gap: Spacing.two },
   wardrobeAddBtn: {
     width: 80, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.vintageCream, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.linen, gap: 4,
+    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.lineStrong, gap: 4,
     paddingVertical: Spacing.three,
   },
   wardrobeAddText: { ...T.micro, color: Colors.terracotta },
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   wardrobeThumbImg: { width: 80, height: 80, borderRadius: Radius.md },
   wardrobeThumbPlaceholder: {
     width: 80, height: 80, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
   },
   wardrobeThumbName: { ...T.micro, fontSize: 10, textAlign: 'center' },
 
@@ -533,16 +533,20 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   inspirationImage: {
-    width: '100%', aspectRatio: 3 / 4, backgroundColor: Colors.vintageCream,
+    width: '100%', aspectRatio: 3 / 4, backgroundColor: Colors.paperCard,
     alignItems: 'center', justifyContent: 'center',
   },
   inspirationInfo: { padding: Spacing.two, gap: 4 },
   inspirationTags: { flexDirection: 'row', gap: 4 },
   inspirationTag: {
-    backgroundColor: Colors.ink, borderRadius: Radius.sm,
-    paddingHorizontal: 6, paddingVertical: 2,
+    backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 5,
+    borderWidth: 1, borderColor: Colors.lineStrong,
+    paddingHorizontal: 7, paddingVertical: 2,
   },
-  inspirationTagText: { ...T.micro, color: Colors.paper, fontSize: 10 },
+  inspirationTagText: {
+    ...T.micro, color: Colors.inkSoft, fontSize: 10,
+    textTransform: 'uppercase',
+  },
   inspirationComment: {
     ...T.bodyText, fontSize: 12, lineHeight: 18,
     color: Colors.walnut,

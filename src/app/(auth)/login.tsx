@@ -90,7 +90,7 @@ export default function LoginScreen() {
             disabled={!canSubmit || loading}
           >
             {loading
-              ? <ActivityIndicator color={Colors.paperRaised} />
+              ? <ActivityIndicator color={Colors.paper} />
               : <Text style={styles.buttonText}>登录</Text>
             }
           </TouchableOpacity>

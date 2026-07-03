@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
-import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { Gender } from '@/types';
 import { searchCitiesOnline, CityResult } from '@/lib/weather';
 
@@ -236,15 +236,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: Spacing.two,
-    borderRadius: Radius.md,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.line,
-    backgroundColor: Colors.paperCard,
+    borderColor: Colors.lineStrong,
+    backgroundColor: Colors.paper,
     gap: 4,
   },
   genderBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   genderEmoji: { fontSize: 22 },
-  genderText: { ...T.tag, color: Colors.walnut },
+  genderText: { ...T.tag, color: Colors.ink },
   genderTextActive: { ...T.tag, color: Colors.paper },
   actions: { gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
   nextBtn: {
@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
     borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
     maxHeight: '70%', padding: Spacing.four,
+    ...Shadow.two,
   },
   modalTitle: { ...T.sectionTitle, textAlign: 'center', marginBottom: Spacing.three },
   citySearchInput: {

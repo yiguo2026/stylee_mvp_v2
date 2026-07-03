@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   avatarWrap: { position: 'relative' },
   avatarImage: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: Colors.vintageCream,
+    backgroundColor: Colors.paperCard,
   },
   avatarPlaceholder: {
     width: 80, height: 80, borderRadius: 40,
@@ -361,16 +361,16 @@ const styles = StyleSheet.create({
   genderBtn: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: Radius.md,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.line,
-    backgroundColor: Colors.paperCard,
+    borderColor: Colors.lineStrong,
+    backgroundColor: Colors.paper,
   },
   genderBtnActive: {
     backgroundColor: Colors.ink,
     borderColor: Colors.ink,
   },
-  genderText: { ...T.tag, color: Colors.walnut },
+  genderText: { ...T.tag, color: Colors.ink },
   genderTextActive: { ...T.tag, color: Colors.paper },
   bodyInfoSection: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

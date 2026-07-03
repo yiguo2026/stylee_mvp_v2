@@ -267,10 +267,10 @@ const styles = StyleSheet.create({
 
   imageWrap: {
     height: 320, borderRadius: Radius.lg, overflow: 'hidden',
-    backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.lineStrong, ...Shadow.two,
+    backgroundColor: Colors.paperCard, ...Shadow.two,
   },
   image: { width: '100%', height: '100%' },
-  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.vintageCream },
+  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
 
   itemName: { ...T.sectionTitle, fontSize: 22 },
 
@@ -278,10 +278,11 @@ const styles = StyleSheet.create({
   metaText: { ...T.micro, color: Colors.walnut },
 
   categoryBadge: {
-    alignSelf: 'flex-start', backgroundColor: Colors.vintageCream,
-    paddingHorizontal: Spacing.two, paddingVertical: 4, borderRadius: Radius.sm,
+    alignSelf: 'flex-start', backgroundColor: Colors.paper,
+    paddingHorizontal: Spacing.two, paddingVertical: 4, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.lineStrong,
   },
-  categoryBadgeText: { ...T.tag, color: Colors.walnut },
+  categoryBadgeText: { ...T.tag, color: Colors.ink },
 
   attrsToggle: {
     flexDirection: 'row', alignItems: 'center',
@@ -302,7 +303,7 @@ const styles = StyleSheet.create({
   attrValue: { ...T.itemName },
   attrUnset: { ...T.itemName, color: Colors.walnut2 },
 
-  aiCard: { backgroundColor: Colors.vintageCream, borderRadius: Radius.md, padding: Spacing.three, gap: Spacing.one },
+  aiCard: { backgroundColor: Colors.signalSoft, borderRadius: Radius.md, padding: Spacing.three, gap: Spacing.one },
   aiTitle: { ...T.formLabel, marginBottom: 4 },
   aiAttr: { ...T.itemDesc },
 
@@ -322,6 +323,6 @@ const styles = StyleSheet.create({
 
   meta: { ...T.micro, textAlign: 'center' },
 
-  recHint: { backgroundColor: Colors.vintageCream, borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
+  recHint: { backgroundColor: Colors.signalSoft, borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
   recHintText: { ...T.itemDesc, color: Colors.walnut2 },
 });

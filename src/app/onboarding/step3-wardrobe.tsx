@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
@@ -257,25 +257,25 @@ const styles = StyleSheet.create({
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
   catBtn: {
     paddingHorizontal: Spacing.two, paddingVertical: Spacing.one + 2,
-    borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.line,
+    borderRadius: 10, borderWidth: 1, borderColor: Colors.lineStrong,
     backgroundColor: Colors.paper, alignItems: 'center', gap: 2,
   },
   catBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   catEmoji: { fontSize: 14 },
-  catText: { ...T.tag, fontSize: 11, color: Colors.walnut },
+  catText: { ...T.tag, fontSize: 11, color: Colors.ink },
   catTextActive: { ...T.tag, fontSize: 11, color: Colors.paper },
 
   builtinGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   builtinItem: {
     width: '47%', flexDirection: 'row', alignItems: 'center',
-    gap: Spacing.one + 2, backgroundColor: Colors.paper,
+    gap: Spacing.one + 2, backgroundColor: Colors.paperCard,
     borderRadius: Radius.md, padding: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
+    ...Shadow.one,
   },
-  builtinItemSelected: { borderColor: Colors.ink, backgroundColor: Colors.signalSoft },
+  builtinItemSelected: { backgroundColor: Colors.signalSoft },
   builtinIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
   },
   builtinIconSelected: { backgroundColor: Colors.signalSoft },
   builtinCheck: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   batchAddBtn: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   albumRow: { flexDirection: 'row', gap: Spacing.two },
   albumThumbWrap: { position: 'relative' },
-  albumThumb: { width: 64, height: 64, borderRadius: Radius.md, backgroundColor: Colors.vintageCream },
+  albumThumb: { width: 64, height: 64, borderRadius: Radius.md, backgroundColor: Colors.paperCard },
   albumRemove: {
     position: 'absolute', top: -4, right: -4,
     width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent,

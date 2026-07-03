@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   },
   bodyInfoThumb: {
     width: 48, height: 48, borderRadius: 24,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
   bodyInfoThumbImg: { width: 48, height: 48, borderRadius: 24 },
@@ -402,11 +402,11 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
     backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    padding: Spacing.two + 2, borderWidth: 1, borderColor: Colors.line,
+    padding: Spacing.two + 2, ...Shadow.one,
   },
   itemIcon: {
     width: 48, height: 48, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
   itemImage: { width: 48, height: 48, borderRadius: Radius.md },
@@ -418,22 +418,22 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', gap: Spacing.two },
   tab: {
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two - 2,
-    borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.line,
-    backgroundColor: Colors.paperCard,
+    borderRadius: 10, borderWidth: 1, borderColor: Colors.lineStrong,
+    backgroundColor: Colors.paper,
   },
   tabActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  tabText: { ...T.tag, color: Colors.walnut },
+  tabText: { ...T.tag, color: Colors.ink },
   tabTextActive: { ...T.tag, color: Colors.paper },
 
   // ── Outfit Grid ──
   outfitGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   outfitCard: {
     width: '48%', backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    overflow: 'hidden', borderWidth: 1.5, borderColor: Colors.line,
+    overflow: 'hidden', ...Shadow.one,
   },
   outfitCardSelected: { borderColor: Colors.ink, borderWidth: 2 },
   outfitThumb: {
-    width: '100%', aspectRatio: 3 / 4, backgroundColor: Colors.vintageCream,
+    width: '100%', aspectRatio: 3 / 4, backgroundColor: Colors.paperCard,
     position: 'relative',
   },
   outfitThumbImg: { width: '100%', height: '100%' },
@@ -458,10 +458,10 @@ const styles = StyleSheet.create({
   sceneOpt: {
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
-    borderRadius: Radius.md, backgroundColor: Colors.paperCard,
-    borderWidth: 1.5, borderColor: 'transparent', minWidth: 72, gap: 4,
+    borderRadius: 10, backgroundColor: Colors.paper,
+    borderWidth: 1, borderColor: Colors.lineStrong, minWidth: 72, gap: 4,
   },
-  sceneOptSelected: { borderColor: Colors.ink, backgroundColor: Colors.vintageCream },
+  sceneOptSelected: { borderColor: Colors.ink, backgroundColor: Colors.signalSoft },
   sceneEmoji: { fontSize: 24 },
   sceneLabel: { ...T.micro, color: Colors.walnut },
   sceneLabelSelected: { color: Colors.ink, fontFamily: Fonts.uiSemiBold },
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
 
   // ── Result ──
   resultCard: {
-    backgroundColor: '#000', borderRadius: Radius.lg,
+    backgroundColor: Colors.ink, borderRadius: Radius.lg,
     overflow: 'hidden',
   },
   resultImage: { width: '100%', aspectRatio: 3 / 4 },

@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Modal, ActivityIndicator,
 } from 'react-native';
-import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -71,12 +71,13 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   dialog: {
-    backgroundColor: Colors.paperRaised,
+    backgroundColor: Colors.paper,
     borderRadius: Radius.lg,
     padding: Spacing.four,
     width: '100%',
     maxWidth: 340,
     gap: Spacing.three,
+    ...Shadow.three,
   },
   title: {
     ...T.sectionTitle,

@@ -170,7 +170,7 @@ export default function RegisterScreen() {
             disabled={!canSubmit || loading}
           >
             {loading
-              ? <ActivityIndicator color={Colors.paperRaised} />
+              ? <ActivityIndicator color={Colors.paper} />
               : <Text style={styles.buttonText}>注册</Text>
             }
           </TouchableOpacity>

@@ -102,6 +102,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapActive: {
-    backgroundColor: Colors.signalSoft,
+    backgroundColor: Colors.paperRaised,
   },
 });

@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink,
   },
   heroImage: { width: '100%', height: '100%' },
-  heroPlaceholder: { width: '100%', height: '100%', backgroundColor: Colors.vintageCream },
+  heroPlaceholder: { width: '100%', height: '100%', backgroundColor: Colors.paperCard },
 
   closeBtn: {
     position: 'absolute', top: 12, right: 12,
@@ -122,19 +122,19 @@ const styles = StyleSheet.create({
   tagSection: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagPill: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-    backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9,
+    backgroundColor: Colors.signal,
   },
-  tagPillOccasion: { borderColor: Colors.terracotta, backgroundColor: Colors.accentSoft },
-  tagPillText: { fontSize: 12, fontFamily: Fonts.ui, color: Colors.ink },
-  tagPillTextOccasion: { color: Colors.terracotta },
+  tagPillOccasion: { borderWidth: 1, borderColor: Colors.accent, backgroundColor: Colors.accentSoft },
+  tagPillText: { fontSize: 12, fontFamily: Fonts.ui, color: Colors.paper },
+  tagPillTextOccasion: { color: Colors.accent },
 
   // Item Breakdown
   breakdownSection: {
     marginHorizontal: Spacing.four, marginTop: Spacing.three,
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
     padding: Spacing.three, gap: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
+    ...Shadow.one,
   },
   breakdownTitle: { fontSize: 15, fontFamily: Fonts.uiSemiBold, color: Colors.ink, marginBottom: Spacing.one },
   breakdownItem: {
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   breakdownThumb: {
     width: 48, height: 48, borderRadius: 12, overflow: 'hidden',
-    backgroundColor: Colors.vintageCream,
+    backgroundColor: Colors.paperCard,
   },
   breakdownThumbImg: { width: '100%', height: '100%' },
   breakdownThumbPlaceholder: {

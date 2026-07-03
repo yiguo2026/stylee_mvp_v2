@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, SafeAreaView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useTryOnStore, TryOnRecord } from '@/stores/tryonStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
@@ -159,11 +159,11 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
     backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    padding: Spacing.two + 2, borderWidth: 1, borderColor: Colors.line,
+    padding: Spacing.two + 2, ...Shadow.one,
   },
   itemIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
-    backgroundColor: Colors.vintageCream, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
   itemImage: { width: 44, height: 44, borderRadius: Radius.md },

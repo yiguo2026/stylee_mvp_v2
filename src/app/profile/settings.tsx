@@ -102,7 +102,7 @@ export default function SettingsPage() {
             <Switch
               value={locationAccess}
               onValueChange={() => toggleAndSave('locationAccess', locationAccess, setLocationAccess)}
-              trackColor={{ false: '#e5e5ea', true: Colors.signal }}
+              trackColor={{ false: Colors.line, true: Colors.signal }}
               thumbColor="#fff"
             />
           </View>
@@ -198,7 +198,7 @@ export default function SettingsPage() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F5F5F7' },
+  safe: { flex: 1, backgroundColor: Colors.paper },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.two + 4,
   },
-  rowBorder: { height: 1, backgroundColor: '#E5E5EA', marginLeft: Spacing.four + 28 },
+  rowBorder: { height: 1, backgroundColor: Colors.line, marginLeft: Spacing.four + 28 },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   rowIcon: { fontSize: 18, width: 28, textAlign: 'center' },
   rowLabel: { ...T.bodyText, fontSize: 15, color: Colors.ink },

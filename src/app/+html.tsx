@@ -20,7 +20,7 @@ export default function Root({ children }: PropsWithChildren) {
 const webShellStyle = `
 @media (min-width: 430px) {
   body {
-    background-color: #f4f4f5;
+    background-color: #FFFFFF;
     display: flex;
     justify-content: center;
     align-items: center;

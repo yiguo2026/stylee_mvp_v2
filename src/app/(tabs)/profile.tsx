@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   editBtn: {
     ...T.tag, color: Colors.ink,
     paddingHorizontal: Spacing.three, paddingVertical: 4,
-    borderRadius: Radius.xl, backgroundColor: Colors.signalSoft,
+    borderRadius: 9, backgroundColor: Colors.signalSoft,
     overflow: 'hidden', marginTop: 4, alignSelf: 'flex-start',
   },
 
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
 
   // Style tags
   styleTags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
-  stylePill: { paddingHorizontal: Spacing.two, paddingVertical: 4, borderRadius: Radius.xl },
+  stylePill: { paddingHorizontal: Spacing.two, paddingVertical: 4, borderRadius: 9 },
   stylePillLiked: { backgroundColor: Colors.sage },
   stylePillText: { ...T.tag, color: Colors.paper },
   stylePillEmpty: { ...T.tag, color: Colors.walnut2, fontStyle: 'italic' },
