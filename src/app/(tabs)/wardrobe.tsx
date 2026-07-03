@@ -51,9 +51,9 @@ function LinkImportModal({ visible, url, onChangeUrl, importing, onImport, onClo
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.linkHeader}>
-            <Text style={styles.linkTitle}>🔗 链接导入</Text>
+            <Text style={styles.linkTitle}>链接导入</Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.linkClose}>✕</Text>
+              <Text style={styles.linkClose}>关闭</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.linkLabel}>商品链接</Text>
@@ -246,7 +246,7 @@ export default function WardrobeTab() {
         {/* Wishlist Entry (bottom of page) */}
         <View style={styles.wishlistEntry}>
           <TouchableOpacity style={styles.wishlistEntryBtn} onPress={() => setShowWishlist(true)}>
-            <Text style={styles.wishlistEntryIcon}>♡</Text>
+            <Text style={styles.wishlistEntryIcon}>查看</Text>
             <Text style={styles.wishlistEntryLabel}>心愿单</Text>
             {wishlistItems.length > 0 && (
               <View style={styles.wishlistEntryBadge}>
@@ -261,7 +261,7 @@ export default function WardrobeTab() {
         <View style={styles.quickAddEntry}>
           <TouchableOpacity style={styles.quickAddEntryBtn} onPress={() => router.push('/wardrobe/quick-add')}>
             <View style={styles.quickAddEntryIcon}>
-              <Text style={styles.quickAddEntryIconText}>✨</Text>
+              <Text style={styles.quickAddEntryIconText}>AI</Text>
             </View>
             <View style={styles.quickAddEntryInfo}>
               <Text style={styles.quickAddEntryTitle}>快速添加推荐单品</Text>
@@ -287,20 +287,17 @@ export default function WardrobeTab() {
       <Modal visible={showAddModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalWarning}>⚠️ 仅支持单品上传，请每次上传一件衣物</Text>
+            <Text style={styles.modalWarning}>仅支持单品上传，请每次上传一件衣物</Text>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/add'); }}>
-              <Text style={styles.modalOptionIcon}>🖼️</Text>
               <Text style={styles.modalOptionText}>单品录入</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/batch'); }}>
-              <Text style={styles.modalOptionIcon}>📚</Text>
               <Text style={styles.modalOptionText}>批量导入</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); setShowLinkModal(true); }}>
-              <Text style={styles.modalOptionIcon}>🔗</Text>
               <Text style={styles.modalOptionText}>链接导入</Text>
             </TouchableOpacity>
 

@@ -74,7 +74,6 @@ export default function SettingsPage() {
             if (isWeb) { window.alert('当前用户名: ' + (profile?.nickname ?? '未设置')); } else { Alert.alert('用户名', '当前用户名: ' + (profile?.nickname ?? '未设置')); }
           }}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>👤</Text>
               <Text style={styles.rowLabel}>用户名</Text>
             </View>
             <Text style={styles.rowValue}>{profile?.nickname ?? 'user_1234'} ›</Text>
@@ -84,7 +83,6 @@ export default function SettingsPage() {
             if (isWeb) { window.alert('请通过登录页面的"忘记密码"功能重置密码'); } else { Alert.alert('修改密码', '请通过登录页面的"忘记密码"功能重置密码'); }
           }}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>🔑</Text>
               <Text style={styles.rowLabel}>登录密码</Text>
             </View>
             <Text style={styles.rowValue}>已设置 ›</Text>
@@ -96,7 +94,6 @@ export default function SettingsPage() {
         <View style={styles.group}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>📍</Text>
               <Text style={styles.rowLabel}>位置信息</Text>
             </View>
             <Switch
@@ -115,7 +112,6 @@ export default function SettingsPage() {
             if (isWeb) { window.alert('正在备份您的数据...'); } else { Alert.alert('数据备份', '正在备份您的数据...'); }
           }}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>☁️</Text>
               <Text style={styles.rowLabel}>数据备份</Text>
             </View>
             <Text style={styles.rowValue}>今天 08:30 ›</Text>
@@ -123,7 +119,6 @@ export default function SettingsPage() {
           <View style={styles.rowBorder} />
           <TouchableOpacity style={styles.row} onPress={handleClearCache}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>🗑️</Text>
               <Text style={styles.rowLabel}>清除缓存</Text>
             </View>
             <Text style={styles.rowValue}>128 MB</Text>
@@ -135,7 +130,6 @@ export default function SettingsPage() {
         <View style={styles.group}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>ℹ️</Text>
               <Text style={styles.rowLabel}>当前版本</Text>
             </View>
             <Text style={styles.rowValue}>v{appVersion}</Text>
@@ -145,7 +139,6 @@ export default function SettingsPage() {
             if (isWeb) { window.alert('感谢您的反馈！请通过邮件联系我们：feedback@stylee.app'); } else { Alert.alert('意见反馈', '感谢您的反馈！请通过邮件联系我们：feedback@stylee.app'); }
           }}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>✏️</Text>
               <Text style={styles.rowLabel}>意见反馈</Text>
             </View>
             <Text style={styles.rowValue}>›</Text>
@@ -157,7 +150,6 @@ export default function SettingsPage() {
             });
           }}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>📄</Text>
               <Text style={styles.rowLabel}>用户协议</Text>
             </View>
             <Text style={styles.rowValue}>›</Text>
@@ -169,7 +161,6 @@ export default function SettingsPage() {
             });
           }}>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>🔒</Text>
               <Text style={styles.rowLabel}>隐私政策</Text>
             </View>
             <Text style={styles.rowValue}>›</Text>
@@ -179,7 +170,7 @@ export default function SettingsPage() {
         {/* 退出登录 */}
         <View style={styles.signOutGroup}>
           <TouchableOpacity style={styles.signOutBtn} onPress={() => setShowSignOut(true)}>
-            <Text style={styles.signOutText}>🚪 退出登录</Text>
+            <Text style={styles.signOutText}>退出登录</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -222,9 +213,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.two + 4,
   },
-  rowBorder: { height: 1, backgroundColor: Colors.line, marginLeft: Spacing.four + 28 },
+  rowBorder: { height: 1, backgroundColor: Colors.line, marginLeft: Spacing.four },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  rowIcon: { fontSize: 18, width: 28, textAlign: 'center' },
   rowLabel: { ...T.bodyText, fontSize: 15, color: Colors.ink },
   rowValue: { fontSize: 13, color: Colors.gray1 },
 

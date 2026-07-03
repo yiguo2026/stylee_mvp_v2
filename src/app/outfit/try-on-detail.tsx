@@ -65,7 +65,7 @@ export default function TryOnDetailScreen() {
         <View style={styles.infoRow}>
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>场景</Text>
-            <Text style={styles.infoValue}>{record.sceneEmoji} {record.sceneLabel}</Text>
+            <Text style={styles.infoValue}>{record.sceneLabel}</Text>
           </View>
           <View style={styles.infoDivider} />
           <View style={styles.infoItem}>

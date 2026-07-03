@@ -229,7 +229,7 @@ export default function AddWardrobeItem() {
               >
                 <Text style={[styles.stdToggleBtnText, useStandardized && styles.stdToggleBtnTextActive]}>标准图</Text>
               </TouchableOpacity>
-              <Text style={styles.stdDoneCaption}>✓ 已生成标准图</Text>
+              <Text style={styles.stdDoneCaption}>已生成标准图</Text>
             </View>
           ) : null}
           {stdState === 'failed' ? (

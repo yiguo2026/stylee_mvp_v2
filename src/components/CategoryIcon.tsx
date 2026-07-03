@@ -1,14 +1,18 @@
-import { Text } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Feather from '@expo/vector-icons/Feather';
+import { Colors } from '@/constants/theme';
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  '上装': '👔',
-  '下装': '👖',
-  '连体装': '👗',
-  '外套': '🧥',
-  '鞋履': '👟',
-  '包袋': '🎒',
-  '帽巾': '🧢',
-  '配饰': '✨',
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+const CATEGORY_ICON_MAP: Record<string, IconName> = {
+  '上装': 'tshirt-crew-outline',
+  '下装': 'hanger',
+  '连体装': 'human-female',
+  '外套': 'coat-rack',
+  '鞋履': 'shoe-formal',
+  '包袋': 'bag-personal-outline',
+  '帽巾': 'hat-fedora',
+  '配饰': 'diamond-stone',
 };
 
 interface Props {
@@ -17,11 +21,14 @@ interface Props {
   color?: string;
 }
 
-export function CategoryIcon({ category, size = 32 }: Props) {
-  const emoji = CATEGORY_EMOJI[category] ?? '🏷️';
-  return <Text style={{ fontSize: size * 0.7 }}>{emoji}</Text>;
+export function CategoryIcon({ category, size = 32, color = Colors.walnut2 }: Props) {
+  const name = CATEGORY_ICON_MAP[category];
+  if (!name) {
+    return <Feather name="tag" size={size * 0.72} color={color} />;
+  }
+  return <MaterialCommunityIcons name={name} size={size * 0.72} color={color} />;
 }
 
 export function getCategoryEmoji(category: string): string {
-  return CATEGORY_EMOJI[category] ?? '🏷️';
+  return category;
 }

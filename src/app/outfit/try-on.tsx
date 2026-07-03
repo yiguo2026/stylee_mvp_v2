@@ -14,11 +14,11 @@ import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 const isWeb = Platform.OS === 'web';
 
 const TRYON_SCENES = [
-  { id: 'cafe', emoji: '☕', label: '咖啡馆' },
-  { id: 'street', emoji: '🏙️', label: '街道' },
-  { id: 'office', emoji: '💼', label: '办公室' },
-  { id: 'park', emoji: '🌿', label: '公园' },
-  { id: 'home', emoji: '🏠', label: '居家' },
+  { id: 'cafe', label: '咖啡馆' },
+  { id: 'street', label: '街道' },
+  { id: 'office', label: '办公室' },
+  { id: 'park', label: '公园' },
+  { id: 'home', label: '居家' },
 ];
 
 const SCENE_IMAGES: Record<string, any> = {
@@ -176,7 +176,7 @@ export default function TryOnScreen() {
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []);
     addRecord({
       scene: selectedScene,
-      sceneEmoji: sceneObj?.emoji ?? '✨',
+      sceneEmoji: '',
       sceneLabel: sceneObj?.label ?? selectedScene,
       outfitName,
       items: recordItems,
@@ -201,7 +201,7 @@ export default function TryOnScreen() {
             {selfieUri ? (
               <Image source={{ uri: selfieUri }} style={styles.bodyInfoThumbImg} resizeMode="cover" />
             ) : (
-              <Text style={styles.bodyInfoEmoji}>🧍</Text>
+              <Text style={styles.bodyInfoSub}>点击录入（首次需要）</Text>
             )}
           </View>
           <View style={styles.bodyInfoText}>
@@ -285,9 +285,7 @@ export default function TryOnScreen() {
                           <Image source={{ uri: outfit.items[0].image_url }} style={styles.outfitThumbImg} resizeMode="cover" />
                         ) : (
                           <View style={styles.outfitThumbPlaceholder}>
-                            <Text style={styles.outfitThumbEmoji}>
-                              {outfit.items[0]?.category === '上装' ? '👔' : outfit.items[0]?.category === '下装' ? '👖' : outfit.items[0]?.category === '外套' ? '🧥' : outfit.items[0]?.category === '鞋履' ? '👟' : '👗'}
-                            </Text>
+                            <CategoryIcon category={outfit.items[0]?.category ?? ''} size={28} color={Colors.walnut2} />
                           </View>
                         )}
                         {outfit.items.length > 1 ? (
@@ -321,7 +319,6 @@ export default function TryOnScreen() {
                   onPress={() => setSelectedScene(scene.id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.sceneEmoji}>{scene.emoji}</Text>
                   <Text style={[styles.sceneLabel, isSelected && styles.sceneLabelSelected]}>{scene.label}</Text>
                 </TouchableOpacity>
               );
@@ -341,7 +338,7 @@ export default function TryOnScreen() {
               <Text style={styles.generateBtnText}>生成中…</Text>
             </View>
           ) : (
-            <Text style={styles.generateBtnText}>✨ 生成试穿效果图</Text>
+            <Text style={styles.generateBtnText}>生成试穿效果图</Text>
           )}
         </TouchableOpacity>
         <Text style={styles.generateHint}>AI 将结合身体信息 + 搭配方案 + 场景氛围生成效果图</Text>
@@ -362,7 +359,7 @@ export default function TryOnScreen() {
               <TouchableOpacity style={styles.resultSaveBtn} onPress={() => {
                 if (isWeb) { window.alert('图片已保存'); } else { Alert.alert('提示', '图片已保存到相册'); }
               }}>
-                <Text style={styles.resultSaveBtnText}>💾 保存图片</Text>
+                <Text style={styles.resultSaveBtnText}>保存图片</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -373,7 +370,6 @@ export default function TryOnScreen() {
       {generating ? (
         <View style={styles.generatingOverlay}>
           <View style={styles.generatingCard}>
-            <Text style={styles.progressEmoji}>✨</Text>
             <Text style={styles.progressTitle}>AI 正在生成试穿效果...</Text>
             <Text style={styles.progressStepText}>
               {['分析身体数据中...', '匹配穿搭单品...', '合成试穿效果...', '优化画面细节...'][genStep]}

@@ -78,10 +78,10 @@ export default function ProfileTab() {
               ) : profile?.nickname?.[0] ? (
                 <Text style={styles.avatarText}>{profile.nickname[0]}</Text>
               ) : (
-                <Text style={styles.avatarEmoji}>👩</Text>
+                <Text style={styles.avatarEmoji}>S</Text>
               )}
               <View style={styles.editBadge}>
-                <Text style={styles.editBadgeIcon}>✏️</Text>
+                <Text style={styles.editBadgeIcon}>编辑</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.profileInfo}>
@@ -115,7 +115,7 @@ export default function ProfileTab() {
         {/* Style Preference */}
         <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/profile/style')}>
           <View style={styles.menuCardHeader}>
-            <Text style={styles.menuCardTitle}>🎨 我的风格偏好</Text>
+            <Text style={styles.menuCardTitle}>我的风格偏好</Text>
             <Text style={styles.menuCardArrow}>›</Text>
           </View>
           <View style={styles.styleTags}>
@@ -132,14 +132,13 @@ export default function ProfileTab() {
         {/* AI Try-on */}
         <View style={styles.menuCard}>
           <View style={styles.menuCardHeader}>
-            <Text style={styles.menuCardTitle}>👗 试穿记录</Text>
+            <Text style={styles.menuCardTitle}>试穿记录</Text>
             <TouchableOpacity onPress={() => router.push('/outfit/try-on')}>
               <Text style={styles.tryOnLabel}>去试穿 ›</Text>
             </TouchableOpacity>
           </View>
           {tryOnRecords.length === 0 ? (
             <View style={styles.tryOnEmpty}>
-              <Text style={styles.tryOnEmptyIcon}>✨</Text>
               <Text style={styles.tryOnEmptyTitle}>还没有试穿记录</Text>
               <Text style={styles.tryOnEmptySub}>使用AI试穿功能后，效果图会展示在这里</Text>
             </View>
@@ -153,7 +152,7 @@ export default function ProfileTab() {
                   activeOpacity={0.7}
                 >
                   <Image source={tryOnSceneImageUri(record.scene)} style={styles.tryOnPhoto} resizeMode="cover" />
-                  <Text style={styles.tryOnPhotoScene}>{record.sceneEmoji} {record.sceneLabel}</Text>
+                  <Text style={styles.tryOnPhotoScene}>{record.sceneLabel}</Text>
                   <Text style={styles.tryOnPhotoDate} numberOfLines={1}>
                     {record.outfitName}
                   </Text>
@@ -165,7 +164,6 @@ export default function ProfileTab() {
 
         {/* Settings */}
         <TouchableOpacity style={styles.settingsEntry} onPress={() => router.push('/profile/settings')}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
           <Text style={styles.settingsText}>更多设置</Text>
           <Text style={styles.settingsArrow}>›</Text>
         </TouchableOpacity>
@@ -254,7 +252,6 @@ const styles = StyleSheet.create({
   // Try-on
   tryOnLabel: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   tryOnEmpty: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
-  tryOnEmptyIcon: { fontSize: 28 },
   tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
   tryOnEmptySub: { ...T.micro, color: Colors.walnut2, textAlign: 'center', lineHeight: 18 },
 

@@ -20,10 +20,10 @@ function randomNickname(): string {
   return `${adj}${noun}${num}`;
 }
 
-const GENDERS: { label: string; emoji: string; value: Gender }[] = [
-  { label: '女士', emoji: '👩', value: 'female' },
-  { label: '男士', emoji: '👨', value: 'male' },
-  { label: '其他', emoji: '✨', value: 'other' },
+const GENDERS: { label: string; value: Gender }[] = [
+  { label: '女士', value: 'female' },
+  { label: '男士', value: 'male' },
+  { label: '其他', value: 'other' },
 ];
 
 export default function OnboardingStep1() {
@@ -102,7 +102,6 @@ export default function OnboardingStep1() {
               style={[styles.genderBtn, gender === g.value && styles.genderBtnActive]}
               onPress={() => setGender(g.value)}
             >
-              <Text style={styles.genderEmoji}>{g.emoji}</Text>
               <Text style={[styles.genderText, gender === g.value && styles.genderTextActive]}>
                 {g.label}
               </Text>
@@ -167,7 +166,7 @@ export default function OnboardingStep1() {
       <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>📍 选择城市</Text>
+            <Text style={styles.modalTitle}>选择城市</Text>
             <TextInput
               style={styles.citySearchInput}
               placeholder="搜索城市..."
@@ -243,7 +242,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   genderBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  genderEmoji: { fontSize: 22 },
   genderText: { ...T.tag, color: Colors.ink },
   genderTextActive: { ...T.tag, color: Colors.paper },
   actions: { gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },

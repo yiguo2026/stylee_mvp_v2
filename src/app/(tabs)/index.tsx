@@ -365,7 +365,7 @@ export default function OutfitTab() {
         {/* ── Section 3: Outfit Inspiration ── */}
         <View style={styles.inspirationSection}>
           <View style={styles.inspirationHeader}>
-            <Text style={styles.inspirationTitle}>✨ 穿搭灵感</Text>
+            <Text style={styles.inspirationTitle}>穿搭灵感</Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.inspirationRow}>
@@ -402,10 +402,7 @@ export default function OutfitTab() {
           onPress={() => router.push('/outfit/try-on')}
           activeOpacity={0.85}
         >
-          <View style={styles.tryOnTitleRow}>
-            <Text style={styles.tryOnSparkle}>✨</Text>
-            <Text style={styles.tryOnTitle}>AI试穿</Text>
-          </View>
+          <Text style={styles.tryOnTitle}>AI试穿</Text>
           <Text style={styles.tryOnSubtitle}>选一套搭配，看看上身效果</Text>
         </TouchableOpacity>
 
@@ -415,7 +412,7 @@ export default function OutfitTab() {
       <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>📍 选择城市</Text>
+            <Text style={styles.modalTitle}>选择城市</Text>
             <TextInput
               style={styles.citySearchInput}
               placeholder="搜索城市..."
@@ -589,16 +586,6 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
     borderColor: Colors.line,
-  },
-  tryOnTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  tryOnSparkle: {
-    fontSize: 16,
-    lineHeight: 18,
-    color: Colors.gray1,
   },
   tryOnTitle: {
     fontFamily: Fonts.title,

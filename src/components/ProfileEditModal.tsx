@@ -14,9 +14,9 @@ import { Gender } from '@/types';
 const isWeb = Platform.OS === 'web';
 
 const GENDERS: { label: string; value: Gender }[] = [
-  { label: '👩 女士', value: 'female' },
-  { label: '👨 男士', value: 'male' },
-  { label: '✨ 其他', value: 'other' },
+  { label: '女士', value: 'female' },
+  { label: '男士', value: 'male' },
+  { label: '其他', value: 'other' },
   { label: '保密', value: 'private' },
 ];
 
@@ -162,7 +162,7 @@ export function ProfileEditModal({ visible, onClose }: Props) {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>编辑资料</Text>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Text style={styles.closeBtn}>✕</Text>
+              <Text style={styles.closeBtn}>关闭</Text>
             </TouchableOpacity>
           </View>
 
@@ -175,14 +175,14 @@ export function ProfileEditModal({ visible, onClose }: Props) {
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarEmoji}>
-                      {profile?.nickname?.[0] ?? '👩'}
+                      {profile?.nickname?.[0] ?? 'S'}
                     </Text>
                   </View>
                 )}
                 <View style={styles.avatarCamera}>
                   {uploadingAvatar
                     ? <ActivityIndicator size="small" color={Colors.ink} />
-                    : <Text style={styles.avatarCameraIcon}>📷</Text>
+                    : <Text style={styles.avatarCameraIcon}>更换</Text>
                   }
                 </View>
               </TouchableOpacity>
@@ -271,7 +271,6 @@ export function ProfileEditModal({ visible, onClose }: Props) {
                   <Image source={{ uri: localSelfieUri }} style={styles.selfieImage} resizeMode="cover" />
                 ) : (
                   <View style={styles.selfiePlaceholder}>
-                    <Text style={styles.selfieEmoji}>🤳</Text>
                     <Text style={styles.selfieLabel}>点击上传自拍照</Text>
                   </View>
                 )}
@@ -390,7 +389,6 @@ const styles = StyleSheet.create({
   selfiePlaceholder: {
     width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: Spacing.one,
   },
-  selfieEmoji: { fontSize: 36 },
   selfieLabel: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
   selfieHint: { ...T.micro, color: Colors.walnut2, marginTop: 2 },
 

@@ -202,7 +202,7 @@ export default function RegisterScreen() {
           <View style={styles.termsModalHeader}>
             <Text style={styles.termsModalTitle}>用户协议与隐私政策</Text>
             <TouchableOpacity onPress={() => setShowTerms(false)}>
-              <Text style={styles.termsModalClose}>✕</Text>
+              <Text style={styles.termsModalClose}>关闭</Text>
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.termsModalContent}>

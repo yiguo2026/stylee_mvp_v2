@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
-  StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, Alert, Platform,
+  StyleSheet, ScrollView, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-
-const isWeb = Platform.OS === 'web';
 
 export default function BatchImportScreen() {
   const { user } = useUserStore();
@@ -81,7 +79,7 @@ export default function BatchImportScreen() {
         {!showResult && (
           <View style={styles.batchGroup}>
             <TouchableOpacity style={styles.batchOption} onPress={handleBatchImport} disabled={importing}>
-              <Text style={styles.batchIcon}>🖼️</Text>
+              <View style={styles.batchIcon} />
               <View style={styles.batchInfo}>
                 <Text style={styles.batchTitle}>
                   {importing ? '导入中...' : '从相册批量导入'}
@@ -105,7 +103,7 @@ export default function BatchImportScreen() {
           <View style={styles.resultSection}>
             <View style={styles.successBanner}>
               <View style={styles.successCheck}>
-                <Text style={styles.successCheckText}>✓</Text>
+                <Text style={styles.successCheckText}>完成</Text>
               </View>
               <View>
                 <Text style={styles.successText}>已成功导入 {importCount} 件单品</Text>
@@ -132,7 +130,7 @@ export default function BatchImportScreen() {
         {/* Tip card */}
         {!showResult && (
           <View style={styles.tipCard}>
-            <Text style={styles.tipTitle}>💡 小贴士</Text>
+            <Text style={styles.tipTitle}>小贴士</Text>
             <Text style={styles.tipContent}>
               导入后，AI 会自动识别每件衣物的类别，你可以在衣橱中逐件确认和修改。
             </Text>
@@ -175,7 +173,7 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.two,
   },
-  batchIcon: { fontSize: 24 },
+  batchIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.paperRaised },
   batchInfo: { flex: 1, gap: 2 },
   batchTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.ink },
   batchDesc: { ...T.micro, color: Colors.walnut2 },

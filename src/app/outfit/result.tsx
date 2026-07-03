@@ -18,10 +18,6 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  '上装': '👔', '下装': '👖', '连体装': '👗', '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
-};
-
 const GEN_STEPS = ['分析天气场景...', '筛选衣橱单品...', '组合搭配方案...', '优化推荐说明...'];
 const GEN_TOTAL_STEPS = GEN_STEPS.length;
 const GEN_STEP_DURATION_MS = 800;
@@ -391,7 +387,7 @@ export default function OutfitResultScreen() {
           <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
         ) : (
           <View style={styles.flatlayGarmentInner}>
-            <Text style={styles.flatlayEmoji}>{CATEGORY_EMOJI[fi.category] || '👔'}</Text>
+            <CategoryIcon category={fi.category} size={30} color={Colors.walnut2} />
             <Text style={styles.flatlayGarmentLabel} numberOfLines={1}>{fi.name}</Text>
           </View>
         )}
@@ -410,7 +406,7 @@ export default function OutfitResultScreen() {
         <Text style={styles.headerTitle}>推荐方案</Text>
         <TouchableOpacity style={styles.favBtn} onPress={handleFavorite}>
           <Text style={[styles.favIcon, isFavorited && styles.favIconActive]}>
-            {isFavorited ? '♥' : '♡'}
+            {isFavorited ? '已收藏' : '收藏'}
           </Text>
           <Text style={[styles.favLabel, isFavorited && styles.favLabelActive]}>
             {isFavorited ? '已收藏' : '收藏此搭配'}
@@ -438,7 +434,7 @@ export default function OutfitResultScreen() {
                         <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
                       ) : (
                         <View style={styles.flatlayGarmentInner}>
-                          <Text style={styles.flatlayEmoji}>{CATEGORY_EMOJI[fi.category] || '👖'}</Text>
+                          <CategoryIcon category={fi.category} size={30} color={Colors.paper} />
                           <Text style={styles.flatlayGarmentLabel} numberOfLines={1}>{fi.name}</Text>
                         </View>
                       )}
@@ -454,7 +450,7 @@ export default function OutfitResultScreen() {
                           {fi.image_url ? (
                             <Image source={{ uri: fi.image_url }} style={styles.flatlayShoeImg} resizeMode="cover" />
                           ) : (
-                            <Text style={styles.flatlayEmoji}>{CATEGORY_EMOJI[fi.category] || '👟'}</Text>
+                            <CategoryIcon category={fi.category} size={28} color={Colors.walnut2} />
                           )}
                         </View>
                         <Text style={styles.flatlayItemName} numberOfLines={1}>{fi.name}</Text>
@@ -471,7 +467,7 @@ export default function OutfitResultScreen() {
                         {fi.image_url ? (
                           <Image source={{ uri: fi.image_url }} style={styles.flatlaySideImg} resizeMode="cover" />
                         ) : (
-                          <Text style={styles.flatlaySideEmoji}>{CATEGORY_EMOJI[fi.category] || '✨'}</Text>
+                          <CategoryIcon category={fi.category} size={24} color={Colors.walnut2} />
                         )}
                       </View>
                       <Text style={styles.flatlaySideName} numberOfLines={1}>{fi.name}</Text>
@@ -489,7 +485,7 @@ export default function OutfitResultScreen() {
         {ownedItems.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>👕 已有单品</Text>
+              <Text style={styles.sectionTitle}>已有单品</Text>
               <Text style={styles.sectionSubOwned}>来自你的衣橱</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -510,7 +506,7 @@ export default function OutfitResultScreen() {
                     </View>
                     <View style={styles.itemCardInfo}>
                       <Text style={styles.itemCardName} numberOfLines={1}>{oi.item?.name ?? oi.item?.category}</Text>
-                      <Text style={styles.itemCardOwned}>✓ 已有</Text>
+                      <Text style={styles.itemCardOwned}>已有</Text>
                     </View>
                     {adjustMode ? (
                       <View style={styles.swapBadge}><Feather name="refresh-cw" size={10} color={Colors.paper} /></View>
@@ -526,7 +522,7 @@ export default function OutfitResultScreen() {
         {recommendedItems.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>✨ 推荐单品</Text>
+              <Text style={styles.sectionTitle}>推荐单品</Text>
               <Text style={styles.sectionSubRec}>建议添加</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -560,7 +556,7 @@ export default function OutfitResultScreen() {
                           disabled={isWishlisted}
                         >
                           <Text style={[styles.wishlistBtnText, isWishlisted && styles.wishlistBtnTextDone]}>
-                            {isWishlisted ? '已收藏' : '♡ 收藏'}
+                            {isWishlisted ? '已收藏' : '收藏'}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -576,7 +572,7 @@ export default function OutfitResultScreen() {
         {/* All owned hint */}
         {recommendedItems.length === 0 && ownedItems.length > 0 ? (
           <View style={styles.allOwnedHint}>
-            <Text style={styles.allOwnedText}>🎉 太棒了！这套搭配所需单品你都有</Text>
+            <Text style={styles.allOwnedText}>这套搭配所需单品你都已拥有</Text>
           </View>
         ) : null}
 
@@ -606,7 +602,7 @@ export default function OutfitResultScreen() {
           style={[styles.decisionBtnConfirm, !!savedId && styles.decisionBtnSaved]}
           onPress={handleWear} disabled={saving || !!savedId}
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? '✓ 已保存' : '就这么穿'}</Text>}
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? '已保存' : '就这么穿'}</Text>}
         </TouchableOpacity>
         <View style={styles.decisionBtnRow}>
           <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleSwap}>
@@ -653,7 +649,7 @@ export default function OutfitResultScreen() {
       </Modal>
 
       <ConfirmModal visible={showSavedConfirm ? Boolean(savedId) : false} title="已保存"
-        message="这套搭配已保存到你的穿搭记录 🎉" confirmText="好的" singleButton
+        message="这套搭配已保存到你的穿搭记录" confirmText="好的" singleButton
         onConfirm={() => { setShowSavedConfirm(false); router.back(); }}
         onCancel={() => setShowSavedConfirm(false)}
       />

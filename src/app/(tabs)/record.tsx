@@ -309,7 +309,6 @@ export default function RecordTab() {
             </View>
           ) : monthTotal === 0 && !loading ? (
             <View style={styles.emptySection}>
-              <Text style={styles.emptyEmoji}>👗</Text>
               <Text style={styles.emptyTitle}>穿过的搭配会自动记录在这里</Text>
               <Text style={styles.emptySub}>每次确认穿搭后，都会自动保存到这里</Text>
             </View>
@@ -319,7 +318,6 @@ export default function RecordTab() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {favorites.length === 0 ? (
             <View style={styles.emptySection}>
-              <Text style={styles.emptyEmoji}>🧷</Text>
               <Text style={styles.emptyTitle}>还没有收藏搭配</Text>
               <Text style={styles.emptySub}>在推荐结果页点击「收藏此搭配」即可保存灵感</Text>
             </View>
@@ -491,7 +489,6 @@ const styles = StyleSheet.create({
 
   // Empty sections
   emptySection: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.six, marginTop: Spacing.three },
-  emptyEmoji: { fontSize: 40 },
   emptyTitle: { ...T.emptyTitle },
   emptySub: { ...T.itemDesc, textAlign: 'center', lineHeight: 22 },
 

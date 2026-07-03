@@ -12,11 +12,6 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 
 const isWeb = Platform.OS === 'web';
 
-const CATEGORY_ICONS: Record<string, string> = {
-  '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
-  '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
-};
-
 export default function QuickAddPage() {
   const { user } = useUserStore();
   const { items, addItem, fetchItems } = useWardrobeStore();
@@ -117,7 +112,7 @@ export default function QuickAddPage() {
 
         <View style={styles.builtinSection}>
           <View style={styles.builtinHeader}>
-            <Text style={styles.builtinHeaderTitle}>🧠 AI为你推荐</Text>
+            <Text style={styles.builtinHeaderTitle}>AI 推荐单品</Text>
             <TouchableOpacity onPress={selectAll}>
               <Text style={styles.builtinSelectAll}>
                 {addableIndices.length > 0 && addableIndices.every(i => selected.has(i)) ? '取消全选' : '全选添加'}
@@ -134,7 +129,6 @@ export default function QuickAddPage() {
                   style={[styles.catBtn, filterCategory === cat && styles.catBtnActive]}
                   onPress={() => setFilterCategory(cat)}
                 >
-                  <Text style={styles.catEmoji}>{CATEGORY_ICONS[cat]}</Text>
                   <Text style={[styles.catText, filterCategory === cat && styles.catTextActive]}>
                     {cat}
                   </Text>
@@ -144,7 +138,7 @@ export default function QuickAddPage() {
           </ScrollView>
 
           <View style={styles.builtinGrid}>
-            {filteredItems.map((item, i) => {
+            {filteredItems.map(item => {
               const realIndex = PRESET_BASIC_ITEMS.indexOf(item);
               const isSelected = selected.has(realIndex);
               const alreadyAdded = isAdded(realIndex);
@@ -167,7 +161,7 @@ export default function QuickAddPage() {
                     )}
                     {isSelected && (
                       <View style={styles.builtinCheck}>
-                        <Text style={styles.builtinCheckText}>✓</Text>
+                        <Text style={styles.builtinCheckText}>已选</Text>
                       </View>
                     )}
                     {alreadyAdded && (
@@ -236,7 +230,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper, alignItems: 'center', gap: 2,
   },
   catBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  catEmoji: { fontSize: 14 },
   catText: { ...T.tag, fontSize: 11, color: Colors.ink },
   catTextActive: { ...T.tag, fontSize: 11, color: Colors.paper },
 

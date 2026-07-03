@@ -1,24 +1,16 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
+  ScrollView, SafeAreaView, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
 
 const isWeb = Platform.OS === 'web';
 const LIKE_COLOR = Colors.signal;
-
-const STYLE_EMOJIS: Record<string, string> = {
-  quiet_luxury: '💎', minimalist: '◻️', commute_style: '💼', french: '🥐',
-  preppy: '🎓', safari: '🦒', vintage: '📻', street: '🛹',
-  sporty_casual: '🏃', rock: '🎸', goth: '🦇', sweet: '🍰',
-  romantic: '🌸', bohemian: '🏜️', western: '🤠', utility: '🔧',
-  wabi_sabi: '🍵', avantgarde: '📐', urban_cool: '🌃',
-};
 
 export default function StylePreferencePage() {
   const { user, stylePreferences, fetchProfile } = useUserStore();
@@ -109,7 +101,6 @@ export default function StylePreferencePage() {
         <View style={styles.tagsGrid}>
           {PRESET_STYLE_PREFERENCES.map(tag => {
             const isLiked = liked.has(tag.tag_id);
-            const emoji = STYLE_EMOJIS[tag.tag_id] ?? '✨';
             return (
               <TouchableOpacity
                 key={tag.tag_id}
@@ -117,11 +108,10 @@ export default function StylePreferencePage() {
                 onPress={() => toggleLike(tag)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.styleEmoji}>{emoji}</Text>
                 <Text style={[styles.styleName, isLiked && styles.styleNameLiked]}>
                   {tag.tag_name}
                 </Text>
-                {isLiked && <Text style={styles.styleCheck}>✓</Text>}
+                {isLiked && <Text style={styles.styleCheck}>已选</Text>}
               </TouchableOpacity>
             );
           })}
@@ -172,7 +162,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   styleCardLiked: { borderColor: LIKE_COLOR, backgroundColor: Colors.signal },
-  styleEmoji: { fontSize: 32 },
   styleName: { ...T.tag, color: Colors.ink, fontFamily: Fonts.ui },
   styleNameLiked: { color: Colors.paper, fontFamily: Fonts.uiSemiBold },
   styleCheck: {

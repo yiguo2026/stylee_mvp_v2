@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useTryOnStore } from '@/stores/tryonStore';
 
 const isWeb = Platform.OS === 'web';
@@ -103,7 +103,6 @@ export default function TryOnBodyPage() {
             <Image source={{ uri: localUri }} style={styles.photoPreview} resizeMode="cover" />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoEmoji}>🤳</Text>
               <Text style={styles.photoLabel}>点击上传自拍照</Text>
             </View>
           )}
@@ -111,13 +110,12 @@ export default function TryOnBodyPage() {
 
         {/* Photo Tips */}
         <View style={styles.tipsCard}>
-          <Text style={styles.tipsTitle}>📸 拍摄建议</Text>
+          <Text style={styles.tipsTitle}>拍摄建议</Text>
           <Text style={styles.tipItem}>• 面部正面清晰可见，光线充足均匀</Text>
         </View>
 
         {/* Privacy Note */}
         <View style={styles.privacyCard}>
-          <Text style={styles.privacyIcon}>🔒</Text>
           <Text style={styles.privacyText}>照片仅用于AI试穿效果生成，不会上传至服务器。</Text>
         </View>
 
@@ -161,7 +159,6 @@ const styles = StyleSheet.create({
   photoPlaceholder: {
     width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: Spacing.one,
   },
-  photoEmoji: { fontSize: 36 },
   photoLabel: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
 
   tipsCard: {
@@ -177,7 +174,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.signalSoft, borderRadius: Radius.md,
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
   },
-  privacyIcon: { fontSize: 16 },
   privacyText: { ...T.micro, color: Colors.ink, flex: 1, lineHeight: 18 },
 
   saveBtn: {

@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
 export default function InspirationDetailScreen() {
@@ -33,7 +33,7 @@ export default function InspirationDetailScreen() {
             <View style={styles.heroPlaceholder} />
           )}
           <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.closeBtnText}>✕</Text>
+            <Text style={styles.closeBtnText}>关闭</Text>
           </TouchableOpacity>
         </View>
 

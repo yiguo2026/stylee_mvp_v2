@@ -12,11 +12,6 @@ import { useWishlistStore } from '@/stores/wishlistStore';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
-const CATEGORY_ICONS: Record<string, string> = {
-  '全部': '📦', '上装': '👕', '下装': '👖', '连体装': '👗',
-  '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
-};
-
 export default function OnboardingStep3() {
   const { user } = useUserStore();
   const { addItem } = useWardrobeStore();
@@ -122,7 +117,7 @@ export default function OnboardingStep3() {
         {/* AI Recommended Section */}
         <View style={styles.builtinSection}>
           <View style={styles.builtinHeader}>
-            <Text style={styles.builtinHeaderTitle}>🧠 AI为你推荐</Text>
+            <Text style={styles.builtinHeaderTitle}>AI 推荐单品</Text>
             <TouchableOpacity onPress={selectAll}>
               <Text style={styles.builtinSelectAll}>
                 {selected.size === PRESET_BASIC_ITEMS.length ? '取消全选' : '全选添加'}
@@ -139,7 +134,6 @@ export default function OnboardingStep3() {
                   style={[styles.catBtn, filterCategory === cat && styles.catBtnActive]}
                   onPress={() => setFilterCategory(cat)}
                 >
-                  <Text style={styles.catEmoji}>{CATEGORY_ICONS[cat]}</Text>
                   <Text style={[styles.catText, filterCategory === cat && styles.catTextActive]}>
                     {cat}
                   </Text>
@@ -163,7 +157,7 @@ export default function OnboardingStep3() {
                     <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
                     {isSelected && (
                       <View style={styles.builtinCheck}>
-                        <Text style={styles.builtinCheckText}>✓</Text>
+                        <Text style={styles.builtinCheckText}>已选</Text>
                       </View>
                     )}
                   </View>
@@ -186,7 +180,7 @@ export default function OnboardingStep3() {
         {/* Batch Import */}
         <View style={styles.batchSection}>
           <View style={styles.batchHeader}>
-            <Text style={styles.batchHeaderTitle}>📦 相册批量导入</Text>
+            <Text style={styles.batchHeaderTitle}>相册批量导入</Text>
             <TouchableOpacity onPress={handleBatchImport}>
               <Text style={styles.batchAddBtn}>+ 选择图片</Text>
             </TouchableOpacity>
@@ -198,7 +192,7 @@ export default function OnboardingStep3() {
                   <View key={i} style={styles.albumThumbWrap}>
                     <Image source={{ uri }} style={styles.albumThumb} resizeMode="cover" />
                     <TouchableOpacity style={styles.albumRemove} onPress={() => setAlbumImages(prev => prev.filter(u => u !== uri))}>
-                      <Text style={styles.albumRemoveText}>✕</Text>
+                      <Text style={styles.albumRemoveText}>移除</Text>
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -261,7 +255,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper, alignItems: 'center', gap: 2,
   },
   catBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  catEmoji: { fontSize: 14 },
   catText: { ...T.tag, fontSize: 11, color: Colors.ink },
   catTextActive: { ...T.tag, fontSize: 11, color: Colors.paper },
 
