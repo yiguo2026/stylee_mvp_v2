@@ -397,16 +397,14 @@ export default function OutfitTab() {
         </View>
 
         {/* ── Section P2: AI Try-on ── */}
-        <View style={styles.tryOnSection}>
-          <View style={styles.tryOnPreview}>
-            <Ionicons name="person-outline" size={48} color={Colors.walnut2} />
-            <Text style={styles.tryOnLabel}>AI试穿</Text>
-            <Text style={styles.tryOnDesc}>真人建模·场景化氛围感生图</Text>
-          </View>
-          <TouchableOpacity style={styles.tryOnBtn} onPress={() => router.push('/outfit/try-on')}>
-            <Text style={styles.tryOnBtnText}>生成图像</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.tryOnSection}
+          onPress={() => router.push('/outfit/try-on')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.tryOnTitle}>✨ AI 试穿</Text>
+          <Text style={styles.tryOnSubtitle}>选一套搭配，看看上身效果</Text>
+        </TouchableOpacity>
 
       </ScrollView>
 
@@ -581,18 +579,31 @@ const styles = StyleSheet.create({
 
   // ── AI Try-on (P2) ──
   tryOnSection: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.three, alignItems: 'center', gap: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
+    backgroundColor: Colors.paper,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderColor: Colors.line,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
-  tryOnPreview: { alignItems: 'center', gap: Spacing.one },
-  tryOnLabel: { ...T.subTitle },
-  tryOnDesc: { ...T.micro, fontSize: 12 },
-  tryOnBtn: {
-    backgroundColor: Colors.ink, borderRadius: Radius.md,
-    paddingHorizontal: Spacing.four, paddingVertical: Spacing.two,
+  tryOnTitle: {
+    fontFamily: Fonts.cnDisplay,
+    fontSize: 22,
+    lineHeight: 28,
+    color: Colors.ink,
   },
-  tryOnBtnText: { ...T.buttonSecondary, color: Colors.paper, fontSize: 13 },
+  tryOnSubtitle: {
+    ...T.bodyText,
+    fontSize: 16,
+    lineHeight: 22,
+    color: Colors.gray1,
+  },
 
   // ── City Modal ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
