@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 密钥绝不入库(key 走环境变量)
+.env
+*.key
+secrets*
+
+# Garments2Look 原始语料(~134MB,如需重建语料才下载;派生的 exemplars/索引已随仓)
+data/garments2look/polyvore_outfit_*.json
+data/garments2look/mytheresa_outfit_*.json
+data/garments2look/style-guide/
+*.bak
+
+.DS_Store
