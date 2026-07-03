@@ -201,7 +201,7 @@ export default function TryOnScreen() {
             {selfieUri ? (
               <Image source={{ uri: selfieUri }} style={styles.bodyInfoThumbImg} resizeMode="cover" />
             ) : (
-              <Text style={styles.bodyInfoSub}>点击录入（首次需要）</Text>
+              <Text style={styles.bodyInfoEmoji}>🧍</Text>
             )}
           </View>
           <View style={styles.bodyInfoText}>

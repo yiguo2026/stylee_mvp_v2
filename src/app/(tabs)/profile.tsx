@@ -81,7 +81,7 @@ export default function ProfileTab() {
                 <Text style={styles.avatarEmoji}>S</Text>
               )}
               <View style={styles.editBadge}>
-                <Text style={styles.editBadgeIcon}>编辑</Text>
+                <Text style={styles.editBadgeIcon}>✏️</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.profileInfo}>

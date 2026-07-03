@@ -182,7 +182,7 @@ export function ProfileEditModal({ visible, onClose }: Props) {
                 <View style={styles.avatarCamera}>
                   {uploadingAvatar
                     ? <ActivityIndicator size="small" color={Colors.ink} />
-                    : <Text style={styles.avatarCameraIcon}>更换</Text>
+                    : <Text style={styles.avatarCameraIcon}>📷</Text>
                   }
                 </View>
               </TouchableOpacity>
