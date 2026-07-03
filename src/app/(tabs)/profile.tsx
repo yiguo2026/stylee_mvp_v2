@@ -1,12 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import Feather from '@expo/vector-icons/Feather';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
@@ -44,7 +42,7 @@ export default function ProfileTab() {
   useFocusEffect(
     useCallback(() => {
       if (user?.id) fetchProfile();
-    }, [user?.id])
+    }, [fetchProfile, user?.id])
   );
 
   useEffect(() => {
@@ -62,7 +60,6 @@ export default function ProfileTab() {
   }, [user?.id]);
 
   const liked = stylePreferences.filter(p => p.preference_type === 'like');
-  const utilization = items.length > 0 ? Math.min(Math.round((savedOutfitCount / items.length) * 100), 100) : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -185,7 +182,7 @@ export default function ProfileTab() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper },
+  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
   pageTitle: { ...T.pageTitle },
 

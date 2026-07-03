@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, Modal, ScrollView, ActivityIndicator, Alert, Platform,
@@ -31,7 +31,11 @@ async function compressToDataUrl(uri: string, maxWidth = 200): Promise<string> {
         const canvas = document.createElement('canvas');
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d')!;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(uri);
+          return;
+        }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', 0.6));
       };
@@ -154,151 +158,164 @@ export function ProfileEditModal({ visible, onClose }: Props) {
     }
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen">
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>编辑资料</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Text style={styles.closeBtn}>关闭</Text>
-            </TouchableOpacity>
-          </View>
+  const content = (
+    <View style={styles.overlay}>
+      <View style={styles.sheet}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>编辑资料</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Text style={styles.closeBtn}>关闭</Text>
+          </TouchableOpacity>
+        </View>
 
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyInner}>
-            {/* Avatar */}
-            <View style={styles.avatarSection}>
-              <TouchableOpacity style={styles.avatarWrap} onPress={handleAvatarPick}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarEmoji}>
-                      {profile?.nickname?.[0] ?? 'S'}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.avatarCamera}>
-                  {uploadingAvatar
-                    ? <ActivityIndicator size="small" color={Colors.ink} />
-                    : <Text style={styles.avatarCameraIcon}>📷</Text>
-                  }
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyInner}>
+          {/* Avatar */}
+          <View style={styles.avatarSection}>
+            <TouchableOpacity style={styles.avatarWrap} onPress={handleAvatarPick}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarEmoji}>
+                    {profile?.nickname?.[0] ?? 'S'}
+                  </Text>
                 </View>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleAvatarPick} disabled={uploadingAvatar}>
-                <Text style={styles.avatarChange}>
-                  {uploadingAvatar ? '上传中...' : '更换头像'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Fields */}
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>昵称</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={nickname}
-                onChangeText={setNickname}
-                placeholder="请输入昵称"
-                placeholderTextColor={Colors.walnut2}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>性别</Text>
-              <View style={styles.genderRow}>
-                {GENDERS.map(g => (
-                  <TouchableOpacity
-                    key={g.value}
-                    style={[styles.genderBtn, gender === g.value && styles.genderBtnActive]}
-                    onPress={() => setGender(g.value)}
-                  >
-                    <Text style={[styles.genderText, gender === g.value && styles.genderTextActive]}>
-                      {g.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              )}
+              <View style={styles.avatarCamera}>
+                {uploadingAvatar
+                  ? <ActivityIndicator size="small" color={Colors.ink} />
+                  : <Text style={styles.avatarCameraIcon}>📷</Text>
+                }
               </View>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>年龄</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={age}
-                onChangeText={setAge}
-                placeholder="请输入年龄"
-                placeholderTextColor={Colors.walnut2}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>城市</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={city}
-                onChangeText={setCity}
-                placeholder="请输入城市"
-                placeholderTextColor={Colors.walnut2}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>职业</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={profession}
-                onChangeText={setProfession}
-                placeholder="请输入职业"
-                placeholderTextColor={Colors.walnut2}
-              />
-            </View>
-
-            {/* Selfie for AI Try-on */}
-            <View style={styles.bodyInfoSection}>
-              <Text style={styles.bodyInfoTitle}>身体信息（AI试穿）</Text>
-              <Text style={styles.bodyInfoStatus}>
-                {localSelfieUri ? '已录入' : '未录入'}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleAvatarPick} disabled={uploadingAvatar}>
+              <Text style={styles.avatarChange}>
+                {uploadingAvatar ? '上传中...' : '更换头像'}
               </Text>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>面部自拍</Text>
-              <TouchableOpacity style={styles.selfieCard} onPress={handleSelfiePick} activeOpacity={0.7}>
-                {localSelfieUri ? (
-                  <Image source={{ uri: localSelfieUri }} style={styles.selfieImage} resizeMode="cover" />
-                ) : (
-                  <View style={styles.selfiePlaceholder}>
-                    <Text style={styles.selfieLabel}>点击上传自拍照</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <Text style={styles.selfieHint}>面部正面清晰可见，光线充足均匀</Text>
-            </View>
-          </ScrollView>
-
-          {/* Save Button */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && styles.disabled]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator color={Colors.paper} />
-                : <Text style={styles.saveText}>保存</Text>
-              }
             </TouchableOpacity>
           </View>
+
+          {/* Fields */}
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>昵称</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={nickname}
+              onChangeText={setNickname}
+              placeholder="请输入昵称"
+              placeholderTextColor={Colors.walnut2}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>性别</Text>
+            <View style={styles.genderRow}>
+              {GENDERS.map(g => (
+                <TouchableOpacity
+                  key={g.value}
+                  style={[styles.genderBtn, gender === g.value && styles.genderBtnActive]}
+                  onPress={() => setGender(g.value)}
+                >
+                  <Text style={[styles.genderText, gender === g.value && styles.genderTextActive]}>
+                    {g.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>年龄</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={age}
+              onChangeText={setAge}
+              placeholder="请输入年龄"
+              placeholderTextColor={Colors.walnut2}
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>城市</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={city}
+              onChangeText={setCity}
+              placeholder="请输入城市"
+              placeholderTextColor={Colors.walnut2}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>职业</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={profession}
+              onChangeText={setProfession}
+              placeholder="请输入职业"
+              placeholderTextColor={Colors.walnut2}
+            />
+          </View>
+
+          {/* Selfie for AI Try-on */}
+          <View style={styles.bodyInfoSection}>
+            <Text style={styles.bodyInfoTitle}>身体信息（AI试穿）</Text>
+            <Text style={styles.bodyInfoStatus}>
+              {localSelfieUri ? '已录入' : '未录入'}
+            </Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>面部自拍</Text>
+            <TouchableOpacity style={styles.selfieCard} onPress={handleSelfiePick} activeOpacity={0.7}>
+              {localSelfieUri ? (
+                <Image source={{ uri: localSelfieUri }} style={styles.selfieImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.selfiePlaceholder}>
+                  <Text style={styles.selfieLabel}>点击上传自拍照</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.selfieHint}>面部正面清晰可见，光线充足均匀</Text>
+          </View>
+        </ScrollView>
+
+        {/* Save Button */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.disabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator color={Colors.paper} />
+              : <Text style={styles.saveText}>保存</Text>
+            }
+          </TouchableOpacity>
         </View>
       </View>
+    </View>
+  );
+
+  if (isWeb) {
+    if (!visible) return null;
+    return <View style={styles.webLayer}>{content}</View>;
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
