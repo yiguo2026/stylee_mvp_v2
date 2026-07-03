@@ -1,11 +1,11 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Shadow, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Fonts } from '@/constants/theme';
 
 // ── Tab icon wrapper ──────────────────────────────────────
 function TabIcon({
@@ -30,12 +30,7 @@ export default function TabsLayout() {
 
   const paddingBottom = Math.max(Spacing.two, insets.bottom);
   const height = 60 + paddingBottom;
-
-  // Web/内嵌浏览器常见底部工具栏会覆盖可视区域，需要把 TabBar 上移
-  const webBottomOffset = Platform.OS === 'web' ? Spacing.four : 0;
-  const tabBarStyle = Platform.OS === 'web'
-    ? [{ ...styles.tabBar, paddingBottom, height, position: 'absolute', left: 0, right: 0, bottom: webBottomOffset }]
-    : [{ ...styles.tabBar, paddingBottom, height }];
+  const tabBarStyle = [{ ...styles.tabBar, paddingBottom, height }];
 
   return (
     <Tabs
@@ -102,7 +97,6 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.line,
     borderTopWidth: 1,
     paddingTop: Spacing.one,
-    ...Shadow.two,
   },
   tabItem: {
     paddingTop: 2,
