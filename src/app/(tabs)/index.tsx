@@ -367,8 +367,7 @@ export default function OutfitTab() {
           <View style={styles.inspirationHeader}>
             <Text style={styles.inspirationTitle}>✨ 穿搭灵感</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.inspirationRow}>
+          <View style={styles.inspirationRow}>
               {inspirations.map(card => (
                 <TouchableOpacity key={card.card_id} style={styles.inspirationCard}
                   onPress={() => handleInspire(card)} activeOpacity={0.8}
@@ -392,8 +391,7 @@ export default function OutfitTab() {
                   </View>
                 </TouchableOpacity>
               ))}
-            </View>
-          </ScrollView>
+          </View>
         </View>
 
         {/* ── Section P2: AI Try-on ── */}
@@ -553,14 +551,15 @@ const styles = StyleSheet.create({
   inspirationSection: { gap: Spacing.two },
   inspirationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   inspirationTitle: { ...T.subTitle },
-  inspirationRow: { flexDirection: 'row', gap: Spacing.two },
+  inspirationRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   inspirationCard: {
-    width: '47%', backgroundColor: Colors.paperCard,
+    width: '48%', backgroundColor: Colors.paperCard,
     borderRadius: Radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.line,
+    marginBottom: Spacing.two,
   },
   inspirationImage: {
-    width: '100%', aspectRatio: 3 / 4, backgroundColor: Colors.paperCard,
+    width: '100%', aspectRatio: 4 / 3, backgroundColor: Colors.paperCard,
     alignItems: 'center', justifyContent: 'center',
   },
   inspirationInfo: { padding: Spacing.two, gap: 4 },

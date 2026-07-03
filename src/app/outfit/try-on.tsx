@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, ActivityIndicator, Alert, Image, Platform,
+  ScrollView, SafeAreaView, ActivityIndicator, Alert, Image, Platform, useWindowDimensions,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
@@ -41,6 +41,8 @@ type OutfitSummary = {
 };
 
 export default function TryOnScreen() {
+  const { width: winW, height: winH } = useWindowDimensions();
+
   const { items: itemsParam } = useLocalSearchParams<{ items?: string; outfitId?: string }>();
   const isFromResult = !!itemsParam;
 
@@ -352,8 +354,8 @@ export default function TryOnScreen() {
           <View style={styles.resultCard}>
             <Image
               source={typeof tryOnImage === 'string' ? { uri: tryOnImage } : tryOnImage}
-              style={styles.resultImage}
-              resizeMode="cover"
+              style={[styles.resultImage, { height: Math.min(winH * 0.62, winW * 1.2) }]}
+              resizeMode="contain"
             />
             <View style={styles.resultFooter}>
               <Text style={styles.resultCaption}>AI 试穿效果预览</Text>
@@ -521,7 +523,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, borderRadius: Radius.lg,
     overflow: 'hidden',
   },
-  resultImage: { width: '100%', aspectRatio: 3 / 4 },
+  resultImage: { width: '100%', backgroundColor: Colors.ink },
   resultFooter: { padding: Spacing.three, gap: Spacing.two },
   resultCaption: { ...T.bodyText, color: Colors.paper, fontSize: 13 },
   resultSaveBtn: {

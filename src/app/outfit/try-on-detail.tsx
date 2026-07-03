@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, SafeAreaView } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, SafeAreaView, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useTryOnStore, TryOnRecord } from '@/stores/tryonStore';
@@ -13,6 +14,7 @@ const SCENE_IMAGES: Record<string, any> = {
 };
 
 export default function TryOnDetailScreen() {
+  const { width: winW, height: winH } = useWindowDimensions();
   const params = useLocalSearchParams();
   const recordId = params.recordId as string | undefined;
   const { records } = useTryOnStore();
@@ -56,7 +58,7 @@ export default function TryOnDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Result Image */}
         <View style={styles.imageCard}>
-          <Image source={sceneImage} style={styles.resultImage} resizeMode="cover" />
+          <Image source={sceneImage} style={[styles.resultImage, { height: Math.min(winH * 0.55, winW * 1.2) }]} resizeMode="contain" />
         </View>
 
         {/* Info Row */}
@@ -80,27 +82,27 @@ export default function TryOnDetailScreen() {
         </View>
 
         {/* Selfie */}
-        {record.selfieUri && (
+        {record.selfieUri ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>面部信息</Text>
             <View style={styles.selfieCard}>
               <Image source={{ uri: record.selfieUri }} style={styles.selfieImage} resizeMode="cover" />
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* Outfit Items */}
-        {record.items.length > 0 && (
+        {record.items.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>搭配单品</Text>
             <View style={styles.itemsList}>
-              {record.items.map((item, i) => (
-                <View key={i} style={styles.itemRow}>
+              {record.items.map((item) => (
+                <View key={`${item.name}-${item.category}-${item.color}-${item.image_url ?? ''}`} style={styles.itemRow}>
                   <View style={styles.itemIcon}>
-                    {item.image_url
-                      ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
-                      : <CategoryIcon category={item.category} size={24} color={Colors.walnut2} />
-                    }
+              {item.image_url
+                ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
+                : <CategoryIcon category={item.category ?? ''} size={24} color={Colors.walnut2} />
+              }
                   </View>
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemName}>{item.name}</Text>
@@ -110,7 +112,7 @@ export default function TryOnDetailScreen() {
               ))}
             </View>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -133,8 +135,9 @@ const styles = StyleSheet.create({
   imageCard: {
     borderRadius: Radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.line,
+    backgroundColor: Colors.ink,
   },
-  resultImage: { width: '100%', aspectRatio: 3 / 4 },
+  resultImage: { width: '100%', backgroundColor: Colors.ink },
 
   infoRow: {
     flexDirection: 'row', backgroundColor: Colors.paperCard,
