@@ -402,7 +402,10 @@ export default function OutfitTab() {
           onPress={() => router.push('/outfit/try-on')}
           activeOpacity={0.85}
         >
-          <Text style={styles.tryOnTitle}>✨ AI 试穿</Text>
+          <View style={styles.tryOnTitleRow}>
+            <Text style={styles.tryOnSparkle}>✨</Text>
+            <Text style={styles.tryOnTitle}>AI试穿</Text>
+          </View>
           <Text style={styles.tryOnSubtitle}>选一套搭配，看看上身效果</Text>
         </TouchableOpacity>
 
@@ -579,28 +582,35 @@ const styles = StyleSheet.create({
 
   // ── AI Try-on (P2) ──
   tryOnSection: {
-    backgroundColor: Colors.paper,
+    backgroundColor: Colors.paperCard,
     borderRadius: Radius.lg,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    gap: 6,
     borderWidth: 1,
     borderColor: Colors.line,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+  },
+  tryOnTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tryOnSparkle: {
+    fontSize: 16,
+    lineHeight: 18,
+    color: Colors.gray1,
   },
   tryOnTitle: {
-    fontFamily: Fonts.cnDisplay,
-    fontSize: 22,
-    lineHeight: 28,
-    color: Colors.ink,
+    fontFamily: Fonts.title,
+    fontSize: 18,
+    letterSpacing: 0,
+    lineHeight: 22,
+    color: Colors.gray1,
   },
   tryOnSubtitle: {
-    ...T.bodyText,
-    fontSize: 16,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    letterSpacing: 0,
     lineHeight: 22,
     color: Colors.gray1,
   },
