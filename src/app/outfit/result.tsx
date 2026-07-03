@@ -22,6 +22,10 @@ const CATEGORY_EMOJI: Record<string, string> = {
   '上装': '👔', '下装': '👖', '连体装': '👗', '外套': '🧥', '鞋履': '👟', '包袋': '👜', '帽巾': '🧢', '配饰': '✨',
 };
 
+const GEN_STEPS = ['分析天气场景...', '筛选衣橱单品...', '组合搭配方案...', '优化推荐说明...'];
+const GEN_TOTAL_STEPS = GEN_STEPS.length;
+const GEN_STEP_DURATION_MS = 800;
+
 export default function OutfitResultScreen() {
   const params = useLocalSearchParams<{
     city: string; temp: string; weather: string; query: string; tags: string; inputMode?: string;
@@ -30,6 +34,7 @@ export default function OutfitResultScreen() {
   const { items, fetchItems } = useWardrobeStore();
 
   const [loading, setLoading] = useState(true);
+  const [genStep, setGenStep] = useState(0);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -53,9 +58,33 @@ export default function OutfitResultScreen() {
     setCurrentIndex(0);
     setErrorMessage(null);
     setWishlistedRecs(new Set());
+    setGenStep(0);
+
+    // 进度条动画 (4步)，用 Promise.all 保证动画时长与AI请求并行
+    const totalSteps = GEN_TOTAL_STEPS;
+    const minDurationMs = totalSteps * GEN_STEP_DURATION_MS;
+    const startTime = Date.now();
+
+    let finished = false;
+    const animPromise = new Promise<void>(resolve => {
+      const runStep = (i: number) => {
+        if (finished) return resolve();
+        setGenStep(i);
+        if (i < totalSteps - 1) {
+          setTimeout(() => runStep(i + 1), GEN_STEP_DURATION_MS);
+        } else {
+          // 最后一步
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, minDurationMs - elapsed);
+          setTimeout(() => resolve(), remaining);
+        }
+      };
+      runStep(0);
+    });
 
     const userId = useUserStore.getState().user?.id;
     if (!userId) {
+      finished = true;
       setOutfits([]);
       setErrorMessage('请先登录后再生成搭配');
       setLoading(false);
@@ -65,6 +94,7 @@ export default function OutfitResultScreen() {
     const q = await consumeQuota(userId, 'recommend');
     setQuota({ used: q.used, limit: q.limit, remaining: q.remaining });
     if (!q.ok) {
+      finished = true;
       setOutfits([]);
       setErrorMessage(`今日 AI 推荐次数已用完（${q.limit} 次），明天再来`);
       setLoading(false);
@@ -80,7 +110,7 @@ export default function OutfitResultScreen() {
       .filter((name): name is string => Boolean(name))
       .join('、') ?? '';
 
-    const { outfits: results, error } = await aiRecommendOutfits(
+    const aiPromise = aiRecommendOutfits(
       freshItems,
       userId,
       sessionId,
@@ -94,8 +124,12 @@ export default function OutfitResultScreen() {
       },
     );
 
-    setOutfits(results);
-    if (error) setErrorMessage(error);
+    const aiResult = await aiPromise;
+    await animPromise;
+
+    finished = true;
+    setOutfits(aiResult.outfits);
+    if (aiResult.error) setErrorMessage(aiResult.error);
     setLoading(false);
   }, [params.city, params.query, params.tags, params.temp, params.weather]);
 
@@ -311,14 +345,18 @@ export default function OutfitResultScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingContainer}>
-          <Ionicons name="sparkles-outline" size={52} color={Colors.walnut2} style={styles.loadingIconView} />
-          <Text style={styles.loadingTitle}>AI 正在为你搭配…</Text>
-          <Text style={styles.loadingSubtitle}>从你的衣橱里挑选最合适的单品</Text>
-          {quota ? (
-            <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
-          ) : null}
-          <ActivityIndicator color={Colors.terracotta} style={{ marginTop: Spacing.three }} />
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <Ionicons name="sparkles-outline" size={52} color={Colors.walnut2} style={styles.loadingIconView} />
+            <Text style={styles.loadingTitle}>AI 正在为你搭配…</Text>
+            <Text style={styles.loadingStep}>{GEN_STEPS[genStep]}</Text>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${((genStep + 1) / GEN_TOTAL_STEPS) * 100}%` }]} />
+            </View>
+            {quota ? (
+              <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
+            ) : null}
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -626,10 +664,13 @@ export default function OutfitResultScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
 
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
+  loadingOverlay: { flex: 1, backgroundColor: 'rgba(255,255,255,0.96)', alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
+  loadingCard: { width: '100%', maxWidth: 340, backgroundColor: Colors.paperCard, borderRadius: Radius.xl, padding: Spacing.five, alignItems: 'center', gap: Spacing.three, borderWidth: 1, borderColor: Colors.line },
   loadingIconView: { marginBottom: Spacing.one },
   loadingTitle: { ...T.storyTitle, fontSize: 22 },
-  loadingSubtitle: { ...T.bodyText, textAlign: 'center' },
+  loadingStep: { ...T.bodyText, textAlign: 'center', color: Colors.walnut2 },
+  progressBarBg: { width: '100%', height: 6, backgroundColor: Colors.line, borderRadius: 3, overflow: 'hidden', marginTop: Spacing.one },
+  progressBarFill: { height: '100%', backgroundColor: Colors.terracotta, borderRadius: 3 },
   quotaHint: { ...T.micro, color: Colors.walnut2, textAlign: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: Colors.line, backgroundColor: Colors.paperRaised },

@@ -347,20 +347,6 @@ export default function TryOnScreen() {
           <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
         ) : null}
 
-        {/* ── Generating Progress ── */}
-        {generating ? (
-          <View style={styles.progressCard}>
-            <Text style={styles.progressEmoji}>✨</Text>
-            <Text style={styles.progressTitle}>AI 正在生成试穿效果...</Text>
-            <Text style={styles.progressStep}>
-              {['分析身体数据中...', '匹配穿搭单品...', '合成试穿效果...', '优化画面细节...'][genStep]}
-            </Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${(genStep + 1) * 25}%` }]} />
-            </View>
-          </View>
-        ) : null}
-
         {/* ── Result ── */}
         {tryOnImage !== null && !generating ? (
           <View style={styles.resultCard}>
@@ -380,6 +366,22 @@ export default function TryOnScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* ── Generating Full Screen Overlay ── */}
+      {generating ? (
+        <View style={styles.generatingOverlay}>
+          <View style={styles.generatingCard}>
+            <Text style={styles.progressEmoji}>✨</Text>
+            <Text style={styles.progressTitle}>AI 正在生成试穿效果...</Text>
+            <Text style={styles.progressStepText}>
+              {['分析身体数据中...', '匹配穿搭单品...', '合成试穿效果...', '优化画面细节...'][genStep]}
+            </Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${(genStep + 1) * 25}%` }]} />
+            </View>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -498,15 +500,19 @@ const styles = StyleSheet.create({
   quotaHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: 2 },
   generatingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
 
-  // ── Progress ──
-  progressCard: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.four, alignItems: 'center', gap: Spacing.two,
-    borderWidth: 1, borderColor: Colors.line,
+  // ── Progress (Full Screen) ──
+  generatingOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.96)', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+    padding: Spacing.four,
+  },
+  generatingCard: {
+    width: '100%', maxWidth: 340, backgroundColor: Colors.paperCard, borderRadius: Radius.xl,
+    padding: Spacing.five, alignItems: 'center', gap: Spacing.three, borderWidth: 1, borderColor: Colors.line,
   },
   progressEmoji: { fontSize: 40 },
-  progressTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
-  progressStep: { ...T.micro, color: Colors.walnut },
+  progressTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.ink, fontSize: 18 },
+  progressStepText: { ...T.micro, color: Colors.walnut, textAlign: 'center' },
   progressBar: { width: '100%', height: 6, borderRadius: 3, backgroundColor: Colors.line, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.terracotta },
 
