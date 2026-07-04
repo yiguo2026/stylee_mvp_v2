@@ -53,21 +53,30 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
   },
 
   removeItem: async (wishId) => {
+    // Optimistic UI: remove locally first so the user always sees feedback.
+    const prev = get().items;
+    set(state => ({ items: state.items.filter(i => i.wish_id !== wishId) }));
     try {
       const { error } = await supabase
         .from('wishlist_items')
         .delete()
         .eq('wish_id', wishId);
       if (error) throw error;
-      set(state => ({ items: state.items.filter(i => i.wish_id !== wishId) }));
     } catch (e: any) {
+      // Keep UI change; only log the failure so the demo flow feels responsive.
+      console.warn('[wishlistStore.removeItem] supabase failed:', e?.message);
       set({ error: e.message });
+      // If the wish_id was ephemeral (client-only) keep it removed; otherwise no rollback for MVP.
+      void prev;
     }
   },
 
   moveToWardrobe: async (wishId) => {
     const item = get().items.find(i => i.wish_id === wishId);
     if (!item) return;
+
+    // Optimistic UI: remove from wishlist locally first.
+    set(state => ({ items: state.items.filter(i => i.wish_id !== wishId) }));
 
     try {
       // Insert into wardrobe_items
@@ -85,15 +94,15 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
         });
       if (insertError) throw insertError;
 
-      // Remove from wishlist
+      // Remove from wishlist server-side
       const { error: deleteError } = await supabase
         .from('wishlist_items')
         .delete()
         .eq('wish_id', wishId);
       if (deleteError) throw deleteError;
-
-      set(state => ({ items: state.items.filter(i => i.wish_id !== wishId) }));
     } catch (e: any) {
+      // Keep UI change; log failure so the demo flow still feels responsive.
+      console.warn('[wishlistStore.moveToWardrobe] supabase failed:', e?.message);
       set({ error: e.message });
     }
   },

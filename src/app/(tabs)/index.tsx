@@ -370,14 +370,17 @@ export default function OutfitTab() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.wardrobeRow}>
-                {/* Add button first */}
-                <TouchableOpacity
-                  style={styles.wardrobeAddBtn}
-                  onPress={() => router.push('/wardrobe/add')}
-                >
-                  <Feather name="plus" size={20} color={Colors.terracotta} />
-                  <Text style={styles.wardrobeAddText}>添加</Text>
-                </TouchableOpacity>
+                {/* Add button first — matches thumb column layout */}
+                <View style={styles.wardrobeThumb}>
+                  <TouchableOpacity
+                    style={styles.wardrobeAddBox}
+                    onPress={() => router.push('/wardrobe/add')}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="plus" size={22} color={Colors.terracotta} />
+                  </TouchableOpacity>
+                  <Text style={styles.wardrobeAddText} numberOfLines={1}>添加</Text>
+                </View>
                 {recentItems.map(item => (
                   <TouchableOpacity
                     key={item.item_id}
@@ -564,14 +567,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
   },
   wardrobeEmptyText: { ...T.emptyTitle, fontSize: 14 },
-  wardrobeRow: { flexDirection: 'row', gap: 12 },
-  wardrobeAddBtn: {
-    width: 74, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.lineStrong, gap: 4,
-    paddingVertical: 12,
+  wardrobeRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  wardrobeAddBox: {
+    width: 80, height: 80, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.lineStrong,
+    backgroundColor: Colors.paperCard,
+    alignItems: 'center', justifyContent: 'center',
   },
-  wardrobeAddText: { ...T.micro, color: Colors.terracotta },
+  wardrobeAddText: { ...T.micro, fontSize: 10, textAlign: 'center', color: Colors.terracotta },
   wardrobeThumb: { width: 80, gap: 4 },
   wardrobeThumbImg: { width: 80, height: 80, borderRadius: Radius.md },
   wardrobeThumbPlaceholder: {

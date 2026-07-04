@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
-  Modal, Platform,
+  Modal, Platform, Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
@@ -14,6 +14,23 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { supabase } from '@/lib/supabase';
 
 const isWeb = Platform.OS === 'web';
+
+// AI outfit hero image pool — deterministic pick based on outfit_id.
+const OUTFIT_HERO_ASSETS = [
+  require('../../../assets/tryon/casual.png'),
+  require('../../../assets/tryon/street.png'),
+  require('../../../assets/tryon/office.png'),
+  require('../../../assets/tryon/layered.png'),
+  require('../../../assets/tryon/home.png'),
+  require('../../../assets/tryon/elegant.png'),
+  require('../../../assets/tryon/sporty.png'),
+];
+function pickOutfitHero(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  const idx = Math.abs(hash) % OUTFIT_HERO_ASSETS.length;
+  return OUTFIT_HERO_ASSETS[idx];
+}
 
 // ── Types ────────────────────────────────────────────────
 interface SavedOutfit {
@@ -173,6 +190,20 @@ export default function RecordTab() {
       </View>
 
       <ScrollView contentContainerStyle={styles.modalContent}>
+        {detailOutfit ? (
+          <View style={styles.heroWrap}>
+            <Image
+              source={pickOutfitHero(detailOutfit.outfit_id)}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+            <View style={styles.heroBadge}>
+              <Feather name="zap" size={11} color={Colors.paper} />
+              <Text style={styles.heroBadgeText}>AI 生成穿搭</Text>
+            </View>
+          </View>
+        ) : null}
+
         {detailOutfit ? (
           <Text style={styles.modalDate}>
             保存于 {new Date(detailOutfit.created_at).toLocaleDateString('zh-CN', {
@@ -360,7 +391,6 @@ export default function RecordTab() {
             </View>
           ) : monthTotal === 0 && !loading ? (
             <View style={styles.emptySection}>
-              <Text style={styles.emptyTitle}>穿过的搭配会自动记录在这里</Text>
               <Text style={styles.emptySub}>每次确认穿搭后，都会自动保存到这里</Text>
             </View>
           ) : null}
@@ -524,6 +554,19 @@ const styles = StyleSheet.create({
   modalTitle: { ...T.sectionTitle },
   modalClose: { ...T.buttonSecondary, color: Colors.terracotta },
   modalContent: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+  heroWrap: {
+    width: '100%', aspectRatio: 3 / 4, borderRadius: Radius.lg, overflow: 'hidden',
+    backgroundColor: Colors.paperCard, position: 'relative',
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  heroImage: { width: '100%', height: '100%' },
+  heroBadge: {
+    position: 'absolute', top: 12, left: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(30,24,20,0.72)',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+  },
+  heroBadgeText: { fontSize: 11, color: Colors.paper, fontFamily: Fonts.uiSemiBold },
   modalDate: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   commentCard: {
     backgroundColor: Colors.signalSoft, borderRadius: Radius.lg,

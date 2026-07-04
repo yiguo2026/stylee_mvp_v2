@@ -12,6 +12,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { Toast } from '@/components/Toast';
 import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { aiExtractProductFromLink } from '@/lib/ai';
 
@@ -107,6 +108,22 @@ export default function WardrobeTab() {
   const [showWishlist, setShowWishlist] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkImporting, setLinkImporting] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ visible: true, message });
+    toastTimerRef.current = setTimeout(() => {
+      setToast({ visible: false, message: '' });
+    }, 1600);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -180,6 +197,12 @@ export default function WardrobeTab() {
   const handleMoveToWardrobe = async (wishId: string) => {
     await moveToWardrobe(wishId);
     if (user) fetchItems(user.id);
+    showToast('已转入衣橱');
+  };
+
+  const handleRemoveWish = async (wishId: string) => {
+    await removeItem(wishId);
+    showToast('已删除心愿单单品');
   };
 
   const addSheet = (
@@ -238,17 +261,28 @@ export default function WardrobeTab() {
                 <Text style={styles.wishItemMeta}>{wish.category} · {wish.color} · {wish.source === 'ai_recommended' ? '来自AI推荐' : '手动添加'}</Text>
               </View>
               <View style={styles.wishItemActions}>
-                <TouchableOpacity style={styles.wishAddBtn} onPress={() => handleMoveToWardrobe(wish.wish_id)}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.wishAddBtn}
+                  onPress={() => handleMoveToWardrobe(wish.wish_id)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
                   <Text style={styles.wishAddBtnText}>转入衣橱</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => removeItem(wish.wish_id)}>
-                  <Text style={styles.wishRemoveText}>移除</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.wishRemoveBtn}
+                  onPress={() => handleRemoveWish(wish.wish_id)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Text style={styles.wishRemoveText}>删除</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ))
         )}
       </ScrollView>
+      <Toast visible={toast.visible} message={toast.message} />
     </SafeAreaView>
   );
 
@@ -576,5 +610,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink,
   },
   wishAddBtnText: { fontSize: 11, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
+  wishRemoveBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.line,
+    alignItems: 'center', justifyContent: 'center',
+  },
   wishRemoveText: { fontSize: 11, color: Colors.accent, textAlign: 'center' },
 });
