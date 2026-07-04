@@ -206,6 +206,48 @@ export default function WardrobeTab() {
     </View>
   );
 
+  const wishlistOverlayContent = (
+    <SafeAreaView style={styles.wishlistOverlay}>
+      <View style={styles.wishlistHeader}>
+        <TouchableOpacity onPress={() => setShowWishlist(false)} hitSlop={12}>
+          <Text style={styles.wishlistBack}>← 返回</Text>
+        </TouchableOpacity>
+        <Text style={styles.wishlistTitle}>心愿单</Text>
+        <Text style={styles.wishlistCountText}>{wishlistItems.length} 件想要的</Text>
+      </View>
+      <ScrollView style={styles.wishlistBody} contentContainerStyle={{ paddingBottom: 40 }}>
+        {wishlistItems.length === 0 ? (
+          <View style={styles.wishlistEmpty}>
+            <Text style={styles.wishlistEmptyText}>还没有心愿单哦{'\n'}AI 推荐时会自动加入</Text>
+          </View>
+        ) : (
+          wishlistItems.map(wish => (
+            <View key={wish.wish_id} style={styles.wishItem}>
+              <View style={styles.wishItemImg}>
+                {wish.image_url
+                  ? <Image source={{ uri: wish.image_url }} style={styles.image} resizeMode="cover" />
+                  : <View style={styles.wishImgPlaceholder}><CategoryIcon category={wish.category} size={32} color={Colors.walnut2} /></View>
+                }
+              </View>
+              <View style={styles.wishItemInfo}>
+                <Text style={styles.wishItemName} numberOfLines={1}>{wish.name}</Text>
+                <Text style={styles.wishItemMeta}>{wish.category} · {wish.color} · {wish.source === 'ai_recommended' ? '来自AI推荐' : '手动添加'}</Text>
+              </View>
+              <View style={styles.wishItemActions}>
+                <TouchableOpacity style={styles.wishAddBtn} onPress={() => handleMoveToWardrobe(wish.wish_id)}>
+                  <Text style={styles.wishAddBtnText}>转入衣橱</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => removeItem(wish.wish_id)}>
+                  <Text style={styles.wishRemoveText}>移除</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -338,47 +380,13 @@ export default function WardrobeTab() {
       />
 
       {/* Wishlist Overlay (slide-in full page) */}
-      <Modal visible={showWishlist} animationType="slide">
-        <SafeAreaView style={styles.wishlistOverlay}>
-          <View style={styles.wishlistHeader}>
-            <TouchableOpacity onPress={() => setShowWishlist(false)} hitSlop={12}>
-              <Text style={styles.wishlistBack}>← 返回</Text>
-            </TouchableOpacity>
-            <Text style={styles.wishlistTitle}>心愿单</Text>
-            <Text style={styles.wishlistCountText}>{wishlistItems.length} 件想要的</Text>
-          </View>
-          <ScrollView style={styles.wishlistBody} contentContainerStyle={{ paddingBottom: 40 }}>
-            {wishlistItems.length === 0 ? (
-              <View style={styles.wishlistEmpty}>
-                <Text style={styles.wishlistEmptyText}>还没有心愿单哦{'\n'}AI 推荐时会自动加入</Text>
-              </View>
-            ) : (
-              wishlistItems.map(wish => (
-                <View key={wish.wish_id} style={styles.wishItem}>
-                  <View style={styles.wishItemImg}>
-                    {wish.image_url
-                      ? <Image source={{ uri: wish.image_url }} style={styles.image} resizeMode="cover" />
-                      : <View style={styles.wishImgPlaceholder}><CategoryIcon category={wish.category} size={32} color={Colors.walnut2} /></View>
-                    }
-                  </View>
-                  <View style={styles.wishItemInfo}>
-                    <Text style={styles.wishItemName} numberOfLines={1}>{wish.name}</Text>
-                    <Text style={styles.wishItemMeta}>{wish.category} · {wish.color} · {wish.source === 'ai_recommended' ? '来自AI推荐' : '手动添加'}</Text>
-                  </View>
-                  <View style={styles.wishItemActions}>
-                    <TouchableOpacity style={styles.wishAddBtn} onPress={() => handleMoveToWardrobe(wish.wish_id)}>
-                      <Text style={styles.wishAddBtnText}>转入衣橱</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeItem(wish.wish_id)}>
-                      <Text style={styles.wishRemoveText}>移除</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      {isWeb ? (
+        showWishlist ? <View style={styles.webLayer}>{wishlistOverlayContent}</View> : null
+      ) : (
+        <Modal visible={showWishlist} animationType="slide" onRequestClose={() => setShowWishlist(false)}>
+          {wishlistOverlayContent}
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
