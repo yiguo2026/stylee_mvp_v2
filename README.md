@@ -8,13 +8,13 @@
 
 ## 技术栈
 
-- **前端**：Expo SDK 55 + TypeScript + Expo Router（文件路由）
+- **前端**：Expo SDK 54 + TypeScript + Expo Router（文件路由）
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
 - **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动 fallback 到本地 mock）
-- **AI**：DeepSeek API（意图识别、穿搭推荐、穿搭理由，JSON mode）；火山方舟 API 已关闭（节省成本）
-- **部署**：Vercel（静态 SPA）+ EAS Build（iOS）
+- **AI**：本地模型服务（`model-service/`）+ DashScope（Qwen VL / Qwen Image）+ DeepSeek（可选）；Ark 已关闭
+- **部署**：GitHub Pages（gh-pages）+ EAS Build（iOS）
 - **状态管理**：Zustand
-- **样式**：全局设计规范（三字体体系 / 暖色配色 / emoji 图标系统）
+- **样式**：Editorial Mark v3.6（冷调中性黑白体系 / 统一字体体系 / 过程态规范）
 
 ## 功能
 
@@ -34,7 +34,7 @@
 - 天气信息 + 快捷穿搭入口
 
 ### 衣橱管理
-- 紧凑分类标签（上装/下装/连体装/外套/鞋/包/帽子/围巾，带数量角标）
+- 紧凑分类标签（上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰，带数量角标）
 - 模糊搜索（支持同义词匹配，如"裤子"→下装/阔腿裤/短裤）
 - 单品详情查看 + 编辑（照片、名称、分类、颜色、材质、品牌、价格）
 - 单品删除（自定义 ConfirmModal，Web 兼容）
@@ -55,7 +55,7 @@
   - 首页入口：身体信息 → 选择搭配方案（已穿搭配/收藏搭配 Tab） → 选择场景 → 生成
   - 推荐结果入口：身体信息 → 搭配单品（已选） → 选择场景 → 生成
 - 场景风格选择（☕咖啡馆/🏙️街道/💼办公室/🌿公园/🏠居家）
-- 生成进度动画（4步：分析身体数据→匹配单品→合成效果→优化细节）
+- 等待过程态（1%-99% 进度条 + 4 步清单 + 呼吸闪烁动画：分析身体数据→匹配单品→合成效果→优化细节）
 - 效果图展示 + 保存（AI 生成失败时 fallback 到预置场景图）
 
 ### Web 兼容
@@ -101,10 +101,12 @@ npx expo start
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon Key | Supabase Dashboard |
 | `EXPO_PUBLIC_QWEATHER_KEY` | 和风天气 API Key（可选） | [dev.qweather.com](https://dev.qweather.com/) |
 | `EXPO_PUBLIC_QWEATHER_HOST` | 和风天气 API Host（商业版需自定义） | QWeather 控制台 |
+| `EXPO_PUBLIC_DASHSCOPE_API_KEY` | DashScope API Key（Qwen VL / Qwen Image，推荐） | DashScope 控制台 |
 | `EXPO_PUBLIC_DEEPSEEK_KEY` | DeepSeek API Key（可选） | [platform.deepseek.com](https://platform.deepseek.com/) |
 | `EXPO_PUBLIC_DEEPSEEK_HOST` | DeepSeek API Host（可选，默认 api.deepseek.com） | — |
+| `EXPO_PUBLIC_STYLEE_API` | 本地模型服务地址（可选，默认 http://127.0.0.1:8000） | — |
 
-> 不配置 `EXPO_PUBLIC_QWEATHER_KEY` 时，天气数据将使用本地 mock 数据；不配置 `EXPO_PUBLIC_DEEPSEEK_KEY` 时，AI 功能将使用本地 mock 数据，均不影响其他功能。
+> 不配置 `EXPO_PUBLIC_QWEATHER_KEY` 时，天气数据将使用本地 mock 数据；不配置 `EXPO_PUBLIC_DASHSCOPE_API_KEY` / `EXPO_PUBLIC_DEEPSEEK_KEY` 时，AI 功能会自动回落到 mock/预置结果（不影响衣橱、记录等基础功能）。
 
 ### iOS 构建
 
@@ -117,10 +119,11 @@ npx expo run:ios          # 本地模拟器运行
 ### Web 部署
 
 ```bash
-npm run build:web        # 构建到 dist/
-# Vercel 部署：
-vercel --yes
+npm run build:web        # 构建到 dist/（含 post-build patch）
 ```
+
+- 仓库已配置 GitHub Actions：push 到 `main` 后自动构建并发布到 GitHub Pages。
+- 在线地址：https://yiguo2026.github.io/
 
 选择 Web / iOS 模拟器 / Android 模拟器运行。
 
@@ -152,10 +155,38 @@ vercel --yes
 | `87806db` | v0.7.1：接入真实和风天气API（55城市本地ID映射，修复GeoAPI 403 fallback mock问题） |
 | — | v0.8.0：iOS App Store 适配（Bundle ID / 隐私声明 / 权限清理 / 设置持久化 / 隐私政策 / EAS Build 配置） |
 | `67fa832` | v0.9.0：对齐原型图 — 资源文件+emoji图标+Unsplash图片+场景试穿+模板推荐 |
-| `e1213fe` | v0.9.1：灵感详情页+衣橱改版+风格标签重构+关闭Ark API |
-| — | v0.9.2：AI试穿3步流程改版（身体信息录入+搭配选择+场景选择） |
-| — | v0.9.3：修复记录页查询列不存在+收藏outfit_id错误+个人页跳转记录tab+快速添加页+衣橱标签间距+tryonStore web兼容 |
-| — | v0.9.4：设置页对齐原型（移除通知/微信/导出/评分）+ 个人页精简（去掉入驻天数/风格标签）+ 衣橱删除无限loading修复 + GitHub Pages 部署 |
+| `e1213fe` | v0.9.1：灵感详情页+衣橱改版+风格标签重构+关闭 Ark API |
+| `03175d6` | v0.9.2：AI 试穿 3 步流程改版（身体信息录入 + 搭配选择 + 场景选择） |
+| `1674203` | v0.9.3：修复记录页查询列不存在/收藏 outfit_id 错误；快速添加页与“跳转记录”联动等 |
+| `7e94a67` | v0.9.4：设置页对齐原型、个人页精简、衣橱删除无限 loading 修复、GitHub Pages 部署 |
+| `1111655` | v0.9.5：统一 AI 过程态（呼吸闪烁 + 进度条）；推荐单品可加入衣橱/心愿单；衣橱按“穿搭+收藏”倒排；单品详情展示穿着记录缩略图；新增独立穿搭详情页 |
+
+## e1213fe 之后的主要更新（v0.9.1+）
+
+> 范围：`e1213fe..HEAD`（共 86 个 commit）。下述为按模块汇总的变更摘要，便于产品/验收；更细粒度可直接查看 GitHub commit 历史。
+
+### 1) 视觉与交互（Editorial Mark v3.6）
+- 全局视觉从暖米色系升级为冷调中性黑白体系，统一字体、间距、Tab/空态/卡片等样式，对齐 v3.6 规范。
+- Web 端适配增强：iPhone 14 Pro 外壳、@font-face 注入、TabBar 贴底与不截断、Modal/Sheet 约束在手机容器内。
+
+### 2) AI 能力与过程态
+- 接入仓内 `model-service/` 本地推理服务（服饰识别 / 标准化 / 推荐），不可达时自动回落；默认使用 DashScope（Qwen VL / Qwen Image），DeepSeek 可选。
+- 增加 AI 过程态与每日次数限制；结果页展示模型来源与耗时。
+- 等待动画统一为 demo 样式：呼吸闪烁加载 + 1%-99% 进度条 + 步骤清单（推荐结果 / 衣物解析 / AI 试穿）。
+
+### 3) AI 试穿
+- 试穿流程改为 3 步：身体信息 → 选择搭配（已穿/收藏）→ 选择场景 → 生成。
+- 试穿结果支持保存到记录，并完善试穿历史/详情页展示。
+
+### 4) 衣橱 / 穿搭 / 记录
+- 衣橱列表支持按「穿搭次数 + 收藏次数」倒序展示；单品详情展示关联搭配缩略图。
+- 新增独立穿搭详情页 `/outfit/[id]`，记录页/单品页点击搭配统一跳转详情页。
+- 推荐方案页：推荐单品支持【+衣橱】【+心愿单】真实写入并 toast 提示。
+- 修复记录页查询列/收藏关系、月份切换展示逻辑、快速添加流程等问题。
+
+### 5) 工程化、部署与安全
+- Web 构建链路完善：`build:web` + post-build patch；GitHub Actions 自动发布到 GitHub Pages（gh-pages）。
+- 安全加固：移除硬编码 key，统一改为环境变量注入；README/配置同步更新。
 
 ## 项目结构
 
