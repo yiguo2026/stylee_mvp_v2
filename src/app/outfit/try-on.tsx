@@ -6,6 +6,8 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { AIResultBanner } from '@/components/AIResultBanner';
+import { AIMeta } from '@/lib/ai';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
@@ -63,6 +65,7 @@ export default function TryOnScreen() {
   const [generating, setGenerating] = useState(false);
   const [genStep, setGenStep] = useState(0);
   const [tryOnImage, setTryOnImage] = useState<string | number | null>(null);
+  const [tryOnMeta, setTryOnMeta] = useState<AIMeta | null>(null);
 
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
 
@@ -152,8 +155,10 @@ export default function TryOnScreen() {
 
     setGenerating(true);
     setTryOnImage(null);
+    setTryOnMeta(null);
     setGenStep(0);
 
+    const t0 = Date.now();
     const steps = ['分析身体数据中...', '匹配穿搭单品...', '合成试穿效果...', '优化画面细节...'];
     for (let i = 0; i < steps.length; i++) {
       setGenStep(i);
@@ -164,6 +169,7 @@ export default function TryOnScreen() {
     const assetKey = SCENE_ASSET_MAP[selectedScene] ?? 'casual';
     const fallbackAsset = SCENE_IMAGES[assetKey];
     setTryOnImage(fallbackAsset || SCENE_IMAGES.casual);
+    setTryOnMeta({ source: 'mock', durationMs: Date.now() - t0 });
     setGenerating(false);
 
     // Save try-on record
@@ -347,6 +353,7 @@ export default function TryOnScreen() {
         ) : null}
 
         {/* ── Result ── */}
+        {tryOnMeta && <AIResultBanner {...tryOnMeta} />}
         {tryOnImage !== null && !generating ? (
           <View style={styles.resultCard}>
             <Image

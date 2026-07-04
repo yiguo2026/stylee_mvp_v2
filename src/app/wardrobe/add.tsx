@@ -11,9 +11,10 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS } from '@/lib/ai';
+import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { ClothingCategory } from '@/types';
+import { AIResultBanner } from '@/components/AIResultBanner';
 
 const isWeb = Platform.OS === 'web';
 
@@ -38,6 +39,8 @@ export default function AddWardrobeItem() {
   const [standardizedUri, setStandardizedUri] = useState<string | null>(null);
   const [stdState, setStdState] = useState<'idle' | 'generating' | 'done' | 'failed'>('idle');
   const [useStandardized, setUseStandardized] = useState(true);
+  const [recognizeMeta, setRecognizeMeta] = useState<AIMeta | null>(null);
+  const [stdMeta, setStdMeta] = useState<AIMeta | null>(null);
 
   // Monotonic token — incremented on every new image pick; stale async results
   // whose token no longer matches the current value are discarded.
@@ -74,19 +77,22 @@ export default function AddWardrobeItem() {
 
   const runStandardize = async (uri: string, cat: string, pt: string, token: number) => {
     setStdState('generating');
-    const std = await aiStandardizeGarment(uri, cat, pt);
+    const { url, meta } = await aiStandardizeGarment(uri, cat, pt);
     if (reqTokenRef.current !== token) return;
-    if (std) { setStandardizedUri(std); setUseStandardized(true); setStdState('done'); }
+    setStdMeta(meta);
+    if (url) { setStandardizedUri(url); setUseStandardized(true); setStdState('done'); }
     else { setStdState('failed'); }
   };
 
   const runRecognition = async (uri: string) => {
     const token = ++reqTokenRef.current;
     setRecognizing(true);
+    setRecognizeMeta(null); setStdMeta(null);
     setStandardizedUri(null); setStdState('idle');
     try {
-      const result = await aiRecognizeClothing(uri);
+      const { result, meta } = await aiRecognizeClothing(uri);
       if (reqTokenRef.current !== token) return;
+      setRecognizeMeta(meta);
       setCategory(result.category);
       setColor(result.color);
       if (result.material) setMaterial(result.material);
@@ -284,6 +290,9 @@ export default function AddWardrobeItem() {
             <Text style={styles.recognizingBannerText}>AI 正在识别衣物属性…</Text>
           </View>
         ) : null}
+
+        {recognizeMeta && <AIResultBanner {...recognizeMeta} />}
+        {stdState !== 'idle' && stdState !== 'generating' && stdMeta && <AIResultBanner {...stdMeta} />}
 
         {/* Form */}
         <View style={styles.form}>

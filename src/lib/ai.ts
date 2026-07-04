@@ -4,6 +4,13 @@ import { qwenVisionChat, isAvailable as isDashScopeAvailable } from '@/lib/dashs
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 
+// ─── AI 元信息 ───────────────────────────────────────────
+
+export interface AIMeta {
+  source: string;     // 模型名 或 'mock'
+  durationMs: number; // 耗时毫秒
+}
+
 // ─── 衣服识别 ───────────────────────────────────────────
 // 优先使用 Qwen VL (DashScope)，不可用时降级到 mock
 
@@ -19,41 +26,47 @@ const RECOGNIZE_PROMPT = `请识别这件衣物的属性，返回JSON格式：
 }
 只返回JSON，不要其他文字。`;
 
-export const aiRecognizeClothing = async (imageUri: string): Promise<RecognitionResult> => {
+export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: RecognitionResult; meta: AIMeta }> => {
+  const t0 = Date.now();
   if (isDashScopeAvailable()) {
     try {
       const raw = await qwenVisionChat(imageUri, RECOGNIZE_PROMPT, { jsonMode: true, temperature: 0.3 });
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
-          category: parsed.category || '上装',
-          color: parsed.color || '未知',
-          material: parsed.material || '',
-          style: parsed.style || '',
-          brand: parsed.brand || '',
+          result: {
+            category: parsed.category || '上装',
+            color: parsed.color || '未知',
+            material: parsed.material || '',
+            style: parsed.style || '',
+            brand: parsed.brand || '',
+          },
+          meta: { source: 'qwen3-vl-plus', durationMs: Date.now() - t0 },
         };
       }
     } catch (e) {
       console.warn('[AI] Qwen VL recognition failed, falling back to mock:', e);
     }
   }
-  return mockRecognizeClothing(imageUri);
+  const result = await mockRecognizeClothing(imageUri);
+  return { result, meta: { source: 'mock', durationMs: Date.now() - t0 } };
 };
 
 export const aiStandardizeGarment = async (
   imageUri: string, category: string, photoType: string,
-): Promise<string | null> => {
-  if (!isDashScopeAvailable()) return null;
+): Promise<{ url: string | null; meta: AIMeta }> => {
+  const t0 = Date.now();
+  if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0 } };
 
   const prompt = `将这件${category}衣物生成标准化的商品展示图，纯白背景，正面平铺，无模特，无多余装饰，高清商业摄影风格。`;
 
   try {
     const { qwenGenerateImage } = await import('@/lib/dashscope');
     const imageUrl = await qwenGenerateImage(prompt, { imageUrl: imageUri });
-    return imageUrl;
+    return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0 } };
   } catch (e) {
     console.warn('[AI] Qwen Image standardization failed:', e);
-    return null;
+    return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0 } };
   }
 };
 
@@ -151,9 +164,10 @@ export async function aiRecommendOutfits(
   userId: string,
   sessionId: string,
   context?: { weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string },
-): Promise<{ outfits: Outfit[]; error?: string }> {
+): Promise<{ outfits: Outfit[]; error?: string; meta: AIMeta }> {
+  const t0 = Date.now();
   const itemsSummary = buildItemsSummary(wardrobeItems);
-  if (!itemsSummary) return { outfits: [], error: '衣橱中没有衣物，请先添加' };
+  if (!itemsSummary) return { outfits: [], error: '衣橱中没有衣物，请先添加', meta: { source: 'mock', durationMs: Date.now() - t0 } };
 
   const activeItems = wardrobeItems.filter(i => i.status === 'active');
   const hasTop = activeItems.some(i => i.category === '上装' || i.category === '外套');
@@ -162,7 +176,7 @@ export async function aiRecommendOutfits(
     const missing = [];
     if (!hasTop) missing.push('上装');
     if (!hasBottom) missing.push('下装或连体装');
-    return { outfits: [], error: `衣橱中缺少${missing.join('和')}，建议先添加` };
+    return { outfits: [], error: `衣橱中缺少${missing.join('和')}，建议先添加`, meta: { source: 'mock', durationMs: Date.now() - t0 } };
   }
 
   const contextParts: string[] = [];
@@ -184,13 +198,15 @@ export async function aiRecommendOutfits(
   );
 
   if (!raw) {
-    return { outfits: await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined) };
+    const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
+    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0 } };
   }
 
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.outfits) || parsed.outfits.length === 0) {
-      return { outfits: await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined) };
+      const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
+      return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0 } };
     }
 
     const itemMap = new Map(wardrobeItems.map(i => [i.item_id, i]));
@@ -218,7 +234,6 @@ export async function aiRecommendOutfits(
         });
       }
 
-      // Also count recommended items toward top/bottom check
       const recommended: RecommendedItem[] = Array.isArray(o.recommended_items)
         ? o.recommended_items.map((r: any) => ({
             name: String(r.name || ''),
@@ -234,7 +249,6 @@ export async function aiRecommendOutfits(
         if (r.category === '下装' || r.category === '连体装') hasBottom = true;
       }
 
-      // Allow outfits with recommended items even if no owned top/bottom yet
       if (!hasTop && !hasBottom && outfitItems.length === 0 && recommended.length === 0) continue;
 
       const outfit_id = `ai_outfit_${outfits.length}_${Date.now()}`;
@@ -252,12 +266,14 @@ export async function aiRecommendOutfits(
     }
 
     if (outfits.length === 0) {
-      return { outfits: await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined) };
+      const fallback = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
+      return { outfits: fallback, meta: { source: 'mock', durationMs: Date.now() - t0 } };
     }
 
-    return { outfits };
+    return { outfits, meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0 } };
   } catch {
-    return { outfits: await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined) };
+    const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
+    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0 } };
   }
 }
 
@@ -319,7 +335,6 @@ const LINK_EXTRACT_PROMPT = `根据以下商品链接URL，推断商品信息并
 只返回JSON。如果无法确定某字段，留空字符串。`;
 
 export async function aiExtractProductFromLink(url: string): Promise<ProductExtraction | null> {
-  // 尝试用 DeepSeek 从 URL 文本推断
   try {
     const raw = await deepseekChat(
       [
@@ -342,7 +357,6 @@ export async function aiExtractProductFromLink(url: string): Promise<ProductExtr
     }
   } catch {}
 
-  // Mock fallback
   return {
     name: '链接导入商品',
     category: '上装',
@@ -394,7 +408,6 @@ export async function aiGenerateTryOnSuggestion(
     }
   } catch {}
 
-  // Mock fallback
   return {
     suggestion: '这套搭配色彩协调，风格统一，整体效果不错。单品质感搭配合理，适合多种场合。',
     compatibility_score: 82,

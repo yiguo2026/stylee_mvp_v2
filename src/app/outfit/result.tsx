@@ -11,10 +11,11 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { aiRecommendOutfits } from '@/lib/ai';
+import { aiRecommendOutfits, AIMeta } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { AIResultBanner } from '@/components/AIResultBanner';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
 
@@ -42,6 +43,7 @@ export default function OutfitResultScreen() {
   const [swapTarget, setSwapTarget] = useState<OutfitItem | null>(null);
   // Wishlist states per recommended item
   const [wishlistedRecs, setWishlistedRecs] = useState<Set<number>>(new Set());
+  const [aiMeta, setAiMeta] = useState<AIMeta | null>(null);
 
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
 
@@ -125,6 +127,7 @@ export default function OutfitResultScreen() {
 
     finished = true;
     setOutfits(aiResult.outfits);
+    setAiMeta(aiResult.meta);
     if (aiResult.error) setErrorMessage(aiResult.error);
     setLoading(false);
   }, [params.city, params.query, params.tags, params.temp, params.weather]);
@@ -414,6 +417,7 @@ export default function OutfitResultScreen() {
         </TouchableOpacity>
       </View>
 
+      {aiMeta && <AIResultBanner {...aiMeta} />}
       <ScrollView contentContainerStyle={styles.content}>
         {/* Weather & Context */}
         <View style={styles.contextRow}>
