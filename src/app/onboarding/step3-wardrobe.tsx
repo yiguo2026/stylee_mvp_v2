@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
   ScrollView, ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
@@ -20,10 +21,6 @@ export default function OnboardingStep3() {
   const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
   const [albumImages, setAlbumImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const filteredItems = filterCategory === '全部'
-    ? PRESET_BASIC_ITEMS
-    : PRESET_BASIC_ITEMS.filter(i => i.category === filterCategory);
 
   const toggleItem = (index: number) => {
     const next = new Set(selected);
@@ -148,18 +145,18 @@ export default function OnboardingStep3() {
               const isSelected = selected.has(index);
               return (
                 <TouchableOpacity
-                  key={index}
+                  key={item.name}
                   style={[styles.builtinItem, isSelected && styles.builtinItemSelected]}
                   onPress={() => toggleItem(index)}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.builtinIcon, isSelected && styles.builtinIconSelected]}>
                     <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
-                    {isSelected && (
+                    {isSelected ? (
                       <View style={styles.builtinCheck}>
                         <Text style={styles.builtinCheckText}>已选</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                   <View style={styles.builtinInfo}>
                     <Text style={[styles.builtinName, isSelected && styles.builtinNameSelected]} numberOfLines={1}>
@@ -181,15 +178,16 @@ export default function OnboardingStep3() {
         <View style={styles.batchSection}>
           <View style={styles.batchHeader}>
             <Text style={styles.batchHeaderTitle}>相册批量导入</Text>
-            <TouchableOpacity onPress={handleBatchImport}>
-              <Text style={styles.batchAddBtn}>+ 选择图片</Text>
+            <TouchableOpacity onPress={handleBatchImport} style={styles.batchAddBtnWrap}>
+              <Feather name="image" size={15} color={Colors.ink} />
+              <Text style={styles.batchAddBtn}>选择图片</Text>
             </TouchableOpacity>
           </View>
           {albumImages.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.albumRow}>
-                {albumImages.map((uri, i) => (
-                  <View key={i} style={styles.albumThumbWrap}>
+                {albumImages.map(uri => (
+                  <View key={uri} style={styles.albumThumbWrap}>
                     <Image source={{ uri }} style={styles.albumThumb} resizeMode="cover" />
                     <TouchableOpacity style={styles.albumRemove} onPress={() => setAlbumImages(prev => prev.filter(u => u !== uri))}>
                       <Text style={styles.albumRemoveText}>移除</Text>
@@ -290,6 +288,7 @@ const styles = StyleSheet.create({
   },
   batchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   batchHeaderTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
+  batchAddBtnWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   batchAddBtn: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   albumRow: { flexDirection: 'row', gap: Spacing.two },
   albumThumbWrap: { position: 'relative' },

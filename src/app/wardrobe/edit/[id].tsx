@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
@@ -164,7 +165,7 @@ export default function EditItemScreen() {
           {[1, 2, 3].map(i => (
             <TouchableOpacity key={i} style={styles.photoSlot} onPress={pickImage}>
               <View style={styles.photoAddSlot}>
-                <Text style={styles.photoPlus}>+</Text>
+                <Feather name="plus-circle" size={18} color={Colors.walnut2} />
                 <Text style={styles.photoAddLabel}>添加</Text>
               </View>
             </TouchableOpacity>
@@ -186,7 +187,7 @@ export default function EditItemScreen() {
               <Text style={styles.fieldSelectText}>{category}</Text>
               <Text style={styles.fieldSelectArrow}>›</Text>
             </TouchableOpacity>
-            {showCategoryPicker && (
+            {showCategoryPicker ? (
               <View style={styles.pickerGrid}>
                 {CATEGORIES.map(cat => (
                   <TouchableOpacity key={cat} style={[styles.pickerOption, category === cat && styles.pickerOptionActive]} onPress={() => { setCategory(cat); setShowCategoryPicker(false); }}>
@@ -194,14 +195,14 @@ export default function EditItemScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Color */}
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>颜色</Text>
             <TextInput style={styles.fieldInput} value={color} onChangeText={setColor} placeholder="输入或选择颜色" placeholderTextColor={Colors.walnut2} onFocus={() => setShowColorPicker(true)} />
-            {showColorPicker && (
+            {showColorPicker ? (
               <View style={styles.pickerWrap}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.pickerRow}>
@@ -213,14 +214,14 @@ export default function EditItemScreen() {
                   </View>
                 </ScrollView>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Material */}
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>材质</Text>
             <TextInput style={styles.fieldInput} value={material} onChangeText={setMaterial} placeholder="输入或选择材质" placeholderTextColor={Colors.walnut2} onFocus={() => setShowMaterialPicker(true)} />
-            {showMaterialPicker && (
+            {showMaterialPicker ? (
               <View style={styles.pickerWrap}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.pickerRow}>
@@ -232,7 +233,7 @@ export default function EditItemScreen() {
                   </View>
                 </ScrollView>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Brand */}
@@ -351,8 +352,7 @@ const styles = StyleSheet.create({
   },
   removePhotoText: { color: '#fff', fontSize: 14, fontFamily: Fonts.uiSemiBold },
   photoEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
-  photoAddSlot: { alignItems: 'center', gap: 2 },
-  photoPlus: { fontSize: 20, color: Colors.walnut2 },
+  photoAddSlot: { alignItems: 'center', gap: 4 },
   photoAddLabel: { ...T.micro, color: Colors.walnut2 },
 
   formSection: { gap: Spacing.three },

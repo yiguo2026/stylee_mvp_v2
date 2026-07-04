@@ -4,6 +4,7 @@ import {
   StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Modal, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
+import Feather from '@expo/vector-icons/Feather';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
@@ -103,6 +104,7 @@ export default function OnboardingStep1() {
           })}
         </ScrollView>
         <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          <Feather name="x-circle" size={16} color={Colors.walnut} />
           <Text style={styles.modalCloseText}>取消</Text>
         </TouchableOpacity>
       </View>
@@ -304,6 +306,6 @@ const styles = StyleSheet.create({
   cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
   cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
-  modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', paddingVertical: Spacing.two },
+  modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

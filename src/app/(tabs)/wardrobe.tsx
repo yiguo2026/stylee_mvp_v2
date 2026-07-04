@@ -188,18 +188,22 @@ export default function WardrobeTab() {
         <Text style={styles.modalWarning}>仅支持单品上传，请每次上传一件衣物</Text>
 
         <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/add'); }}>
+          <Feather name="tag" size={18} color={Colors.ink} style={styles.modalOptionIcon} />
           <Text style={styles.modalOptionText}>单品录入</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/batch'); }}>
+          <Feather name="grid" size={18} color={Colors.ink} style={styles.modalOptionIcon} />
           <Text style={styles.modalOptionText}>批量导入</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); setShowLinkModal(true); }}>
+          <Feather name="link-2" size={18} color={Colors.ink} style={styles.modalOptionIcon} />
           <Text style={styles.modalOptionText}>链接导入</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
+          <Feather name="x-circle" size={16} color={Colors.walnut} />
           <Text style={styles.modalCancelText}>取消</Text>
         </TouchableOpacity>
       </View>
@@ -509,9 +513,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three, paddingHorizontal: Spacing.two,
     borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
-  modalOptionIcon: { fontSize: 22 },
+  modalOptionIcon: { width: 20, textAlign: 'center' },
   modalOptionText: { ...T.bodyText, fontSize: 16, color: Colors.ink },
-  modalCancel: { alignItems: 'center', paddingVertical: Spacing.three, marginTop: Spacing.one },
+  modalCancel: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.three, marginTop: Spacing.one },
   modalCancelText: { ...T.bodyText, fontSize: 16, color: Colors.walnut },
 
   linkHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two },

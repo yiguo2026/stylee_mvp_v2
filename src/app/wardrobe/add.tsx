@@ -207,7 +207,8 @@ export default function AddWardrobeItem() {
       <Stack.Screen options={{ presentation: isWeb ? 'card' : 'modal' }} />
       <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerActionBtn}>
+          <Feather name="x-circle" size={16} color={Colors.walnut} />
           <Text style={styles.cancel}>取消</Text>
         </TouchableOpacity>
         <Text style={styles.title}>添加衣物</Text>
@@ -315,7 +316,7 @@ export default function AddWardrobeItem() {
                 onPress={() => setPickerField('category')}
               >
                 <Text style={styles.selectText}>{category}</Text>
-                <Text style={styles.selectArrow}>›</Text>
+                <Feather name="chevron-right" size={16} color={Colors.walnut2} />
               </TouchableOpacity>
             </View>
             <View style={[styles.field, styles.flex1]}>
@@ -327,7 +328,7 @@ export default function AddWardrobeItem() {
                 <Text style={[styles.selectText, !color && styles.placeholder]}>
                   {color || '选择'}
                 </Text>
-                <Text style={styles.selectArrow}>›</Text>
+                <Feather name="chevron-right" size={16} color={Colors.walnut2} />
               </TouchableOpacity>
             </View>
           </View>
@@ -396,6 +397,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.line,
   },
+  headerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cancel: { ...T.buttonSecondary, color: Colors.walnut },
   // 方正悠宋 — nav title
   title: { ...T.subTitle },

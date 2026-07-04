@@ -630,7 +630,12 @@ export default function OutfitResultScreen() {
             <View style={styles.modalSheet}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>替换{swapTarget?.item?.category ?? ''}</Text>
-                <TouchableOpacity onPress={() => setSwapTarget(null)}><Text style={styles.modalClose}>取消</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setSwapTarget(null)}>
+                  <View style={styles.modalCloseBtn}>
+                    <Feather name="x-circle" size={16} color={Colors.terracotta} />
+                    <Text style={styles.modalClose}>取消</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
               {swapAlternatives.length === 0 ? (
                 <View style={styles.modalEmpty}>
@@ -814,6 +819,7 @@ const styles = StyleSheet.create({
   modalSheet: { backgroundColor: Colors.paper, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '60%', ...Shadow.three },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: Colors.line },
   modalTitle: { ...T.subTitle },
+  modalCloseBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   modalClose: { ...T.buttonSecondary, color: Colors.terracotta },
   modalEmpty: { padding: Spacing.five, alignItems: 'center' },
   modalEmptyText: { ...T.emptyTitle, fontSize: 14, textAlign: 'center', lineHeight: 24 },
