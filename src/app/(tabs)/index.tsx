@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal, Alert,
-  Image,
+  Image, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -21,6 +21,7 @@ import {
   OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS,
 } from '@/types';
 
+const isWeb = Platform.OS === 'web';
 
 // Mock inspiration data (will be replaced by DB content)
 const MOCK_INSPIRATIONS: InspirationCard[] = [
@@ -204,6 +205,41 @@ export default function OutfitTab() {
     setCitySearch('');
     searchCitiesOnline('').then(setCityResults);
   };
+
+  const citySheet = (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalSheet}>
+        <Text style={styles.modalTitle}>选择城市</Text>
+        <TextInput
+          style={styles.citySearchInput}
+          placeholder="搜索城市..."
+          placeholderTextColor={Colors.walnut2}
+          value={citySearch}
+          onChangeText={handleCitySearch}
+          autoFocus
+        />
+        <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
+          {cityResults.map(cr => {
+            const isActive = weather.city === cr.name;
+            return (
+              <TouchableOpacity
+                key={cr.id || cr.name}
+                style={[styles.cityRow, isActive && styles.cityRowActive]}
+                onPress={() => selectCity(cr.name)}
+              >
+                <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
+                  {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          <Text style={styles.modalCloseText}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const recentItems = items.slice(0, 8);
 
@@ -409,46 +445,23 @@ export default function OutfitTab() {
       </ScrollView>
 
       {/* City Modal */}
-      <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>选择城市</Text>
-            <TextInput
-              style={styles.citySearchInput}
-              placeholder="搜索城市..."
-              placeholderTextColor={Colors.walnut2}
-              value={citySearch}
-              onChangeText={handleCitySearch}
-              autoFocus
-            />
-            <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
-              {cityResults.map(cr => {
-                const isActive = weather.city === cr.name;
-                return (
-                  <TouchableOpacity
-                    key={cr.id || cr.name}
-                    style={[styles.cityRow, isActive && styles.cityRowActive]}
-                    onPress={() => selectCity(cr.name)}
-                  >
-                    <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
-                      {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
-              <Text style={styles.modalCloseText}>取消</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {isWeb ? (
+        cityModalVisible ? <View style={styles.webLayer}>{citySheet}</View> : null
+      ) : (
+        <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          {citySheet}
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
+  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   container: { flex: 1 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 

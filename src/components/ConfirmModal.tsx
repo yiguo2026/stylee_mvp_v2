@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Modal, ActivityIndicator,
+  Modal, ActivityIndicator, Platform,
 } from 'react-native';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+
+const isWeb = Platform.OS === 'web';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -30,39 +32,52 @@ export function ConfirmModal({
   loading,
   singleButton,
 }: ConfirmModalProps) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={styles.overlay}>
-        <View style={styles.dialog}>
-          <Text style={styles.title}>{title}</Text>
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-          <View style={styles.buttons}>
-            {!singleButton && (
-              <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                <Text style={styles.cancelText}>{cancelText}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[
-                singleButton ? styles.singleConfirmBtn : styles.confirmBtn,
-                confirmStyle === 'destructive' && styles.destructiveBtn,
-              ]}
-              onPress={onConfirm}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color={Colors.paper} size="small" />
-                : <Text style={styles.confirmText}>{confirmText}</Text>
-              }
+  const content = (
+    <View style={styles.overlay}>
+      <View style={styles.dialog}>
+        <Text style={styles.title}>{title}</Text>
+        {message ? <Text style={styles.message}>{message}</Text> : null}
+        <View style={styles.buttons}>
+          {!singleButton && (
+            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+              <Text style={styles.cancelText}>{cancelText}</Text>
             </TouchableOpacity>
-          </View>
+          )}
+          <TouchableOpacity
+            style={[
+              singleButton ? styles.singleConfirmBtn : styles.confirmBtn,
+              confirmStyle === 'destructive' && styles.destructiveBtn,
+            ]}
+            onPress={onConfirm}
+            disabled={loading}
+          >
+            {loading
+              ? <ActivityIndicator color={Colors.paper} size="small" />
+              : <Text style={styles.confirmText}>{confirmText}</Text>
+            }
+          </TouchableOpacity>
         </View>
       </View>
+    </View>
+  );
+
+  if (isWeb) {
+    if (!visible) return null;
+    return <View style={styles.webLayer}>{content}</View>;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 240,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

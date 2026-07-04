@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, ScrollView, ActivityIndicator, SafeAreaView, Alert,
-  Animated, Modal, FlatList,
+  Animated, Modal, FlatList, Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -18,6 +18,8 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
+
+const isWeb = Platform.OS === 'web';
 
 const GEN_STEPS = ['分析天气场景...', '筛选衣橱单品...', '组合搭配方案...', '优化推荐说明...'];
 const GEN_TOTAL_STEPS = GEN_STEPS.length;
@@ -621,36 +623,71 @@ export default function OutfitResultScreen() {
       </View>
 
       {/* Swap Modal */}
-      <Modal visible={swapTarget !== null} transparent animationType="slide" onRequestClose={() => setSwapTarget(null)}>
-        <TouchableOpacity style={styles.modalBackdrop} onPress={() => setSwapTarget(null)} />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>替换{swapTarget?.item?.category ?? ''}</Text>
-            <TouchableOpacity onPress={() => setSwapTarget(null)}><Text style={styles.modalClose}>取消</Text></TouchableOpacity>
-          </View>
-          {swapAlternatives.length === 0 ? (
-            <View style={styles.modalEmpty}>
-              <Text style={styles.modalEmptyText}>衣橱里没有其他{swapTarget?.item?.category}可以替换{'\n'}去衣橱添加更多单品吧</Text>
-            </View>
-          ) : (
-            <FlatList data={swapAlternatives} keyExtractor={i => i.item_id} numColumns={3}
-              contentContainerStyle={styles.swapGrid}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.swapOption} onPress={() => confirmSwap(item)}>
-                  {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.swapOptionImage} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.swapOptionPlaceholder}>
-                      <CategoryIcon category={item.category} size={28} color={Colors.walnut2} />
-                    </View>
+      {isWeb ? (
+        swapTarget ? (
+          <View style={styles.webLayer}>
+            <TouchableOpacity style={styles.modalBackdrop} onPress={() => setSwapTarget(null)} />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>替换{swapTarget?.item?.category ?? ''}</Text>
+                <TouchableOpacity onPress={() => setSwapTarget(null)}><Text style={styles.modalClose}>取消</Text></TouchableOpacity>
+              </View>
+              {swapAlternatives.length === 0 ? (
+                <View style={styles.modalEmpty}>
+                  <Text style={styles.modalEmptyText}>衣橱里没有其他{swapTarget?.item?.category}可以替换{'\n'}去衣橱添加更多单品吧</Text>
+                </View>
+              ) : (
+                <FlatList data={swapAlternatives} keyExtractor={i => i.item_id} numColumns={3}
+                  contentContainerStyle={styles.swapGrid}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity style={styles.swapOption} onPress={() => confirmSwap(item)}>
+                      {item.image_url ? (
+                        <Image source={{ uri: item.image_url }} style={styles.swapOptionImage} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.swapOptionPlaceholder}>
+                          <CategoryIcon category={item.category} size={28} color={Colors.walnut2} />
+                        </View>
+                      )}
+                      <Text style={styles.swapOptionName} numberOfLines={2}>{item.name}</Text>
+                    </TouchableOpacity>
                   )}
-                  <Text style={styles.swapOptionName} numberOfLines={2}>{item.name}</Text>
-                </TouchableOpacity>
+                />
               )}
-            />
-          )}
-        </View>
-      </Modal>
+            </View>
+          </View>
+        ) : null
+      ) : (
+        <Modal visible={swapTarget !== null} transparent animationType="slide" onRequestClose={() => setSwapTarget(null)}>
+          <TouchableOpacity style={styles.modalBackdrop} onPress={() => setSwapTarget(null)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>替换{swapTarget?.item?.category ?? ''}</Text>
+              <TouchableOpacity onPress={() => setSwapTarget(null)}><Text style={styles.modalClose}>取消</Text></TouchableOpacity>
+            </View>
+            {swapAlternatives.length === 0 ? (
+              <View style={styles.modalEmpty}>
+                <Text style={styles.modalEmptyText}>衣橱里没有其他{swapTarget?.item?.category}可以替换{'\n'}去衣橱添加更多单品吧</Text>
+              </View>
+            ) : (
+              <FlatList data={swapAlternatives} keyExtractor={i => i.item_id} numColumns={3}
+                contentContainerStyle={styles.swapGrid}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={styles.swapOption} onPress={() => confirmSwap(item)}>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.swapOptionImage} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.swapOptionPlaceholder}>
+                        <CategoryIcon category={item.category} size={28} color={Colors.walnut2} />
+                      </View>
+                    )}
+                    <Text style={styles.swapOptionName} numberOfLines={2}>{item.name}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </Modal>
+      )}
 
       <ConfirmModal visible={showSavedConfirm ? Boolean(savedId) : false} title="已保存"
         message="这套搭配已保存到你的穿搭记录" confirmText="好的" singleButton
@@ -662,7 +699,11 @@ export default function OutfitResultScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper },
+  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
 
   loadingOverlay: { flex: 1, backgroundColor: 'rgba(255,255,255,0.96)', alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   loadingCard: { width: '100%', maxWidth: 340, backgroundColor: Colors.paperCard, borderRadius: Radius.xl, padding: Spacing.five, alignItems: 'center', gap: Spacing.three, borderWidth: 1, borderColor: Colors.line },

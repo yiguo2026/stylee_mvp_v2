@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Modal,
+  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Modal, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +9,8 @@ import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { Gender } from '@/types';
 import { searchCitiesOnline, CityResult } from '@/lib/weather';
+
+const isWeb = Platform.OS === 'web';
 
 const ADJECTIVES = ['快乐的', '阳光的', '温柔的', '酷酷的', '可爱的', '优雅的', '元气', '自由', '治愈系', '文艺范'];
 const NOUNS = ['小鹿', '猫咪', '云朵', '星星', '月亮', '花栗鼠', '企鹅', '棉花糖', '小熊', '兔子'];
@@ -64,6 +66,48 @@ export default function OnboardingStep1() {
   const handleSkip = () => {
     router.replace('/(tabs)');
   };
+
+  const citySheet = (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalSheet}>
+        <Text style={styles.modalTitle}>选择城市</Text>
+        <TextInput
+          style={styles.citySearchInput}
+          placeholder="搜索城市..."
+          placeholderTextColor={Colors.walnut2}
+          value={citySearch}
+          onChangeText={(text) => {
+            setCitySearch(text);
+            searchCitiesOnline(text).then(setCityResults);
+          }}
+          autoFocus
+        />
+        <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
+          {cityResults.map(cr => {
+            const isActive = city === cr.name;
+            return (
+              <TouchableOpacity
+                key={cr.id || cr.name}
+                style={[styles.cityRow, isActive && styles.cityRowActive]}
+                onPress={() => {
+                  setCity(cr.name);
+                  setCityModalVisible(false);
+                  setCitySearch('');
+                }}
+              >
+                <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
+                  {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          <Text style={styles.modalCloseText}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -163,53 +207,23 @@ export default function OnboardingStep1() {
       </View>
     </ScrollView>
 
-      <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>选择城市</Text>
-            <TextInput
-              style={styles.citySearchInput}
-              placeholder="搜索城市..."
-              placeholderTextColor={Colors.walnut2}
-              value={citySearch}
-              onChangeText={(text) => {
-                setCitySearch(text);
-                searchCitiesOnline(text).then(setCityResults);
-              }}
-              autoFocus
-            />
-            <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
-              {cityResults.map(cr => {
-                const isActive = city === cr.name;
-                return (
-                  <TouchableOpacity
-                    key={cr.id || cr.name}
-                    style={[styles.cityRow, isActive && styles.cityRowActive]}
-                    onPress={() => {
-                      setCity(cr.name);
-                      setCityModalVisible(false);
-                      setCitySearch('');
-                    }}
-                  >
-                    <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
-                      {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
-              <Text style={styles.modalCloseText}>取消</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {isWeb ? (
+        cityModalVisible ? <View style={styles.webLayer}>{citySheet}</View> : null
+      ) : (
+        <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          {citySheet}
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.paper },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
+  safeArea: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   container: { flex: 1 },
   inner: { padding: Spacing.four, paddingTop: Spacing.six, gap: Spacing.three },
   progress: { flexDirection: 'row', gap: Spacing.one, marginBottom: Spacing.two },

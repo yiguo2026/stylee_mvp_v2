@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
-  Modal, FlatList,
+  Modal, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
@@ -12,6 +12,8 @@ import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { supabase } from '@/lib/supabase';
+
+const isWeb = Platform.OS === 'web';
 
 // ── Types ────────────────────────────────────────────────
 interface SavedOutfit {
@@ -161,6 +163,55 @@ export default function RecordTab() {
     }
   };
 
+  const detailSheet = (
+    <SafeAreaView style={styles.modalSafe}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>{detailOutfit?.name ?? '搭配详情'}</Text>
+        <TouchableOpacity onPress={() => setDetailOutfit(null)}>
+          <Text style={styles.modalClose}>关闭</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.modalContent}>
+        {detailOutfit ? (
+          <Text style={styles.modalDate}>
+            保存于 {new Date(detailOutfit.created_at).toLocaleDateString('zh-CN', {
+              year: 'numeric', month: 'long', day: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            })}
+          </Text>
+        ) : null}
+
+        {detailOutfit?.ai_comment ? (
+          <View style={styles.commentCard}>
+            <Text style={styles.commentLabel}>AI 搭配点评</Text>
+            <Text style={styles.commentText}>{detailOutfit.ai_comment}</Text>
+          </View>
+        ) : null}
+
+        <Text style={styles.itemsTitle}>搭配单品</Text>
+        {loadingItems ? (
+          <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: 16 }} />
+        ) : detailOutfit?.items?.length ? (
+          detailOutfit.items.map(item => (
+            <View key={item.item_id} style={styles.itemRow}>
+              <View style={styles.itemIconWrap}>
+                <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
+              </View>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={styles.itemMeta}>{item.color} · {item.category}</Text>
+              </View>
+              {item.role ? <Text style={styles.itemRole}>{item.role}</Text> : null}
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noItems}>单品信息暂无</Text>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
     else setViewMonth(m => m - 1);
@@ -237,8 +288,8 @@ export default function RecordTab() {
               ))}
             </View>
             <View style={styles.daysGrid}>
-              {Array.from({ length: firstDay }).map((_, i) => (
-                <View key={`empty-${i}`} style={styles.dayCell} />
+              {Array.from({ length: firstDay }, (_, i) => `${viewYear}-${viewMonth}-${i}`).map(slotKey => (
+                <View key={`empty-${slotKey}`} style={styles.dayCell} />
               ))}
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
                 const key = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -257,13 +308,13 @@ export default function RecordTab() {
                     <Text style={[styles.dayNum, isToday && styles.dayNumToday, isSelected && styles.dayNumSelected]}>
                       {day}
                     </Text>
-                    {hasOutfit && (
+                    {hasOutfit ? (
                       <View style={styles.dotRow}>
-                        {Array.from({ length: Math.min(outfitCount, 3) }).map((_, i) => (
-                          <View key={i} style={[styles.dot, isSelected && styles.dotSelected]} />
+                        {Array.from({ length: Math.min(outfitCount, 3) }, (_, i) => `${key}-dot-${i}`).map(dotKey => (
+                          <View key={dotKey} style={[styles.dot, isSelected && styles.dotSelected]} />
                         ))}
                       </View>
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}
@@ -348,62 +399,21 @@ export default function RecordTab() {
         </ScrollView>
       )}
 
-      {loading && <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: Spacing.two }} />}
+      {loading ? <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: Spacing.two }} /> : null}
 
       {/* Outfit Detail Modal */}
-      <Modal
-        visible={!!detailOutfit}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setDetailOutfit(null)}
-      >
-        <SafeAreaView style={styles.modalSafe}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{detailOutfit?.name ?? '搭配详情'}</Text>
-            <TouchableOpacity onPress={() => setDetailOutfit(null)}>
-              <Text style={styles.modalClose}>关闭</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            {detailOutfit && (
-              <Text style={styles.modalDate}>
-                保存于 {new Date(detailOutfit.created_at).toLocaleDateString('zh-CN', {
-                  year: 'numeric', month: 'long', day: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              </Text>
-            )}
-
-            {detailOutfit?.ai_comment && (
-              <View style={styles.commentCard}>
-                <Text style={styles.commentLabel}>AI 搭配点评</Text>
-                <Text style={styles.commentText}>{detailOutfit.ai_comment}</Text>
-              </View>
-            )}
-
-            <Text style={styles.itemsTitle}>搭配单品</Text>
-            {loadingItems ? (
-              <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: 16 }} />
-            ) : detailOutfit?.items?.length ? (
-              detailOutfit.items.map(item => (
-                <View key={item.item_id} style={styles.itemRow}>
-                  <View style={styles.itemIconWrap}>
-                    <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
-                  </View>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemMeta}>{item.color} · {item.category}</Text>
-                  </View>
-                  {item.role && <Text style={styles.itemRole}>{item.role}</Text>}
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noItems}>单品信息暂无</Text>
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      {isWeb ? (
+        detailOutfit ? <View style={styles.webLayer}>{detailSheet}</View> : null
+      ) : (
+        <Modal
+          visible={!!detailOutfit}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setDetailOutfit(null)}
+        >
+          {detailSheet}
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -411,7 +421,11 @@ export default function RecordTab() {
 const CELL_SIZE = 44;
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
+  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two,

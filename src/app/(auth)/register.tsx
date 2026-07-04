@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
   ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase, supabaseAdmin, confirmUser } from '@/lib/supabase';
-import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { Colors, Spacing, Radius, T } from '@/constants/theme';
+
+const isWeb = Platform.OS === 'web';
 
 function usernameToEmail(username: string) {
   return `${username.toLowerCase().trim()}@users.stylee.app`;
@@ -113,6 +115,47 @@ export default function RegisterScreen() {
     }
   };
 
+  const termsContent = (
+    <View style={styles.termsModal}>
+      <View style={styles.termsModalHeader}>
+        <Text style={styles.termsModalTitle}>用户协议与隐私政策</Text>
+        <TouchableOpacity onPress={() => setShowTerms(false)}>
+          <Text style={styles.termsModalClose}>关闭</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={styles.termsModalContent}>
+        <Text style={styles.termsSectionTitle}>用户协议</Text>
+        <Text style={styles.termsBody}>
+一、服务说明{'\n\n'}
+Stylee AI穿搭助手（下称“本应用”）仅面向个人非商用场景提供以下工具类服务：穿搭智能推荐、衣橱数字化管理、穿搭记录留存、虚拟试穿辅助。{'\n\n'}
+二、账号责任{'\n\n'}
+注册账号、设置密码后，您需自行保管账号登录信息。因账号泄露、转借他人造成的数据丢失、他人恶意操作衣橱内容等后果，均由您本人自行承担。{'\n\n'}
+三、功能限制{'\n\n'}
+AI穿搭方案仅为参考建议，不构成穿搭、服饰选购的决定性依据。虚拟试穿、风格推荐受算法模型限制，无法保证100%贴合个人身形、场景需求。{'\n\n'}
+四、使用规范{'\n\n'}
+禁止上传色情、暴力、侵权、违法违规衣物图片。禁止利用本应用传播违规内容。{'\n\n'}
+五、知识产权{'\n\n'}
+本应用界面设计、AI算法模型、推荐逻辑等均为Stylee所有。{'\n\n'}
+六、免责声明{'\n\n'}
+因不可抗力导致的数据丢失，本应用不承担赔偿责任。
+        </Text>
+        <Text style={styles.termsSectionTitle}>隐私政策</Text>
+        <Text style={styles.termsBody}>
+一、数据收集范围{'\n\n'}
+本应用仅在本地浏览器 LocalStorage 存储以下信息：账号昵称与基本偏好设置、衣橱衣物信息、穿搭记录与搭配历史、风格偏好设置、AI试穿身体信息。不会主动收集手机号、身份证、精确地理位置等敏感个人信息。{'\n\n'}
+二、图片权限说明{'\n\n'}
+相册、相机权限仅用于拍摄/上传衣物照片录入衣橱。图片文件仅保存在您当前设备本地。不会自动上传至外部服务器。{'\n\n'}
+三、数据使用规则{'\n\n'}
+您的衣橱数据、穿搭记录仅用于为您个人生成个性化AI穿搭推荐。不会向第三方售卖、共享您的数据。不会基于您的数据进行广告推送。{'\n\n'}
+四、数据存储与安全{'\n\n'}
+所有数据均存储于浏览器本地，不经过远程服务器。数据安全性取决于您的设备与浏览器安全环境。{'\n\n'}
+五、数据删除{'\n\n'}
+您可随时通过「我的 → 设置 → 退出登录」清空本地全部存储数据。
+        </Text>
+      </ScrollView>
+    </View>
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -197,52 +240,23 @@ export default function RegisterScreen() {
       </ScrollView>
 
       {/* Terms Modal */}
-      <Modal visible={showTerms} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.termsModal}>
-          <View style={styles.termsModalHeader}>
-            <Text style={styles.termsModalTitle}>用户协议与隐私政策</Text>
-            <TouchableOpacity onPress={() => setShowTerms(false)}>
-              <Text style={styles.termsModalClose}>关闭</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.termsModalContent}>
-            <Text style={styles.termsSectionTitle}>用户协议</Text>
-            <Text style={styles.termsBody}>
-一、服务说明{'\n\n'}
-Stylee AI穿搭助手（下称"本应用"）仅面向个人非商用场景提供以下工具类服务：穿搭智能推荐、衣橱数字化管理、穿搭记录留存、虚拟试穿辅助。{'\n\n'}
-二、账号责任{'\n\n'}
-注册账号、设置密码后，您需自行保管账号登录信息。因账号泄露、转借他人造成的数据丢失、他人恶意操作衣橱内容等后果，均由您本人自行承担。{'\n\n'}
-三、功能限制{'\n\n'}
-AI穿搭方案仅为参考建议，不构成穿搭、服饰选购的决定性依据。虚拟试穿、风格推荐受算法模型限制，无法保证100%贴合个人身形、场景需求。{'\n\n'}
-四、使用规范{'\n\n'}
-禁止上传色情、暴力、侵权、违法违规衣物图片。禁止利用本应用传播违规内容。{'\n\n'}
-五、知识产权{'\n\n'}
-本应用界面设计、AI算法模型、推荐逻辑等均为Stylee所有。{'\n\n'}
-六、免责声明{'\n\n'}
-因不可抗力导致的数据丢失，本应用不承担赔偿责任。
-            </Text>
-            <Text style={styles.termsSectionTitle}>隐私政策</Text>
-            <Text style={styles.termsBody}>
-一、数据收集范围{'\n\n'}
-本应用仅在本地浏览器 LocalStorage 存储以下信息：账号昵称与基本偏好设置、衣橱衣物信息、穿搭记录与搭配历史、风格偏好设置、AI试穿身体信息。不会主动收集手机号、身份证、精确地理位置等敏感个人信息。{'\n\n'}
-二、图片权限说明{'\n\n'}
-相册、相机权限仅用于拍摄/上传衣物照片录入衣橱。图片文件仅保存在您当前设备本地。不会自动上传至外部服务器。{'\n\n'}
-三、数据使用规则{'\n\n'}
-您的衣橱数据、穿搭记录仅用于为您个人生成个性化AI穿搭推荐。不会向第三方售卖、共享您的数据。不会基于您的数据进行广告推送。{'\n\n'}
-四、数据存储与安全{'\n\n'}
-所有数据均存储于浏览器本地，不经过远程服务器。数据安全性取决于您的设备与浏览器安全环境。{'\n\n'}
-五、数据删除{'\n\n'}
-您可随时通过「我的 → 设置 → 退出登录」清空本地全部存储数据。
-            </Text>
-          </ScrollView>
-        </View>
-      </Modal>
+      {isWeb ? (
+        showTerms ? <View style={styles.webLayer}>{termsContent}</View> : null
+      ) : (
+        <Modal visible={showTerms} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowTerms(false)}>
+          {termsContent}
+        </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.paper },
+  container: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
   inner: {
     flexGrow: 1, justifyContent: 'center',
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.six,
