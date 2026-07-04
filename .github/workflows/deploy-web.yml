@@ -31,6 +31,6 @@ jobs:
         with:
           personal_token: ${{ secrets.DEPLOY_TOKEN }}
           external_repository: yiguo2026/yiguo2026.github.io
-          publish_branch: main
+          publish_branch: gh-pages
           publish_dir: ./dist
           force_orphan: true
