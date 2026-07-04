@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Image, ActivityIndicator, Alert, Modal,
   SafeAreaView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
@@ -160,8 +160,46 @@ export default function AddWardrobeItem() {
     : pickerField === 'color' ? color
     : material;
 
+  const pickerSheet = (
+    <>
+      <TouchableOpacity
+        style={styles.modalBackdrop}
+        onPress={() => setPickerField(null)}
+      />
+      <View style={styles.modalContent}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>
+            {pickerField ? pickerTitles[pickerField] : ''}
+          </Text>
+          <TouchableOpacity onPress={() => setPickerField(null)}>
+            <Text style={styles.modalClose}>完成</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView>
+          {pickerField ? pickerOptions[pickerField].map(opt => (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.pickerOption, opt === currentPickerValue && styles.pickerOptionActive]}
+              onPress={() => handlePickerSelect(opt)}
+            >
+              <Text style={[
+                styles.pickerOptionText,
+                opt === currentPickerValue && styles.pickerOptionTextActive,
+              ]}>
+                {opt}
+              </Text>
+              {opt === currentPickerValue ? <Feather name="check" size={16} color={Colors.sage} /> : null}
+            </TouchableOpacity>
+          )) : null}
+        </ScrollView>
+      </View>
+    </>
+  );
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <>
+      <Stack.Screen options={{ presentation: isWeb ? 'card' : 'modal' }} />
+      <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.cancel}>取消</Text>
@@ -320,45 +358,26 @@ export default function AddWardrobeItem() {
       ) : null}
 
       {/* Picker Modal */}
-      <Modal visible={pickerField !== null} transparent animationType="slide">
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          onPress={() => setPickerField(null)}
-        />
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {pickerField ? pickerTitles[pickerField] : ''}
-            </Text>
-            <TouchableOpacity onPress={() => setPickerField(null)}>
-              <Text style={styles.modalClose}>完成</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView>
-            {pickerField ? pickerOptions[pickerField].map(opt => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.pickerOption, opt === currentPickerValue && styles.pickerOptionActive]}
-                onPress={() => handlePickerSelect(opt)}
-              >
-                <Text style={[
-                  styles.pickerOptionText,
-                  opt === currentPickerValue && styles.pickerOptionTextActive,
-                ]}>
-                  {opt}
-                </Text>
-                {opt === currentPickerValue ? <Feather name="check" size={16} color={Colors.sage} /> : null}
-              </TouchableOpacity>
-            )) : null}
-          </ScrollView>
-        </View>
-      </Modal>
-    </SafeAreaView>
+      {pickerField ? (
+        isWeb ? (
+          <View style={styles.webLayer}>{pickerSheet}</View>
+        ) : (
+          <Modal visible transparent animationType="slide" onRequestClose={() => setPickerField(null)}>
+            {pickerSheet}
+          </Modal>
+        )
+      ) : null}
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
+  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

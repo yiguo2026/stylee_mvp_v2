@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, SafeAreaView, RefreshControl,
-  TextInput, Modal, ScrollView, ActivityIndicator, Alert,
+  TextInput, Modal, ScrollView, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -14,6 +14,8 @@ import { useWishlistStore } from '@/stores/wishlistStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { aiExtractProductFromLink } from '@/lib/ai';
+
+const isWeb = Platform.OS === 'web';
 
 function ItemCard({ item }: { item: WardrobeItem }) {
   return (
@@ -46,40 +48,49 @@ function LinkImportModal({ visible, url, onChangeUrl, importing, onImport, onClo
   visible: boolean; url: string; onChangeUrl: (v: string) => void;
   importing: boolean; onImport: () => void; onClose: () => void;
 }) {
-  return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.linkHeader}>
-            <Text style={styles.linkTitle}>链接导入</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.linkClose}>关闭</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.linkLabel}>商品链接</Text>
-          <TextInput
-            style={styles.linkInput}
-            placeholder="粘贴商品链接…"
-            placeholderTextColor={Colors.walnut2}
-            value={url}
-            onChangeText={onChangeUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-          />
-          <Text style={styles.linkHint}>AI 将自动识别商品信息并填入衣橱</Text>
-          <TouchableOpacity
-            style={[styles.linkImportBtn, importing && styles.disabled]}
-            onPress={onImport}
-            disabled={importing}
-          >
-            {importing
-              ? <ActivityIndicator color={Colors.paper} />
-              : <Text style={styles.linkImportBtnText}>导入商品</Text>
-            }
+  const content = (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        <View style={styles.linkHeader}>
+          <Text style={styles.linkTitle}>链接导入</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={styles.linkClose}>关闭</Text>
           </TouchableOpacity>
         </View>
+        <Text style={styles.linkLabel}>商品链接</Text>
+        <TextInput
+          style={styles.linkInput}
+          placeholder="粘贴商品链接…"
+          placeholderTextColor={Colors.walnut2}
+          value={url}
+          onChangeText={onChangeUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+        />
+        <Text style={styles.linkHint}>AI 将自动识别商品信息并填入衣橱</Text>
+        <TouchableOpacity
+          style={[styles.linkImportBtn, importing && styles.disabled]}
+          onPress={onImport}
+          disabled={importing}
+        >
+          {importing
+            ? <ActivityIndicator color={Colors.paper} />
+            : <Text style={styles.linkImportBtnText}>导入商品</Text>
+          }
+        </TouchableOpacity>
       </View>
+    </View>
+  );
+
+  if (isWeb) {
+    if (!visible) return null;
+    return <View style={styles.webLayer}>{content}</View>;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {content}
     </Modal>
   );
 }
@@ -102,7 +113,7 @@ export default function WardrobeTab() {
       fetchItems(user.id);
       fetchWishlist(user.id);
     }
-  }, [user]);
+  }, [fetchItems, fetchWishlist, user]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -170,6 +181,30 @@ export default function WardrobeTab() {
     await moveToWardrobe(wishId);
     if (user) fetchItems(user.id);
   };
+
+  const addSheet = (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        <Text style={styles.modalWarning}>仅支持单品上传，请每次上传一件衣物</Text>
+
+        <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/add'); }}>
+          <Text style={styles.modalOptionText}>单品录入</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/batch'); }}>
+          <Text style={styles.modalOptionText}>批量导入</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); setShowLinkModal(true); }}>
+          <Text style={styles.modalOptionText}>链接导入</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
+          <Text style={styles.modalCancelText}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -284,29 +319,13 @@ export default function WardrobeTab() {
       </TouchableOpacity>
 
       {/* Add Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalWarning}>仅支持单品上传，请每次上传一件衣物</Text>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/add'); }}>
-              <Text style={styles.modalOptionText}>单品录入</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/batch'); }}>
-              <Text style={styles.modalOptionText}>批量导入</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); setShowLinkModal(true); }}>
-              <Text style={styles.modalOptionText}>链接导入</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
-              <Text style={styles.modalCancelText}>取消</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {isWeb ? (
+        showAddModal ? <View style={styles.webLayer}>{addSheet}</View> : null
+      ) : (
+        <Modal visible={showAddModal} transparent animationType="slide" onRequestClose={() => setShowAddModal(false)}>
+          {addSheet}
+        </Modal>
+      )}
 
       {/* Link Import Modal */}
       <LinkImportModal
@@ -365,7 +384,11 @@ export default function WardrobeTab() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper },
+  webLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 220,
+  },
+  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two,
