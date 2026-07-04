@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Image, Alert, Platform,
+  ScrollView, SafeAreaView, Image, Alert, Platform, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useTryOnStore } from '@/stores/tryonStore';
+import { useUserStore } from '@/stores/userStore';
+import { saveSelfie } from '@/lib/bodyModel';
 
 const isWeb = Platform.OS === 'web';
 
@@ -35,7 +37,9 @@ async function compressToDataUrl(uri: string, maxWidth = 200): Promise<string> {
 
 export default function TryOnBodyPage() {
   const { selfieUri, setSelfie } = useTryOnStore();
+  const { user } = useUserStore();
   const [localUri, setLocalUri] = useState<string | null>(selfieUri);
+  const [saving, setSaving] = useState(false);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -74,8 +78,14 @@ export default function TryOnBodyPage() {
     }
   };
 
-  const handleSave = () => {
-    setSelfie(localUri);
+  const handleSave = async () => {
+    if (!localUri || !user?.id) return;
+    setSaving(true);
+    // Upload to Supabase and get persistent URL
+    const serverUrl = await saveSelfie(localUri, user.id);
+    // Use server URL if available, otherwise fall back to local URI
+    setSelfie(serverUrl || localUri);
+    setSaving(false);
     if (router.canGoBack()) router.back();
   };
 
@@ -116,16 +126,19 @@ export default function TryOnBodyPage() {
 
         {/* Privacy Note */}
         <View style={styles.privacyCard}>
-          <Text style={styles.privacyText}>照片仅用于AI试穿效果生成，不会上传至服务器。</Text>
+          <Text style={styles.privacyText}>照片仅用于AI试穿效果生成，安全存储在您的账户中。</Text>
         </View>
 
         {/* Save Button */}
         <TouchableOpacity
-          style={[styles.saveBtn, !localUri && styles.saveBtnDisabled]}
+          style={[styles.saveBtn, (!localUri || saving) && styles.saveBtnDisabled]}
           onPress={handleSave}
-          disabled={!localUri}
+          disabled={!localUri || saving}
         >
-          <Text style={styles.saveBtnText}>保存身体信息</Text>
+          {saving
+            ? <ActivityIndicator color={Colors.paper} size="small" />
+            : <Text style={styles.saveBtnText}>保存身体信息</Text>
+          }
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

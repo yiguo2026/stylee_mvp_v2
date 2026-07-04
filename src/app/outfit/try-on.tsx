@@ -49,7 +49,7 @@ export default function TryOnScreen() {
   const { items: itemsParam } = useLocalSearchParams<{ items?: string; outfitId?: string }>();
   const isFromResult = !!itemsParam;
 
-  const { selfieUri, selectedScene, setSelectedScene, addRecord } = useTryOnStore();
+  const { selfieUri, selectedScene, setSelectedScene, addRecord, loadSelfieFromServer, loaded } = useTryOnStore();
   const { user } = useUserStore();
 
   // Outfit selection (for home entry)
@@ -81,6 +81,7 @@ export default function TryOnScreen() {
   useEffect(() => {
     if (!user?.id) return;
     getQuota(user.id, 'tryon').then(q => setQuota({ used: q.used, limit: q.limit, remaining: q.remaining }));
+    if (!loaded) loadSelfieFromServer(user.id);
   }, [user?.id]);
 
   const loadOutfits = useCallback(async () => {

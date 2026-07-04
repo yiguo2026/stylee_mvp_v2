@@ -9,6 +9,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { supabase } from '@/lib/supabase';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
+import { saveSelfie } from '@/lib/bodyModel';
 import { Gender } from '@/types';
 
 const isWeb = Platform.OS === 'web';
@@ -143,9 +144,14 @@ export function ProfileEditModal({ visible, onClose }: Props) {
         { onConflict: 'user_id' },
       );
       if (error) throw error;
-      // Save selfie to tryon store
+      // Save selfie to Supabase and tryon store
       if (localSelfieUri !== selfieUri) {
-        setSelfie(localSelfieUri);
+        if (localSelfieUri && user.id) {
+          const serverUrl = await saveSelfie(localSelfieUri, user.id);
+          setSelfie(serverUrl || localSelfieUri);
+        } else {
+          setSelfie(localSelfieUri);
+        }
       }
       try {
         await fetchProfile();

@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type QuotaType = 'recommend' | 'tryon';
 
 export const DAILY_LIMIT: Record<QuotaType, number> = {
-  recommend: 5,
-  tryon: 3,
+  recommend: 10,
+  tryon: 10,
 };
 
 type QuotaState = {
