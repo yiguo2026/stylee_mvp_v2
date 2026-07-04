@@ -1,6 +1,7 @@
 import { DASHSCOPE_API_KEY } from './secrets';
 
 const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+const DASHSCOPE_NATIVE_URL = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 const QWEN_VL_MODEL = 'qwen3-vl-plus';
 const QWEN_IMAGE_MODEL = 'qwen-image-2.0-pro';
 
@@ -114,12 +115,11 @@ export async function qwenVisionChat(
 }
 
 /**
- * qwen-image-2.0-pro uses the chat completions endpoint with text input,
- * but returns image URLs in a non-standard format:
- * choices[0].message.content = [{image: "https://..."}]
+ * qwen-image-2.0-pro must use DashScope's native MultiModalConversation endpoint,
+ * NOT the OpenAI-compatible-mode endpoint (which returns empty content).
  *
- * This is NOT the OpenAI-compatible format — it's DashScope's MultiModalConversation format
- * exposed through the compatible-mode endpoint.
+ * Native endpoint: POST /api/v1/services/aigc/multimodal-generation/generation
+ * Response: output.choices[0].message.content[0].image = "https://..."
  */
 export async function qwenGenerateImage(
   prompt: string,
@@ -131,20 +131,26 @@ export async function qwenGenerateImage(
   }
 
   try {
-    const contentParts: DashScopeContentBlock[] = [
-      { type: 'text', text: prompt },
+    const contentParts: { text: string }[] = [
+      { text: prompt },
     ];
 
-    const body: Record<string, unknown> = {
+    const body = {
       model: QWEN_IMAGE_MODEL,
-      messages: [{ role: 'user', content: contentParts }],
-      stream: false,
+      input: {
+        messages: [
+          {
+            role: 'user',
+            content: contentParts,
+          },
+        ],
+      },
     };
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 120000);
 
-    const res = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, {
+    const res = await fetch(DASHSCOPE_NATIVE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,13 +167,9 @@ export async function qwenGenerateImage(
     }
 
     const data = await res.json();
-    const content = data.choices?.[0]?.message?.content;
 
-    console.log('[DashScope] Image gen raw content type:', typeof content, 'preview:', JSON.stringify(content)?.slice(0, 300));
-
-    // Response content can be:
-    // 1. Array: [{image: "https://..."}] — DashScope's native format
-    // 2. String with URL — rare but possible
+    // Native format: output.choices[0].message.content[0].image
+    const content = data.output?.choices?.[0]?.message?.content;
     if (Array.isArray(content)) {
       for (const item of content) {
         if (typeof item === 'object' && item.image && typeof item.image === 'string') {
@@ -176,11 +178,7 @@ export async function qwenGenerateImage(
       }
     }
 
-    if (typeof content === 'string' && content.startsWith('http')) {
-      return content.trim();
-    }
-
-    console.warn('[DashScope] Image gen: unexpected response format', typeof content);
+    console.warn('[DashScope] Image gen: unexpected response', JSON.stringify(data).slice(0, 300));
     return null;
   } catch (e) {
     console.warn('[DashScope] Image gen failed:', e);
