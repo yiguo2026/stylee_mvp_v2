@@ -311,10 +311,16 @@ export default function WardrobeTab() {
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="hanger" size={56} color={Colors.walnut2} />
-            <Text style={styles.emptyTitle}>
-              {selectedCategory === '全部' ? '还没有衣物' : `没有${selectedCategory}类型的衣物`}
-            </Text>
-            <Text style={styles.emptySub}>添加第一件衣服，开启你的数字衣橱</Text>
+            {selectedCategory === '全部' ? (
+              <>
+                <Text style={styles.emptyTitle}>还没有衣物</Text>
+                <Text style={styles.emptySub}>添加第一件衣服，开启你的数字衣橱</Text>
+              </>
+            ) : (
+              <Text style={styles.emptySub}>
+                {`没有${selectedCategory}类型的衣物。添加第一件衣服，开启你的数字衣橱`}
+              </Text>
+            )}
           </View>
         ) : (
           <View style={styles.grid}>
@@ -402,15 +408,22 @@ const styles = StyleSheet.create({
   },
   safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
+    minHeight: 44,
   },
   title: { ...T.pageTitle },
 
   // Search
   searchRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.four, marginBottom: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.four,
+    marginBottom: Spacing.two,
   },
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
@@ -519,7 +532,7 @@ const styles = StyleSheet.create({
   modalCancelText: { ...T.bodyText, fontSize: 16, color: Colors.walnut },
 
   linkHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two },
-  linkTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 18, color: Colors.ink },
+  linkTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 18, color: Colors.ink },
   linkClose: { fontSize: 18, color: Colors.walnut2 },
   linkLabel: { ...T.tag, fontSize: 12, color: Colors.walnut, marginBottom: Spacing.one },
   linkInput: {
@@ -542,7 +555,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
   wishlistBack: { fontSize: 16, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
-  wishlistTitle: { fontSize: 18, fontFamily: Fonts.cnTitle, color: Colors.ink },
+  wishlistTitle: { fontSize: 18, fontFamily: Fonts.titleSerif, color: Colors.ink },
   wishlistCountText: { fontSize: 13, color: Colors.walnut2, marginLeft: 'auto' },
   wishlistBody: { flex: 1, padding: Spacing.four },
   wishlistEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },

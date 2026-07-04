@@ -721,7 +721,7 @@ const styles = StyleSheet.create({
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: Colors.line, backgroundColor: Colors.paperRaised },
   back: { ...T.buttonSecondary, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
-  headerTitle: { fontSize: 17, fontFamily: Fonts.cnTitle, color: Colors.ink },
+  headerTitle: { fontSize: 17, fontFamily: Fonts.titleSerif, color: Colors.ink },
   headerIdx: { color: Colors.terracotta },
   headerTotal: { color: Colors.walnut2 },
   favBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 },

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
@@ -83,7 +84,11 @@ export default function OnboardingStep2() {
               <Text style={[styles.styleName, isLiked && styles.styleNameLiked]}>
                 {tag.tag_name}
               </Text>
-              {isLiked && <Text style={styles.styleCheck}>已选</Text>}
+              {isLiked ? (
+                <View style={styles.styleCheck}>
+                  <Feather name="check" size={12} color={Colors.paper} />
+                </View>
+              ) : null}
             </TouchableOpacity>
           );
         })}
@@ -149,8 +154,10 @@ const styles = StyleSheet.create({
   styleName: { ...T.tag, color: Colors.ink, fontFamily: Fonts.ui },
   styleNameLiked: { color: Colors.paper, fontFamily: Fonts.uiSemiBold },
   styleCheck: {
-    position: 'absolute', top: 6, right: 8,
-    fontSize: 14, color: Colors.paper, fontFamily: Fonts.uiSemiBold,
+    position: 'absolute', top: 8, right: 8,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center', justifyContent: 'center',
   },
 
   previewRow: { flexDirection: 'row', gap: Spacing.one },

@@ -63,9 +63,11 @@ export default function ProfileTab() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.header}>
         <Text style={styles.pageTitle}>我的</Text>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.content}>
         {/* Profile Header */}
         <View style={styles.profileCard}>
           <View style={styles.profileTop}>
@@ -183,7 +185,18 @@ export default function ProfileTab() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+  header: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  content: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.six,
+    gap: Spacing.three,
+  },
   pageTitle: { ...T.pageTitle },
 
   // Profile card
@@ -198,7 +211,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  avatarText: { fontSize: 32, color: '#fff', fontFamily: Fonts.cnDisplay },
+  avatarText: { fontSize: 32, color: '#fff', fontFamily: Fonts.pageTitleSerif },
   avatarEmoji: { fontSize: 32, color: '#fff' },
   avatarImage: { width: 72, height: 72, borderRadius: 36 },
   editBadge: {
@@ -236,7 +249,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   menuCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  menuCardTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
+  menuCardTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 16, color: Colors.ink },
   menuCardArrow: { color: Colors.walnut2, fontSize: 16 },
 
   // Style tags

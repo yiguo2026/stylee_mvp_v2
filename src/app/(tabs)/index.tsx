@@ -464,7 +464,12 @@ const styles = StyleSheet.create({
   },
   safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   container: { flex: 1 },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: Spacing.two,
+    gap: 12,
+    paddingBottom: Spacing.four + 8,
+  },
 
   // ── Weather Bar ──
   weatherBar: {
@@ -472,24 +477,24 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontFamily: Fonts.displayItalic,
-    fontSize: 28,
+    fontSize: 26,
     letterSpacing: 0,
     color: Colors.ink,
   },
   weatherBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.one + 2,
+    paddingHorizontal: Spacing.two + 2, paddingVertical: Spacing.one + 1,
     borderWidth: 1, borderColor: Colors.lineStrong,
   },
   weatherBtnText: { ...T.tag, color: Colors.ink },
 
   // ── Input Section ──
-  inputSection: { gap: Spacing.two },
+  inputSection: { gap: 6 },
   inputTabRow: { flexDirection: 'row', gap: Spacing.one },
   inputTab: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: Spacing.two,
+    gap: 6, paddingVertical: 6,
     borderRadius: Radius.md, borderWidth: 1,
     borderColor: Colors.line, backgroundColor: Colors.paperCard,
   },
@@ -499,16 +504,22 @@ const styles = StyleSheet.create({
 
   descCard: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.three, gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 8,
     borderWidth: 1, borderColor: Colors.line,
   },
   queryInput: {
-    ...T.bodyText, color: Colors.ink, minHeight: 60,
+    ...T.bodyText, color: Colors.ink, minHeight: 48,
     textAlignVertical: 'top',
   },
   tagsCard: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.three, gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 8,
     borderWidth: 1, borderColor: Colors.line,
   },
   tagSection: { gap: Spacing.one },
@@ -525,15 +536,21 @@ const styles = StyleSheet.create({
 
   generateBtn: {
     backgroundColor: Colors.ink, borderRadius: Radius.md,
-    paddingVertical: Spacing.two + 2, flexDirection: 'row',
+    paddingVertical: 9, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   generateBtnDisabled: { opacity: 0.4 },
   generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
-  quotaHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: Spacing.one },
+  quotaHint: {
+    ...T.micro,
+    textAlign: 'center',
+    color: Colors.walnut2,
+    marginTop: 2,
+    lineHeight: 14,
+  },
 
   // ── Wardrobe Preview ──
-  wardrobeSection: { gap: Spacing.two },
+  wardrobeSection: { gap: 10 },
   wardrobeHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
@@ -541,16 +558,18 @@ const styles = StyleSheet.create({
   wardrobeViewAll: { ...T.tag, color: Colors.terracotta },
   wardrobeEmpty: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.four, alignItems: 'center', gap: Spacing.two,
+    paddingVertical: 18,
+    paddingHorizontal: Spacing.four,
+    alignItems: 'center', gap: 6,
     borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
   },
   wardrobeEmptyText: { ...T.emptyTitle, fontSize: 14 },
-  wardrobeRow: { flexDirection: 'row', gap: Spacing.two },
+  wardrobeRow: { flexDirection: 'row', gap: 12 },
   wardrobeAddBtn: {
-    width: 80, alignItems: 'center', justifyContent: 'center',
+    width: 74, alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.paperCard, borderRadius: Radius.md,
     borderWidth: 1, borderColor: Colors.lineStrong, gap: 4,
-    paddingVertical: Spacing.three,
+    paddingVertical: 12,
   },
   wardrobeAddText: { ...T.micro, color: Colors.terracotta },
   wardrobeThumb: { width: 80, gap: 4 },
@@ -562,12 +581,12 @@ const styles = StyleSheet.create({
   wardrobeThumbName: { ...T.micro, fontSize: 10, textAlign: 'center' },
 
   // ── Inspiration ──
-  inspirationSection: { gap: Spacing.two },
+  inspirationSection: { gap: 10 },
   inspirationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   inspirationTitle: { ...T.subTitle },
-  inspirationRow: { flexDirection: 'row', gap: Spacing.two, paddingRight: Spacing.four },
+  inspirationRow: { flexDirection: 'row', gap: 12, paddingRight: Spacing.three },
   inspirationCard: {
-    width: 168, backgroundColor: Colors.paperCard,
+    width: 156, backgroundColor: Colors.paperCard,
     borderRadius: Radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.line,
   },
@@ -575,7 +594,7 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 4 / 3, backgroundColor: Colors.paperCard,
     alignItems: 'center', justifyContent: 'center',
   },
-  inspirationInfo: { padding: Spacing.two, gap: 4 },
+  inspirationInfo: { paddingHorizontal: Spacing.two, paddingTop: 6, paddingBottom: Spacing.one + 2, gap: 4 },
   inspirationTags: { flexDirection: 'row', gap: 4 },
   inspirationTag: {
     backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 5,
@@ -595,24 +614,24 @@ const styles = StyleSheet.create({
   tryOnSection: {
     backgroundColor: Colors.paperCard,
     borderRadius: Radius.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    gap: 6,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    gap: 3,
     borderWidth: 1,
     borderColor: Colors.line,
   },
   tryOnTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 18,
+    fontFamily: Fonts.titleSerif,
+    fontSize: 16,
     letterSpacing: 0,
-    lineHeight: 22,
+    lineHeight: 20,
     color: Colors.gray1,
   },
   tryOnSubtitle: {
     fontFamily: Fonts.body,
-    fontSize: 14,
+    fontSize: 12,
     letterSpacing: 0,
-    lineHeight: 22,
+    lineHeight: 18,
     color: Colors.gray1,
   },
 

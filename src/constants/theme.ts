@@ -64,6 +64,21 @@ export const Fonts = {
   // 中文一级标题（字重与 display 对应，但用无衬线）
   cnDisplay: 'Inter_600SemiBold',
   cnTitle: 'Inter_500Medium',
+  // 页面主标题 · 英文 Playfair Display + 中文宋体衬线回退（对齐 v3.6 · 01 Display）
+  pageTitleSerif: (Platform.select({
+    web: '"PlayfairDisplay_600SemiBold", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong", STZhongsong, SimSun, serif',
+    default: 'PlayfairDisplay_600SemiBold',
+  }) ?? 'PlayfairDisplay_600SemiBold') as string,
+  // 02 Title · Playfair Display 500 + 中文宋体衬线回退
+  titleSerif: (Platform.select({
+    web: '"PlayfairDisplay_500Medium", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong", STZhongsong, SimSun, serif',
+    default: 'PlayfairDisplay_500Medium',
+  }) ?? 'PlayfairDisplay_500Medium') as string,
+  // 04 Numeric · Playfair Display 500 · 与 titleSerif 相同族，等宽正体
+  numericSerif: (Platform.select({
+    web: '"PlayfairDisplay_500Medium", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong", STZhongsong, SimSun, serif',
+    default: 'PlayfairDisplay_500Medium',
+  }) ?? 'PlayfairDisplay_500Medium') as string,
 };
 
 // ─────────────────────────────────────────────────────────
@@ -73,14 +88,14 @@ export const T = {
 
   // ── Display · Playfair Display 600 — 英文大标题 / 品牌字标 ──
   emptyTitle: {
-    fontFamily: Fonts.cnDisplay,
+    fontFamily: Fonts.pageTitleSerif,
     fontSize: 30,
     letterSpacing: 0,
     lineHeight: 36,
     color: Colors.ink,
   },
   storyTitle: {
-    fontFamily: Fonts.display,
+    fontFamily: Fonts.pageTitleSerif,
     fontSize: 34,
     letterSpacing: 0,
     lineHeight: 40,
@@ -89,21 +104,21 @@ export const T = {
 
   // ── Title · 中文用 Inter 500/600；英文用 Playfair Display 500 ──
   pageTitle: {
-    fontFamily: Fonts.cnDisplay,
-    fontSize: 22,
+    fontFamily: Fonts.pageTitleSerif,
+    fontSize: 24,
     letterSpacing: 0,
-    lineHeight: 28,
+    lineHeight: 30,
     color: Colors.ink,
   },
   sectionTitle: {
-    fontFamily: Fonts.cnTitle,
+    fontFamily: Fonts.titleSerif,
     fontSize: 18,
     letterSpacing: 0,
     lineHeight: 24,
     color: Colors.ink,
   },
   subTitle: {
-    fontFamily: Fonts.cnTitle,
+    fontFamily: Fonts.titleSerif,
     fontSize: 15,
     letterSpacing: 0,
     lineHeight: 20,
@@ -180,19 +195,19 @@ export const T = {
 
   // ── Numeric · Playfair Display 正体 — 等宽数字 ──
   tempLarge: {
-    fontFamily: Fonts.numeric,
+    fontFamily: Fonts.numericSerif,
     fontSize: 26,
     letterSpacing: 0,
     color: Colors.ink,
   },
   statNum: {
-    fontFamily: Fonts.numeric,
+    fontFamily: Fonts.numericSerif,
     fontSize: 22,
     letterSpacing: 0,
     color: Colors.ink,
   },
   numInline: {
-    fontFamily: Fonts.numeric,
+    fontFamily: Fonts.numericSerif,
     fontSize: 15,
     letterSpacing: 0,
     color: Colors.ink,

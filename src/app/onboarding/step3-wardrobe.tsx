@@ -154,7 +154,7 @@ export default function OnboardingStep3() {
                     <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
                     {isSelected ? (
                       <View style={styles.builtinCheck}>
-                        <Text style={styles.builtinCheckText}>已选</Text>
+                        <Feather name="check" size={10} color={Colors.paper} />
                       </View>
                     ) : null}
                   </View>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
+  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 16, color: Colors.ink },
   builtinSelectAll: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
@@ -274,7 +274,6 @@ const styles = StyleSheet.create({
     width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
-  builtinCheckText: { fontSize: 10, color: '#fff', fontFamily: Fonts.uiSemiBold },
   builtinInfo: { flex: 1, gap: 2 },
   builtinName: { ...T.tag, color: Colors.ink, fontSize: 12, fontFamily: Fonts.uiSemiBold },
   builtinNameSelected: { color: Colors.ink },
@@ -287,7 +286,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   batchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  batchHeaderTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
+  batchHeaderTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 16, color: Colors.ink },
   batchAddBtnWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   batchAddBtn: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
   albumRow: { flexDirection: 'row', gap: Spacing.two },

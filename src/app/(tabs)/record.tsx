@@ -427,13 +427,22 @@ const styles = StyleSheet.create({
   },
   safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
+    minHeight: 44,
   },
   pageTitle: { ...T.pageTitle },
   headerStats: { ...T.micro, color: Colors.walnut },
 
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+  content: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.six,
+    gap: Spacing.three,
+  },
 
   // Month nav
   monthNav: {

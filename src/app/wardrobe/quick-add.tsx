@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
   ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
 } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
@@ -43,7 +44,10 @@ export default function QuickAddPage() {
   );
 
   const addableIndices = useMemo(() =>
-    filteredIndices.filter(i => !isAdded(i)),
+    filteredIndices.filter(i => {
+      const item = PRESET_BASIC_ITEMS[i];
+      return !existingKeys.has(`${item.name}||${item.category}`);
+    }),
     [filteredIndices, existingKeys]
   );
 
@@ -159,16 +163,16 @@ export default function QuickAddPage() {
                     ) : (
                       <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
                     )}
-                    {isSelected && (
+                    {isSelected ? (
                       <View style={styles.builtinCheck}>
-                        <Text style={styles.builtinCheckText}>已选</Text>
+                        <Feather name="check" size={10} color={Colors.paper} />
                       </View>
-                    )}
-                    {alreadyAdded && (
+                    ) : null}
+                    {alreadyAdded ? (
                       <View style={styles.builtinAddedBadge}>
                         <Text style={styles.builtinAddedText}>已添加</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                   <View style={styles.builtinInfo}>
                     <Text style={[styles.builtinName, isSelected && styles.builtinNameSelected, alreadyAdded && styles.builtinNameDisabled]} numberOfLines={1}>
@@ -220,7 +224,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   builtinHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.cnTitle, fontSize: 16, color: Colors.ink },
+  builtinHeaderTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 16, color: Colors.ink },
   builtinSelectAll: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
 
   categoryRow: { flexDirection: 'row', gap: Spacing.one },
@@ -256,7 +260,6 @@ const styles = StyleSheet.create({
     width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.signal,
     alignItems: 'center', justifyContent: 'center',
   },
-  builtinCheckText: { fontSize: 10, color: '#fff', fontFamily: Fonts.uiSemiBold },
   builtinAddedBadge: {
     position: 'absolute', bottom: 0, right: 0, left: 0,
     backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center',
