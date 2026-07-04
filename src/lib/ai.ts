@@ -9,6 +9,7 @@ import { mockRecognizeClothing } from '@/lib/mock/recognition';
 export interface AIMeta {
   source: string;     // 模型名 或 'mock'
   durationMs: number; // 耗时毫秒
+  ok: boolean;        // 是否成功拿到可用结果
 }
 
 // ─── 衣服识别 ───────────────────────────────────────────
@@ -41,7 +42,7 @@ export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: R
             style: parsed.style || '',
             brand: parsed.brand || '',
           },
-          meta: { source: 'qwen3-vl-plus', durationMs: Date.now() - t0 },
+          meta: { source: 'qwen3-vl-plus', durationMs: Date.now() - t0, ok: true },
         };
       }
     } catch (e) {
@@ -49,24 +50,24 @@ export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: R
     }
   }
   const result = await mockRecognizeClothing(imageUri);
-  return { result, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+  return { result, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
 };
 
 export const aiStandardizeGarment = async (
   imageUri: string, category: string, photoType: string,
 ): Promise<{ url: string | null; meta: AIMeta }> => {
   const t0 = Date.now();
-  if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+  if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
 
   const prompt = `将这件${category}衣物生成标准化的商品展示图，纯白背景，正面平铺，无模特，无多余装饰，高清商业摄影风格。`;
 
   try {
     const { qwenGenerateImage } = await import('@/lib/dashscope');
     const imageUrl = await qwenGenerateImage(prompt, { imageUrl: imageUri });
-    return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0 } };
+    return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: !!imageUrl } };
   } catch (e) {
     console.warn('[AI] Qwen Image standardization failed:', e);
-    return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+    return { url: null, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: false } };
   }
 };
 
@@ -167,7 +168,7 @@ export async function aiRecommendOutfits(
 ): Promise<{ outfits: Outfit[]; error?: string; meta: AIMeta }> {
   const t0 = Date.now();
   const itemsSummary = buildItemsSummary(wardrobeItems);
-  if (!itemsSummary) return { outfits: [], error: '衣橱中没有衣物，请先添加', meta: { source: 'mock', durationMs: Date.now() - t0 } };
+  if (!itemsSummary) return { outfits: [], error: '衣橱中没有衣物，请先添加', meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
 
   const activeItems = wardrobeItems.filter(i => i.status === 'active');
   const hasTop = activeItems.some(i => i.category === '上装' || i.category === '外套');
@@ -176,7 +177,7 @@ export async function aiRecommendOutfits(
     const missing = [];
     if (!hasTop) missing.push('上装');
     if (!hasBottom) missing.push('下装或连体装');
-    return { outfits: [], error: `衣橱中缺少${missing.join('和')}，建议先添加`, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+    return { outfits: [], error: `衣橱中缺少${missing.join('和')}，建议先添加`, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
   }
 
   const contextParts: string[] = [];
@@ -199,14 +200,14 @@ export async function aiRecommendOutfits(
 
   if (!raw) {
     const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
   }
 
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.outfits) || parsed.outfits.length === 0) {
       const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-      return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+      return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
     }
 
     const itemMap = new Map(wardrobeItems.map(i => [i.item_id, i]));
@@ -267,13 +268,13 @@ export async function aiRecommendOutfits(
 
     if (outfits.length === 0) {
       const fallback = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-      return { outfits: fallback, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+      return { outfits: fallback, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
     }
 
-    return { outfits, meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0 } };
+    return { outfits, meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0, ok: true } };
   } catch {
     const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0 } };
+    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
   }
 }
 

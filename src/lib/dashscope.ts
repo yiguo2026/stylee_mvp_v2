@@ -163,6 +163,8 @@ export async function qwenGenerateImage(
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
 
+    console.log('[DashScope] Image gen raw content type:', typeof content, 'preview:', JSON.stringify(content)?.slice(0, 300));
+
     // Response content can be:
     // 1. Array: [{image: "https://..."}] — DashScope's native format
     // 2. String with URL — rare but possible

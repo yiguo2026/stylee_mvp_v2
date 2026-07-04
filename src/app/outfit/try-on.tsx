@@ -169,7 +169,7 @@ export default function TryOnScreen() {
     const assetKey = SCENE_ASSET_MAP[selectedScene] ?? 'casual';
     const fallbackAsset = SCENE_IMAGES[assetKey];
     setTryOnImage(fallbackAsset || SCENE_IMAGES.casual);
-    setTryOnMeta({ source: 'mock', durationMs: Date.now() - t0 });
+    setTryOnMeta({ source: 'mock', durationMs: Date.now() - t0, ok: false });
     setGenerating(false);
 
     // Save try-on record
