@@ -121,7 +121,8 @@ export interface WardrobeItem {
   ai_recognized_attrs?: Record<string, string>;
   status: ItemStatus;
   tags?: StyleTag[];
-  wear_count?: number;    // v2: 穿着次数（计算字段）
+  wear_count?: number;    // v2: 穿搭次数（含此单品的搭配数，计算字段）
+  favorite_count?: number; // v2: 收藏次数（含此单品的收藏搭配数，计算字段）
   last_worn_at?: string;  // v2: 最近穿着时间
   created_at: string;
   updated_at: string;

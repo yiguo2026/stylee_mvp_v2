@@ -4,10 +4,11 @@ import {
   StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { ItemOutfits } from '@/components/ItemOutfits';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { WardrobeItem, RecommendedItem, OCCASION_TAGS } from '@/types';
 
@@ -23,17 +24,28 @@ export default function ItemDetailScreen() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAttrs, setShowAttrs] = useState(false);
-  const [favorited, setFavorited] = useState(false);
 
   const isRecommended = id.startsWith('rec_');
 
   useEffect(() => {
     if (isRecommended && itemDataParam) {
       try { setRecommendedItem(JSON.parse(itemDataParam)); } catch {}
-    } else {
-      setItem(items.find(i => i.item_id === id));
+      return;
     }
-  }, [id, itemDataParam, items]);
+    const found = items.find(i => i.item_id === id);
+    if (found) { setItem(found); return; }
+    // Not in store (e.g. navigated from an outfit detail page) — fetch directly.
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from('wardrobe_items')
+        .select('*')
+        .eq('item_id', id)
+        .maybeSingle();
+      if (active && data) setItem(data as WardrobeItem);
+    })();
+    return () => { active = false; };
+  }, [id, itemDataParam, items, isRecommended]);
 
   if (!item && !recommendedItem) {
     return (
@@ -150,9 +162,6 @@ export default function ItemDetailScreen() {
         {/* Metadata row */}
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>{item!.category} · {wearCountText}{lastWornText ? ` · 最近${lastWornText}` : ''}</Text>
-          <TouchableOpacity onPress={() => setFavorited(!favorited)}>
-            <Ionicons name={favorited ? 'heart' : 'heart-outline'} size={22} color={favorited ? Colors.terracotta : Colors.walnut2} />
-          </TouchableOpacity>
         </View>
 
         {/* 基础属性编辑 expandable */}
@@ -213,12 +222,7 @@ export default function ItemDetailScreen() {
         <View style={styles.wearSection}>
           <Text style={styles.wearTitle}>穿着记录</Text>
           <Text style={styles.wearCount}>{wearCountText}</Text>
-        </View>
-
-        {/* 已穿搭配 */}
-        <View style={styles.outfitSection}>
-          <Text style={styles.outfitTitle}>已穿搭配</Text>
-          <Text style={styles.outfitEmpty}>暂无搭配记录</Text>
+          <ItemOutfits itemId={item!.item_id} />
         </View>
 
         {/* Source */}
@@ -313,13 +317,6 @@ const styles = StyleSheet.create({
   },
   wearTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
   wearCount: { ...T.micro, color: Colors.walnut, marginTop: Spacing.one },
-
-  outfitSection: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg, padding: Spacing.three,
-    borderWidth: 1, borderColor: Colors.line,
-  },
-  outfitTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
-  outfitEmpty: { ...T.micro, color: Colors.walnut2, marginTop: Spacing.one },
 
   meta: { ...T.micro, textAlign: 'center' },
 

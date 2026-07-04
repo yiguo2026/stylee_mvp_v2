@@ -2,35 +2,15 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
-  Modal, Platform, Image,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { supabase } from '@/lib/supabase';
-
-const isWeb = Platform.OS === 'web';
-
-// AI outfit hero image pool — deterministic pick based on outfit_id.
-const OUTFIT_HERO_ASSETS = [
-  require('../../../assets/tryon/casual.png'),
-  require('../../../assets/tryon/street.png'),
-  require('../../../assets/tryon/office.png'),
-  require('../../../assets/tryon/layered.png'),
-  require('../../../assets/tryon/home.png'),
-  require('../../../assets/tryon/elegant.png'),
-  require('../../../assets/tryon/sporty.png'),
-];
-function pickOutfitHero(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  const idx = Math.abs(hash) % OUTFIT_HERO_ASSETS.length;
-  return OUTFIT_HERO_ASSETS[idx];
-}
 
 // ── Types ────────────────────────────────────────────────
 interface SavedOutfit {
@@ -41,6 +21,7 @@ interface SavedOutfit {
   created_at: string;
   is_favorited?: boolean;
   items?: OutfitItemDetail[];
+  cover_image?: string | null;
 }
 
 interface OutfitItemDetail {
@@ -49,6 +30,7 @@ interface OutfitItemDetail {
   category: string;
   color: string;
   role: string | null;
+  image_url?: string | null;
 }
 
 // ── Calendar helpers ─────────────────────────────────────
@@ -64,6 +46,31 @@ function getFirstDayOfMonth(year: number, month: number) {
 }
 function toDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+// Normalize a supabase outfit row (with nested outfit_items -> wardrobe_items) into SavedOutfit.
+function mapOutfitRow(o: any): SavedOutfit {
+  const rawItems: any[] = Array.isArray(o.outfit_items) ? o.outfit_items : [];
+  const items: OutfitItemDetail[] = rawItems
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    .map((r: any) => ({
+      item_id: r.item_id,
+      role: r.role ?? null,
+      name: r.wardrobe_items?.name ?? '未知单品',
+      category: r.wardrobe_items?.category ?? '',
+      color: r.wardrobe_items?.color ?? '',
+      image_url: r.wardrobe_items?.image_url ?? null,
+    }));
+  const cover = items.find(it => !!it.image_url)?.image_url ?? null;
+  return {
+    outfit_id: o.outfit_id,
+    name: o.name,
+    ai_comment: o.ai_comment,
+    source: o.source,
+    created_at: o.created_at,
+    items,
+    cover_image: cover,
+  };
 }
 
 type RecordTab = 'worn' | 'favorite';
@@ -82,8 +89,6 @@ export default function RecordTab() {
   const [outfitsByDay, setOutfitsByDay] = useState<Record<string, SavedOutfit[]>>({});
   const [favorites, setFavorites] = useState<SavedOutfit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [detailOutfit, setDetailOutfit] = useState<SavedOutfit | null>(null);
-  const [loadingItems, setLoadingItems] = useState(false);
 
   // Fetch worn outfits for calendar
   const fetchMonthOutfits = useCallback(async () => {
@@ -95,7 +100,7 @@ export default function RecordTab() {
 
     const { data, error } = await supabase
       .from('outfits')
-      .select('outfit_id, name, ai_comment, source, created_at')
+      .select('outfit_id, name, ai_comment, source, created_at, outfit_items(item_id, role, display_order, wardrobe_items(name, category, color, image_url))')
       .eq('user_id', user.id)
       .gte('created_at', start)
       .lte('created_at', end)
@@ -106,10 +111,11 @@ export default function RecordTab() {
     if (error) { console.warn('[Record] fetchMonthOutfits error:', error.message); return; }
     if (!data) return;
     const grouped: Record<string, SavedOutfit[]> = {};
-    data.forEach((o: SavedOutfit) => {
-      const key = toDateKey(new Date(o.created_at));
+    data.forEach((o: any) => {
+      const outfit = mapOutfitRow(o);
+      const key = toDateKey(new Date(outfit.created_at));
       if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(o);
+      grouped[key].push(outfit);
     });
     setOutfitsByDay(grouped);
   }, [user?.id, viewYear, viewMonth]);
@@ -122,7 +128,7 @@ export default function RecordTab() {
       .select(`
         favorite_id,
         outfit_id,
-        outfits ( outfit_id, name, ai_comment, source, created_at )
+        outfits ( outfit_id, name, ai_comment, source, created_at, outfit_items(item_id, role, display_order, wardrobe_items(name, category, color, image_url)) )
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
@@ -133,14 +139,7 @@ export default function RecordTab() {
       const favs: SavedOutfit[] = data
         .map((r: any) => r.outfits)
         .filter(Boolean)
-        .map((o: any) => ({
-          outfit_id: o.outfit_id,
-          name: o.name,
-          ai_comment: o.ai_comment,
-          source: o.source,
-          created_at: o.created_at,
-          is_favorited: true,
-        }));
+        .map((o: any) => ({ ...mapOutfitRow(o), is_favorited: true }));
       setFavorites(favs);
     }
   }, [user?.id]);
@@ -154,94 +153,9 @@ export default function RecordTab() {
     }, [fetchMonthOutfits, fetchFavorites, params.tab])
   );
 
-  const openDetail = async (outfit: SavedOutfit) => {
-    setDetailOutfit(outfit);
-    setLoadingItems(true);
-
-    const { data } = await supabase
-      .from('outfit_items')
-      .select(`
-        item_id, role,
-        wardrobe_items ( name, category, color )
-      `)
-      .eq('outfit_id', outfit.outfit_id);
-
-    setLoadingItems(false);
-
-    if (data) {
-      const items: OutfitItemDetail[] = data.map((r: any) => ({
-        item_id: r.item_id,
-        role: r.role,
-        name: r.wardrobe_items?.name ?? '未知单品',
-        category: r.wardrobe_items?.category ?? '',
-        color: r.wardrobe_items?.color ?? '',
-      }));
-      setDetailOutfit(prev => prev ? { ...prev, items } : null);
-    }
+  const openDetail = (outfit: SavedOutfit) => {
+    router.push({ pathname: '/outfit/[id]', params: { id: outfit.outfit_id } });
   };
-
-  const detailSheet = (
-    <SafeAreaView style={styles.modalSafe}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>{detailOutfit?.name ?? '搭配详情'}</Text>
-        <TouchableOpacity onPress={() => setDetailOutfit(null)}>
-          <Text style={styles.modalClose}>关闭</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.modalContent}>
-        {detailOutfit ? (
-          <View style={styles.heroWrap}>
-            <Image
-              source={pickOutfitHero(detailOutfit.outfit_id)}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-            <View style={styles.heroBadge}>
-              <Feather name="zap" size={11} color={Colors.paper} />
-              <Text style={styles.heroBadgeText}>AI 生成穿搭</Text>
-            </View>
-          </View>
-        ) : null}
-
-        {detailOutfit ? (
-          <Text style={styles.modalDate}>
-            保存于 {new Date(detailOutfit.created_at).toLocaleDateString('zh-CN', {
-              year: 'numeric', month: 'long', day: 'numeric',
-              hour: '2-digit', minute: '2-digit',
-            })}
-          </Text>
-        ) : null}
-
-        {detailOutfit?.ai_comment ? (
-          <View style={styles.commentCard}>
-            <Text style={styles.commentLabel}>AI 搭配点评</Text>
-            <Text style={styles.commentText}>{detailOutfit.ai_comment}</Text>
-          </View>
-        ) : null}
-
-        <Text style={styles.itemsTitle}>搭配单品</Text>
-        {loadingItems ? (
-          <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: 16 }} />
-        ) : detailOutfit?.items?.length ? (
-          detailOutfit.items.map(item => (
-            <View key={item.item_id} style={styles.itemRow}>
-              <View style={styles.itemIconWrap}>
-                <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
-              </View>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemMeta}>{item.color} · {item.category}</Text>
-              </View>
-              {item.role ? <Text style={styles.itemRole}>{item.role}</Text> : null}
-            </View>
-          ))
-        ) : (
-          <Text style={styles.noItems}>单品信息暂无</Text>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
@@ -282,9 +196,13 @@ export default function RecordTab() {
       onPress={() => openDetail(outfit)}
       activeOpacity={0.8}
     >
-      <View style={styles.outfitCardLeft}>
-        <MaterialCommunityIcons name="hanger" size={22} color={Colors.walnut2} />
-      </View>
+      {outfit.cover_image ? (
+        <Image source={{ uri: outfit.cover_image }} style={styles.outfitCardThumb} resizeMode="cover" />
+      ) : (
+        <View style={styles.outfitCardThumbPlaceholder}>
+          <CategoryIcon category={outfit.items?.[0]?.category ?? ''} size={22} color={Colors.walnut2} />
+        </View>
+      )}
       <View style={styles.outfitCardInfo}>
         <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
         {outfit.ai_comment ? (
@@ -426,8 +344,17 @@ export default function RecordTab() {
                 onPress={() => openDetail(outfit)}
                 activeOpacity={0.8}
               >
-                <View style={styles.outfitCardLeft}>
-                  <Feather name="heart" size={20} color={Colors.terracotta} />
+                <View style={styles.outfitCardThumbWrap}>
+                  {outfit.cover_image ? (
+                    <Image source={{ uri: outfit.cover_image }} style={styles.outfitCardThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.outfitCardThumbPlaceholder}>
+                      <CategoryIcon category={outfit.items?.[0]?.category ?? ''} size={22} color={Colors.walnut2} />
+                    </View>
+                  )}
+                  <View style={styles.favBadge}>
+                    <Feather name="heart" size={10} color={Colors.paper} />
+                  </View>
                 </View>
                 <View style={styles.outfitCardInfo}>
                   <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
@@ -446,20 +373,6 @@ export default function RecordTab() {
       )}
 
       {loading ? <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: Spacing.two }} /> : null}
-
-      {/* Outfit Detail Modal */}
-      {isWeb ? (
-        detailOutfit ? <View style={styles.webLayer}>{detailSheet}</View> : null
-      ) : (
-        <Modal
-          visible={!!detailOutfit}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setDetailOutfit(null)}
-        >
-          {detailSheet}
-        </Modal>
-      )}
     </SafeAreaView>
   );
 }
@@ -547,9 +460,23 @@ const styles = StyleSheet.create({
     padding: Spacing.three, flexDirection: 'row', alignItems: 'center',
     gap: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
-  outfitCardLeft: {
-    width: 48, height: 48, backgroundColor: Colors.paperCard,
-    borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center',
+  outfitCardThumb: {
+    width: 56, height: 56, borderRadius: Radius.md,
+    backgroundColor: Colors.paperCard,
+  },
+  outfitCardThumbPlaceholder: {
+    width: 56, height: 56, borderRadius: Radius.md,
+    backgroundColor: Colors.paperCard,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  outfitCardThumbWrap: { position: 'relative' },
+  favBadge: {
+    position: 'absolute', top: -4, right: -4,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: Colors.terracotta,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: Colors.paperCard,
   },
   outfitCardInfo: { flex: 1, gap: 2 },
   outfitName: { ...T.itemName, fontSize: 15 },
@@ -570,19 +497,18 @@ const styles = StyleSheet.create({
   modalTitle: { ...T.sectionTitle },
   modalClose: { ...T.buttonSecondary, color: Colors.terracotta },
   modalContent: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
-  heroWrap: {
-    width: '100%', aspectRatio: 3 / 4, borderRadius: Radius.lg, overflow: 'hidden',
-    backgroundColor: Colors.paperCard, position: 'relative',
-    borderWidth: 1, borderColor: Colors.line,
+  flatlay: { gap: Spacing.three, alignItems: 'center' },
+  flatlayItem: { width: '100%', alignItems: 'center', gap: Spacing.one },
+  flatlayImg: {
+    width: '78%', aspectRatio: 4 / 3, borderRadius: Radius.lg,
+    backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
-  heroImage: { width: '100%', height: '100%' },
-  heroBadge: {
-    position: 'absolute', top: 12, left: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(30,24,20,0.72)',
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+  flatlayPlaceholder: {
+    width: '78%', aspectRatio: 4 / 3, borderRadius: Radius.lg,
+    backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
+    alignItems: 'center', justifyContent: 'center',
   },
-  heroBadgeText: { fontSize: 11, color: Colors.paper, fontFamily: Fonts.uiSemiBold },
+  flatlayName: { ...T.itemDesc, fontSize: 13, color: Colors.walnut2, textAlign: 'center' },
   modalDate: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   commentCard: {
     backgroundColor: Colors.signalSoft, borderRadius: Radius.lg,

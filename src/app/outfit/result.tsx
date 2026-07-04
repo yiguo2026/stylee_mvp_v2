@@ -15,6 +15,8 @@ import { aiRecommendOutfits, AIMeta } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Toast } from '@/components/Toast';
+import { AILoading } from '@/components/AILoading';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
@@ -25,6 +27,29 @@ const GEN_STEPS = ['分析天气场景...', '筛选衣橱单品...', '组合搭�
 const GEN_TOTAL_STEPS = GEN_STEPS.length;
 const GEN_STEP_DURATION_MS = 800;
 
+// 线上数据库的 category 约束使用旧词表，且两张表不一致：
+//   wardrobe_items 允许: 上装/下装/外套/鞋/包/配饰
+//   wishlist_items 允许: 上装/下装/连体装/外套/鞋/包/围巾
+// AI 推荐的类别（如“衬衫/连衣裙/运动鞋”）需先归一到概念，再映射到各表允许值，否则触发 CHECK 约束导致插入失败。
+type CatConcept = 'top' | 'bottom' | 'dress' | 'outer' | 'shoes' | 'bag' | 'hat' | 'acc';
+const toCatConcept = (raw: string): CatConcept => {
+  const s = (raw || '').trim();
+  if (['连衣裙', '连体', '裙装', '长裙', '短裙', '半身裙', 'onepiece'].some(k => s.includes(k))) return 'dress';
+  if (['外套', '夹克', '大衣', '风衣', '羽绒', '棉服', '西装', '开衫', '皮衣', '冲锋衣', '棒球服', '皮草'].some(k => s.includes(k))) return 'outer';
+  if (['上装', '衬衫', 'T恤', '恤', '毛衣', '卫衣', '上衣', '针织', '吊带', '背心', '打底', '马甲', 'Polo'].some(k => s.includes(k))) return 'top';
+  if (['下装', '裤', '牛仔', '阔腿', '短裤', '长裤', '半裙', '西裤', '运动裤', '休闲裤', '裙'].some(k => s.includes(k))) return 'bottom';
+  if (['鞋', '靴', '凉鞋', '拖鞋', '乐福'].some(k => s.includes(k))) return 'shoes';
+  if (['包', '手袋', '挎', '托特', '链条'].some(k => s.includes(k))) return 'bag';
+  if (['帽', '围巾', '丝巾', '领巾', '披肩', '脖套', '头巾'].some(k => s.includes(k))) return 'hat';
+  return 'acc';
+};
+const WARDROBE_DB_CAT: Record<CatConcept, string> = {
+  top: '上装', bottom: '下装', dress: '上装', outer: '外套', shoes: '鞋', bag: '包', hat: '配饰', acc: '配饰',
+};
+const WISHLIST_DB_CAT: Record<CatConcept, string> = {
+  top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋', bag: '包', hat: '围巾', acc: '围巾',
+};
+
 export default function OutfitResultScreen() {
   const params = useLocalSearchParams<{
     city: string; temp: string; weather: string; query: string; tags: string; inputMode?: string;
@@ -33,7 +58,7 @@ export default function OutfitResultScreen() {
   const { items, fetchItems } = useWardrobeStore();
 
   const [loading, setLoading] = useState(true);
-  const [genStep, setGenStep] = useState(0);
+  const [, setGenStep] = useState(0);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -48,6 +73,15 @@ export default function OutfitResultScreen() {
   const [aiMeta, setAiMeta] = useState<AIMeta | null>(null);
 
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
+  const [toast, setToast] = useState('');
+  const [addingRecIdx, setAddingRecIdx] = useState<number | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2000);
+  }, []);
 
   const dotAnim = useRef(new Animated.Value(0)).current;
 
@@ -270,15 +304,23 @@ export default function OutfitResultScreen() {
     : [];
 
   const addRecommendedToWardrobe = async (rec: RecommendedItem, idx: number) => {
-    if (!user?.id) return;
-    const { addItem } = useWardrobeStore.getState();
-    const saved = await addItem({
-      user_id: user.id, name: rec.name, category: rec.category,
-      color: rec.color, source_type: 'ai_recommended',
-      source_label: 'AI推荐添加', status: 'active',
-      image_url: rec.image_url || undefined,
-    });
-    if (saved) {
+    if (addingRecIdx !== null) return;
+    if (!user?.id) { showToast('请先登录后再添加'); return; }
+    setAddingRecIdx(idx);
+    try {
+      const { addItem } = useWardrobeStore.getState();
+      const saved = await addItem({
+        user_id: user.id, name: rec.name, category: WARDROBE_DB_CAT[toCatConcept(rec.category)] as ClothingCategory,
+        color: rec.color || '', source_type: 'manual',
+        source_label: 'AI推荐添加', status: 'active',
+        image_url: rec.image_url || undefined,
+      });
+      if (!saved) {
+        const err = useWardrobeStore.getState().error;
+        console.warn('[addRecommendedToWardrobe] addItem returned null:', err);
+        showToast(err ? `添加失败：${err}` : '添加失败，请稍后重试');
+        return;
+      }
       setOutfits(prev => prev.map((o, i) => {
         if (i !== currentIndex) return o;
         const newItems = [
@@ -288,17 +330,28 @@ export default function OutfitResultScreen() {
         return { ...o, items: newItems, recommended_items: o.recommended_items?.filter((_, ri) => ri !== idx) };
       }));
       await fetchItems(user.id);
-      Alert.alert('提示', '已添加到衣橱');
+      showToast(`「${rec.name}」已添加到衣橱`);
+    } catch (e: any) {
+      console.warn('[addRecommendedToWardrobe] error:', e?.message);
+      showToast('添加失败，请稍后重试');
+    } finally {
+      setAddingRecIdx(null);
     }
   };
 
   const addRecommendedToWishlist = async (rec: RecommendedItem, idx: number) => {
-    if (!user?.id) return;
-    await supabase.from('wishlist_items').insert({
-      user_id: user.id, name: rec.name, category: rec.category,
-      color: rec.color, source: 'ai_recommended',
+    if (!user?.id) { showToast('请先登录后再添加'); return; }
+    const { error } = await supabase.from('wishlist_items').insert({
+      user_id: user.id, name: rec.name, category: WISHLIST_DB_CAT[toCatConcept(rec.category)],
+      color: rec.color || '', source: 'ai_recommended',
     });
+    if (error) {
+      console.warn('[addRecommendedToWishlist] error:', error.message);
+      showToast(`加入心愿单失败：${error.message}`);
+      return;
+    }
     setWishlistedRecs(prev => new Set(prev).add(idx));
+    showToast(`「${rec.name}」已加入心愿单`);
   };
 
   const normalizeCategory = (raw: string): string => {
@@ -312,7 +365,7 @@ export default function OutfitResultScreen() {
     if (['帽子', '帽', '棒球帽', '渔夫帽', '冷帽', '贝雷帽', '针织帽', '遮阳帽', '草帽', '围巾', '丝巾', '领巾', '披肩', '脖套'].some(k => s.includes(k))) return '帽巾';
     if (['配饰', '腰带', '领带', '胸针', '耳饰', '项链', '手链', '戒指', '手表', '眼镜', '墨镜'].some(k => s.includes(k))) return '配饰';
     if (CLOTHING_CATEGORIES.includes(s as ClothingCategory)) return s;
-    return s;
+    return '配饰';
   };
 
   // Build flatlay items
@@ -346,19 +399,13 @@ export default function OutfitResultScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingCard}>
-            <Ionicons name="sparkles-outline" size={52} color={Colors.walnut2} style={styles.loadingIconView} />
-            <Text style={styles.loadingTitle}>AI 正在为你搭配…</Text>
-            <Text style={styles.loadingStep}>{GEN_STEPS[genStep]}</Text>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${((genStep + 1) / GEN_TOTAL_STEPS) * 100}%` }]} />
-            </View>
-            {quota ? (
-              <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
-            ) : null}
-          </View>
-        </View>
+        <AILoading
+          title="AI 正在为你搭配"
+          subtitle="正在生成专属搭配方案..."
+          steps={['理解你的需求', '分析衣橱单品', '匹配风格与场景', '生成专属搭配方案']}
+          durationMs={9000}
+          hint={quota ? `今日剩余 ${quota.remaining}/${quota.limit} 次` : undefined}
+        />
       </SafeAreaView>
     );
   }
@@ -487,91 +534,68 @@ export default function OutfitResultScreen() {
           )}
         </View>
 
-        {/* ── 2. Owned Items ── */}
-        {ownedItems.length > 0 ? (
+        {/* ── 2. 搭配单品（已有 + 推荐合并） ── */}
+        {(ownedItems.length > 0 || recommendedItems.length > 0) ? (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>已有单品</Text>
-              <Text style={styles.sectionSubOwned}>来自你的衣橱</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.itemsRow}>
-                {ownedItems.map((oi) => (
-                  <TouchableOpacity key={oi.item_id}
-                    style={[styles.itemCard, adjustMode && styles.itemCardAdjust]}
-                    onPress={() => handleItemTap(oi)} activeOpacity={adjustMode ? 0.6 : 1}
-                  >
-                    <View style={styles.itemThumbSmall}>
-                      {oi.item?.image_url ? (
-                        <Image source={{ uri: oi.item.image_url }} style={styles.itemThumbImg} resizeMode="cover" />
+            <Text style={styles.sectionTitle}>搭配单品</Text>
+            <Text style={styles.comboSub}>
+              {ownedItems.length} 件已有 · {recommendedItems.length} 件推荐添置
+            </Text>
+            <View style={styles.grid}>
+              {ownedItems.map((oi) => (
+                <TouchableOpacity key={oi.item_id}
+                  style={[styles.gridCard, adjustMode && styles.itemCardAdjust]}
+                  onPress={() => handleItemTap(oi)} activeOpacity={adjustMode ? 0.6 : 1}
+                >
+                  <Text style={styles.badgeOwned}>已有</Text>
+                  <View style={styles.gridThumb}>
+                    {oi.item?.image_url ? (
+                      <Image source={{ uri: oi.item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
+                    ) : (
+                      <CategoryIcon category={oi.item?.category ?? ''} size={26} color={Colors.walnut2} />
+                    )}
+                  </View>
+                  <Text style={styles.gridName} numberOfLines={1}>{oi.item?.name ?? oi.item?.category}</Text>
+                  {adjustMode ? (
+                    <View style={styles.swapBadge}><Feather name="refresh-cw" size={10} color={Colors.paper} /></View>
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+              {recommendedItems.map((rec, idx) => {
+                const isWishlisted = wishlistedRecs.has(idx);
+                const recKey = `${rec.name}-${rec.category}-${rec.color}-${rec.image_url ?? ''}`;
+                return (
+                  <View key={recKey} style={[styles.gridCard, styles.gridCardRec]}>
+                    <Text style={styles.badgeRec}>推荐</Text>
+                    <View style={[styles.gridThumb, { backgroundColor: Colors.signalSoft }]}>
+                      {rec.image_url ? (
+                        <Image source={{ uri: rec.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
                       ) : (
-                        <View style={styles.itemThumbPlaceholder}>
-                          <CategoryIcon category={oi.item?.category ?? ''} size={22} color={Colors.walnut2} />
-                        </View>
+                        <CategoryIcon category={rec.category} size={26} color={Colors.walnut2} />
                       )}
                     </View>
-                    <View style={styles.itemCardInfo}>
-                      <Text style={styles.itemCardName} numberOfLines={1}>{oi.item?.name ?? oi.item?.category}</Text>
-                      <Text style={styles.itemCardOwned}>已有</Text>
+                    <Text style={styles.gridName} numberOfLines={1}>{rec.name}</Text>
+                    <View style={styles.recBtnCol}>
+                      <TouchableOpacity style={styles.recAddBtn} activeOpacity={0.7}
+                        disabled={addingRecIdx !== null}
+                        onPress={() => addRecommendedToWardrobe(rec, idx)}>
+                        <Text style={styles.recAddBtnText}>{addingRecIdx === idx ? '添加中…' : '+衣橱'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.recWishBtn, isWishlisted && styles.recWishBtnDone]}
+                        activeOpacity={0.7}
+                        onPress={() => !isWishlisted && addRecommendedToWishlist(rec, idx)}
+                        disabled={isWishlisted}
+                      >
+                        <Text style={[styles.recWishBtnText, isWishlisted && styles.recWishBtnTextDone]}>
+                          {isWishlisted ? '已加入' : '+心愿单'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                    {adjustMode ? (
-                      <View style={styles.swapBadge}><Feather name="refresh-cw" size={10} color={Colors.paper} /></View>
-                    ) : null}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
-        ) : null}
-
-        {/* ── 3. Recommended Items ── */}
-        {recommendedItems.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>推荐单品</Text>
-              <Text style={styles.sectionSubRec}>建议添加</Text>
+                  </View>
+                );
+              })}
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.itemsRow}>
-                {recommendedItems.map((rec, idx) => {
-                  const isWishlisted = wishlistedRecs.has(idx);
-                  const recKey = `${rec.name}-${rec.category}-${rec.color}-${rec.image_url ?? ''}`;
-                  return (
-                    <TouchableOpacity key={recKey}
-                      style={[styles.itemCard, styles.itemCardRecommended]}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.itemThumbSmall, { backgroundColor: Colors.signalSoft }]}>
-                        {rec.image_url ? (
-                          <Image source={{ uri: rec.image_url }} style={styles.itemThumbImg} resizeMode="cover" />
-                        ) : (
-                          <View style={styles.itemThumbPlaceholder}>
-                            <CategoryIcon category={rec.category} size={22} color={Colors.walnut2} />
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.itemCardInfo}>
-                        <Text style={styles.itemCardName} numberOfLines={1}>{rec.name}</Text>
-                        <TouchableOpacity style={styles.addToWardrobeBtn}
-                          onPress={() => addRecommendedToWardrobe(rec, idx)}>
-                          <Text style={styles.addToWardrobeBtnText}>+ 加入衣橱</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.wishlistBtn, isWishlisted && styles.wishlistBtnDone]}
-                          onPress={() => !isWishlisted && addRecommendedToWishlist(rec, idx)}
-                          disabled={isWishlisted}
-                        >
-                          <Text style={[styles.wishlistBtnText, isWishlisted && styles.wishlistBtnTextDone]}>
-                            {isWishlisted ? '已收藏' : '♡ 收藏'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.recBadge}><Text style={styles.recBadgeText}>推荐</Text></View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
           </View>
         ) : null}
 
@@ -699,6 +723,8 @@ export default function OutfitResultScreen() {
         onConfirm={() => { setShowSavedConfirm(false); router.back(); }}
         onCancel={() => setShowSavedConfirm(false)}
       />
+
+      <Toast message={toast} visible={!!toast} />
     </SafeAreaView>
   );
 }
@@ -790,6 +816,33 @@ const styles = StyleSheet.create({
   swapBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.terracotta, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   recBadge: { position: 'absolute', top: -6, right: -4, backgroundColor: Colors.terracotta, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   recBadgeText: { color: '#fff', fontSize: 9, fontFamily: Fonts.uiSemiBold },
+
+  // 合并后的搭配单品网格
+  comboSub: { ...T.micro, color: Colors.walnut, marginBottom: Spacing.one },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gridCard: {
+    width: '31.5%', backgroundColor: Colors.paperCard, borderRadius: Radius.md,
+    padding: Spacing.two, position: 'relative', ...Shadow.one,
+  },
+  gridCardRec: {
+    backgroundColor: Colors.accentSoft,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.terracotta,
+  },
+  gridThumb: {
+    width: '100%', aspectRatio: 1.25, borderRadius: 10, overflow: 'hidden',
+    backgroundColor: Colors.signalSoft, alignItems: 'center', justifyContent: 'center',
+  },
+  gridThumbImg: { width: '100%', height: '100%' },
+  gridName: { fontFamily: Fonts.ui, fontSize: 12, color: Colors.ink, textAlign: 'center', marginTop: 4 },
+  badgeOwned: { position: 'absolute', top: 6, right: 8, zIndex: 2, fontSize: 10, color: Colors.walnut2 },
+  badgeRec: { position: 'absolute', top: 6, right: 8, zIndex: 2, fontSize: 10, color: Colors.terracotta, fontFamily: Fonts.uiSemiBold },
+  recBtnCol: { flexDirection: 'row', marginTop: 4, gap: 4 },
+  recAddBtn: { flex: 1, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.ink, alignItems: 'center' },
+  recAddBtnText: { color: '#fff', fontSize: 10, fontFamily: Fonts.uiSemiBold },
+  recWishBtn: { flex: 1, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.lineStrong, backgroundColor: Colors.paper, alignItems: 'center' },
+  recWishBtnDone: { borderColor: Colors.line, backgroundColor: Colors.paperCard },
+  recWishBtnText: { fontSize: 10, color: Colors.ink, fontFamily: Fonts.ui },
+  recWishBtnTextDone: { fontSize: 10, color: Colors.walnut2 },
 
   allOwnedHint: { backgroundColor: Colors.signalSoft, borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
   allOwnedText: { ...T.bodyText, color: Colors.sage, fontSize: 13 },

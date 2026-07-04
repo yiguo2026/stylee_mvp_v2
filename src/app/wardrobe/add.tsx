@@ -15,6 +15,7 @@ import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTI
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { ClothingCategory } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
+import { AILoading } from '@/components/AILoading';
 
 const isWeb = Platform.OS === 'web';
 
@@ -377,6 +378,17 @@ export default function AddWardrobeItem() {
           </Modal>
         )
       ) : null}
+
+      {recognizing ? (
+        <View style={styles.aiLoadingLayer}>
+          <AILoading
+            title="AI 正在识别衣物"
+            subtitle="正在解析单品属性..."
+            steps={['读取图片', '识别衣物轮廓', '解析颜色材质', '生成单品信息']}
+            durationMs={8000}
+          />
+        </View>
+      ) : null}
       </SafeAreaView>
     </>
   );
@@ -386,6 +398,10 @@ const styles = StyleSheet.create({
   webLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 220,
+  },
+  aiLoadingLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 300,
   },
   safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {

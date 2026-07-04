@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AIResultBanner } from '@/components/AIResultBanner';
+import { AILoading } from '@/components/AILoading';
 import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion, TryOnSuggestion } from '@/lib/ai';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
@@ -63,7 +64,7 @@ export default function TryOnScreen() {
 
   // Generation
   const [generating, setGenerating] = useState(false);
-  const [genStep, setGenStep] = useState(0);
+  const [, setGenStep] = useState(0);
   const [tryOnImage, setTryOnImage] = useState<string | number | null>(null);
   const [tryOnMeta, setTryOnMeta] = useState<AIMeta | null>(null);
   const [tryOnSuggestion, setTryOnSuggestion] = useState<TryOnSuggestion | null>(null);
@@ -432,15 +433,12 @@ export default function TryOnScreen() {
       {/* ── Generating Full Screen Overlay ── */}
       {generating ? (
         <View style={styles.generatingOverlay}>
-          <View style={styles.generatingCard}>
-            <Text style={styles.progressTitle}>AI 正在生成试穿效果...</Text>
-            <Text style={styles.progressStepText}>
-              {['分析身体数据中...', '匹配穿搭单品...', '合成试穿效果...', '优化画面细节...'][genStep]}
-            </Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${(genStep + 1) * 25}%` }]} />
-            </View>
-          </View>
+          <AILoading
+            title="AI 正在生成试穿效果"
+            subtitle="正在合成你的专属试穿图..."
+            steps={['分析身体数据', '匹配穿搭单品', '合成试穿效果', '优化画面细节']}
+            durationMs={14000}
+          />
         </View>
       ) : null}
     </SafeAreaView>
