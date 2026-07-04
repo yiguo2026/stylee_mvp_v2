@@ -270,6 +270,36 @@ export default function RecordTab() {
     return now.getTime() - d.getTime() < 7 * 24 * 3600 * 1000;
   }).reduce((sum, [, arr]) => sum + arr.length, 0);
 
+  // All outfits of the current viewed month, newest first — shown when no specific day is selected.
+  const monthOutfits = Object.values(outfitsByDay)
+    .flat()
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const renderOutfitCard = (outfit: SavedOutfit, showDate = false) => (
+    <TouchableOpacity
+      key={outfit.outfit_id}
+      style={styles.outfitCard}
+      onPress={() => openDetail(outfit)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.outfitCardLeft}>
+        <MaterialCommunityIcons name="hanger" size={22} color={Colors.walnut2} />
+      </View>
+      <View style={styles.outfitCardInfo}>
+        <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
+        {outfit.ai_comment ? (
+          <Text style={styles.outfitComment} numberOfLines={2}>{outfit.ai_comment}</Text>
+        ) : null}
+        <Text style={styles.outfitTime}>
+          {showDate
+            ? `${new Date(outfit.created_at).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} ${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`
+            : `${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`}
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={Colors.walnut2} />
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -365,31 +395,17 @@ export default function RecordTab() {
                   <Text style={styles.emptyDayText}>这天没有保存搭配</Text>
                 </View>
               ) : (
-                selectedOutfits.map(outfit => (
-                  <TouchableOpacity
-                    key={outfit.outfit_id}
-                    style={styles.outfitCard}
-                    onPress={() => openDetail(outfit)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.outfitCardLeft}>
-                      <MaterialCommunityIcons name="hanger" size={22} color={Colors.walnut2} />
-                    </View>
-                    <View style={styles.outfitCardInfo}>
-                      <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
-                      {outfit.ai_comment ? (
-                        <Text style={styles.outfitComment} numberOfLines={2}>{outfit.ai_comment}</Text>
-                      ) : null}
-                      <Text style={styles.outfitTime}>
-                        {new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存
-                      </Text>
-                    </View>
-                    <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-                  </TouchableOpacity>
-                ))
+                selectedOutfits.map(outfit => renderOutfitCard(outfit))
               )}
             </View>
-          ) : monthTotal === 0 && !loading ? (
+          ) : monthOutfits.length > 0 ? (
+            <View style={styles.dayDetail}>
+              <Text style={styles.dayDetailTitle}>
+                {viewMonth + 1}月全部搭配 · {monthTotal} 套
+              </Text>
+              {monthOutfits.map(outfit => renderOutfitCard(outfit, true))}
+            </View>
+          ) : !loading ? (
             <View style={styles.emptySection}>
               <Text style={styles.emptySub}>每次确认穿搭后，都会自动保存到这里</Text>
             </View>
