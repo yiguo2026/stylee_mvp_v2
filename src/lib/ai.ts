@@ -374,10 +374,13 @@ export interface TryOnSuggestion {
   tips: string[];
 }
 
+type ItemBrief = Pick<WardrobeItem, 'name' | 'category' | 'color'>;
+
 export async function aiGenerateTryOnSuggestion(
-  outfitItems: WardrobeItem[],
+  outfitItems: ItemBrief[],
   bodyShape?: string,
-): Promise<TryOnSuggestion | null> {
+): Promise<{ suggestion: TryOnSuggestion; meta: AIMeta }> {
+  const t0 = Date.now();
   const itemsDesc = outfitItems.map(i => `${i.name || i.category}（${i.color}）`).join('、');
 
   const systemPrompt = `你是一个专业穿搭顾问。根据搭配单品和用户体型，给出试穿建议。
@@ -402,17 +405,23 @@ export async function aiGenerateTryOnSuggestion(
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        suggestion: parsed.suggestion ?? '这套搭配整体协调，适合日常穿着。',
-        compatibility_score: parsed.compatibility_score ?? 80,
-        tips: Array.isArray(parsed.tips) ? parsed.tips : ['搭配和谐', '颜色协调'],
+        suggestion: {
+          suggestion: parsed.suggestion ?? '这套搭配整体协调，适合日常穿着。',
+          compatibility_score: parsed.compatibility_score ?? 80,
+          tips: Array.isArray(parsed.tips) ? parsed.tips : ['搭配和谐', '颜色协调'],
+        },
+        meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0, ok: true },
       };
     }
   } catch {}
 
   return {
-    suggestion: '这套搭配色彩协调，风格统一，整体效果不错。单品质感搭配合理，适合多种场合。',
-    compatibility_score: 82,
-    tips: ['可以加一条围巾增加层次感', '建议搭配简约配饰', '适合日常通勤和休闲场景'],
+    suggestion: {
+      suggestion: '这套搭配色彩协调，风格统一，整体效果不错。单品质感搭配合理，适合多种场合。',
+      compatibility_score: 82,
+      tips: ['可以加一条围巾增加层次感', '建议搭配简约配饰', '适合日常通勤和休闲场景'],
+    },
+    meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0, ok: false },
   };
 }
 
@@ -427,10 +436,13 @@ const SCENE_PROMPTS: Record<string, string> = {
 };
 
 export async function aiGenerateTryOnImage(
-  outfitItems: WardrobeItem[],
+  outfitItems: ItemBrief[],
   bodyShape?: string,
   scene?: string,
-): Promise<string | null> {
+): Promise<{ url: string | null; meta: AIMeta }> {
+  const t0 = Date.now();
+  if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
+
   const itemsDesc = outfitItems.map(i => `${i.color}${i.name || i.category}`).join('、');
   const bodyDesc = bodyShape ? `，${bodyShape}身材` : '';
   const sceneDesc = scene && SCENE_PROMPTS[scene] ? `，${SCENE_PROMPTS[scene]}` : '，站在城市街头，自然光线';
@@ -440,10 +452,9 @@ export async function aiGenerateTryOnImage(
   try {
     const { qwenGenerateImage } = await import('@/lib/dashscope');
     const imageUrl = await qwenGenerateImage(prompt);
-    if (imageUrl) return imageUrl;
+    return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: !!imageUrl } };
   } catch (e) {
     console.warn('[AI] Try-on image generation failed:', e);
+    return { url: null, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: false } };
   }
-
-  return null;
 }

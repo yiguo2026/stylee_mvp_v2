@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AIResultBanner } from '@/components/AIResultBanner';
-import { AIMeta } from '@/lib/ai';
+import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion, TryOnSuggestion } from '@/lib/ai';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
@@ -66,6 +66,7 @@ export default function TryOnScreen() {
   const [genStep, setGenStep] = useState(0);
   const [tryOnImage, setTryOnImage] = useState<string | number | null>(null);
   const [tryOnMeta, setTryOnMeta] = useState<AIMeta | null>(null);
+  const [tryOnSuggestion, setTryOnSuggestion] = useState<TryOnSuggestion | null>(null);
 
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
 
@@ -156,20 +157,54 @@ export default function TryOnScreen() {
     setGenerating(true);
     setTryOnImage(null);
     setTryOnMeta(null);
+    setTryOnSuggestion(null);
     setGenStep(0);
 
-    const t0 = Date.now();
-    const steps = ['分析身体数据中...', '匹配穿搭单品...', '合成试穿效果...', '优化画面细节...'];
-    for (let i = 0; i < steps.length; i++) {
-      setGenStep(i);
-      await new Promise(r => setTimeout(r, 600));
+    // Collect outfit items as ItemBrief[]
+    const items = isFromResult
+      ? resultItems.map(i => ({ name: i.name ?? '', category: i.category ?? '上装' as const, color: i.color ?? '' }))
+      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []).map(i => ({ name: i.name ?? '', category: i.category ?? '上装' as const, color: '' }));
+
+    const bodyShape = undefined; // TODO: extract from selfieUri / user profile
+
+    setGenStep(0); // "分析搭配单品..."
+    await new Promise(r => setTimeout(r, 300));
+
+    setGenStep(1); // "生成试穿效果图..."
+
+    // Call both AI functions in parallel
+    const [imageResult, suggestionResult] = await Promise.all([
+      aiGenerateTryOnImage(items, bodyShape, selectedScene),
+      aiGenerateTryOnSuggestion(items, bodyShape),
+    ]);
+
+    setGenStep(2); // "优化画面细节..."
+    await new Promise(r => setTimeout(r, 200));
+
+    setGenStep(3); // "完成"
+
+    // Image: use AI URL if available, otherwise fall back to local asset
+    if (imageResult.url) {
+      setTryOnImage(imageResult.url);
+    } else {
+      const assetKey = SCENE_ASSET_MAP[selectedScene] ?? 'casual';
+      setTryOnImage(SCENE_IMAGES[assetKey] || SCENE_IMAGES.casual);
     }
 
-    // Fallback to pre-rendered scene image
-    const assetKey = SCENE_ASSET_MAP[selectedScene] ?? 'casual';
-    const fallbackAsset = SCENE_IMAGES[assetKey];
-    setTryOnImage(fallbackAsset || SCENE_IMAGES.casual);
-    setTryOnMeta({ source: 'mock', durationMs: Date.now() - t0, ok: false });
+    // Suggestion
+    setTryOnSuggestion(suggestionResult.suggestion);
+
+    // Meta: combine image + suggestion results
+    const anyOk = imageResult.meta.ok || suggestionResult.meta.ok;
+    const sources: string[] = [];
+    if (imageResult.meta.source !== 'mock') sources.push(imageResult.meta.source);
+    if (suggestionResult.meta.source !== 'mock' && !sources.includes(suggestionResult.meta.source)) sources.push(suggestionResult.meta.source);
+    setTryOnMeta({
+      source: sources.length > 0 ? sources.join(' + ') : 'mock',
+      durationMs: Math.max(imageResult.meta.durationMs, suggestionResult.meta.durationMs),
+      ok: anyOk,
+    });
+
     setGenerating(false);
 
     // Save try-on record
@@ -371,6 +406,27 @@ export default function TryOnScreen() {
             </View>
           </View>
         ) : null}
+        {tryOnSuggestion && !generating ? (
+          <View style={styles.suggestionCard}>
+            <View style={styles.scoreRow}>
+              <View style={styles.scoreCircle}>
+                <Text style={styles.scoreNum}>{tryOnSuggestion.compatibility_score}</Text>
+              </View>
+              <Text style={styles.scoreLabel}>搭配契合度</Text>
+            </View>
+            <Text style={styles.suggestionText}>{tryOnSuggestion.suggestion}</Text>
+            {tryOnSuggestion.tips.length > 0 ? (
+              <View style={styles.tipsList}>
+                {tryOnSuggestion.tips.map((tip, idx) => (
+                  <View key={idx} style={styles.tipRow}>
+                    <Text style={styles.tipBullet}>•</Text>
+                    <Text style={styles.tipText}>{tip}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* ── Generating Full Screen Overlay ── */}
@@ -535,4 +591,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center', gap: 6,
   },
   resultSaveBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
+
+  // ── Suggestion ──
+  suggestionCard: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
+  },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  scoreCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.signalSoft, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: Colors.signal,
+  },
+  scoreNum: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.signal, fontSize: 16 },
+  scoreLabel: { ...T.bodyText, color: Colors.walnut, fontSize: 13 },
+  suggestionText: { ...T.bodyText, color: Colors.ink, fontSize: 14, lineHeight: 22 },
+  tipsList: { gap: Spacing.one, marginTop: Spacing.one },
+  tipRow: { flexDirection: 'row', gap: Spacing.one, alignItems: 'flex-start' },
+  tipBullet: { ...T.micro, color: Colors.terracotta },
+  tipText: { ...T.micro, color: Colors.walnut, flex: 1, lineHeight: 18 },
 });
