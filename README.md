@@ -11,7 +11,7 @@
 - **前端**：Expo SDK 54 + TypeScript + Expo Router（文件路由）
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
 - **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动 fallback 到本地 mock）
-- **AI**：本地模型服务（`model-service/`）+ DashScope（Qwen VL / Qwen Image）+ DeepSeek（可选）；Ark 已关闭
+- **AI**：DashScope（Qwen VL 识别 / Qwen Image 生图）+ DeepSeek（意图识别 / 穿搭推荐 / 试穿建议）；不可用时自动回落 mock
 - **部署**：GitHub Pages（gh-pages）+ EAS Build（iOS）
 - **状态管理**：Zustand
 - **样式**：Editorial Mark v3.6（冷调中性黑白体系 / 统一字体体系 / 过程态规范）
@@ -46,17 +46,20 @@
 - 自然语言输入（DeepSeek 意图识别，自动匹配标签）
 - 场合/风格/色系/温度标签筛选（场合10个、风格19个、色系8个、温度4个）
 - AI 穿搭推荐（DeepSeek 生成搭配方案 + AI评论）
+- AI 结果页模型来源 banner（✓ 真实模型·耗时 / ✗ 结果不可用·已降级 / ⚠ mock）
 - 穿搭结果：方案展示、AI点评、收藏、单品替换
 - 穿搭历史记录
 
 ### AI 试穿
-- 身体信息录入（自拍上传，AsyncStorage 持久化，首次录入后无需重复填写）
+- 身体信息录入（自拍上传至 Supabase Storage，持久化到 user_body_models 表，跨设备跨会话保留）
 - 两种入口流程：
   - 首页入口：身体信息 → 选择搭配方案（已穿搭配/收藏搭配 Tab） → 选择场景 → 生成
   - 推荐结果入口：身体信息 → 搭配单品（已选） → 选择场景 → 生成
 - 场景风格选择（☕咖啡馆/🏙️街道/💼办公室/🌿公园/🏠居家）
 - 等待过程态（1%-99% 进度条 + 4 步清单 + 呼吸闪烁动画：分析身体数据→匹配单品→合成效果→优化细节）
+- AI 试穿图生成（qwen-image-2.0-pro）+ 搭配建议（deepseek-v4-flash，含契合度评分、穿搭建议、风格小贴士）
 - 效果图展示 + 保存（AI 生成失败时 fallback 到预置场景图）
+- 每日使用次数限制（10次/天，客户端 AsyncStorage 计数）
 
 ### Web 兼容
 - ConfirmModal 替代 Alert.alert 多按钮弹窗
@@ -104,7 +107,7 @@ npx expo start
 | `EXPO_PUBLIC_DASHSCOPE_API_KEY` | DashScope API Key（Qwen VL / Qwen Image，推荐） | DashScope 控制台 |
 | `EXPO_PUBLIC_DEEPSEEK_KEY` | DeepSeek API Key（可选） | [platform.deepseek.com](https://platform.deepseek.com/) |
 | `EXPO_PUBLIC_DEEPSEEK_HOST` | DeepSeek API Host（可选，默认 api.deepseek.com） | — |
-| `EXPO_PUBLIC_STYLEE_API` | 本地模型服务地址（可选，默认 http://127.0.0.1:8000） | — |
+| `EXPO_PUBLIC_SUPABASE_SERVICE_KEY` | Supabase Service Role Key | Supabase Dashboard |
 
 > 不配置 `EXPO_PUBLIC_QWEATHER_KEY` 时，天气数据将使用本地 mock 数据；不配置 `EXPO_PUBLIC_DASHSCOPE_API_KEY` / `EXPO_PUBLIC_DEEPSEEK_KEY` 时，AI 功能会自动回落到 mock/预置结果（不影响衣橱、记录等基础功能）。
 
@@ -159,7 +162,12 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `03175d6` | v0.9.2：AI 试穿 3 步流程改版（身体信息录入 + 搭配选择 + 场景选择） |
 | `1674203` | v0.9.3：修复记录页查询列不存在/收藏 outfit_id 错误；快速添加页与“跳转记录”联动等 |
 | `7e94a67` | v0.9.4：设置页对齐原型、个人页精简、衣橱删除无限 loading 修复、GitHub Pages 部署 |
-| `1111655` | v0.9.5：统一 AI 过程态（呼吸闪烁 + 进度条）；推荐单品可加入衣橱/心愿单；衣橱按“穿搭+收藏”倒排；单品详情展示穿着记录缩略图；新增独立穿搭详情页 |
+| `1111655` | v0.9.5：统一 AI 过程态（呼吸闪烁 + 进度条）；推荐单品可加入衣橱/心愿单；衣橱按”穿搭+收藏”倒排；单品详情展示穿着记录缩略图；新增独立穿搭详情页 |
+| `f022551` | v0.9.6：AI 结果页 banner 精确显示模型来源/耗时/成败（AIMeta.ok 三态）；每日 AI 次数限制改为 10 次/天 |
+| `fc72a63` | v0.9.7：AI 试穿接入真实模型（qwen-image-2.0-pro 生图 + deepseek-v4-flash 建议含评分/贴士） |
+| `ad52330` | 修复 qwen-image-2.0-pro 端点：compatible-mode 返回空 content，改用 DashScope 原生 MultiModalConversation |
+| `60a9283` | 安全：移除 secrets.ts 所有 base64 硬编码 key，统一环境变量注入（.env + GitHub Secrets） |
+| `5f52180` | 自拍照持久化：上传至 Supabase Storage + user_body_models 表，启动时从数据库加载；AI 次数限制 10/天 |
 
 ## e1213fe 之后的主要更新（v0.9.1+）
 
@@ -170,12 +178,16 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 - Web 端适配增强：iPhone 14 Pro 外壳、@font-face 注入、TabBar 贴底与不截断、Modal/Sheet 约束在手机容器内。
 
 ### 2) AI 能力与过程态
-- 接入仓内 `model-service/` 本地推理服务（服饰识别 / 标准化 / 推荐），不可达时自动回落；默认使用 DashScope（Qwen VL / Qwen Image），DeepSeek 可选。
-- 增加 AI 过程态与每日次数限制；结果页展示模型来源与耗时。
+- 直接嵌入 DashScope API（qwen3-vl-plus 识别 / qwen-image-2.0-pro 生图）+ DeepSeek API（deepseek-v4-flash 意图识别 / 穿搭推荐 / 试穿建议），不再依赖本地 model-service。
+- qwen-image-2.0-pro 使用 DashScope 原生 MultiModalConversation 端点（compatible-mode 返回空 content）。
+- AI 结果页显示模型来源 banner：✓ 真实模型·耗时 / ✗ 调用了真实模型但结果不可用·已降级 / ⚠ mock（模型服务不可用）。AIMeta 含 `ok` 字段精确区分三种状态。
 - 等待动画统一为 demo 样式：呼吸闪烁加载 + 1%-99% 进度条 + 步骤清单（推荐结果 / 衣物解析 / AI 试穿）。
+- 每日使用次数限制：推荐 10 次/天，试穿 10 次/天（客户端 AsyncStorage 计数，按 userId 隔离）。
 
 ### 3) AI 试穿
 - 试穿流程改为 3 步：身体信息 → 选择搭配（已穿/收藏）→ 选择场景 → 生成。
+- 试穿页接入真实 AI：qwen-image-2.0-pro 生成试穿图 + deepseek-v4-flash 生成搭配建议（契合度评分 / 穿搭建议 / 风格小贴士），AI 不可用时降级到本地预置场景图。
+- 自拍照持久化：上传至 Supabase Storage（wardrobe-images/selfie/），URL 存入 user_body_models 表，启动时从数据库加载，跨设备跨会话保留（替代之前不可靠的 localStorage 压缩存储）。
 - 试穿结果支持保存到记录，并完善试穿历史/详情页展示。
 
 ### 4) 衣橱 / 穿搭 / 记录
@@ -185,8 +197,9 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 - 修复记录页查询列/收藏关系、月份切换展示逻辑、快速添加流程等问题。
 
 ### 5) 工程化、部署与安全
-- Web 构建链路完善：`build:web` + post-build patch；GitHub Actions 自动发布到 GitHub Pages（gh-pages）。
-- 安全加固：移除硬编码 key，统一改为环境变量注入；README/配置同步更新。
+- Web 构建链路完善：`build:web` + post-build patch；GitHub Actions 自动发布到 GitHub Pages（gh-pages 分支）。
+- 安全加固：移除 secrets.ts 中所有 base64 硬编码 key，统一改为 EXPO_PUBLIC_* 环境变量注入（本地 .env + CI GitHub Secrets），代码仓库零明文 key。
+- CI workflow 注入全部 6 个环境变量（DeepSeek key/host、DashScope key、Supabase URL/anon key/service key）。
 
 ## 项目结构
 
@@ -201,7 +214,7 @@ src/
     wardrobe/       # 添加衣物 / 单品详情 / 单品编辑 / 批量导入
   components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon
   constants/        # theme（配色、字体、间距、圆角、阴影）
-  lib/              # supabase / deepseek / ark / ai / weather / uploadImage / mock
+  lib/              # supabase / deepseek / dashscope / ai / weather / uploadImage / bodyModel / dailyQuota / mock
   stores/           # userStore / wardrobeStore / wishlistStore / tryonStore
   types/            # TypeScript 类型 + 统一标签定义
 assets/
@@ -209,30 +222,14 @@ assets/
   tryon/            # AI试穿预置场景图（7张）
 ```
 
-## 接入本地模型服务
+## AI 模型配置
 
-三个 AI 能力（服饰识别 / 标准化生图 / 搭配推荐）由**仓内自带**的本地推理服务提供，代码在 [`model-service/`](model-service/)（纯 Python 标准库，零 pip 依赖，clone 即完整功能）。
+App 直接调用云端 API，无需本地模型服务：
 
-### 启动本地服务
+| 能力 | 模型 | 端点 |
+|------|------|------|
+| 服饰识别（拍照→属性） | qwen3-vl-plus | DashScope compatible-mode chat/completions |
+| 标准图/试穿图生成 | qwen-image-2.0-pro | DashScope 原生 MultiModalConversation |
+| 意图识别 / 穿搭推荐 / 试穿建议 | deepseek-v4-flash | DeepSeek chat/completions |
 
-```bash
-cd model-service
-DEEPSEEK_API_KEY=<key> DASHSCOPE_API_KEY=<key> python3 serve.py --provider deepseek
-```
-
-服务默认运行在 `http://127.0.0.1:8000`。key 找 fitzw 拿；不带 key 也可 `python3 serve.py` 起 mock 模式联调。
-详细说明（端点、测试、重建索引）见 [`model-service/README.md`](model-service/README.md)。
-
-### 配置环境变量
-
-App 侧默认就是 `http://127.0.0.1:8000`，通常**无需配置**。如需改地址，在 `.env` 设：
-
-```bash
-EXPO_PUBLIC_STYLEE_API=http://127.0.0.1:8000
-```
-
-### 自动回落机制
-
-当本地服务不可达时，App 会自动回落到默认行为（mock 识别 / 客户端直连 DeepSeek / 用原图），不影响其他功能的正常使用。
-
-可通过 `node scripts/styleeSmoke.ts` 验证服务连接状态（需先启动本地服务）。
+API 不可用时自动回落到 mock 数据，不影响基础功能。
