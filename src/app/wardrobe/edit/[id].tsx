@@ -151,7 +151,7 @@ export default function EditItemScreen() {
           <TouchableOpacity style={[styles.photoSlot, styles.photoSlotCover]} onPress={pickImage}>
             {imageUri ? (
               <>
-                <Image source={{ uri: imageUri }} style={styles.photoImage} />
+                <Image source={{ uri: imageUri }} style={styles.photoImage} resizeMode="contain" />
                 <TouchableOpacity style={styles.removePhotoBtn} onPress={() => setImageUri('')}>
                   <Text style={styles.removePhotoText}>×</Text>
                 </TouchableOpacity>
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   photoSlotCover: { width: 120, height: 120 },
-  photoImage: { width: '100%', height: '100%', borderRadius: Radius.md },
+  photoImage: { width: '100%', height: '100%', borderRadius: Radius.md, backgroundColor: Colors.paperCard },
   removePhotoBtn: {
     position: 'absolute', top: 4, right: 4,
     width: 22, height: 22, borderRadius: 11,

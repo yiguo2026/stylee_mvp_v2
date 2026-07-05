@@ -8,16 +8,26 @@ import * as ImagePicker from 'expo-image-picker';
 import { Stack, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
-import { ClothingCategory } from '@/types';
+import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
 
 const isWeb = Platform.OS === 'web';
+
+const CATEGORIES = CLOTHING_CATEGORIES_WITH_ALL.filter(c => c !== '全部') as ClothingCategory[];
+const FIT_OPTIONS: FitType[] = ['超紧身', '修身', '常规合身', '宽松', '廓形'];
+const SEASON_OPTIONS = [
+  { id: 'spring', label: '春' },
+  { id: 'summer', label: '夏' },
+  { id: 'autumn', label: '秋' },
+  { id: 'winter', label: '冬' },
+  { id: 'all_season', label: '四季' },
+] as const;
 
 type PickerField = 'category' | 'color' | 'material';
 
@@ -31,9 +41,17 @@ export default function AddWardrobeItem() {
   const [color, setColor] = useState('');
   const [material, setMaterial] = useState('');
   const [brand, setBrand] = useState('');
+  const [price, setPrice] = useState('');
+  const [fitType, setFitType] = useState<string>('');
+  const [seasons, setSeasons] = useState<string[]>([]);
+  const [occasionTags, setOccasionTags] = useState<string[]>([]);
+  const [purchaseDate, setPurchaseDate] = useState('');
   const [recognizing, setRecognizing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pickerField, setPickerField] = useState<PickerField | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showMaterialPicker, setShowMaterialPicker] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   // Standardization state
   const [photoType, setPhotoType] = useState<string>('flat');
@@ -43,8 +61,6 @@ export default function AddWardrobeItem() {
   const [recognizeMeta, setRecognizeMeta] = useState<AIMeta | null>(null);
   const [stdMeta, setStdMeta] = useState<AIMeta | null>(null);
 
-  // Monotonic token — incremented on every new image pick; stale async results
-  // whose token no longer matches the current value are discarded.
   const reqTokenRef = useRef(0);
 
   const pickImage = async () => {
@@ -76,9 +92,17 @@ export default function AddWardrobeItem() {
     }
   };
 
-  const runStandardize = async (uri: string, cat: string, pt: string, token: number) => {
+  const toggleSeason = (id: string) => {
+    setSeasons(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+  };
+
+  const toggleOccasion = (id: string) => {
+    setOccasionTags(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+  };
+
+  const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string }) => {
     setStdState('generating');
-    const { url, meta } = await aiStandardizeGarment(uri, cat, pt);
+    const { url, meta } = await aiStandardizeGarment(uri, cat, pt, extras);
     if (reqTokenRef.current !== token) return;
     setStdMeta(meta);
     if (url) { setStandardizedUri(url); setUseStandardized(true); setStdState('done'); }
@@ -97,10 +121,13 @@ export default function AddWardrobeItem() {
       setCategory(result.category);
       setColor(result.color);
       if (result.material) setMaterial(result.material);
+      if (result.fit_type) setFitType(result.fit_type);
+      if (result.season?.length) setSeasons(result.season);
+      if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
       if (!name) setName(`${result.color}${result.category}`);
       const pt = result.photo_type || photoType;
       setPhotoType(pt);
-      void runStandardize(uri, result.category, pt, token);
+      void runStandardize(uri, result.category, pt, token, { color: result.color, material: result.material });
     } finally {
       if (reqTokenRef.current === token) setRecognizing(false);
     }
@@ -114,14 +141,12 @@ export default function AddWardrobeItem() {
     if (!user) return;
     setSaving(true);
 
-    // Upload the chosen image (standardized or original) to Supabase Storage;
-    // fall back to the local original URI if not set up yet or upload fails.
     let finalImageUrl = imageUri;
     const chosen = (useStandardized && standardizedUri) ? standardizedUri : imageUri;
     if (chosen) {
       const uploaded = await uploadWardrobeImage(chosen, user.id);
       if (uploaded) finalImageUrl = uploaded;
-      else finalImageUrl = imageUri; // upload failed → keep local original
+      else finalImageUrl = imageUri;
     }
 
     const saved = await addItem({
@@ -131,6 +156,11 @@ export default function AddWardrobeItem() {
       color,
       material: material || undefined,
       brand: brand || undefined,
+      price: price ? parseFloat(price) : undefined,
+      fit_type: (fitType || undefined) as FitType | undefined,
+      season: seasons.length > 0 ? seasons as any : undefined,
+      occasion_tags: occasionTags.length > 0 ? occasionTags : undefined,
+      purchase_date: purchaseDate || undefined,
       image_url: finalImageUrl ?? undefined,
       source_type: imageUri ? 'photo_ai' : 'manual',
       source_label: imageUri ? '拍照识别' : '手动添加',
@@ -229,7 +259,7 @@ export default function AddWardrobeItem() {
               <Image
                 source={{ uri: useStandardized && standardizedUri ? standardizedUri : imageUri }}
                 style={styles.image}
-                resizeMode="cover"
+                resizeMode="contain"
               />
               {recognizing ? (
                 <View style={styles.recognizingOverlay}>
@@ -298,6 +328,7 @@ export default function AddWardrobeItem() {
 
         {/* Form */}
         <View style={styles.form}>
+          {/* Name */}
           <View style={styles.field}>
             <Text style={styles.label}>名称 *</Text>
             <TextInput
@@ -309,44 +340,80 @@ export default function AddWardrobeItem() {
             />
           </View>
 
-          <View style={styles.row}>
-            <View style={[styles.field, styles.flex1]}>
-              <Text style={styles.label}>分类</Text>
-              <TouchableOpacity
-                style={styles.select}
-                onPress={() => setPickerField('category')}
-              >
-                <Text style={styles.selectText}>{category}</Text>
-                <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.field, styles.flex1]}>
-              <Text style={styles.label}>颜色</Text>
-              <TouchableOpacity
-                style={styles.select}
-                onPress={() => setPickerField('color')}
-              >
-                <Text style={[styles.selectText, !color && styles.placeholder]}>
-                  {color || '选择'}
-                </Text>
-                <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
+          {/* Category */}
           <View style={styles.field}>
-            <Text style={styles.label}>材质</Text>
+            <Text style={styles.label}>分类</Text>
             <TouchableOpacity
               style={styles.select}
-              onPress={() => setPickerField('material')}
+              onPress={() => setShowCategoryPicker(!showCategoryPicker)}
             >
-              <Text style={[styles.selectText, !material && styles.placeholder]}>
-                {material || '选择材质（可选）'}
-              </Text>
+              <Text style={styles.selectText}>{category}</Text>
               <Text style={styles.selectArrow}>›</Text>
             </TouchableOpacity>
+            {showCategoryPicker ? (
+              <View style={styles.pickerGrid}>
+                {CATEGORIES.map(cat => (
+                  <TouchableOpacity key={cat} style={[styles.gridOption, category === cat && styles.gridOptionActive]} onPress={() => { setCategory(cat); setShowCategoryPicker(false); }}>
+                    <Text style={[styles.gridOptionText, category === cat && styles.gridOptionTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
           </View>
 
+          {/* Color */}
+          <View style={styles.field}>
+            <Text style={styles.label}>颜色</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="输入或选择颜色"
+              placeholderTextColor={Colors.walnut2}
+              value={color}
+              onChangeText={setColor}
+              onFocus={() => setShowColorPicker(true)}
+            />
+            {showColorPicker ? (
+              <View style={styles.pickerWrap}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.pickerRow}>
+                    {COLOR_OPTIONS.map(c => (
+                      <TouchableOpacity key={c} style={[styles.pickerChip, color === c && styles.pickerChipActive]} onPress={() => { setColor(c); setShowColorPicker(false); }}>
+                        <Text style={[styles.pickerChipText, color === c && styles.pickerChipTextActive]}>{c}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Material */}
+          <View style={styles.field}>
+            <Text style={styles.label}>材质</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="输入或选择材质"
+              placeholderTextColor={Colors.walnut2}
+              value={material}
+              onChangeText={setMaterial}
+              onFocus={() => setShowMaterialPicker(true)}
+            />
+            {showMaterialPicker ? (
+              <View style={styles.pickerWrap}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.pickerRow}>
+                    {MATERIAL_OPTIONS.map(m => (
+                      <TouchableOpacity key={m} style={[styles.pickerChip, material === m && styles.pickerChipActive]} onPress={() => { setMaterial(m); setShowMaterialPicker(false); }}>
+                        <Text style={[styles.pickerChipText, material === m && styles.pickerChipTextActive]}>{m}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Brand */}
           <View style={styles.field}>
             <Text style={styles.label}>品牌</Text>
             <TextInput
@@ -356,6 +423,67 @@ export default function AddWardrobeItem() {
               value={brand}
               onChangeText={setBrand}
             />
+          </View>
+
+          {/* Price */}
+          <View style={styles.field}>
+            <Text style={styles.label}>价格</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="可选"
+              placeholderTextColor={Colors.walnut2}
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Fit Type */}
+          <View style={styles.field}>
+            <Text style={styles.label}>版型</Text>
+            <View style={styles.pickerGrid}>
+              {FIT_OPTIONS.map(fit => (
+                <TouchableOpacity key={fit} style={[styles.gridOption, fitType === fit && styles.gridOptionActive]} onPress={() => setFitType(fitType === fit ? '' : fit)}>
+                  <Text style={[styles.gridOptionText, fitType === fit && styles.gridOptionTextActive]}>{fit}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Purchase Date */}
+          <View style={styles.field}>
+            <Text style={styles.label}>购买日期</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.walnut2}
+              value={purchaseDate}
+              onChangeText={setPurchaseDate}
+            />
+          </View>
+
+          {/* Season */}
+          <View style={styles.field}>
+            <Text style={styles.label}>季节</Text>
+            <View style={styles.pickerGrid}>
+              {SEASON_OPTIONS.map(s => (
+                <TouchableOpacity key={s.id} style={[styles.gridOption, seasons.includes(s.id) && styles.gridOptionActive]} onPress={() => toggleSeason(s.id)}>
+                  <Text style={[styles.gridOptionText, seasons.includes(s.id) && styles.gridOptionTextActive]}>{s.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Occasion Tags */}
+          <View style={styles.field}>
+            <Text style={styles.label}>场合标签</Text>
+            <View style={styles.pickerGrid}>
+              {OCCASION_TAGS.map(tag => (
+                <TouchableOpacity key={tag.id} style={[styles.gridOption, occasionTags.includes(tag.id) && styles.gridOptionActive]} onPress={() => toggleOccasion(tag.id)}>
+                  <Text style={[styles.gridOptionText, occasionTags.includes(tag.id) && styles.gridOptionTextActive]}>{tag.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -368,7 +496,7 @@ export default function AddWardrobeItem() {
         </View>
       ) : null}
 
-      {/* Picker Modal */}
+      {/* Picker Modal (legacy for non-grid pickers) */}
       {pickerField ? (
         isWeb ? (
           <View style={styles.webLayer}>{pickerSheet}</View>
@@ -415,14 +543,13 @@ const styles = StyleSheet.create({
   },
   headerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cancel: { ...T.buttonSecondary, color: Colors.walnut },
-  // 方正悠宋 — nav title
   title: { ...T.subTitle },
   save: { ...T.buttonSecondary, color: Colors.terracotta },
   saveDisabled: { color: Colors.walnut2 },
   content: { padding: Spacing.four, gap: Spacing.three },
   imageSection: { gap: Spacing.two },
   imageContainer: {
-    height: 240, borderRadius: Radius.lg, overflow: 'hidden',
+    minHeight: 200, maxHeight: 400, borderRadius: Radius.lg, overflow: 'hidden',
     backgroundColor: Colors.paperCard,
   },
   image: { width: '100%', height: '100%' },
@@ -485,7 +612,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     borderWidth: 1, borderColor: Colors.linen, borderStyle: 'dashed',
   },
-  // placeholderEmoji removed — now uses MaterialCommunityIcons hanger
   placeholderText: { ...T.itemDesc, fontSize: 14 },
   imageActions: { flexDirection: 'row', gap: Spacing.two },
   imageBtn: {
@@ -539,6 +665,27 @@ const styles = StyleSheet.create({
   selectText: { ...T.inputText, color: Colors.ink },
   selectArrow: { fontSize: 16, color: Colors.walnut2 },
   placeholder: { color: Colors.walnut2 },
+  pickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one, marginTop: Spacing.one },
+  gridOption: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.lineStrong,
+    backgroundColor: Colors.paper,
+  },
+  gridOptionActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  gridOptionText: { ...T.tag, color: Colors.ink },
+  gridOptionTextActive: { ...T.tag, color: Colors.paper },
+  pickerWrap: { marginTop: Spacing.one },
+  pickerRow: { flexDirection: 'row', gap: Spacing.one, flexWrap: 'wrap' },
+  pickerChip: {
+    paddingHorizontal: Spacing.two, paddingVertical: 4,
+    borderRadius: 10, borderWidth: 1, borderColor: Colors.lineStrong, backgroundColor: Colors.paper,
+  },
+  pickerChipActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  pickerChipText: { ...T.tag, color: Colors.ink, fontSize: 11 },
+  pickerChipTextActive: { ...T.tag, color: Colors.paper, fontSize: 11 },
   row: { flexDirection: 'row', gap: Spacing.two },
   flex1: { flex: 1 },
   modalBackdrop: {
@@ -560,7 +707,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.line,
   },
-  // 方正悠宋 — modal title
   modalTitle: { ...T.subTitle },
   modalClose: { ...T.buttonSecondary, color: Colors.terracotta },
   pickerOption: {
@@ -573,8 +719,6 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.lineSoft,
   },
   pickerOptionActive: { backgroundColor: Colors.signalSoft },
-  // 方正悠宋 — picker item text
   pickerOptionText: { ...T.itemName, fontSize: 16 },
   pickerOptionTextActive: { ...T.itemName, fontSize: 16, color: Colors.terracotta },
-  // checkmark style removed — now uses Feather check icon directly
 });

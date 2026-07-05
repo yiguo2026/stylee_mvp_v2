@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   },
   wardrobeAddText: { ...T.micro, fontSize: 10, textAlign: 'center', color: Colors.terracotta },
   wardrobeThumb: { width: 80, gap: 4 },
-  wardrobeThumbImg: { width: 80, height: 80, borderRadius: Radius.md },
+  wardrobeThumbImg: { width: 80, height: 80, borderRadius: Radius.md, backgroundColor: Colors.paperCard },
   wardrobeThumbPlaceholder: {
     width: 80, height: 80, borderRadius: Radius.md,
     backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',

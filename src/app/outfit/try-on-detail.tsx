@@ -135,9 +135,9 @@ const styles = StyleSheet.create({
   imageCard: {
     borderRadius: Radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.line,
-    backgroundColor: Colors.ink,
+    backgroundColor: Colors.paper,
   },
-  resultImage: { width: '100%', backgroundColor: Colors.ink },
+  resultImage: { width: '100%', backgroundColor: Colors.paper },
 
   infoRow: {
     flexDirection: 'row', backgroundColor: Colors.paperCard,

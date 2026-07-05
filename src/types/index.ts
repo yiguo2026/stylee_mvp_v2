@@ -198,6 +198,8 @@ export interface RecognitionResult {
   brand?: string;
   sleeve_length?: SleeveLength;
   fit_type?: FitType;
+  season?: string[];        // AI识别：['spring','summer',...]
+  occasion_tags?: string[]; // AI识别：['daily_commute','date',...]
   photo_type?: string;      // 服务返回：on_body|flat|product
   needs_review?: boolean;   // 服务返回：低置信需人工确认
   confidence?: number;      // 服务返回：0-1

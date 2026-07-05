@@ -23,7 +23,9 @@ const RECOGNIZE_PROMPT = `请识别这件衣物的属性，返回JSON格式：
   "style": "风格",
   "sleeve_length": "无袖/短袖/长袖（仅上装需要）",
   "fit_type": "超紧身/修身/常规合身/宽松/廓形",
-  "brand": "品牌（可见的话）"
+  "brand": "品牌（可见的话）",
+  "season": ["适合的季节，从 spring/summer/autumn/winter/all_season 中选择1-3个"],
+  "occasion_tags": ["适合的场合，从 daily_commute/date/travel/business/sport/ceremony/beach/hiking/home/party 中选择1-3个"]
 }
 只返回JSON，不要其他文字。`;
 
@@ -41,6 +43,10 @@ export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: R
             material: parsed.material || '',
             style: parsed.style || '',
             brand: parsed.brand || '',
+            fit_type: parsed.fit_type || undefined,
+            sleeve_length: parsed.sleeve_length || undefined,
+            season: Array.isArray(parsed.season) ? parsed.season : undefined,
+            occasion_tags: Array.isArray(parsed.occasion_tags) ? parsed.occasion_tags : undefined,
           },
           meta: { source: 'qwen3-vl-plus', durationMs: Date.now() - t0, ok: true },
         };
@@ -55,15 +61,18 @@ export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: R
 
 export const aiStandardizeGarment = async (
   imageUri: string, category: string, photoType: string,
+  extras?: { color?: string; material?: string },
 ): Promise<{ url: string | null; meta: AIMeta }> => {
   const t0 = Date.now();
   if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
 
-  const prompt = `将这件${category}衣物生成标准化的商品展示图，纯白背景，正面平铺，无模特，无多余装饰，高清商业摄影风格。`;
+  const detail = [extras?.color, extras?.material].filter(Boolean).join('、');
+  const detailInstr = detail ? `（${detail}）` : '';
+  const prompt = `严格保持参考图片中衣物的颜色、材质、纹理、图案、版型等所有视觉细节完全不变，这是同一件衣服，仅将背景替换为纯白色，${category}${detailInstr}，正面平铺展示，无模特，无多余装饰，商品白底图风格，高清摄影`;
 
   try {
     const { qwenGenerateImage } = await import('@/lib/dashscope');
-    const imageUrl = await qwenGenerateImage(prompt, { imageUrl: imageUri });
+    const imageUrl = await qwenGenerateImage(prompt, { refImage: imageUri });
     return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: !!imageUrl } };
   } catch (e) {
     console.warn('[AI] Qwen Image standardization failed:', e);
@@ -439,6 +448,7 @@ export async function aiGenerateTryOnImage(
   outfitItems: ItemBrief[],
   bodyShape?: string,
   scene?: string,
+  selfieUri?: string | null,
 ): Promise<{ url: string | null; meta: AIMeta }> {
   const t0 = Date.now();
   if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
@@ -447,11 +457,16 @@ export async function aiGenerateTryOnImage(
   const bodyDesc = bodyShape ? `，${bodyShape}身材` : '';
   const sceneDesc = scene && SCENE_PROMPTS[scene] ? `，${SCENE_PROMPTS[scene]}` : '，站在城市街头，自然光线';
 
-  const prompt = `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`;
+  const faceInstr = selfieUri
+    ? '严格保持参考照片中人物的面部五官、脸型轮廓、肤色和发型完全一致，不可替换或改变面部任何特征，'
+    : '';
+  const prompt = selfieUri
+    ? `${faceInstr}一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`
+    : `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`;
 
   try {
     const { qwenGenerateImage } = await import('@/lib/dashscope');
-    const imageUrl = await qwenGenerateImage(prompt);
+    const imageUrl = await qwenGenerateImage(prompt, { refImage: selfieUri || undefined });
     return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: !!imageUrl } };
   } catch (e) {
     console.warn('[AI] Try-on image generation failed:', e);

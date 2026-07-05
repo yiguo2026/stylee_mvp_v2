@@ -123,7 +123,7 @@ export async function qwenVisionChat(
  */
 export async function qwenGenerateImage(
   prompt: string,
-  options?: { size?: string; imageUrl?: string },
+  options?: { size?: string; imageUrl?: string; refImage?: string },
 ): Promise<string | null> {
   if (!isAvailable()) {
     console.warn('[DashScope] API Key not set, skipping image generation');
@@ -131,9 +131,35 @@ export async function qwenGenerateImage(
   }
 
   try {
-    const contentParts: { text: string }[] = [
-      { text: prompt },
-    ];
+    // Build content parts: optional reference image + text prompt
+    const contentParts: { image?: string; text?: string }[] = [];
+
+    if (options?.refImage) {
+      // Convert local/file URI to base64 data URL if needed
+      let refUrl = options.refImage;
+      if (!refUrl.startsWith('data:') && !refUrl.startsWith('http')) {
+        try {
+          const response = await fetch(refUrl);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result);
+            };
+            reader.readAsDataURL(blob);
+          });
+          refUrl = base64;
+        } catch (e) {
+          console.warn('[DashScope] Failed to read ref image:', e);
+        }
+      }
+      if (refUrl.startsWith('data:') || refUrl.startsWith('http')) {
+        contentParts.push({ image: refUrl });
+      }
+    }
+
+    contentParts.push({ text: prompt });
 
     const body = {
       model: QWEN_IMAGE_MODEL,

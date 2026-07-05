@@ -174,9 +174,9 @@ export default function TryOnScreen() {
 
     setGenStep(1); // "生成试穿效果图..."
 
-    // Call both AI functions in parallel
+    // Call both AI functions in parallel, pass selfie for face reference
     const [imageResult, suggestionResult] = await Promise.all([
-      aiGenerateTryOnImage(items, bodyShape, selectedScene),
+      aiGenerateTryOnImage(items, bodyShape, selectedScene, selfieUri),
       aiGenerateTryOnSuggestion(items, bodyShape),
     ]);
 
@@ -578,12 +578,12 @@ const styles = StyleSheet.create({
 
   // ── Result ──
   resultCard: {
-    backgroundColor: Colors.ink, borderRadius: Radius.lg,
+    backgroundColor: Colors.paper, borderRadius: Radius.lg,
     overflow: 'hidden',
   },
-  resultImage: { width: '100%', backgroundColor: Colors.ink },
+  resultImage: { width: '100%', backgroundColor: Colors.paper },
   resultFooter: { padding: Spacing.three, gap: Spacing.two },
-  resultCaption: { ...T.bodyText, color: Colors.paper, fontSize: 13 },
+  resultCaption: { ...T.bodyText, color: Colors.ink, fontSize: 13 },
   resultSaveBtn: {
     backgroundColor: Colors.ink, borderRadius: Radius.md,
     paddingVertical: Spacing.two, alignItems: 'center', flexDirection: 'row',

@@ -49,8 +49,7 @@ export default function TryOnBodyPage() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
+      allowsEditing: false,
       quality: 0.7,
       base64: true,
     });
@@ -110,7 +109,7 @@ export default function TryOnBodyPage() {
 
         <TouchableOpacity style={styles.photoCard} onPress={pickImage} activeOpacity={0.7}>
           {localUri ? (
-            <Image source={{ uri: localUri }} style={styles.photoPreview} resizeMode="cover" />
+            <Image source={{ uri: localUri }} style={styles.photoPreview} resizeMode="contain" />
           ) : (
             <View style={styles.photoPlaceholder}>
               <Text style={styles.photoLabel}>点击上传自拍照</Text>
