@@ -1,34 +1,227 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head><base href="/stylee_mvp_v2/">
+<html lang="zh">
+  <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Stylee</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
+      /* These styles make the body full-height */
       html,
       body {
         height: 100%;
       }
+      /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
       }
+      /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
       }
     </style>
-  <link rel="icon" href="/stylee_mvp_v2/favicon.ico" /></head>
+  <link rel="icon" href="/favicon.ico" /><style>
+@font-face{font-family:"PlayfairDisplay_400Regular";src:url("/assets/node_modules/@expo-google-fonts/playfair-display/400Regular/PlayfairDisplay_400Regular.9116faa12b7016e93277294c7a0735b6.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"PlayfairDisplay_400Regular_Italic";src:url("/assets/node_modules/@expo-google-fonts/playfair-display/400Regular_Italic/PlayfairDisplay_400Regular_Italic.aaf0735ffb4ce9ce44d4d8992a64b3a8.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"PlayfairDisplay_500Medium";src:url("/assets/node_modules/@expo-google-fonts/playfair-display/500Medium/PlayfairDisplay_500Medium.5a11632ed293fcfcc40970c2b22c858f.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"PlayfairDisplay_500Medium_Italic";src:url("/assets/node_modules/@expo-google-fonts/playfair-display/500Medium_Italic/PlayfairDisplay_500Medium_Italic.0f0ebaf4ff823ba29d76974788e1ec76.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"PlayfairDisplay_600SemiBold";src:url("/assets/node_modules/@expo-google-fonts/playfair-display/600SemiBold/PlayfairDisplay_600SemiBold.f0713720c230460d5430d96d46f5cd28.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"PlayfairDisplay_600SemiBold_Italic";src:url("/assets/node_modules/@expo-google-fonts/playfair-display/600SemiBold_Italic/PlayfairDisplay_600SemiBold_Italic.ce09c0228b423716854f1a854c4d7fa5.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"Inter_300Light";src:url("/assets/node_modules/@expo-google-fonts/inter/300Light/Inter_300Light.d2994e3dea3856e1834395ad6cce32af.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"Inter_400Regular";src:url("/assets/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.51b6ad87261f18b6433ec52871ddfabc.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"Inter_500Medium";src:url("/assets/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.137ab18bace28dd0bd83eb3b8ed2bc54.ttf") format("truetype");font-display:swap;}
+@font-face{font-family:"Inter_600SemiBold";src:url("/assets/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.a5f35888d2da465de352e0dcfaf33324.ttf") format("truetype");font-display:swap;}
+</style>
+<style>
+@media (min-width: 960px) {
+  body {
+    background: linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%) !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 32px !important;
+    box-sizing: border-box !important;
+    overflow: auto !important;
+  }
+  .desktop-phone-stage {
+    --phone-scale: min(1, calc((100vw - 96px) / 425), calc((100vh - 64px) / 884));
+    width: calc(425px * var(--phone-scale));
+    height: calc(884px * var(--phone-scale));
+    flex: none;
+  }
+  .desktop-phone-frame {
+    position: relative;
+    width: 425px;
+    height: 884px;
+    transform: scale(var(--phone-scale));
+    transform-origin: top left;
+    padding: 14px;
+    box-sizing: border-box;
+    border-radius: 60px;
+    background: linear-gradient(180deg, #2f3136 0%, #111216 22%, #09090b 100%);
+    box-shadow: 0 32px 80px rgba(15, 23, 42, 0.22), 0 10px 24px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .desktop-phone-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 48px;
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.06);
+    isolation: isolate;
+  }
+  .desktop-phone-screen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    pointer-events: none;
+    z-index: 3;
+  }
+  .desktop-phone-statusbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    height: 60px;
+    padding: 14px 28px 0;
+    box-sizing: border-box;
+    color: #0a0a0a;
+    font-family: Inter_600SemiBold, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    pointer-events: none;
+  }
+  .desktop-phone-time {
+    position: absolute;
+    left: 28px;
+    top: 15px;
+    font-size: 15px;
+    letter-spacing: -0.2px;
+  }
+  .desktop-phone-island {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    width: 126px;
+    height: 34px;
+    margin-left: -63px;
+    border-radius: 18px;
+    background: #0a0a0a;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .desktop-phone-system {
+    position: absolute;
+    right: 28px;
+    top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .desktop-phone-network {
+    font-size: 11px;
+    line-height: 1;
+  }
+  .desktop-phone-signal {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+  }
+  .desktop-phone-signal i {
+    display: block;
+    width: 2px;
+    background: #0a0a0a;
+    border-radius: 999px;
+  }
+  .desktop-phone-signal i:nth-child(1) { height: 4px; opacity: 0.55; }
+  .desktop-phone-signal i:nth-child(2) { height: 6px; opacity: 0.7; }
+  .desktop-phone-signal i:nth-child(3) { height: 8px; opacity: 0.85; }
+  .desktop-phone-signal i:nth-child(4) { height: 10px; }
+  .desktop-phone-wifi {
+    position: relative;
+    width: 14px;
+    height: 10px;
+  }
+  .desktop-phone-wifi::before,
+  .desktop-phone-wifi::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 1.6px solid #0a0a0a;
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-radius: 50%;
+  }
+  .desktop-phone-wifi::before {
+    bottom: 1px;
+    width: 14px;
+    height: 10px;
+  }
+  .desktop-phone-wifi::after {
+    bottom: 2px;
+    width: 8px;
+    height: 6px;
+  }
+  .desktop-phone-battery {
+    position: relative;
+    width: 24px;
+    height: 12px;
+    border: 1.6px solid #0a0a0a;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  .desktop-phone-battery::after {
+    content: "";
+    position: absolute;
+    right: -3px;
+    top: 3px;
+    width: 2px;
+    height: 4px;
+    border-radius: 1px;
+    background: #0a0a0a;
+  }
+  .desktop-phone-battery-fill {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    bottom: 2px;
+    width: 14px;
+    border-radius: 2px;
+    background: #0a0a0a;
+  }
+  #root {
+    position: relative !important;
+    z-index: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    flex: none !important;
+    overflow: hidden !important;
+    border-radius: 48px !important;
+    background: #ffffff !important;
+    padding-top: 60px !important;
+    box-sizing: border-box !important;
+  }
+}
+</style>
+</head>
+
   <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
-    <div id="root"></div>
-<script>
-  window.__EXPO_BASE_PATH__ = '/stylee_mvp_v2';
-  window.__EXPO_ASSETS_DIR__ = '/stylee_mvp_v2/assets';
-</script>
-  <script src="/stylee_mvp_v2/_expo/static/js/web/entry-ddefa58b80b4a109b8017e957f24417a.js" defer></script>
+    <!-- The root element for your Expo app. -->
+    <div class="desktop-phone-stage"><div class="desktop-phone-frame"><div class="desktop-phone-screen"><div class="desktop-phone-statusbar" aria-hidden="true"><span class="desktop-phone-time">9:41</span><span class="desktop-phone-island"></span><div class="desktop-phone-system"><span class="desktop-phone-network">5G</span><span class="desktop-phone-signal"><i></i><i></i><i></i><i></i></span><span class="desktop-phone-wifi"></span><span class="desktop-phone-battery"><span class="desktop-phone-battery-fill"></span></span></div></div><div id="root"></div></div></div></div>
+  <script src="/_expo/static/js/web/entry-b18b1c5acb26ecf8e03aac4c97ba9cc7.js" defer></script>
 </body>
 </html>
