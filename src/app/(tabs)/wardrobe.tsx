@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, SafeAreaView, RefreshControl,
-  TextInput, Modal, ScrollView, ActivityIndicator, Alert, Platform,
+  TextInput, Modal, ScrollView, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -12,9 +12,9 @@ import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { Toast } from '@/components/Toast';
 import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
-import { aiExtractProductFromLink } from '@/lib/ai';
 
 const isWeb = Platform.OS === 'web';
 
@@ -45,57 +45,6 @@ function ItemCard({ item }: { item: WardrobeItem }) {
   );
 }
 
-function LinkImportModal({ visible, url, onChangeUrl, importing, onImport, onClose }: {
-  visible: boolean; url: string; onChangeUrl: (v: string) => void;
-  importing: boolean; onImport: () => void; onClose: () => void;
-}) {
-  const content = (
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <View style={styles.linkHeader}>
-          <Text style={styles.linkTitle}>链接导入</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.linkClose}>关闭</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.linkLabel}>商品链接</Text>
-        <TextInput
-          style={styles.linkInput}
-          placeholder="粘贴商品链接…"
-          placeholderTextColor={Colors.walnut2}
-          value={url}
-          onChangeText={onChangeUrl}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-        />
-        <Text style={styles.linkHint}>AI 将自动识别商品信息并填入衣橱</Text>
-        <TouchableOpacity
-          style={[styles.linkImportBtn, importing && styles.disabled]}
-          onPress={onImport}
-          disabled={importing}
-        >
-          {importing
-            ? <ActivityIndicator color={Colors.paper} />
-            : <Text style={styles.linkImportBtnText}>导入商品</Text>
-          }
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  if (isWeb) {
-    if (!visible) return null;
-    return <View style={styles.webLayer}>{content}</View>;
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {content}
-    </Modal>
-  );
-}
-
 export default function WardrobeTab() {
   const { user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
@@ -104,10 +53,7 @@ export default function WardrobeTab() {
   const [searchText, setSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showLinkModal, setShowLinkModal] = useState(false);
   const [showWishlist, setShowWishlist] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const [linkImporting, setLinkImporting] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -167,33 +113,6 @@ export default function WardrobeTab() {
       return terms.some(t => haystack.includes(t));
     });
 
-  const handleLinkImport = async () => {
-    if (!linkUrl.trim() || !user) return;
-    setLinkImporting(true);
-    try {
-      const product = await aiExtractProductFromLink(linkUrl.trim());
-      const { addItem } = useWardrobeStore.getState();
-      await addItem({
-        user_id: user.id,
-        name: product?.name ?? '链接导入商品',
-        category: product?.category ?? '上装',
-        color: product?.color ?? '未知',
-        material: product?.material || undefined,
-        brand: product?.brand || undefined,
-        source_type: 'link',
-        source_label: linkUrl.trim(),
-        status: 'active',
-      });
-      setLinkUrl('');
-      setShowLinkModal(false);
-      Alert.alert('导入成功', '商品已添加到衣橱，请编辑补充详细信息');
-    } catch (e: any) {
-      Alert.alert('导入失败', e.message || '请稍后重试');
-    } finally {
-      setLinkImporting(false);
-    }
-  };
-
   const handleMoveToWardrobe = async (wishId: string) => {
     await moveToWardrobe(wishId);
     if (user) fetchItems(user.id);
@@ -204,34 +123,6 @@ export default function WardrobeTab() {
     await removeItem(wishId);
     showToast('已删除心愿单单品');
   };
-
-  const addSheet = (
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <Text style={styles.modalWarning}>仅支持单品上传，请每次上传一件衣物</Text>
-
-        <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/add'); }}>
-          <Feather name="tag" size={18} color={Colors.ink} style={styles.modalOptionIcon} />
-          <Text style={styles.modalOptionText}>单品录入</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); router.push('/wardrobe/batch'); }}>
-          <Feather name="grid" size={18} color={Colors.ink} style={styles.modalOptionIcon} />
-          <Text style={styles.modalOptionText}>批量导入</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.modalOption} onPress={() => { setShowAddModal(false); setShowLinkModal(true); }}>
-          <Feather name="link-2" size={18} color={Colors.ink} style={styles.modalOptionIcon} />
-          <Text style={styles.modalOptionText}>链接导入</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
-          <Feather name="x-circle" size={16} color={Colors.walnut} />
-          <Text style={styles.modalCancelText}>取消</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 
   const wishlistOverlayContent = (
     <SafeAreaView style={styles.wishlistOverlay}>
@@ -405,23 +296,8 @@ export default function WardrobeTab() {
       </TouchableOpacity>
 
       {/* Add Modal */}
-      {isWeb ? (
-        showAddModal ? <View style={styles.webLayer}>{addSheet}</View> : null
-      ) : (
-        <Modal visible={showAddModal} transparent animationType="slide" onRequestClose={() => setShowAddModal(false)}>
-          {addSheet}
-        </Modal>
+      <AddClothingSheet visible={showAddModal} onClose={() => setShowAddModal(false)} />
       )}
-
-      {/* Link Import Modal */}
-      <LinkImportModal
-        visible={showLinkModal}
-        url={linkUrl}
-        onChangeUrl={setLinkUrl}
-        importing={linkImporting}
-        onImport={handleLinkImport}
-        onClose={() => setShowLinkModal(false)}
-      />
 
       {/* Wishlist Overlay (slide-in full page) */}
       {isWeb ? (
@@ -548,38 +424,6 @@ const styles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.ink,
     alignItems: 'center', justifyContent: 'center', ...Shadow.two,
   },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: {
-    backgroundColor: Colors.paper, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl,
-    padding: Spacing.four, gap: Spacing.two, paddingBottom: Spacing.six,
-  },
-  modalWarning: { ...T.bodyText, fontSize: 13, color: Colors.walnut, textAlign: 'center', marginBottom: Spacing.one },
-  modalOption: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
-    paddingVertical: Spacing.three, paddingHorizontal: Spacing.two,
-    borderBottomWidth: 1, borderBottomColor: Colors.line,
-  },
-  modalOptionIcon: { width: 20, textAlign: 'center' },
-  modalOptionText: { ...T.bodyText, fontSize: 16, color: Colors.ink },
-  modalCancel: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.three, marginTop: Spacing.one },
-  modalCancelText: { ...T.bodyText, fontSize: 16, color: Colors.walnut },
-
-  linkHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two },
-  linkTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 18, color: Colors.ink },
-  linkClose: { fontSize: 18, color: Colors.walnut2 },
-  linkLabel: { ...T.tag, fontSize: 12, color: Colors.walnut, marginBottom: Spacing.one },
-  linkInput: {
-    ...T.inputText, borderWidth: 1, borderColor: Colors.line, borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2, color: Colors.ink,
-  },
-  linkHint: { ...T.micro, color: Colors.walnut2, marginTop: Spacing.one },
-  linkImportBtn: {
-    backgroundColor: Colors.ink, borderRadius: Radius.md,
-    paddingVertical: Spacing.two + 4, alignItems: 'center', marginTop: Spacing.three,
-  },
-  linkImportBtnText: { ...T.buttonPrimary, color: Colors.paper },
-  disabled: { opacity: 0.6 },
 
   // Wishlist overlay (full page)
   wishlistOverlay: { flex: 1, backgroundColor: Colors.paper },

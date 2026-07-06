@@ -5,7 +5,7 @@ import {
   SafeAreaView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
@@ -35,6 +35,11 @@ type PickerField = 'category' | 'color' | 'material';
 export default function AddWardrobeItem() {
   const { user } = useUserStore();
   const { addItem } = useWardrobeStore();
+  const { images: imagesParam } = useLocalSearchParams<{ images?: string }>();
+
+  // Multi-image import: all source images and their detection results
+  const [imageSources, setImageSources] = useState<string[]>([]);
+  const [detectingImages, setDetectingImages] = useState(false);
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -73,6 +78,62 @@ export default function AddWardrobeItem() {
   const [stdMeta, setStdMeta] = useState<AIMeta | null>(null);
 
   const reqTokenRef = useRef(0);
+
+  // Process images passed from AddClothingSheet
+  useEffect(() => {
+    if (!imagesParam) return;
+    let cancelled = false;
+    try {
+      const uris: string[] = JSON.parse(imagesParam);
+      if (uris.length === 0) return;
+
+      setImageSources(uris);
+      setImageUri(uris[0]);
+
+      if (uris.length === 1) {
+        // Single image — use existing single-image flow
+        runRecognition(uris[0]);
+      } else {
+        // Multiple images — detect all in parallel, then show combined picker
+        setDetectingImages(true);
+        setRecognizing(true);
+        Promise.all(uris.map(uri => aiDetectMultiItems(uri).catch(() => ({ items: [], meta: { source: 'mock', durationMs: 0, ok: false } }))))
+          .then(results => {
+            if (cancelled) return;
+            setRecognizing(false);
+            setDetectingImages(false);
+
+            // Collect all items, tag each with its source image URI
+            const allItems: (DetectedItem & { sourceImageUri: string })[] = [];
+            results.forEach((result, imgIdx) => {
+              result.items.forEach(item => {
+                allItems.push({ ...item, sourceImageUri: uris[imgIdx] });
+              });
+            });
+
+            if (allItems.length === 0) {
+              // No items detected — fall back to manual with first image
+              return;
+            }
+
+            if (allItems.length === 1) {
+              const item = allItems[0];
+              setImageUri(item.sourceImageUri);
+              fillFormFromDetected(item);
+              const token = reqTokenRef.current;
+              void runStandardize(item.sourceImageUri, item.category, photoType, token, { color: item.color, material: item.material, description: item.description });
+            } else {
+              // Show combined picker
+              setDetectedItems(allItems as any);
+              setSelectedIndices(new Set(allItems.map((_, i) => i)));
+              setShowItemPicker(true);
+            }
+          });
+      }
+    } catch {}
+
+    return () => { cancelled = true; };
+  }, [imagesParam]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -181,27 +242,32 @@ export default function AddWardrobeItem() {
     setQueueTotal(queue.length);
     setShowItemPicker(false);
 
-    // Fill form with first item and start standardization
+    // Fill form with first item and start standardization using its source image
+    const firstItem = queue[0] as any;
+    const sourceUri = firstItem.sourceImageUri ?? imageUri;
+    setImageUri(sourceUri);
     resetForm();
-    fillFormFromDetected(queue[0]);
+    fillFormFromDetected(firstItem);
     const token = reqTokenRef.current;
-    void runStandardize(imageUri!, queue[0].category, photoType, token, { color: queue[0].color, material: queue[0].material, description: queue[0].description });
+    void runStandardize(sourceUri, firstItem.category, photoType, token, { color: firstItem.color, material: firstItem.material, description: firstItem.description });
   };
 
   // useEffect drives the queue advance after a successful save.
-  // This avoids any stale-closure issues with async handleSave.
   useEffect(() => {
     if (!pendingAdvance) return;
     setPendingAdvance(false);
 
-    const remaining = itemQueue.slice(1);
-    setItemQueue(remaining);
+    const remainingQueue = itemQueue.slice(1);
+    setItemQueue(remainingQueue);
 
-    if (remaining.length > 0) {
+    if (remainingQueue.length > 0) {
+      const nextItem = remainingQueue[0] as any;
+      const sourceUri = nextItem.sourceImageUri ?? imageUri;
+      setImageUri(sourceUri);
       resetForm();
-      fillFormFromDetected(remaining[0]);
+      fillFormFromDetected(nextItem);
       const token = reqTokenRef.current;
-      void runStandardize(imageUri!, remaining[0].category, photoType, token, { color: remaining[0].color, material: remaining[0].material, description: remaining[0].description });
+      void runStandardize(sourceUri, nextItem.category, photoType, token, { color: nextItem.color, material: nextItem.material, description: nextItem.description });
     } else {
       setQueueTotal(0);
       router.back();
@@ -343,6 +409,22 @@ export default function AddWardrobeItem() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Multi-image thumbnails */}
+        {imageSources.length > 1 ? (
+          <View style={styles.thumbRow}>
+            {imageSources.map((uri, idx) => (
+              <TouchableOpacity
+                key={`thumb-${idx}`}
+                style={[styles.thumbItem, uri === imageUri && styles.thumbItemActive]}
+                onPress={() => setImageUri(uri)}
+              >
+                <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" />
+                <Text style={styles.thumbLabel}>图{idx + 1}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
         {/* Image Section */}
         <View style={styles.imageSection}>
           {imageUri ? (
@@ -390,7 +472,26 @@ export default function AddWardrobeItem() {
             </View>
           ) : null}
           {stdState === 'failed' ? (
-            <Text style={styles.stdFailedCaption}>标准图生成失败，用原图</Text>
+            <View style={styles.stdFailedRow}>
+              <Text style={styles.stdFailedCaption}>标准图生成失败</Text>
+              <TouchableOpacity
+                style={styles.stdRetryBtn}
+                onPress={() => {
+                  if (!imageUri) return;
+                  const token = ++reqTokenRef.current;
+                  void runStandardize(imageUri, category, photoType, token, { color, material, description: name });
+                }}
+              >
+                <Feather name="refresh-cw" size={13} color={Colors.terracotta} />
+                <Text style={styles.stdRetryBtnText}>重试</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.stdUseOriginalBtn}
+                onPress={() => { setUseStandardized(false); }}
+              >
+                <Text style={styles.stdUseOriginalBtnText}>用原图保存</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
 
           <View style={styles.imageActions}>
@@ -418,7 +519,11 @@ export default function AddWardrobeItem() {
         {showItemPicker && detectedItems.length > 1 ? (
           <View style={styles.itemPickerCard}>
             <View style={styles.itemPickerHeader}>
-              <Text style={styles.itemPickerTitle}>图片中检测到 {detectedItems.length} 件单品</Text>
+              <Text style={styles.itemPickerTitle}>
+                {imageSources.length > 1
+                  ? `${imageSources.length}张图片中检测到 ${detectedItems.length} 件单品`
+                  : `图片中检测到 ${detectedItems.length} 件单品`}
+              </Text>
               <TouchableOpacity onPress={() => {
                 const all = new Set(detectedItems.map((_, i) => i));
                 setSelectedIndices(prev => prev.size === detectedItems.length ? new Set() : all);
@@ -430,6 +535,10 @@ export default function AddWardrobeItem() {
             </View>
             {detectedItems.map((item, idx) => {
               const isSelected = selectedIndices.has(idx);
+              const sourceItem = item as any;
+              const imgLabel = imageSources.length > 1 && sourceItem.sourceImageUri
+                ? `图${imageSources.indexOf(sourceItem.sourceImageUri) + 1}`
+                : '';
               return (
                 <TouchableOpacity
                   key={idx}
@@ -444,7 +553,7 @@ export default function AddWardrobeItem() {
                       {item.description}
                     </Text>
                     <Text style={styles.detectedItemMeta}>
-                      {item.category} · {item.color}{item.material ? ` · ${item.material}` : ''}
+                      {imgLabel ? `${imgLabel} · ` : ''}{item.category} · {item.color}{item.material ? ` · ${item.material}` : ''}
                     </Text>
                   </View>
                   {isSelected ? (
@@ -660,10 +769,10 @@ export default function AddWardrobeItem() {
       {recognizing ? (
         <View style={styles.aiLoadingLayer}>
           <AILoading
-            title="AI 正在识别衣物"
-            subtitle="正在解析单品属性..."
+            title={detectingImages ? 'AI 正在识别多张图片' : 'AI 正在识别衣物'}
+            subtitle={detectingImages ? `正在分析 ${imageSources.length} 张图片中的单品...` : '正在解析单品属性...'}
             steps={['读取图片', '识别衣物轮廓', '解析颜色材质', '生成单品信息']}
-            durationMs={8000}
+            durationMs={imageSources.length > 1 ? 12000 : 8000}
           />
         </View>
       ) : null}
@@ -697,6 +806,14 @@ const styles = StyleSheet.create({
   save: { ...T.buttonSecondary, color: Colors.terracotta },
   saveDisabled: { color: Colors.walnut2 },
   content: { padding: Spacing.four, gap: Spacing.three },
+  thumbRow: { flexDirection: 'row', gap: Spacing.two },
+  thumbItem: {
+    width: 56, height: 56, borderRadius: Radius.md, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'transparent', alignItems: 'center',
+  },
+  thumbItemActive: { borderColor: Colors.ink },
+  thumbImage: { width: 56, height: 56, borderRadius: Radius.md - 2 },
+  thumbLabel: { ...T.micro, fontSize: 9, color: Colors.walnut2, marginTop: 1, textAlign: 'center' },
   imageSection: { gap: Spacing.two },
   imageContainer: {
     minHeight: 200, maxHeight: 400, borderRadius: Radius.lg, overflow: 'hidden',
@@ -754,7 +871,19 @@ const styles = StyleSheet.create({
   stdToggleBtnText: { ...T.itemDesc, color: Colors.ink },
   stdToggleBtnTextActive: { ...T.itemDesc, color: Colors.ink },
   stdDoneCaption: { ...T.itemDesc, color: Colors.walnut2, flex: 1, textAlign: 'right' },
+  stdFailedRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   stdFailedCaption: { ...T.itemDesc, color: Colors.walnut2 },
+  stdRetryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: Spacing.two, paddingVertical: 4,
+    borderRadius: 10, borderWidth: 1, borderColor: Colors.terracotta, backgroundColor: Colors.paper,
+  },
+  stdRetryBtnText: { ...T.tag, color: Colors.terracotta },
+  stdUseOriginalBtn: {
+    paddingHorizontal: Spacing.two, paddingVertical: 4,
+    borderRadius: 10, backgroundColor: Colors.ink,
+  },
+  stdUseOriginalBtnText: { ...T.tag, color: Colors.paper },
   imagePlaceholder: {
     height: 240, borderRadius: Radius.lg,
     backgroundColor: Colors.paperCard,

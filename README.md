@@ -41,6 +41,9 @@
 - 心愿单（页面底部粉色入口卡片，全屏弹窗展示）
 - 快速添加入口（虚线边框卡片）
 - 单图多品识别：上传包含多件单品的照片时，AI 检测所有单品，用户多选后逐件确认（标准图+属性）批量导入
+- 多图导入：相册选择多张图片，AI 并行识别所有图片中的单品，汇总展示后逐件确认
+- 统一添加入口：所有页面（首页/衣橱/穿搭结果）添加衣物均走「相册导入」弹窗 → 拉起图片选择器 → 详情页
+- 标准图失败处理：生成失败时提供「重试」和「用原图保存」按钮，不再卡死
 
 ### 穿搭推荐
 - 实时天气卡片（和风天气 API，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动匹配温度标签）
@@ -60,6 +63,7 @@
 - 等待过程态（1%-99% 进度条 + 4 步清单 + 呼吸闪烁动画：分析身体数据→匹配单品→合成效果→优化细节）
 - AI 试穿图生成（qwen-image-2.0-pro）+ 搭配建议（deepseek-v4-flash，含契合度评分、穿搭建议、风格小贴士）
 - 效果图展示 + 保存（AI 生成失败时 fallback 到预置场景图）
+- 试穿记录持久化到 Supabase tryon_records 表，详情页展示 AI 效果图 + 契合度评分/建议/贴士
 - 每日使用次数限制（10次/天，客户端 AsyncStorage 计数）
 
 ### Web 兼容
@@ -71,7 +75,7 @@
 
 ## 数据库
 
-11 张表 + 2 个 Storage bucket，全部启用 RLS：
+12 张表 + 2 个 Storage bucket，全部启用 RLS：
 
 | 表 | 用途 |
 |---|---|
@@ -86,6 +90,7 @@
 | `inspiration_cards` | 穿搭灵感卡片 |
 | `user_body_models` | AI试穿身体信息 |
 | `wear_events` | 穿着记录 |
+| `tryon_records` | AI 试穿记录（场景/搭配/效果图URL/AI建议） |
 | Storage `wardrobe-images` | 衣物/头像图片（公开读） |
 | Storage `body-photos` | AI试穿照片（私有） |
 
@@ -170,6 +175,9 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `60a9283` | 安全：移除 secrets.ts 所有 base64 硬编码 key，统一环境变量注入（.env + GitHub Secrets） |
 | `5f52180` | 自拍照持久化：上传至 Supabase Storage + user_body_models 表，启动时从数据库加载；AI 次数限制 10/天 |
 | `2a19374` | 扩展添加衣物表单10字段；修复标准图原图未发送bug；优化推荐prompt(硬约束+温度映射+few-shot+tag翻译)；图片显示contain模式 |
+| `923ff01` | 试穿记录持久化到 Supabase（新建 tryon_records 表；addRecord 改 async + Supabase 读写；详情页展示 AI 效果图 + 契合度评分/建议/贴士） |
+| `b65c9c5` | 修复试穿记录图片为 mock：用 AI 返回的 imageResult.url 而非 stale state |
+| — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试 |
 
 ## 项目结构
 
@@ -182,7 +190,7 @@ src/
     outfit/         # 穿搭结果页 / 灵感详情页 / AI试穿 / 身体信息录入
     profile/        # 风格偏好编辑 / 设置页
     wardrobe/       # 添加衣物 / 单品详情 / 单品编辑 / 批量导入
-  components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon
+  components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon / AddClothingSheet
   constants/        # theme（配色、字体、间距、圆角、阴影）
   lib/              # supabase / deepseek / dashscope / ai / weather / uploadImage / bodyModel / dailyQuota / mock
   stores/           # userStore / wardrobeStore / wishlistStore / tryonStore

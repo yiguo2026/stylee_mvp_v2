@@ -15,6 +15,7 @@ import { aiRecommendOutfits, AIMeta } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { Toast } from '@/components/Toast';
 import { AILoading } from '@/components/AILoading';
 import { AIResultBanner } from '@/components/AIResultBanner';
@@ -68,6 +69,7 @@ export default function OutfitResultScreen() {
   const [showSavedConfirm, setShowSavedConfirm] = useState(false);
   const [adjustMode, setAdjustMode] = useState(false);
   const [swapTarget, setSwapTarget] = useState<OutfitItem | null>(null);
+  const [showAddSheet, setShowAddSheet] = useState(false);
   // Wishlist states per recommended item
   const [wishlistedRecs, setWishlistedRecs] = useState<Set<number>>(new Set());
   const [aiMeta, setAiMeta] = useState<AIMeta | null>(null);
@@ -424,7 +426,7 @@ export default function OutfitResultScreen() {
             {errorMessage || '需要衣橱里有上装和下装才能生成搭配'}{'\n'}快去添加几件衣服吧！
           </Text>
           <TouchableOpacity style={styles.addWardrobeBtn}
-            onPress={() => { router.back(); router.push('/wardrobe/add'); }}>
+            onPress={() => { setShowAddSheet(true); }}>
             <Text style={styles.addWardrobeBtnText}>去添加衣物</Text>
           </TouchableOpacity>
         </View>
@@ -725,6 +727,8 @@ export default function OutfitResultScreen() {
       />
 
       <Toast message={toast} visible={!!toast} />
+
+      <AddClothingSheet visible={showAddSheet} onClose={() => setShowAddSheet(false)} />
     </SafeAreaView>
   );
 }

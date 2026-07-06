@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { getQuota } from '@/lib/dailyQuota';
 import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { AddClothingSheet } from '@/components/AddClothingSheet';
 import {
   WeatherData, FilterTag, InspirationCard,
   OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS,
@@ -97,6 +98,7 @@ export default function OutfitTab() {
   const [query, setQuery] = useState('');
 
   const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
+  const [showAddSheet, setShowAddSheet] = useState(false);
 
   // Tags
   const [allTags, setAllTags] = useState<FilterTag[]>([
@@ -362,7 +364,7 @@ export default function OutfitTab() {
           {recentItems.length === 0 ? (
             <TouchableOpacity
               style={styles.wardrobeEmpty}
-              onPress={() => router.push('/wardrobe/add')}
+              onPress={() => setShowAddSheet(true)}
             >
               <Feather name="camera" size={24} color={Colors.walnut2} />
               <Text style={styles.wardrobeEmptyText}>拍一件衣服开始你的穿搭之旅</Text>
@@ -374,7 +376,7 @@ export default function OutfitTab() {
                 <View style={styles.wardrobeThumb}>
                   <TouchableOpacity
                     style={styles.wardrobeAddBox}
-                    onPress={() => router.push('/wardrobe/add')}
+                    onPress={() => setShowAddSheet(true)}
                     activeOpacity={0.8}
                   >
                     <Feather name="plus" size={22} color={Colors.terracotta} />
@@ -456,6 +458,8 @@ export default function OutfitTab() {
           {citySheet}
         </Modal>
       )}
+
+      <AddClothingSheet visible={showAddSheet} onClose={() => setShowAddSheet(false)} />
     </SafeAreaView>
   );
 }
