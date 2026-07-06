@@ -33,7 +33,7 @@ function tryOnSceneImageUri(scene: string) {
 export default function ProfileTab() {
   const { profile, stylePreferences, signOut, user, fetchProfile } = useUserStore();
   const { items } = useWardrobeStore();
-  const { records: tryOnRecords } = useTryOnStore();
+  const { records: tryOnRecords, fetchRecords: fetchTryOnRecords } = useTryOnStore();
   const [savedOutfitCount, setSavedOutfitCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [showSignOut, setShowSignOut] = useState(false);
@@ -58,6 +58,10 @@ export default function ProfileTab() {
       .eq('user_id', user.id)
       .then(({ count }) => setFavoriteCount(count ?? 0));
   }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) fetchTryOnRecords(user.id);
+  }, [user?.id, fetchTryOnRecords]);
 
   const liked = stylePreferences.filter(p => p.preference_type === 'like');
 
@@ -145,12 +149,16 @@ export default function ProfileTab() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tryOnScroll}>
               {tryOnRecords.map(record => (
                 <TouchableOpacity
-                  key={record.id}
+                  key={record.record_id}
                   style={styles.tryOnPhotoCard}
-                  onPress={() => router.push({ pathname: '/outfit/try-on-detail', params: { recordId: record.id } })}
+                  onPress={() => router.push({ pathname: '/outfit/try-on-detail', params: { recordId: record.record_id } })}
                   activeOpacity={0.7}
                 >
-                  <Image source={tryOnSceneImageUri(record.scene)} style={styles.tryOnPhoto} resizeMode="cover" />
+                  <Image
+                    source={record.resultImageUrl ? { uri: record.resultImageUrl } : tryOnSceneImageUri(record.scene)}
+                    style={styles.tryOnPhoto}
+                    resizeMode="cover"
+                  />
                   <Text style={styles.tryOnPhotoScene}>{record.sceneLabel}</Text>
                   <Text style={styles.tryOnPhotoDate} numberOfLines={1}>
                     {record.outfitName}

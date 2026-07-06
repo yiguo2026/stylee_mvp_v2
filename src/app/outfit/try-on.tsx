@@ -217,14 +217,18 @@ export default function TryOnScreen() {
     const recordItems = isFromResult
       ? resultItems.map(i => ({ name: i.name, category: i.category ?? '', color: i.color, image_url: i.image_url }))
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []);
-    addRecord({
-      scene: selectedScene,
-      sceneEmoji: '',
-      sceneLabel: sceneObj?.label ?? selectedScene,
-      outfitName,
-      items: recordItems,
-      selfieUri,
-    });
+    const resultImageUrl = typeof tryOnImage === 'string' ? tryOnImage : null;
+    if (user?.id) {
+      addRecord({
+        scene: selectedScene,
+        sceneLabel: sceneObj?.label ?? selectedScene,
+        outfitName,
+        items: recordItems,
+        selfieUri,
+        resultImageUrl,
+        suggestion: tryOnSuggestion,
+      }, user.id);
+    }
   };
 
   return (

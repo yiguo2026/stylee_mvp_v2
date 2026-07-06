@@ -19,7 +19,7 @@ export default function TryOnDetailScreen() {
   const recordId = params.recordId as string | undefined;
   const { records } = useTryOnStore();
 
-  const record: TryOnRecord | undefined = records.find(r => r.id === recordId);
+  const record: TryOnRecord | undefined = records.find(r => r.record_id === recordId);
 
   if (!record) {
     return (
@@ -43,7 +43,9 @@ export default function TryOnDetailScreen() {
     );
   }
 
-  const sceneImage = SCENE_IMAGES[record.scene] ?? SCENE_IMAGES.cafe;
+  const imageSource = record.resultImageUrl
+    ? { uri: record.resultImageUrl }
+    : (SCENE_IMAGES[record.scene] ?? SCENE_IMAGES.cafe);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,7 +60,7 @@ export default function TryOnDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Result Image */}
         <View style={styles.imageCard}>
-          <Image source={sceneImage} style={[styles.resultImage, { height: Math.min(winH * 0.55, winW * 1.2) }]} resizeMode="contain" />
+          <Image source={imageSource} style={[styles.resultImage, { height: Math.min(winH * 0.55, winW * 1.2) }]} resizeMode="contain" />
         </View>
 
         {/* Info Row */}
@@ -81,6 +83,31 @@ export default function TryOnDetailScreen() {
           </View>
         </View>
 
+        {/* AI Suggestion */}
+        {record.suggestion ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>AI 穿搭建议</Text>
+            <View style={styles.suggestionCard}>
+              {record.suggestion.compatibility_score != null ? (
+                <View style={styles.scoreRow}>
+                  <Text style={styles.scoreLabel}>契合度</Text>
+                  <Text style={styles.scoreValue}>{record.suggestion.compatibility_score}/100</Text>
+                </View>
+              ) : null}
+              {record.suggestion.suggestion ? (
+                <Text style={styles.suggestionText}>{record.suggestion.suggestion}</Text>
+              ) : null}
+              {record.suggestion.tips?.length > 0 ? (
+                <View style={styles.tipsList}>
+                  {record.suggestion.tips.map((tip, i) => (
+                    <Text key={i} style={styles.tipItem}>· {tip}</Text>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
         {/* Selfie */}
         {record.selfieUri ? (
           <View style={styles.section}>
@@ -96,8 +123,8 @@ export default function TryOnDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>搭配单品</Text>
             <View style={styles.itemsList}>
-              {record.items.map((item) => (
-                <View key={`${item.name}-${item.category}-${item.color}-${item.image_url ?? ''}`} style={styles.itemRow}>
+              {record.items.map((item, idx) => (
+                <View key={`${idx}-${item.name}-${item.category}`} style={styles.itemRow}>
                   <View style={styles.itemIcon}>
               {item.image_url
                 ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
@@ -173,4 +200,14 @@ const styles = StyleSheet.create({
   itemInfo: { flex: 1, gap: 2 },
   itemName: { ...T.itemName },
   itemMeta: { ...T.micro },
+  suggestionCard: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, borderWidth: 1, borderColor: Colors.line, gap: Spacing.two,
+  },
+  scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  scoreLabel: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
+  scoreValue: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.terracotta },
+  suggestionText: { ...T.bodyText, fontSize: 13, lineHeight: 20, color: Colors.ink },
+  tipsList: { gap: 4, marginTop: Spacing.one },
+  tipItem: { ...T.micro, color: Colors.walnut, lineHeight: 18 },
 });
