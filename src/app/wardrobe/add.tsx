@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Image, ActivityIndicator, Alert, Modal,
@@ -11,11 +11,12 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { aiRecognizeClothing, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
+import { aiDetectMultiItems, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
-import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType } from '@/types';
+import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, DetectedItem } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
+import { CategoryIcon } from '@/components/CategoryIcon';
 
 const isWeb = Platform.OS === 'web';
 
@@ -52,6 +53,16 @@ export default function AddWardrobeItem() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+
+  // Multi-item detection state
+  const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [showItemPicker, setShowItemPicker] = useState(false);
+
+  // Item queue: sequential confirm flow for multi-item import
+  const [itemQueue, setItemQueue] = useState<DetectedItem[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [pendingAdvance, setPendingAdvance] = useState(false); // set true after save, effect handles advance
 
   // Standardization state
   const [photoType, setPhotoType] = useState<string>('flat');
@@ -100,7 +111,33 @@ export default function AddWardrobeItem() {
     setOccasionTags(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
 
-  const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string }) => {
+  const toggleDetectedItem = (idx: number) => {
+    setSelectedIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
+  const resetForm = () => {
+    setName(''); setCategory('上装'); setColor(''); setMaterial('');
+    setBrand(''); setPrice(''); setFitType(''); setSeasons([]);
+    setOccasionTags([]); setPurchaseDate('');
+    setStandardizedUri(null); setStdState('idle'); setUseStandardized(true);
+    setStdMeta(null);
+  };
+
+  const fillFormFromDetected = (item: DetectedItem) => {
+    setCategory(item.category);
+    setColor(item.color);
+    if (item.material) setMaterial(item.material);
+    setName(item.description || `${item.color}${item.category}`);
+    if (item.fit_type) setFitType(item.fit_type);
+    if (item.season?.length) setSeasons(item.season);
+    if (item.occasion_tags?.length) setOccasionTags(item.occasion_tags);
+  };
+
+  const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string; description?: string }) => {
     setStdState('generating');
     const { url, meta } = await aiStandardizeGarment(uri, cat, pt, extras);
     if (reqTokenRef.current !== token) return;
@@ -114,26 +151,64 @@ export default function AddWardrobeItem() {
     setRecognizing(true);
     setRecognizeMeta(null); setStdMeta(null);
     setStandardizedUri(null); setStdState('idle');
+    setDetectedItems([]); setSelectedIndices(new Set()); setShowItemPicker(false);
     try {
-      const { result, meta } = await aiRecognizeClothing(uri);
+      const { items, meta } = await aiDetectMultiItems(uri);
       if (reqTokenRef.current !== token) return;
       setRecognizeMeta(meta);
-      setCategory(result.category);
-      setColor(result.color);
-      if (result.material) setMaterial(result.material);
-      if (result.fit_type) setFitType(result.fit_type);
-      if (result.season?.length) setSeasons(result.season);
-      if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
-      if (!name) setName(`${result.color}${result.category}`);
-      const pt = result.photo_type || photoType;
-      setPhotoType(pt);
-      void runStandardize(uri, result.category, pt, token, { color: result.color, material: result.material });
+
+      if (items.length === 1) {
+        // Single item — skip picker, fill form directly
+        fillFormFromDetected(items[0]);
+        const pt = photoType;
+        void runStandardize(uri, items[0].category, pt, token, { color: items[0].color, material: items[0].material, description: items[0].description });
+      } else {
+        // Multiple items — show picker
+        setDetectedItems(items);
+        setSelectedIndices(new Set([0])); // pre-select first
+        setShowItemPicker(true);
+      }
     } finally {
       if (reqTokenRef.current === token) setRecognizing(false);
     }
   };
 
-  const handleSave = async () => {
+  const handleConfirmSelection = () => {
+    if (selectedIndices.size === 0) return;
+    const sortedIndices = [...selectedIndices].sort();
+    const queue = sortedIndices.map(i => detectedItems[i]);
+    setItemQueue(queue);
+    setQueueTotal(queue.length);
+    setShowItemPicker(false);
+
+    // Fill form with first item and start standardization
+    resetForm();
+    fillFormFromDetected(queue[0]);
+    const token = reqTokenRef.current;
+    void runStandardize(imageUri!, queue[0].category, photoType, token, { color: queue[0].color, material: queue[0].material, description: queue[0].description });
+  };
+
+  // useEffect drives the queue advance after a successful save.
+  // This avoids any stale-closure issues with async handleSave.
+  useEffect(() => {
+    if (!pendingAdvance) return;
+    setPendingAdvance(false);
+
+    const remaining = itemQueue.slice(1);
+    setItemQueue(remaining);
+
+    if (remaining.length > 0) {
+      resetForm();
+      fillFormFromDetected(remaining[0]);
+      const token = reqTokenRef.current;
+      void runStandardize(imageUri!, remaining[0].category, photoType, token, { color: remaining[0].color, material: remaining[0].material, description: remaining[0].description });
+    } else {
+      setQueueTotal(0);
+      router.back();
+    }
+  }, [pendingAdvance]);
+
+  const handleSave = useCallback(async () => {
     if (!name.trim()) {
       Alert.alert('提示', '请填写衣物名称');
       return;
@@ -141,38 +216,48 @@ export default function AddWardrobeItem() {
     if (!user) return;
     setSaving(true);
 
-    let finalImageUrl = imageUri;
-    const chosen = (useStandardized && standardizedUri) ? standardizedUri : imageUri;
-    if (chosen) {
-      const uploaded = await uploadWardrobeImage(chosen, user.id);
-      if (uploaded) finalImageUrl = uploaded;
-      else finalImageUrl = imageUri;
-    }
+    try {
+      // Determine the image to save
+      let finalImageUrl = imageUri;
+      const chosen = (useStandardized && standardizedUri) ? standardizedUri : imageUri;
+      if (chosen) {
+        const uploaded = await uploadWardrobeImage(chosen, user.id);
+        if (uploaded) finalImageUrl = uploaded;
+        else finalImageUrl = imageUri;
+      }
 
-    const saved = await addItem({
-      user_id: user.id,
-      name: name.trim(),
-      category,
-      color,
-      material: material || undefined,
-      brand: brand || undefined,
-      price: price ? parseFloat(price) : undefined,
-      fit_type: (fitType || undefined) as FitType | undefined,
-      season: seasons.length > 0 ? seasons as any : undefined,
-      occasion_tags: occasionTags.length > 0 ? occasionTags : undefined,
-      purchase_date: purchaseDate || undefined,
-      image_url: finalImageUrl ?? undefined,
-      source_type: imageUri ? 'photo_ai' : 'manual',
-      source_label: imageUri ? '拍照识别' : '手动添加',
-      status: 'active',
-    });
-    setSaving(false);
-    if (saved) {
-      router.back();
-    } else {
-      Alert.alert('保存失败', '请稍后重试');
+      const saved = await addItem({
+        user_id: user.id,
+        name: name.trim(),
+        category,
+        color,
+        material: material || undefined,
+        brand: brand || undefined,
+        price: price ? parseFloat(price) : undefined,
+        fit_type: (fitType || undefined) as FitType | undefined,
+        season: seasons.length > 0 ? seasons as any : undefined,
+        occasion_tags: occasionTags.length > 0 ? occasionTags : undefined,
+        purchase_date: purchaseDate || undefined,
+        image_url: finalImageUrl ?? undefined,
+        source_type: imageUri ? 'photo_ai' : 'manual',
+        source_label: imageUri ? '拍照识别' : '手动添加',
+        status: 'active',
+      });
+
+      if (!saved) {
+        Alert.alert('保存失败', '请稍后重试');
+        return;
+      }
+
+      // Signal the effect to advance the queue
+      setPendingAdvance(true);
+    } catch (e) {
+      console.warn('[AddWardrobe] Save failed:', e);
+      Alert.alert('保存出错', '请稍后重试');
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [user, name, category, color, material, brand, price, fitType, seasons, occasionTags, purchaseDate, imageUri, useStandardized, standardizedUri, addItem]);
 
   const pickerOptions: Record<PickerField, string[]> = {
     category: CATEGORY_OPTIONS,
@@ -242,11 +327,17 @@ export default function AddWardrobeItem() {
           <Feather name="x-circle" size={16} color={Colors.walnut} />
           <Text style={styles.cancel}>取消</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>添加衣物</Text>
+        <Text style={styles.title}>
+          {queueTotal > 1 ? `添加衣物 (${queueTotal - itemQueue.length + 1}/${queueTotal})` : '添加衣物'}
+        </Text>
         <TouchableOpacity onPress={handleSave} disabled={saving || !name.trim()}>
           {saving
             ? <ActivityIndicator size="small" color={Colors.terracotta} />
-            : <Text style={[styles.save, !name.trim() && styles.saveDisabled]}>保存</Text>
+            : <Text style={[styles.save, !name.trim() && styles.saveDisabled]}>
+                {itemQueue.length > 1
+                  ? `保存 (还有${itemQueue.length - 1}件)`
+                  : '保存'}
+              </Text>
           }
         </TouchableOpacity>
       </View>
@@ -323,175 +414,234 @@ export default function AddWardrobeItem() {
           </View>
         ) : null}
 
+        {/* Multi-item picker */}
+        {showItemPicker && detectedItems.length > 1 ? (
+          <View style={styles.itemPickerCard}>
+            <View style={styles.itemPickerHeader}>
+              <Text style={styles.itemPickerTitle}>图片中检测到 {detectedItems.length} 件单品</Text>
+              <TouchableOpacity onPress={() => {
+                const all = new Set(detectedItems.map((_, i) => i));
+                setSelectedIndices(prev => prev.size === detectedItems.length ? new Set() : all);
+              }}>
+                <Text style={styles.itemPickerSelectAll}>
+                  {selectedIndices.size === detectedItems.length ? '取消全选' : '全选'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {detectedItems.map((item, idx) => {
+              const isSelected = selectedIndices.has(idx);
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.detectedItemRow, isSelected && styles.detectedItemRowActive]}
+                  onPress={() => toggleDetectedItem(idx)}
+                >
+                  <View style={[styles.detectedItemIcon, isSelected && styles.detectedItemIconActive]}>
+                    <CategoryIcon category={item.category} size={20} color={isSelected ? Colors.paper : Colors.ink} />
+                  </View>
+                  <View style={styles.detectedItemInfo}>
+                    <Text style={[styles.detectedItemDesc, isSelected && styles.detectedItemDescActive]}>
+                      {item.description}
+                    </Text>
+                    <Text style={styles.detectedItemMeta}>
+                      {item.category} · {item.color}{item.material ? ` · ${item.material}` : ''}
+                    </Text>
+                  </View>
+                  {isSelected ? (
+                    <View style={styles.detectedItemCheck}>
+                      <Feather name="check" size={14} color={Colors.paper} />
+                    </View>
+                  ) : (
+                    <View style={styles.detectedItemUncheck} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[styles.confirmBtn, selectedIndices.size === 0 && styles.confirmBtnDisabled]}
+              onPress={handleConfirmSelection}
+              disabled={selectedIndices.size === 0}
+            >
+              <Text style={styles.confirmBtnText}>
+                确认导入 {selectedIndices.size} 件
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {recognizeMeta && <AIResultBanner {...recognizeMeta} />}
         {stdState !== 'idle' && stdState !== 'generating' && stdMeta && <AIResultBanner {...stdMeta} />}
 
-        {/* Form */}
-        <View style={styles.form}>
-          {/* Name */}
-          <View style={styles.field}>
-            <Text style={styles.label}>名称 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="例如：白色棉质T恤"
-              placeholderTextColor={Colors.walnut2}
-              value={name}
-              onChangeText={setName}
-            />
-          </View>
+        {/* Form — only visible when not in item picker mode or after selection */}
+        {!showItemPicker ? (
+          <View style={styles.form}>
+            {/* Name */}
+            <View style={styles.field}>
+              <Text style={styles.label}>名称 *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="例如：白色棉质T恤"
+                placeholderTextColor={Colors.walnut2}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
 
-          {/* Category */}
-          <View style={styles.field}>
-            <Text style={styles.label}>分类</Text>
-            <TouchableOpacity
-              style={styles.select}
-              onPress={() => setShowCategoryPicker(!showCategoryPicker)}
-            >
-              <Text style={styles.selectText}>{category}</Text>
-              <Text style={styles.selectArrow}>›</Text>
-            </TouchableOpacity>
-            {showCategoryPicker ? (
+            {/* Category */}
+            <View style={styles.field}>
+              <Text style={styles.label}>分类</Text>
+              <TouchableOpacity
+                style={styles.select}
+                onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+              >
+                <Text style={styles.selectText}>{category}</Text>
+                <Text style={styles.selectArrow}>›</Text>
+              </TouchableOpacity>
+              {showCategoryPicker ? (
+                <View style={styles.pickerGrid}>
+                  {CATEGORIES.map(cat => (
+                    <TouchableOpacity key={cat} style={[styles.gridOption, category === cat && styles.gridOptionActive]} onPress={() => { setCategory(cat); setShowCategoryPicker(false); }}>
+                      <Text style={[styles.gridOptionText, category === cat && styles.gridOptionTextActive]}>{cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+
+            {/* Color */}
+            <View style={styles.field}>
+              <Text style={styles.label}>颜色</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="输入或选择颜色"
+                placeholderTextColor={Colors.walnut2}
+                value={color}
+                onChangeText={setColor}
+                onFocus={() => setShowColorPicker(true)}
+              />
+              {showColorPicker ? (
+                <View style={styles.pickerWrap}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.pickerRow}>
+                      {COLOR_OPTIONS.map(c => (
+                        <TouchableOpacity key={c} style={[styles.pickerChip, color === c && styles.pickerChipActive]} onPress={() => { setColor(c); setShowColorPicker(false); }}>
+                          <Text style={[styles.pickerChipText, color === c && styles.pickerChipTextActive]}>{c}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Material */}
+            <View style={styles.field}>
+              <Text style={styles.label}>材质</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="输入或选择材质"
+                placeholderTextColor={Colors.walnut2}
+                value={material}
+                onChangeText={setMaterial}
+                onFocus={() => setShowMaterialPicker(true)}
+              />
+              {showMaterialPicker ? (
+                <View style={styles.pickerWrap}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.pickerRow}>
+                      {MATERIAL_OPTIONS.map(m => (
+                        <TouchableOpacity key={m} style={[styles.pickerChip, material === m && styles.pickerChipActive]} onPress={() => { setMaterial(m); setShowMaterialPicker(false); }}>
+                          <Text style={[styles.pickerChipText, material === m && styles.pickerChipTextActive]}>{m}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Brand */}
+            <View style={styles.field}>
+              <Text style={styles.label}>品牌</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="可选"
+                placeholderTextColor={Colors.walnut2}
+                value={brand}
+                onChangeText={setBrand}
+              />
+            </View>
+
+            {/* Price */}
+            <View style={styles.field}>
+              <Text style={styles.label}>价格</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="可选"
+                placeholderTextColor={Colors.walnut2}
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* Fit Type */}
+            <View style={styles.field}>
+              <Text style={styles.label}>版型</Text>
               <View style={styles.pickerGrid}>
-                {CATEGORIES.map(cat => (
-                  <TouchableOpacity key={cat} style={[styles.gridOption, category === cat && styles.gridOptionActive]} onPress={() => { setCategory(cat); setShowCategoryPicker(false); }}>
-                    <Text style={[styles.gridOptionText, category === cat && styles.gridOptionTextActive]}>{cat}</Text>
+                {FIT_OPTIONS.map(fit => (
+                  <TouchableOpacity key={fit} style={[styles.gridOption, fitType === fit && styles.gridOptionActive]} onPress={() => setFitType(fitType === fit ? '' : fit)}>
+                    <Text style={[styles.gridOptionText, fitType === fit && styles.gridOptionTextActive]}>{fit}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            ) : null}
-          </View>
+            </View>
 
-          {/* Color */}
-          <View style={styles.field}>
-            <Text style={styles.label}>颜色</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="输入或选择颜色"
-              placeholderTextColor={Colors.walnut2}
-              value={color}
-              onChangeText={setColor}
-              onFocus={() => setShowColorPicker(true)}
-            />
-            {showColorPicker ? (
-              <View style={styles.pickerWrap}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.pickerRow}>
-                    {COLOR_OPTIONS.map(c => (
-                      <TouchableOpacity key={c} style={[styles.pickerChip, color === c && styles.pickerChipActive]} onPress={() => { setColor(c); setShowColorPicker(false); }}>
-                        <Text style={[styles.pickerChipText, color === c && styles.pickerChipTextActive]}>{c}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+            {/* Purchase Date */}
+            <View style={styles.field}>
+              <Text style={styles.label}>购买日期</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.walnut2}
+                value={purchaseDate}
+                onChangeText={setPurchaseDate}
+              />
+            </View>
+
+            {/* Season */}
+            <View style={styles.field}>
+              <Text style={styles.label}>季节</Text>
+              <View style={styles.pickerGrid}>
+                {SEASON_OPTIONS.map(s => (
+                  <TouchableOpacity key={s.id} style={[styles.gridOption, seasons.includes(s.id) && styles.gridOptionActive]} onPress={() => toggleSeason(s.id)}>
+                    <Text style={[styles.gridOptionText, seasons.includes(s.id) && styles.gridOptionTextActive]}>{s.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            ) : null}
-          </View>
+            </View>
 
-          {/* Material */}
-          <View style={styles.field}>
-            <Text style={styles.label}>材质</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="输入或选择材质"
-              placeholderTextColor={Colors.walnut2}
-              value={material}
-              onChangeText={setMaterial}
-              onFocus={() => setShowMaterialPicker(true)}
-            />
-            {showMaterialPicker ? (
-              <View style={styles.pickerWrap}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.pickerRow}>
-                    {MATERIAL_OPTIONS.map(m => (
-                      <TouchableOpacity key={m} style={[styles.pickerChip, material === m && styles.pickerChipActive]} onPress={() => { setMaterial(m); setShowMaterialPicker(false); }}>
-                        <Text style={[styles.pickerChipText, material === m && styles.pickerChipTextActive]}>{m}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+            {/* Occasion Tags */}
+            <View style={styles.field}>
+              <Text style={styles.label}>场合标签</Text>
+              <View style={styles.pickerGrid}>
+                {OCCASION_TAGS.map(tag => (
+                  <TouchableOpacity key={tag.id} style={[styles.gridOption, occasionTags.includes(tag.id) && styles.gridOptionActive]} onPress={() => toggleOccasion(tag.id)}>
+                    <Text style={[styles.gridOptionText, occasionTags.includes(tag.id) && styles.gridOptionTextActive]}>{tag.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            ) : null}
-          </View>
-
-          {/* Brand */}
-          <View style={styles.field}>
-            <Text style={styles.label}>品牌</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="可选"
-              placeholderTextColor={Colors.walnut2}
-              value={brand}
-              onChangeText={setBrand}
-            />
-          </View>
-
-          {/* Price */}
-          <View style={styles.field}>
-            <Text style={styles.label}>价格</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="可选"
-              placeholderTextColor={Colors.walnut2}
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="numeric"
-            />
-          </View>
-
-          {/* Fit Type */}
-          <View style={styles.field}>
-            <Text style={styles.label}>版型</Text>
-            <View style={styles.pickerGrid}>
-              {FIT_OPTIONS.map(fit => (
-                <TouchableOpacity key={fit} style={[styles.gridOption, fitType === fit && styles.gridOptionActive]} onPress={() => setFitType(fitType === fit ? '' : fit)}>
-                  <Text style={[styles.gridOptionText, fitType === fit && styles.gridOptionTextActive]}>{fit}</Text>
-                </TouchableOpacity>
-              ))}
             </View>
           </View>
-
-          {/* Purchase Date */}
-          <View style={styles.field}>
-            <Text style={styles.label}>购买日期</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.walnut2}
-              value={purchaseDate}
-              onChangeText={setPurchaseDate}
-            />
-          </View>
-
-          {/* Season */}
-          <View style={styles.field}>
-            <Text style={styles.label}>季节</Text>
-            <View style={styles.pickerGrid}>
-              {SEASON_OPTIONS.map(s => (
-                <TouchableOpacity key={s.id} style={[styles.gridOption, seasons.includes(s.id) && styles.gridOptionActive]} onPress={() => toggleSeason(s.id)}>
-                  <Text style={[styles.gridOptionText, seasons.includes(s.id) && styles.gridOptionTextActive]}>{s.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Occasion Tags */}
-          <View style={styles.field}>
-            <Text style={styles.label}>场合标签</Text>
-            <View style={styles.pickerGrid}>
-              {OCCASION_TAGS.map(tag => (
-                <TouchableOpacity key={tag.id} style={[styles.gridOption, occasionTags.includes(tag.id) && styles.gridOptionActive]} onPress={() => toggleOccasion(tag.id)}>
-                  <Text style={[styles.gridOptionText, occasionTags.includes(tag.id) && styles.gridOptionTextActive]}>{tag.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
+        ) : null}
       </ScrollView>
 
       {saving ? (
         <View style={styles.savingOverlay}>
           <ActivityIndicator color={Colors.paper} />
-          <Text style={styles.savingTitle}>正在导入单品…</Text>
+          <Text style={styles.savingTitle}>
+            {queueTotal > 1 ? `正在导入 (${queueTotal - itemQueue.length + 1}/${queueTotal})…` : '正在导入单品…'}
+          </Text>
           <Text style={styles.savingSub}>上传图片并保存到衣橱</Text>
         </View>
       ) : null}
@@ -638,6 +788,73 @@ const styles = StyleSheet.create({
     borderColor: Colors.linen,
   },
   recognizingBannerText: { ...T.itemDesc },
+
+  // Multi-item picker
+  itemPickerCard: {
+    backgroundColor: Colors.paperCard,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.line,
+    overflow: 'hidden',
+    ...Shadow.one,
+  },
+  itemPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.line,
+  },
+  itemPickerTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold },
+  itemPickerSelectAll: { ...T.buttonSecondary, color: Colors.terracotta },
+  detectedItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    gap: Spacing.two,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.lineSoft,
+  },
+  detectedItemRowActive: {
+    backgroundColor: Colors.signalSoft,
+  },
+  detectedItemIcon: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.paper,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.lineStrong,
+  },
+  detectedItemIconActive: {
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
+  },
+  detectedItemInfo: { flex: 1, gap: 2 },
+  detectedItemDesc: { ...T.bodyText, fontSize: 14 },
+  detectedItemDescActive: { color: Colors.ink, fontFamily: Fonts.uiSemiBold },
+  detectedItemMeta: { ...T.micro, color: Colors.walnut },
+  detectedItemCheck: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: Colors.ink,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  detectedItemUncheck: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 1.5, borderColor: Colors.lineStrong,
+  },
+  confirmBtn: {
+    backgroundColor: Colors.ink,
+    paddingVertical: Spacing.two + 2,
+    alignItems: 'center',
+    marginHorizontal: Spacing.three,
+    marginVertical: Spacing.two,
+    borderRadius: Radius.md,
+  },
+  confirmBtnDisabled: { backgroundColor: Colors.walnut2 },
+  confirmBtnText: { ...T.buttonPrimary, color: Colors.paper },
+
   form: { gap: Spacing.two },
   field: { gap: Spacing.one },
   label: { ...T.formLabel },

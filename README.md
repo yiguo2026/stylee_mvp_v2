@@ -36,10 +36,11 @@
 ### 衣橱管理
 - 紧凑分类标签（上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰，带数量角标）
 - 模糊搜索（支持同义词匹配，如"裤子"→下装/阔腿裤/短裤）
-- 单品详情查看 + 编辑（照片、名称、分类、颜色、材质、品牌、价格）
+- 单品详情查看 + 编辑（照片、名称、分类、颜色、材质、品牌、价格、版型、购买日期、季节、场合标签）
 - 单品删除（自定义 ConfirmModal，Web 兼容）
 - 心愿单（页面底部粉色入口卡片，全屏弹窗展示）
 - 快速添加入口（虚线边框卡片）
+- 单图多品识别：上传包含多件单品的照片时，AI 检测所有单品，用户多选后逐件确认（标准图+属性）批量导入
 
 ### 穿搭推荐
 - 实时天气卡片（和风天气 API，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动匹配温度标签）
@@ -168,6 +169,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `ad52330` | 修复 qwen-image-2.0-pro 端点：compatible-mode 返回空 content，改用 DashScope 原生 MultiModalConversation |
 | `60a9283` | 安全：移除 secrets.ts 所有 base64 硬编码 key，统一环境变量注入（.env + GitHub Secrets） |
 | `5f52180` | 自拍照持久化：上传至 Supabase Storage + user_body_models 表，启动时从数据库加载；AI 次数限制 10/天 |
+| `2a19374` | 扩展添加衣物表单10字段；修复标准图原图未发送bug；优化推荐prompt(硬约束+温度映射+few-shot+tag翻译)；图片显示contain模式 |
 
 ## e1213fe 之后的主要更新（v0.9.1+）
 
@@ -195,6 +197,10 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 - 新增独立穿搭详情页 `/outfit/[id]`，记录页/单品页点击搭配统一跳转详情页。
 - 推荐方案页：推荐单品支持【+衣橱】【+心愿单】真实写入并 toast 提示。
 - 修复记录页查询列/收藏关系、月份切换展示逻辑、快速添加流程等问题。
+- 单图多品识别：添加衣物时，AI 检测图中所有单品，用户多选后逐件确认标准图和属性批量导入；标准图 prompt 指定只提取目标单品去除其他物品。
+- 推荐质量优化：标签 ID→中文翻译、buildItemsSummary 补全属性、温度→穿衣保暖指引映射、3 组 few-shot 示例、temperature 1.0→0.6。
+- 修复 AI banner 误报 mock（fallback 路径硬编码 mock meta 而非透传真实模型结果）。
+- 图片上传优化：远程 URL（DashScope 生成图）直接使用不重复上传，fetch/Supabase 调用加 15s 超时防挂起。
 
 ### 5) 工程化、部署与安全
 - Web 构建链路完善：`build:web` + post-build patch；GitHub Actions 自动发布到 GitHub Pages（gh-pages 分支）。
@@ -229,6 +235,7 @@ App 直接调用云端 API，无需本地模型服务：
 | 能力 | 模型 | 端点 |
 |------|------|------|
 | 服饰识别（拍照→属性） | qwen3-vl-plus | DashScope compatible-mode chat/completions |
+| 多品检测（单图→多件单品） | qwen3-vl-plus | DashScope compatible-mode chat/completions |
 | 标准图/试穿图生成 | qwen-image-2.0-pro | DashScope 原生 MultiModalConversation |
 | 意图识别 / 穿搭推荐 / 试穿建议 | deepseek-v4-flash | DeepSeek chat/completions |
 

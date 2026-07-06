@@ -205,6 +205,20 @@ export interface RecognitionResult {
   confidence?: number;      // 服务返回：0-1
 }
 
+export interface DetectedItem {
+  index: number;
+  category: ClothingCategory;
+  color: string;
+  material?: string;
+  style?: string;
+  brand?: string;
+  sleeve_length?: SleeveLength;
+  fit_type?: FitType;
+  season?: string[];
+  occasion_tags?: string[];
+  description: string;
+}
+
 // ── v2 New Types ───────────────────────────────────────
 
 export interface WishlistItem {

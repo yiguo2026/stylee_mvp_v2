@@ -2,29 +2,38 @@ import { supabase } from './supabase';
 
 const BUCKET = 'wardrobe-images';
 
+function isRemoteUrl(uri: string): boolean {
+  return uri.startsWith('http://') || uri.startsWith('https://');
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 /**
  * Upload a local image URI to Supabase Storage.
  * Returns the public URL on success, or null on failure.
  *
- * Falls back gracefully: if the bucket doesn't exist or upload fails,
- * the caller can keep using the local URI for on-device display.
- *
- * Bucket setup (do once in Supabase dashboard):
- *   Storage → New bucket → Name: "wardrobe-images" → Public: ON
- *   Then add this RLS policy on storage.objects:
- *     CREATE POLICY "Users manage own images" ON storage.objects
- *     FOR ALL USING (bucket_id = 'wardrobe-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+ * - Remote URLs (http/https) are returned as-is (no re-upload needed).
+ * - Local URIs (blob:, data:, file:) are uploaded to Supabase Storage.
+ * - Has a 15s timeout to prevent hanging on network issues.
  */
 export const uploadWardrobeImage = async (
   localUri: string,
   userId: string,
   subfolder?: string,
 ): Promise<string | null> => {
+  // Remote URL — already publicly accessible, no need to re-upload
+  if (isRemoteUrl(localUri)) {
+    return localUri;
+  }
+
   try {
-    // Extract extension: handle blob URLs (web) and file URIs (native)
     let ext = 'jpg';
     if (localUri.startsWith('blob:') || localUri.startsWith('data:')) {
-      // Web: no file extension in blob/data URIs; default to jpg
       ext = 'jpg';
     } else {
       const parsed = localUri.split('.').pop()?.toLowerCase();
@@ -36,16 +45,28 @@ export const uploadWardrobeImage = async (
     const folder = subfolder ? `${userId}/${subfolder}` : userId;
     const fileName = `${folder}/${Date.now()}.${ext}`;
 
-    // Use fetch to read the local file URI as a blob (works in React Native)
-    const response = await fetch(localUri);
+    const response = await withTimeout(fetch(localUri), 15000);
+    if (!response) {
+      console.warn('[uploadImage] fetch timed out for', localUri.slice(0, 60));
+      return null;
+    }
     const blob = await response.blob();
 
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .upload(fileName, blob, { contentType, upsert: false });
+    const uploadResult = await withTimeout(
+      supabase.storage
+        .from(BUCKET)
+        .upload(fileName, blob, { contentType, upsert: false }),
+      15000,
+    );
 
-    if (error) {
-      console.warn('[uploadImage] Storage upload failed:', error.message);
+    if (!uploadResult) {
+      console.warn('[uploadImage] Storage upload timed out');
+      return null;
+    }
+
+    const { data, error } = uploadResult;
+    if (error || !data) {
+      console.warn('[uploadImage] Storage upload failed:', error?.message);
       return null;
     }
 
