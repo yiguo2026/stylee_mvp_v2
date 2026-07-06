@@ -217,7 +217,7 @@ export default function TryOnScreen() {
     const recordItems = isFromResult
       ? resultItems.map(i => ({ name: i.name, category: i.category ?? '', color: i.color, image_url: i.image_url }))
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []);
-    const resultImageUrl = typeof tryOnImage === 'string' ? tryOnImage : null;
+    const resultImageUrl = imageResult.url || null;
     if (user?.id) {
       addRecord({
         scene: selectedScene,
