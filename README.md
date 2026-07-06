@@ -171,42 +171,6 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `5f52180` | 自拍照持久化：上传至 Supabase Storage + user_body_models 表，启动时从数据库加载；AI 次数限制 10/天 |
 | `2a19374` | 扩展添加衣物表单10字段；修复标准图原图未发送bug；优化推荐prompt(硬约束+温度映射+few-shot+tag翻译)；图片显示contain模式 |
 
-## e1213fe 之后的主要更新（v0.9.1+）
-
-> 范围：`e1213fe..HEAD`（共 86 个 commit）。下述为按模块汇总的变更摘要，便于产品/验收；更细粒度可直接查看 GitHub commit 历史。
-
-### 1) 视觉与交互（Editorial Mark v3.6）
-- 全局视觉从暖米色系升级为冷调中性黑白体系，统一字体、间距、Tab/空态/卡片等样式，对齐 v3.6 规范。
-- Web 端适配增强：iPhone 14 Pro 外壳、@font-face 注入、TabBar 贴底与不截断、Modal/Sheet 约束在手机容器内。
-
-### 2) AI 能力与过程态
-- 直接嵌入 DashScope API（qwen3-vl-plus 识别 / qwen-image-2.0-pro 生图）+ DeepSeek API（deepseek-v4-flash 意图识别 / 穿搭推荐 / 试穿建议），不再依赖本地 model-service。
-- qwen-image-2.0-pro 使用 DashScope 原生 MultiModalConversation 端点（compatible-mode 返回空 content）。
-- AI 结果页显示模型来源 banner：✓ 真实模型·耗时 / ✗ 调用了真实模型但结果不可用·已降级 / ⚠ mock（模型服务不可用）。AIMeta 含 `ok` 字段精确区分三种状态。
-- 等待动画统一为 demo 样式：呼吸闪烁加载 + 1%-99% 进度条 + 步骤清单（推荐结果 / 衣物解析 / AI 试穿）。
-- 每日使用次数限制：推荐 10 次/天，试穿 10 次/天（客户端 AsyncStorage 计数，按 userId 隔离）。
-
-### 3) AI 试穿
-- 试穿流程改为 3 步：身体信息 → 选择搭配（已穿/收藏）→ 选择场景 → 生成。
-- 试穿页接入真实 AI：qwen-image-2.0-pro 生成试穿图 + deepseek-v4-flash 生成搭配建议（契合度评分 / 穿搭建议 / 风格小贴士），AI 不可用时降级到本地预置场景图。
-- 自拍照持久化：上传至 Supabase Storage（wardrobe-images/selfie/），URL 存入 user_body_models 表，启动时从数据库加载，跨设备跨会话保留（替代之前不可靠的 localStorage 压缩存储）。
-- 试穿结果支持保存到记录，并完善试穿历史/详情页展示。
-
-### 4) 衣橱 / 穿搭 / 记录
-- 衣橱列表支持按「穿搭次数 + 收藏次数」倒序展示；单品详情展示关联搭配缩略图。
-- 新增独立穿搭详情页 `/outfit/[id]`，记录页/单品页点击搭配统一跳转详情页。
-- 推荐方案页：推荐单品支持【+衣橱】【+心愿单】真实写入并 toast 提示。
-- 修复记录页查询列/收藏关系、月份切换展示逻辑、快速添加流程等问题。
-- 单图多品识别：添加衣物时，AI 检测图中所有单品，用户多选后逐件确认标准图和属性批量导入；标准图 prompt 指定只提取目标单品去除其他物品。
-- 推荐质量优化：标签 ID→中文翻译、buildItemsSummary 补全属性、温度→穿衣保暖指引映射、3 组 few-shot 示例、temperature 1.0→0.6。
-- 修复 AI banner 误报 mock（fallback 路径硬编码 mock meta 而非透传真实模型结果）。
-- 图片上传优化：远程 URL（DashScope 生成图）直接使用不重复上传，fetch/Supabase 调用加 15s 超时防挂起。
-
-### 5) 工程化、部署与安全
-- Web 构建链路完善：`build:web` + post-build patch；GitHub Actions 自动发布到 GitHub Pages（gh-pages 分支）。
-- 安全加固：移除 secrets.ts 中所有 base64 硬编码 key，统一改为 EXPO_PUBLIC_* 环境变量注入（本地 .env + CI GitHub Secrets），代码仓库零明文 key。
-- CI workflow 注入全部 6 个环境变量（DeepSeek key/host、DashScope key、Supabase URL/anon key/service key）。
-
 ## 项目结构
 
 ```
