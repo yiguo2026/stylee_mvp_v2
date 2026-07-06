@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push *)",
+            "command": "bash '/Users/bytedance/Desktop/claude code/stylee_mvp_v2/.claude/hooks/guard-deploy.sh'"
+          },
+          {
+            "type": "command",
+            "if": "Bash(vercel *)",
+            "command": "bash '/Users/bytedance/Desktop/claude code/stylee_mvp_v2/.claude/hooks/guard-deploy.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}
