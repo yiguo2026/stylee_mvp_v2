@@ -3,8 +3,8 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, SafeAreaView, RefreshControl,
   TextInput, Modal, ScrollView, Platform,
-  useFocusEffect,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
