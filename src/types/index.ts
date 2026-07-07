@@ -439,6 +439,32 @@ export function normalizeCategory(raw: string): ClothingCategory {
   return '配饰';
 }
 
+/** Normalize AI-returned color to COLOR_OPTIONS if possible, otherwise strip parentheticals. */
+export function normalizeColor(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '未知';
+  // Direct match
+  if (COLOR_OPTIONS.includes(s)) return s;
+  // Substring match: find the first COLOR_OPTIONS entry contained in the raw value
+  const hit = COLOR_OPTIONS.find(c => s.includes(c));
+  if (hit) return hit;
+  // Fallback: remove parentheticals like "(偏暖)" and return trimmed
+  return s.replace(/[（(][^）)]*[）)]/g, '').trim() || '未知';
+}
+
+/** Normalize AI-returned material to MATERIAL_OPTIONS if possible, otherwise strip parentheticals. */
+export function normalizeMaterial(raw: string | undefined): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  // Direct match
+  if (MATERIAL_OPTIONS.includes(s as MaterialType)) return s;
+  // Substring match
+  const hit = MATERIAL_OPTIONS.find(m => s.includes(m));
+  if (hit) return hit;
+  // Fallback: remove parentheticals
+  return s.replace(/[（(][^）)]*[）)]/g, '').trim();
+}
+
 export const COLOR_OPTIONS: string[] = [
   '白色', '黑色', '灰色', '米色', '蓝色', '深蓝', '浅蓝',
   '红色', '酒红', '粉色', '绿色', '军绿', '卡其', '棕色',
