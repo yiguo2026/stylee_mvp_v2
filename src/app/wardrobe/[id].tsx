@@ -23,7 +23,6 @@ export default function ItemDetailScreen() {
   const [recommendedItem, setRecommendedItem] = useState<RecommendedItem | undefined>();
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showAttrs, setShowAttrs] = useState(false);
 
   const isRecommended = id.startsWith('rec_');
 
@@ -164,49 +163,39 @@ export default function ItemDetailScreen() {
           <Text style={styles.metaText}>{item!.category} · {wearCountText}{lastWornText ? ` · 最近${lastWornText}` : ''}</Text>
         </View>
 
-        {/* 基础属性编辑 expandable */}
-        <TouchableOpacity
-          style={styles.attrsToggle}
-          onPress={() => setShowAttrs(!showAttrs)}
-        >
-          <Text style={styles.attrsToggleText}>基础属性编辑 ›</Text>
-        </TouchableOpacity>
-
-        {showAttrs && (
-          <View style={styles.attrsCard}>
-            {ATTR_LABELS.map((attr, i) => (
-              <View key={attr.label} style={[styles.attrRow, i < ATTR_LABELS.length - 1 && styles.attrRowBorder]}>
-                <Text style={styles.attrLabel}>{attr.label}</Text>
-                <Text style={styles.attrValue}>{attr.value}</Text>
-              </View>
-            ))}
-            {/* Unset attributes */}
-            {(!item!.fit_type) && (
-              <View style={[styles.attrRow, styles.attrRowBorder]}>
-                <Text style={styles.attrLabel}>版型</Text>
-                <Text style={styles.attrUnset}>—</Text>
-              </View>
-            )}
-            {(!item!.season || item!.season.length === 0) && (
-              <View style={[styles.attrRow, styles.attrRowBorder]}>
-                <Text style={styles.attrLabel}>季节</Text>
-                <Text style={styles.attrUnset}>—</Text>
-              </View>
-            )}
-            {(!item!.occasion_tags || item!.occasion_tags.length === 0) && (
-              <View style={[styles.attrRow, styles.attrRowBorder]}>
-                <Text style={styles.attrLabel}>场合</Text>
-                <Text style={styles.attrUnset}>—</Text>
-              </View>
-            )}
-            {(!item!.purchase_date) && (
-              <View style={styles.attrRow}>
-                <Text style={styles.attrLabel}>购入</Text>
-                <Text style={styles.attrUnset}>—</Text>
-              </View>
-            )}
-          </View>
-        )}
+        {/* 基础属性 */}
+        <View style={styles.attrsCard}>
+          {ATTR_LABELS.map((attr, i) => (
+            <View key={attr.label} style={[styles.attrRow, i < ATTR_LABELS.length - 1 && styles.attrRowBorder]}>
+              <Text style={styles.attrLabel}>{attr.label}</Text>
+              <Text style={styles.attrValue}>{attr.value}</Text>
+            </View>
+          ))}
+          {(!item!.fit_type) && (
+            <View style={[styles.attrRow, styles.attrRowBorder]}>
+              <Text style={styles.attrLabel}>版型</Text>
+              <Text style={styles.attrUnset}>—</Text>
+            </View>
+          )}
+          {(!item!.season || item!.season.length === 0) && (
+            <View style={[styles.attrRow, styles.attrRowBorder]}>
+              <Text style={styles.attrLabel}>季节</Text>
+              <Text style={styles.attrUnset}>—</Text>
+            </View>
+          )}
+          {(!item!.occasion_tags || item!.occasion_tags.length === 0) && (
+            <View style={[styles.attrRow, styles.attrRowBorder]}>
+              <Text style={styles.attrLabel}>场合</Text>
+              <Text style={styles.attrUnset}>—</Text>
+            </View>
+          )}
+          {(!item!.purchase_date) && (
+            <View style={styles.attrRow}>
+              <Text style={styles.attrLabel}>购入</Text>
+              <Text style={styles.attrUnset}>—</Text>
+            </View>
+          )}
+        </View>
 
         {/* AI attrs */}
         {item!.ai_recognized_attrs && Object.keys(item!.ai_recognized_attrs).length > 0 && (
@@ -287,12 +276,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.lineStrong,
   },
   categoryBadgeText: { ...T.tag, color: Colors.ink },
-
-  attrsToggle: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: Spacing.two,
-  },
-  attrsToggleText: { ...T.bodyText, fontSize: 14, color: Colors.ink, fontFamily: Fonts.ui },
 
   attrsCard: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
