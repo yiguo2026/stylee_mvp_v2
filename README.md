@@ -180,6 +180,8 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `b65c9c5` | 修复试穿记录图片为 mock：用 AI 返回的 imageResult.url 而非 stale state |
 | — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试；移除心愿单 mock 预填数据；修复快速添加后衣橱/穿搭页不刷新（useFocusEffect）；数据库 category 约束扩展至8类；新增 normalizeCategory 归一化函数；部署流程从 Vercel 切换到 GitHub Pages；添加 /deploy skill 和 guard hook |
 | `fe42bbc` | 快速添加推荐单品精简为17件（仅保留有真实图片的单品），图片从 Unsplash 迁移至 Supabase Storage |
+| `a7be5b5` | 修复 GitHub Pages 天气始终为 mock：deploy workflow 补充 EXPO_PUBLIC_QWEATHER_KEY/HOST 环境变量 |
+| `5600173` | 稳定性：添加 ErrorBoundary 防白屏 + 404.html 支持 SPA 深链接路由 |
 
 ## 项目结构
 
