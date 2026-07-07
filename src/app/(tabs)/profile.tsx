@@ -1,17 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, Image,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useTryOnStore } from '@/stores/tryonStore';
+import { useOutfitStore } from '@/stores/outfitStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
-import { supabase } from '@/lib/supabase';
 import { STYLE_TAGS } from '@/types';
 
 function getTagName(tagId: string, fallback?: string): string {
@@ -34,34 +33,17 @@ export default function ProfileTab() {
   const { profile, stylePreferences, signOut, user, fetchProfile } = useUserStore();
   const { items } = useWardrobeStore();
   const { records: tryOnRecords, fetchRecords: fetchTryOnRecords } = useTryOnStore();
-  const [savedOutfitCount, setSavedOutfitCount] = useState(0);
-  const [favoriteCount, setFavoriteCount] = useState(0);
+  const { savedCount, favoriteCount, refreshCounts } = useOutfitStore();
   const [showSignOut, setShowSignOut] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) fetchProfile();
-    }, [fetchProfile, user?.id])
-  );
-
   useEffect(() => {
-    if (!user?.id) return;
-    supabase
-      .from('outfits')
-      .select('outfit_id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .then(({ count }) => setSavedOutfitCount(count ?? 0));
-    supabase
-      .from('outfit_favorites')
-      .select('favorite_id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .then(({ count }) => setFavoriteCount(count ?? 0));
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id) fetchTryOnRecords(user.id);
-  }, [user?.id, fetchTryOnRecords]);
+    if (user?.id) {
+      fetchProfile();
+      refreshCounts(user.id);
+      fetchTryOnRecords(user.id);
+    }
+  }, [user?.id, fetchProfile, refreshCounts, fetchTryOnRecords]);
 
   const liked = stylePreferences.filter(p => p.preference_type === 'like');
 
@@ -105,7 +87,7 @@ export default function ProfileTab() {
           </TouchableOpacity>
           <View style={styles.statDivider} />
           <TouchableOpacity style={styles.statItem} onPress={() => router.push({ pathname: '/(tabs)/record', params: { tab: 'worn' } })}>
-            <Text style={styles.statNum}>{savedOutfitCount}</Text>
+            <Text style={styles.statNum}>{savedCount}</Text>
             <Text style={styles.statLabel}>已穿搭配</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />

@@ -11,6 +11,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { useOutfitStore } from '@/stores/outfitStore';
 import { aiRecommendOutfits, AIMeta } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -57,6 +58,7 @@ export default function OutfitResultScreen() {
   }>();
   const { user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
+  const { refreshCounts } = useOutfitStore();
 
   const [loading, setLoading] = useState(true);
   const [, setGenStep] = useState(0);
@@ -228,6 +230,7 @@ export default function OutfitResultScreen() {
       }
       setSavedId(outfitId);
       setShowSavedConfirm(true);
+      if (user?.id) refreshCounts(user.id);
       return outfitId;
     } catch (e: any) {
       Alert.alert('保存失败', e.message);
@@ -249,6 +252,7 @@ export default function OutfitResultScreen() {
         .eq('user_id', user.id)
         .eq('outfit_id', currentOutfit.outfit_id);
       setIsFavorited(false);
+      if (user?.id) refreshCounts(user.id);
     } else {
       // Save outfit first if not saved, get real DB outfit_id
       let outfitId = savedId;
@@ -261,6 +265,7 @@ export default function OutfitResultScreen() {
       });
       if (favError) console.warn('[handleFavorite] insert error:', favError.message);
       setIsFavorited(true);
+      if (user?.id) refreshCounts(user.id);
     }
   };
 
