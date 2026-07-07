@@ -139,7 +139,11 @@ export default function OnboardingStep3() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.builtinIcon, isSelected && styles.builtinIconSelected]}>
-                    <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.builtinImage} resizeMode="cover" />
+                    ) : (
+                      <CategoryIcon category={item.category} size={24} color={isSelected ? Colors.ink : Colors.walnut2} />
+                    )}
                     {isSelected ? (
                       <View style={styles.builtinCheck}>
                         <Feather name="check" size={10} color={Colors.paper} />
@@ -255,7 +259,9 @@ const styles = StyleSheet.create({
   builtinIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
     backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
+  builtinImage: { width: 44, height: 44, borderRadius: Radius.md },
   builtinIconSelected: { backgroundColor: Colors.signalSoft },
   builtinCheck: {
     position: 'absolute', bottom: -4, right: -4,
