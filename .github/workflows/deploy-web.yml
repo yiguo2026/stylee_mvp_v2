@@ -21,17 +21,39 @@ jobs:
 
       - run: npm ci
 
+      - name: Validate deploy env
+        env:
+          EXPO_PUBLIC_DEEPSEEK_KEY: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_KEY || vars.EXPO_PUBLIC_DEEPSEEK_KEY }}
+          EXPO_PUBLIC_DEEPSEEK_HOST: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_HOST || vars.EXPO_PUBLIC_DEEPSEEK_HOST }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_SUPABASE_SERVICE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_SERVICE_KEY || vars.EXPO_PUBLIC_SUPABASE_SERVICE_KEY }}
+          EXPO_PUBLIC_DASHSCOPE_API_KEY: ${{ secrets.EXPO_PUBLIC_DASHSCOPE_API_KEY || vars.EXPO_PUBLIC_DASHSCOPE_API_KEY }}
+          EXPO_PUBLIC_QWEATHER_KEY: ${{ secrets.EXPO_PUBLIC_QWEATHER_KEY || vars.EXPO_PUBLIC_QWEATHER_KEY }}
+          EXPO_PUBLIC_QWEATHER_HOST: ${{ secrets.EXPO_PUBLIC_QWEATHER_HOST || vars.EXPO_PUBLIC_QWEATHER_HOST }}
+        run: |
+          missing=()
+          for key in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_SERVICE_KEY; do
+            if [ -z "${!key}" ]; then
+              missing+=("$key")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing required GitHub Actions secrets/vars: ${missing[*]}"
+            exit 1
+          fi
+
       - name: Build web
         run: npm run build:web
         env:
-          EXPO_PUBLIC_DEEPSEEK_KEY: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_KEY }}
-          EXPO_PUBLIC_DEEPSEEK_HOST: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_HOST }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_SUPABASE_SERVICE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_SERVICE_KEY }}
-          EXPO_PUBLIC_DASHSCOPE_API_KEY: ${{ secrets.EXPO_PUBLIC_DASHSCOPE_API_KEY }}
-          EXPO_PUBLIC_QWEATHER_KEY: ${{ secrets.EXPO_PUBLIC_QWEATHER_KEY }}
-          EXPO_PUBLIC_QWEATHER_HOST: ${{ secrets.EXPO_PUBLIC_QWEATHER_HOST }}
+          EXPO_PUBLIC_DEEPSEEK_KEY: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_KEY || vars.EXPO_PUBLIC_DEEPSEEK_KEY }}
+          EXPO_PUBLIC_DEEPSEEK_HOST: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_HOST || vars.EXPO_PUBLIC_DEEPSEEK_HOST }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_SUPABASE_SERVICE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_SERVICE_KEY || vars.EXPO_PUBLIC_SUPABASE_SERVICE_KEY }}
+          EXPO_PUBLIC_DASHSCOPE_API_KEY: ${{ secrets.EXPO_PUBLIC_DASHSCOPE_API_KEY || vars.EXPO_PUBLIC_DASHSCOPE_API_KEY }}
+          EXPO_PUBLIC_QWEATHER_KEY: ${{ secrets.EXPO_PUBLIC_QWEATHER_KEY || vars.EXPO_PUBLIC_QWEATHER_KEY }}
+          EXPO_PUBLIC_QWEATHER_HOST: ${{ secrets.EXPO_PUBLIC_QWEATHER_HOST || vars.EXPO_PUBLIC_QWEATHER_HOST }}
 
       - name: Deploy to yiguo2026.github.io
         uses: peaceiris/actions-gh-pages@v4
