@@ -133,12 +133,7 @@ export default function OutfitDetailScreen() {
             })}
           </Text>
 
-          {outfit.ai_comment ? (
-            <View style={styles.commentCard}>
-              <Text style={styles.commentLabel}>AI 搭配点评</Text>
-              <Text style={styles.commentText}>{outfit.ai_comment}</Text>
-            </View>
-          ) : null}
+
 
           <Text style={styles.itemsTitle}>搭配单品</Text>
           {outfit.items.length ? (

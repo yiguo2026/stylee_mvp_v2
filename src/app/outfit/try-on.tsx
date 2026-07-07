@@ -412,27 +412,7 @@ export default function TryOnScreen() {
             </View>
           </View>
         ) : null}
-        {tryOnSuggestion && !generating ? (
-          <View style={styles.suggestionCard}>
-            <View style={styles.scoreRow}>
-              <View style={styles.scoreCircle}>
-                <Text style={styles.scoreNum}>{tryOnSuggestion.compatibility_score}</Text>
-              </View>
-              <Text style={styles.scoreLabel}>搭配契合度</Text>
-            </View>
-            <Text style={styles.suggestionText}>{tryOnSuggestion.suggestion}</Text>
-            {tryOnSuggestion.tips.length > 0 ? (
-              <View style={styles.tipsList}>
-                {tryOnSuggestion.tips.map((tip, idx) => (
-                  <View key={idx} style={styles.tipRow}>
-                    <Text style={styles.tipBullet}>•</Text>
-                    <Text style={styles.tipText}>{tip}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+
       </ScrollView>
 
       {/* ── Generating Full Screen Overlay ── */}

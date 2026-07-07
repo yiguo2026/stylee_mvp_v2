@@ -83,30 +83,7 @@ export default function TryOnDetailScreen() {
           </View>
         </View>
 
-        {/* AI Suggestion */}
-        {record.suggestion ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AI 穿搭建议</Text>
-            <View style={styles.suggestionCard}>
-              {record.suggestion.compatibility_score != null ? (
-                <View style={styles.scoreRow}>
-                  <Text style={styles.scoreLabel}>契合度</Text>
-                  <Text style={styles.scoreValue}>{record.suggestion.compatibility_score}/100</Text>
-                </View>
-              ) : null}
-              {record.suggestion.suggestion ? (
-                <Text style={styles.suggestionText}>{record.suggestion.suggestion}</Text>
-              ) : null}
-              {record.suggestion.tips?.length > 0 ? (
-                <View style={styles.tipsList}>
-                  {record.suggestion.tips.map((tip, i) => (
-                    <Text key={i} style={styles.tipItem}>· {tip}</Text>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
+
 
         {/* Selfie */}
         {record.selfieUri ? (

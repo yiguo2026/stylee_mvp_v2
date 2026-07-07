@@ -205,9 +205,6 @@ export default function RecordTab() {
       )}
       <View style={styles.outfitCardInfo}>
         <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
-        {outfit.ai_comment ? (
-          <Text style={styles.outfitComment} numberOfLines={2}>{outfit.ai_comment}</Text>
-        ) : null}
         <Text style={styles.outfitTime}>
           {showDate
             ? `${new Date(outfit.created_at).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} ${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`
@@ -358,9 +355,7 @@ export default function RecordTab() {
                 </View>
                 <View style={styles.outfitCardInfo}>
                   <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
-                  {outfit.ai_comment ? (
-                    <Text style={styles.outfitComment} numberOfLines={2}>{outfit.ai_comment}</Text>
-                  ) : null}
+
                   <Text style={styles.outfitTime}>
                     {new Date(outfit.created_at).toLocaleDateString('zh-CN')} 收藏
                   </Text>
