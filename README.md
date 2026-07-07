@@ -49,9 +49,9 @@
 - 实时天气卡片（和风天气 API，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动匹配温度标签）
 - 自然语言输入（DeepSeek 意图识别，自动匹配标签）
 - 场合/风格/色系/温度标签筛选（场合10个、风格19个、色系8个、温度4个）
-- AI 穿搭推荐（DeepSeek 生成搭配方案 + AI评论）
+- AI 穿搭推荐（DeepSeek 生成搭配方案）
 - AI 结果页模型来源 banner（✓ 真实模型·耗时 / ✗ 结果不可用·已降级 / ⚠ mock）
-- 穿搭结果：方案展示、AI点评、收藏、单品替换
+- 穿搭结果：方案展示、收藏、单品替换
 - 穿搭历史记录
 
 ### AI 试穿
@@ -61,9 +61,9 @@
   - 推荐结果入口：身体信息 → 搭配单品（已选） → 选择场景 → 生成
 - 场景风格选择（☕咖啡馆/🏙️街道/💼办公室/🌿公园/🏠居家）
 - 等待过程态（1%-99% 进度条 + 4 步清单 + 呼吸闪烁动画：分析身体数据→匹配单品→合成效果→优化细节）
-- AI 试穿图生成（qwen-image-2.0-pro）+ 搭配建议（deepseek-v4-flash，含契合度评分、穿搭建议、风格小贴士）
+- AI 试穿图生成（qwen-image-2.0-pro）
 - 效果图展示 + 保存（AI 生成失败时 fallback 到预置场景图）
-- 试穿记录持久化到 Supabase tryon_records 表，详情页展示 AI 效果图 + 契合度评分/建议/贴士
+- 试穿记录持久化到 Supabase tryon_records 表，详情页展示 AI 效果图
 - 每日使用次数限制（10次/天，客户端 AsyncStorage 计数）
 
 ### Web 兼容
@@ -180,6 +180,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `b65c9c5` | 修复试穿记录图片为 mock：用 AI 返回的 imageResult.url 而非 stale state |
 | — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试；移除心愿单 mock 预填数据；修复快速添加后衣橱/穿搭页不刷新（useFocusEffect）；数据库 category 约束扩展至8类；新增 normalizeCategory 归一化函数；部署流程从 Vercel 切换到 GitHub Pages；添加 /deploy skill 和 guard hook |
 | `fe42bbc` | 快速添加推荐单品精简为17件（仅保留有真实图片的单品），图片从 Unsplash 迁移至 Supabase Storage |
+| `9cdf4a4` | 移除 AI 试穿评分/点评和穿搭详情 AI 点评（PRD 无此功能） |
 | `a7be5b5` | 修复 GitHub Pages 天气始终为 mock：deploy workflow 补充 EXPO_PUBLIC_QWEATHER_KEY/HOST 环境变量 |
 | — | v0.10.1：修复个人页穿搭/收藏数量不同步（新增 outfitStore Zustand 全局状态，保存后实时更新）；修复 useFocusEffect 在 Web 端不可用（从 react-native 改为 @react-navigation/native 导入） |
 | `5600173` | 稳定性：添加 ErrorBoundary 防白屏 + 404.html 支持 SPA 深链接路由 |
