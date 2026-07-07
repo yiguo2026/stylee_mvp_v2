@@ -231,9 +231,13 @@ html = html.replace('<div id="root"></div>', shellMarkup);
 
 fs.writeFileSync(htmlPath, html);
 
+// ── 4. Create 404.html (identical to index.html for SPA routing on GitHub Pages) ──
+const html404Path = path.join(__dirname, '..', 'dist', '404.html');
+fs.writeFileSync(html404Path, html);
+
 const fontCount = fontMap.filter(({ dir }) => {
   const fullDir = path.join(fontsBase, dir);
   return fs.existsSync(fullDir) && fs.readdirSync(fullDir).some(f => f.endsWith('.ttf'));
 }).length;
 
-console.log(`Patched dist/index.html: lang=zh + ${fontCount} @font-face + web shell`);
+console.log(`Patched dist/index.html: lang=zh + ${fontCount} @font-face + web shell + 404.html`);

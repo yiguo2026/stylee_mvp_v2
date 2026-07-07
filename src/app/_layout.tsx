@@ -21,6 +21,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors } from '@/constants/theme';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -87,7 +88,7 @@ export default function RootLayout() {
   if (!fontsReady) return null;
 
   return (
-    <>
+    <ErrorBoundary>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.paper } }}>
         <Stack.Screen name="(auth)" />
@@ -97,6 +98,6 @@ export default function RootLayout() {
         <Stack.Screen name="wardrobe/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="outfit/result" options={{ presentation: 'card' }} />
       </Stack>
-    </>
+    </ErrorBoundary>
   );
 }
