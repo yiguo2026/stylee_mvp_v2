@@ -1,6 +1,6 @@
 # Stylee 模型推理服务（model-service）
 
-App 三个 AI 能力的本地推理服务：**服饰识别**（qwen3-vl-plus）、**单品标准化生图**（qwen-image-2.0）、**Garments2Look 搭配推荐**（DeepSeek + 向量 RAG）。
+App 三个 AI 能力的本地推理服务：**服饰识别**（qwen3-vl-plus）、**单品标准化生图**（qwen-image-edit）、**Garments2Look 搭配推荐**（DeepSeek + 向量 RAG）。
 
 - **纯 Python 标准库，零 pip 依赖**——系统有 `python3`（≥3.9）即可，无需 venv / pip install。
 - API key 只存在服务进程的环境变量里，App 端零 key。
@@ -29,7 +29,7 @@ App 侧行为：服务在 → 三个能力走真模型；服务不在/挂了 →
 |---|---|---|
 | `GET /health` | 存活检查 | - |
 | `POST /recognize` | 识别衣物属性（类目/颜色/材质/照片类型） | qwen3-vl-plus |
-| `POST /standardize` | 原图 → 白底标准商品图（临时 OSS URL，App 负责转存 Supabase） | qwen-image-2.0 |
+| `POST /standardize` | 原图 → 白底标准商品图（临时 OSS URL，App 负责转存 Supabase） | qwen-image-edit |
 | `POST /recommend` | 衣橱+场景 → 3 套搭配+理由（B0-B6 链路，仅 2 次 LLM 调用） | DeepSeek flash/pro |
 
 注意：`/recommend` 真实生成耗时约 40~60s（App 侧超时 90s），`/standardize` 约 20~40s，属正常。
@@ -67,7 +67,7 @@ model-service/
 ├── serve.py                 # 启动入口: python3 serve.py --port 8000 --provider deepseek
 ├── stylee/
 │   ├── service/             # HTTP 层: server.py 路由 + adapter.py App⇄契约翻译
-│   ├── vision/              # 触点A: 识别(qwen3-vl-plus) + 标准化(qwen-image-2.0)
+│   ├── vision/              # 触点A: 识别(qwen3-vl-plus) + 标准化(qwen-image-edit)
 │   ├── ingest.py            # 入库管线编排
 │   ├── pipeline.py          # 触点B: B0-B6 推荐链路
 │   ├── rag.py / embeddings.py / vectorstore.py   # B2 向量检索(Garments2Look)

@@ -168,9 +168,9 @@ from stylee.vision.mock import MockVisionProvider as _MVP
 
 
 def test_build_edit_payload():
-    p = build_edit_payload("qwen-image-2.0", "data:img", "去背")
+    p = build_edit_payload("qwen-image-edit", "data:img", "去背")
     msgs = p["input"]["messages"][0]["content"]
-    assert p["model"] == "qwen-image-2.0"
+    assert p["model"] == "qwen-image-edit"
     assert {"image": "data:img"} in msgs and {"text": "去背"} in msgs
 
 

@@ -1,8 +1,10 @@
 """真 provider:识别/回验 qwen3-vl-plus(OpenAI-compatible chat,含图);
-标准化 qwen-image-2.0(multimodal-generation 同步端点,base64 进、图 URL 出)。
+标准化 qwen-image-edit(图生图/img2img,multimodal-generation 同步端点,base64 进、图 URL 出)。
 
 纯 urllib,自动走环境代理。识别复用 providers.openai_compat 的 _chat_completion。
-注:qwen-image-2.0 返回的 OSS URL 会过期,落库由调用方负责。
+注:qwen-image-edit 返回的 OSS URL 会过期,落库由调用方负责。
+图像模型选型约定:图生图/图片编辑 → qwen-image-edit;文生图(如从零合成) → qwen-image。
+标准化两种模式(cutout/img2img)都带输入图,故统一走 qwen-image-edit。
 """
 from __future__ import annotations
 
@@ -113,4 +115,4 @@ def build_image_standardizer() -> ImageStandardizer:
         return MockImageStandardizer()
     return DashScopeImageStandardizer(
         base_url=os.environ.get("IMG_BASE_URL", _DASHSCOPE + "/api/v1"),
-        api_key=key, model=os.environ.get("IMG_EDIT_MODEL", "qwen-image-2.0"))
+        api_key=key, model=os.environ.get("IMG_EDIT_MODEL", "qwen-image-edit"))
