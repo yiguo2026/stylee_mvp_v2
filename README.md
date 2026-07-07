@@ -26,7 +26,7 @@
 ### Onboarding 引导（3步）
 - Step1：个人信息（昵称、性别、年龄、职业、城市搜索选择）
 - Step2：风格偏好（19个喜欢标签，点击选择）
-- Step3：初始化衣橱（15件AI推荐基础款 + 相册批量导入，可同时选择两类，真实服装图片）
+- Step3：初始化衣橱（17件AI推荐基础款，Supabase Storage 真实服装图片 + 相册批量导入，可同时选择两类）
 
 ### 首页
 - 穿搭灵感卡片（竖版图片，点击进入灵感详情页）
@@ -179,6 +179,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `923ff01` | 试穿记录持久化到 Supabase（新建 tryon_records 表；addRecord 改 async + Supabase 读写；详情页展示 AI 效果图 + 契合度评分/建议/贴士） |
 | `b65c9c5` | 修复试穿记录图片为 mock：用 AI 返回的 imageResult.url 而非 stale state |
 | — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试；移除心愿单 mock 预填数据；修复快速添加后衣橱/穿搭页不刷新（useFocusEffect）；数据库 category 约束扩展至8类；新增 normalizeCategory 归一化函数；部署流程从 Vercel 切换到 GitHub Pages；添加 /deploy skill 和 guard hook |
+| `fe42bbc` | 快速添加推荐单品精简为17件（仅保留有真实图片的单品），图片从 Unsplash 迁移至 Supabase Storage |
 
 ## 项目结构
 
