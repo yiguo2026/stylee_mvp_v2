@@ -182,6 +182,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `fe42bbc` | 快速添加推荐单品精简为17件（仅保留有真实图片的单品），图片从 Unsplash 迁移至 Supabase Storage |
 | `a7be5b5` | 修复 GitHub Pages 天气始终为 mock：deploy workflow 补充 EXPO_PUBLIC_QWEATHER_KEY/HOST 环境变量 |
 | `5600173` | 稳定性：添加 ErrorBoundary 防白屏 + 404.html 支持 SPA 深链接路由 |
+| `de21d25` | 修复 onboarding step3 AI 推荐单品无缩略图：用 Supabase Storage 真实图片替代 CategoryIcon |
 
 ## 项目结构
 
