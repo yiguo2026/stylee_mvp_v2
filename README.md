@@ -181,6 +181,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试；移除心愿单 mock 预填数据；修复快速添加后衣橱/穿搭页不刷新（useFocusEffect）；数据库 category 约束扩展至8类；新增 normalizeCategory 归一化函数；部署流程从 Vercel 切换到 GitHub Pages；添加 /deploy skill 和 guard hook |
 | `fe42bbc` | 快速添加推荐单品精简为17件（仅保留有真实图片的单品），图片从 Unsplash 迁移至 Supabase Storage |
 | `a7be5b5` | 修复 GitHub Pages 天气始终为 mock：deploy workflow 补充 EXPO_PUBLIC_QWEATHER_KEY/HOST 环境变量 |
+| — | v0.10.1：修复个人页穿搭/收藏数量不同步（新增 outfitStore Zustand 全局状态，保存后实时更新）；修复 useFocusEffect 在 Web 端不可用（从 react-native 改为 @react-navigation/native 导入） |
 | `5600173` | 稳定性：添加 ErrorBoundary 防白屏 + 404.html 支持 SPA 深链接路由 |
 | `de21d25` | 修复 onboarding step3 AI 推荐单品无缩略图：用 Supabase Storage 真实图片替代 CategoryIcon |
 
