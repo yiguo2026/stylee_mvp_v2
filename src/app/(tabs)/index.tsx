@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal, Alert,
   Image, Platform,
+  useFocusEffect,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -108,9 +109,9 @@ export default function OutfitTab() {
   // Inspiration
   const [inspirations, setInspirations] = useState<InspirationCard[]>(MOCK_INSPIRATIONS);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (user?.id) fetchItems(user.id);
-  }, [user?.id, fetchItems]);
+  }, [user?.id, fetchItems]));
 
   useEffect(() => {
     if (!user?.id) return;

@@ -45,10 +45,10 @@ const toCatConcept = (raw: string): CatConcept => {
   return 'acc';
 };
 const WARDROBE_DB_CAT: Record<CatConcept, string> = {
-  top: '上装', bottom: '下装', dress: '上装', outer: '外套', shoes: '鞋', bag: '包', hat: '配饰', acc: '配饰',
+  top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋履', bag: '包袋', hat: '帽巾', acc: '配饰',
 };
 const WISHLIST_DB_CAT: Record<CatConcept, string> = {
-  top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋', bag: '包', hat: '围巾', acc: '围巾',
+  top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋履', bag: '包袋', hat: '帽巾', acc: '配饰',
 };
 
 export default function OutfitResultScreen() {
@@ -344,7 +344,7 @@ export default function OutfitResultScreen() {
   const addRecommendedToWishlist = async (rec: RecommendedItem, idx: number) => {
     if (!user?.id) { showToast('请先登录后再添加'); return; }
     const { error } = await supabase.from('wishlist_items').insert({
-      user_id: user.id, name: rec.name, category: WISHLIST_DB_CAT[toCatConcept(rec.category)],
+      user_id: user.id, name: rec.name, category: normalizeCategory(WISHLIST_DB_CAT[toCatConcept(rec.category)]),
       color: rec.color || '', source: 'ai_recommended',
     });
     if (error) {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { WardrobeItem } from '@/types';
+import { WardrobeItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
 
 interface WardrobeState {
@@ -95,7 +95,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('wardrobe_items')
-        .insert(item)
+        .insert({ ...item, category: normalizeCategory(item.category) })
         .select()
         .single();
       if (error) throw error;

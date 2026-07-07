@@ -12,7 +12,7 @@
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
 - **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动 fallback 到本地 mock）
 - **AI**：DashScope（Qwen VL 识别 / Qwen Image 生图）+ DeepSeek（意图识别 / 穿搭推荐 / 试穿建议）；不可用时自动回落 mock
-- **部署**：GitHub Pages（gh-pages）+ EAS Build（iOS）
+- **部署**：GitHub Pages（yiguo2026.github.io 仓库 gh-pages 分支）+ EAS Build（iOS）
 - **状态管理**：Zustand
 - **样式**：Editorial Mark v3.6（冷调中性黑白体系 / 统一字体体系 / 过程态规范）
 
@@ -132,6 +132,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 ```
 
 - 仓库已配置 GitHub Actions：push 到 `main` 后自动构建并发布到 GitHub Pages。
+- 部署目标：`yiguo2026/yiguo2026.github.io` 仓库的 `gh-pages` 分支。
 - 在线地址：https://yiguo2026.github.io/
 
 选择 Web / iOS 模拟器 / Android 模拟器运行。
@@ -177,7 +178,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `2a19374` | 扩展添加衣物表单10字段；修复标准图原图未发送bug；优化推荐prompt(硬约束+温度映射+few-shot+tag翻译)；图片显示contain模式 |
 | `923ff01` | 试穿记录持久化到 Supabase（新建 tryon_records 表；addRecord 改 async + Supabase 读写；详情页展示 AI 效果图 + 契合度评分/建议/贴士） |
 | `b65c9c5` | 修复试穿记录图片为 mock：用 AI 返回的 imageResult.url 而非 stale state |
-| — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试 |
+| — | v0.10.0：统一添加衣物入口 + 多图导入 + 标准图失败重试；移除心愿单 mock 预填数据；修复快速添加后衣橱/穿搭页不刷新（useFocusEffect）；数据库 category 约束扩展至8类；新增 normalizeCategory 归一化函数；部署流程从 Vercel 切换到 GitHub Pages；添加 /deploy skill 和 guard hook |
 
 ## 项目结构
 

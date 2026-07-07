@@ -435,6 +435,23 @@ export const CATEGORY_OPTIONS: ClothingCategory[] = [
   '上装', '下装', '连体装', '外套', '鞋履', '包袋', '帽巾', '配饰',
 ];
 
+/** Normalize any category string to a valid DB ClothingCategory. */
+export function normalizeCategory(raw: string): ClothingCategory {
+  const s = (raw || '').trim();
+  if (!s) return '配饰';
+  // Direct match
+  if (CLOTHING_CATEGORIES.includes(s as ClothingCategory)) return s as ClothingCategory;
+  // Fuzzy match by keyword
+  if (['连衣裙', '连体', '裙装', '长裙', '短裙', '半身裙', 'onepiece'].some(k => s.includes(k))) return '连体装';
+  if (['外套', '夹克', '大衣', '风衣', '羽绒', '棉服', '西装', '开衫', '皮衣', '冲锋衣', '棒球服', '皮草'].some(k => s.includes(k))) return '外套';
+  if (['上装', '衬衫', 'T恤', '恤', '毛衣', '卫衣', '上衣', '针织', '吊带', '背心', '打底', '马甲', 'Polo'].some(k => s.includes(k))) return '上装';
+  if (['下装', '裤', '牛仔', '阔腿', '短裤', '长裤', '半裙', '西裤', '运动裤', '休闲裤'].some(k => s.includes(k))) return '下装';
+  if (['鞋', '靴', '凉鞋', '拖鞋', '乐福', '运动鞋'].some(k => s.includes(k))) return '鞋履';
+  if (['包', '手袋', '挎', '托特', '链条', '背包'].some(k => s.includes(k))) return '包袋';
+  if (['帽', '围巾', '丝巾', '领巾', '披肩', '脖套', '头巾'].some(k => s.includes(k))) return '帽巾';
+  return '配饰';
+}
+
 export const COLOR_OPTIONS: string[] = [
   '白色', '黑色', '灰色', '米色', '蓝色', '深蓝', '浅蓝',
   '红色', '酒红', '粉色', '绿色', '军绿', '卡其', '棕色',

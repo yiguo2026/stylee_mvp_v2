@@ -7,8 +7,8 @@ Deploy the Stylee app to GitHub Pages with full verification.
 **IMPORTANT:**
 - This is NOT a Next.js app. It's Expo (React Native for web) with static export.
 - Do NOT use Vercel for deployment. The production site is on GitHub Pages.
-- The deployment target is a SEPARATE repo: `yiguo2026/yiguo2026.github.io` (NOT the gh-pages branch of stylee_mvp_v2).
-- Always clone/fetch `yiguo2026.github.io` into a temp directory for deployment — NEVER modify the main working directory's branch.
+- The deployment target is a SEPARATE repo: `yiguo2026/yiguo2026.github.io`, specifically its **gh-pages branch** (GitHub Pages is configured to serve from gh-pages, NOT main).
+- Always clone the **gh-pages branch** of `yiguo2026.github.io` into a temp directory for deployment — NEVER modify the main working directory's branch.
 
 ## Steps
 
@@ -22,9 +22,9 @@ Deploy the Stylee app to GitHub Pages with full verification.
 
 5. **Verify build output** — Check that `dist/` was updated (timestamp is recent, `dist/index.html` exists). If the build failed, STOP and report the error.
 
-6. **Deploy to yiguo2026.github.io** — Clone the deployment repo into a temp directory, replace contents, and push:
+6. **Deploy to yiguo2026.github.io** — Clone the **gh-pages branch** of the deployment repo into a temp directory, replace contents, and push:
    ```bash
-   git clone git@github.com:yiguo2026/yiguo2026.github.io.git /tmp/stylee-deploy
+   git clone -b gh-pages https://github.com/yiguo2026/yiguo2026.github.io.git /tmp/stylee-deploy
    cd /tmp/stylee-deploy
    # Remove old build artifacts (keep privacy.html, terms.html, .nojekyll)
    rm -rf _expo assets favicon.ico index.html metadata.json
@@ -32,7 +32,7 @@ Deploy the Stylee app to GitHub Pages with full verification.
    cp -r <project_root>/dist/* .
    git add -A
    git commit -m "deploy: <message>"
-   git push origin main
+   git push origin gh-pages
    # Clean up
    rm -rf /tmp/stylee-deploy
    ```
@@ -42,6 +42,6 @@ Deploy the Stylee app to GitHub Pages with full verification.
 8. **Report** — Output a summary:
    - URL deployed: https://yiguo2026.github.io
    - Source repo: stylee_mvp_v2 (main branch)
-   - Target repo: yiguo2026.github.io
+   - Target repo: yiguo2026.github.io (gh-pages branch)
    - Build command used
    - Confirmation that live site reflects changes (or list of issues found)

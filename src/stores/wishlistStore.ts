@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { WishlistItem } from '@/types';
+import { WishlistItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
 
 interface WishlistState {
@@ -39,7 +39,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('wishlist_items')
-        .insert(item)
+        .insert({ ...item, category: normalizeCategory(item.category) })
         .select()
         .single();
       if (error) throw error;

@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, SafeAreaView, RefreshControl,
   TextInput, Modal, ScrollView, Platform,
+  useFocusEffect,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -71,12 +72,12 @@ export default function WardrobeTab() {
     };
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (user) {
       fetchItems(user.id);
       fetchWishlist(user.id);
     }
-  }, [fetchItems, fetchWishlist, user]);
+  }, [fetchItems, fetchWishlist, user]));
 
   const onRefresh = async () => {
     setRefreshing(true);
