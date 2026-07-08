@@ -355,7 +355,7 @@ export default function OutfitTab() {
         <View style={styles.wardrobeSection}>
           <View style={styles.wardrobeHeader}>
             <Text style={styles.wardrobeTitle}>我的衣橱</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/wardrobe')}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/wardrobe?scrollTop=1')}>
               <Text style={styles.wardrobeViewAll}>查看全部 ›</Text>
             </TouchableOpacity>
           </View>

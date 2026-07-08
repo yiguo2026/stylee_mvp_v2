@@ -154,31 +154,17 @@ const shellStyle = `<style>
   .desktop-phone-signal i:nth-child(3) { height: 8px; opacity: 0.85; }
   .desktop-phone-signal i:nth-child(4) { height: 10px; }
   .desktop-phone-wifi {
-    position: relative;
-    width: 14px;
-    height: 10px;
+    width: 15px;
+    height: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0a0a0a;
   }
-  .desktop-phone-wifi::before,
-  .desktop-phone-wifi::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 1.6px solid #0a0a0a;
-    border-top-color: transparent;
-    border-left-color: transparent;
-    border-right-color: transparent;
-    border-radius: 50%;
-  }
-  .desktop-phone-wifi::before {
-    bottom: 1px;
-    width: 14px;
-    height: 10px;
-  }
-  .desktop-phone-wifi::after {
-    bottom: 2px;
-    width: 8px;
-    height: 6px;
+  .desktop-phone-wifi svg {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
   .desktop-phone-battery {
     position: relative;
@@ -222,7 +208,7 @@ const shellStyle = `<style>
 }
 </style>`;
 
-const shellMarkup = `<div class="desktop-phone-stage"><div class="desktop-phone-frame"><div class="desktop-phone-screen"><div class="desktop-phone-statusbar" aria-hidden="true"><span class="desktop-phone-time">9:41</span><span class="desktop-phone-island"></span><div class="desktop-phone-system"><span class="desktop-phone-network">5G</span><span class="desktop-phone-signal"><i></i><i></i><i></i><i></i></span><span class="desktop-phone-wifi"></span><span class="desktop-phone-battery"><span class="desktop-phone-battery-fill"></span></span></div></div><div id="root"></div></div></div></div>`;
+const shellMarkup = `<div class="desktop-phone-stage"><div class="desktop-phone-frame"><div class="desktop-phone-screen"><div class="desktop-phone-statusbar" aria-hidden="true"><span class="desktop-phone-time">9:41</span><span class="desktop-phone-island"></span><div class="desktop-phone-system"><span class="desktop-phone-network">5G</span><span class="desktop-phone-signal"><i></i><i></i><i></i><i></i></span><span class="desktop-phone-wifi"><svg viewBox="0 0 16 12" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.2C3.7 3.5 5.7 2.6 8 2.6c2.3 0 4.3 0.9 6 2.6"/><path d="M4.3 7.2C5.4 6.2 6.6 5.7 8 5.7c1.4 0 2.6 0.5 3.7 1.5"/><circle cx="8" cy="9.4" r="0.9" fill="currentColor" stroke="none"/></svg></span><span class="desktop-phone-battery"><span class="desktop-phone-battery-fill"></span></span></div></div><div id="root"></div></div></div></div>`;
 
 // ── 3. Apply patches ──
 html = html.replace('<html lang="en">', '<html lang="zh">');

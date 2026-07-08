@@ -6,29 +6,35 @@ import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 import { setPendingImages } from '@/lib/pendingImages';
+import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { PRESET_BASIC_ITEMS } from '@/types';
 
 const isWeb = Platform.OS === 'web';
 
 interface AddClothingSheetProps {
   visible: boolean;
   onClose: () => void;
-  /** 可选：打开心愿单（衣橱页为同页 Modal，无独立路由时通过此回调触发） */
-  onOpenWishlist?: () => void;
   /** 心愿单数量，用于角标展示 */
   wishlistCount?: number;
 }
 
 function SheetContent({
   onClose,
-  onOpenWishlist,
   wishlistCount = 0,
 }: {
   onClose: () => void;
-  onOpenWishlist?: () => void;
   wishlistCount?: number;
 }) {
   const insets = useSafeAreaInsets();
   const [picking, setPicking] = React.useState(false);
+  const { items } = useWardrobeStore();
+
+  // 全部推荐单品是否都已加入衣橱 —— 用于在入口就提示，避免用户点进去才发现没得可加
+  const allPresetAdded = React.useMemo(() => {
+    if (items.length === 0) return false;
+    const keys = new Set(items.map(it => `${it.name}||${it.category}`));
+    return PRESET_BASIC_ITEMS.every(it => keys.has(`${it.name}||${it.category}`));
+  }, [items]);
 
   // 相册导入 — 主入口
   const handlePickImages = async () => {
@@ -57,26 +63,18 @@ function SheetContent({
     }
   };
 
-  // 一键导入衣橱 — 从购物截图/订单批量识别
-  const handleBatchImport = () => {
-    onClose();
-    router.push('/wardrobe/batch');
-  };
-
   // 快速添加推荐单品 — 从热门基础款补充
   const handleQuickAdd = () => {
+    // 推荐单品已全部加入时，入口已给出提示，点击不再跳转，避免"骗进去"
+    if (allPresetAdded) return;
     onClose();
     router.push('/wardrobe/quick-add');
   };
 
-  // 心愿单 — 优先用回调打开同页 Modal，否则回退到衣橱页
+  // 心愿单 — 独立 pushed 路由，返回时回到来源页
   const handleOpenWishlist = () => {
     onClose();
-    if (onOpenWishlist) {
-      onOpenWishlist();
-    } else {
-      router.push('/(tabs)/wardrobe');
-    }
+    router.push('/wardrobe/wishlist');
   };
 
   return (
@@ -102,24 +100,22 @@ function SheetContent({
 
         <Text style={styles.groupLabel}>更多方式</Text>
 
-        {/* 一键导入衣橱 — 批量识别 */}
-        <TouchableOpacity style={styles.option} onPress={handleBatchImport} activeOpacity={0.7}>
-          <Feather name="shopping-bag" size={18} color={Colors.ink} style={styles.optionIcon} />
-          <View style={styles.optionTextWrap}>
-            <Text style={styles.optionText}>一键导入衣橱</Text>
-            <Text style={styles.optionSub}>从购物截图 / 订单批量识别</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-        </TouchableOpacity>
-
         {/* 快速添加推荐单品 — 从热门基础款补充 */}
-        <TouchableOpacity style={styles.option} onPress={handleQuickAdd} activeOpacity={0.7}>
-          <Feather name="zap" size={18} color={Colors.ink} style={styles.optionIcon} />
+        <TouchableOpacity
+          style={[styles.option, allPresetAdded && styles.optionDisabled]}
+          onPress={handleQuickAdd}
+          activeOpacity={allPresetAdded ? 1 : 0.7}
+        >
+          <Feather name="zap" size={18} color={allPresetAdded ? Colors.walnut2 : Colors.ink} style={styles.optionIcon} />
           <View style={styles.optionTextWrap}>
-            <Text style={styles.optionText}>快速添加推荐单品</Text>
-            <Text style={styles.optionSub}>从热门基础款中一键补充衣橱</Text>
+            <Text style={[styles.optionText, allPresetAdded && styles.optionTextDisabled]}>快速添加推荐单品</Text>
+            <Text style={styles.optionSub}>
+              {allPresetAdded ? '推荐单品已全部加入衣橱，去「相册导入」补充更多吧' : '从热门基础款中一键补充衣橱'}
+            </Text>
           </View>
-          <Feather name="chevron-right" size={16} color={Colors.walnut2} />
+          {allPresetAdded
+            ? <Feather name="check-circle" size={16} color={Colors.walnut2} />
+            : <Feather name="chevron-right" size={16} color={Colors.walnut2} />}
         </TouchableOpacity>
 
         {/* 心愿单 — 查看想要的单品 */}
@@ -145,19 +141,19 @@ function SheetContent({
   );
 }
 
-export function AddClothingSheet({ visible, onClose, onOpenWishlist, wishlistCount }: AddClothingSheetProps) {
+export function AddClothingSheet({ visible, onClose, wishlistCount }: AddClothingSheetProps) {
   if (isWeb) {
     if (!visible) return null;
     return (
       <View style={styles.webLayer}>
-        <SheetContent onClose={onClose} onOpenWishlist={onOpenWishlist} wishlistCount={wishlistCount} />
+        <SheetContent onClose={onClose} wishlistCount={wishlistCount} />
       </View>
     );
   }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <SheetContent onClose={onClose} onOpenWishlist={onOpenWishlist} wishlistCount={wishlistCount} />
+      <SheetContent onClose={onClose} wishlistCount={wishlistCount} />
     </Modal>
   );
 }
@@ -204,7 +200,9 @@ const styles = StyleSheet.create({
   optionIcon: { width: 22, textAlign: 'center' },
   optionTextWrap: { flex: 1, gap: 2 },
   optionText: { ...T.bodyText, fontSize: 15, color: Colors.ink },
+  optionTextDisabled: { color: Colors.walnut2 },
   optionSub: { ...T.micro, color: Colors.walnut2 },
+  optionDisabled: { opacity: 0.6, backgroundColor: Colors.paper },
 
   badge: {
     minWidth: 18, height: 18, borderRadius: 9,

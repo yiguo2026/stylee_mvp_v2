@@ -51,6 +51,12 @@ export default function QuickAddPage() {
     [filteredIndices, existingKeys]
   );
 
+  // 全部推荐单品（不受分类过滤影响）都已加入衣橱？→ 展示空态引导。
+  const allPresetAdded = useMemo(
+    () => PRESET_BASIC_ITEMS.every(it => existingKeys.has(`${it.name}||${it.category}`)),
+    [existingKeys],
+  );
+
   const toggleItem = (index: number) => {
     if (isAdded(index)) return;
     const next = new Set(selected);
@@ -112,7 +118,29 @@ export default function QuickAddPage() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.subtitle}>精选热销基础款，点击即可一键加入衣橱</Text>
+        {allPresetAdded ? (
+          <View style={styles.allDoneWrap}>
+            <View style={styles.allDoneIconWrap}>
+              <Feather name="check-circle" size={44} color={Colors.ink} />
+            </View>
+            <Text style={styles.allDoneTitle}>你已经把推荐单品都加进衣橱啦 🎉</Text>
+            <Text style={styles.allDoneSub}>
+              基础款都齐了，可以从「相册导入」补充更多个性单品；或者直接回衣橱开始搭配。
+            </Text>
+            <TouchableOpacity
+              style={styles.allDonePrimary}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(tabs)/wardrobe');
+              }}
+            >
+              <Text style={styles.allDonePrimaryText}>返回衣橱</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.subtitle}>精选热销基础款，点击即可一键加入衣橱</Text>
 
         <View style={styles.builtinSection}>
           <View style={styles.builtinHeader}>
@@ -201,6 +229,8 @@ export default function QuickAddPage() {
             : <Text style={styles.addBtnText}>加入衣橱 ({selected.size})</Text>
           }
         </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -281,4 +311,36 @@ const styles = StyleSheet.create({
   },
   addBtnDisabled: { opacity: 0.4 },
   addBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 16 },
+
+  // 全部推荐单品已加入时的空态
+  allDoneWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.six,
+    paddingHorizontal: Spacing.four,
+  },
+  allDoneIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: Colors.paperCard,
+    borderWidth: 1, borderColor: Colors.line,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
+  allDoneTitle: {
+    ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 16, color: Colors.ink,
+    textAlign: 'center',
+  },
+  allDoneSub: {
+    ...T.bodyText, fontSize: 13, color: Colors.walnut2,
+    textAlign: 'center', lineHeight: 20,
+    paddingHorizontal: Spacing.two,
+  },
+  allDonePrimary: {
+    marginTop: Spacing.two,
+    backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingVertical: Spacing.two + 4, paddingHorizontal: Spacing.six,
+    alignItems: 'center',
+  },
+  allDonePrimaryText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 15 },
 });

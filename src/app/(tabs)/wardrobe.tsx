@@ -2,10 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, SafeAreaView, RefreshControl,
-  TextInput, Modal, ScrollView, Platform,
+  TextInput, ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
@@ -14,10 +14,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
-import { Toast } from '@/components/Toast';
 import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
-
-const isWeb = Platform.OS === 'web';
 
 function ItemCard({ item }: { item: WardrobeItem }) {
   return (
@@ -49,28 +46,22 @@ function ItemCard({ item }: { item: WardrobeItem }) {
 export default function WardrobeTab() {
   const { user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
-  const { items: wishlistItems, fetchItems: fetchWishlist, moveToWardrobe, removeItem } = useWishlistStore();
+  const { items: wishlistItems, fetchItems: fetchWishlist } = useWishlistStore();
   const [selectedCategory, setSelectedCategory] = useState<ClothingCategory | '全部'>('全部');
   const [searchText, setSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showWishlist, setShowWishlist] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
-  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ visible: true, message });
-    toastTimerRef.current = setTimeout(() => {
-      setToast({ visible: false, message: '' });
-    }, 1600);
-  }, []);
-
+  // 支持从「查看全部」入口回到顶部
+  const params = useLocalSearchParams<{ scrollTop?: string }>();
+  const scrollRef = React.useRef<ScrollView>(null);
+  // 从「查看全部」进入时滚动回顶部（衣橱页在 Tab 间保持挂载，滚动位置会被保留）
   useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
+    if (params.scrollTop) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      router.setParams({ scrollTop: undefined });
+    }
+  }, [params.scrollTop]);
 
   useFocusEffect(useCallback(() => {
     if (user) {
@@ -114,70 +105,6 @@ export default function WardrobeTab() {
       return terms.some(t => haystack.includes(t));
     });
 
-  const handleMoveToWardrobe = async (wishId: string) => {
-    await moveToWardrobe(wishId);
-    if (user) fetchItems(user.id);
-    showToast('已转入衣橱');
-  };
-
-  const handleRemoveWish = async (wishId: string) => {
-    await removeItem(wishId);
-    showToast('已删除心愿单单品');
-  };
-
-  const wishlistOverlayContent = (
-    <SafeAreaView style={styles.wishlistOverlay}>
-      <View style={styles.wishlistHeader}>
-        <TouchableOpacity onPress={() => setShowWishlist(false)} hitSlop={12}>
-          <Text style={styles.wishlistBack}>← 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.wishlistTitle}>心愿单</Text>
-        <Text style={styles.wishlistCountText}>{wishlistItems.length} 件想要的</Text>
-      </View>
-      <ScrollView style={styles.wishlistBody} contentContainerStyle={{ paddingBottom: 40 }}>
-        {wishlistItems.length === 0 ? (
-          <View style={styles.wishlistEmpty}>
-            <Text style={styles.wishlistEmptyText}>还没有心愿单哦{'\n'}AI 推荐时会自动加入</Text>
-          </View>
-        ) : (
-          wishlistItems.map(wish => (
-            <View key={wish.wish_id} style={styles.wishItem}>
-              <View style={styles.wishItemImg}>
-                {wish.image_url
-                  ? <Image source={{ uri: wish.image_url }} style={styles.image} resizeMode="cover" />
-                  : <View style={styles.wishImgPlaceholder}><CategoryIcon category={wish.category} size={32} color={Colors.walnut2} /></View>
-                }
-              </View>
-              <View style={styles.wishItemInfo}>
-                <Text style={styles.wishItemName} numberOfLines={1}>{wish.name}</Text>
-                <Text style={styles.wishItemMeta}>{wish.category} · {wish.color} · {wish.source === 'ai_recommended' ? '来自AI推荐' : '手动添加'}</Text>
-              </View>
-              <View style={styles.wishItemActions}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={styles.wishAddBtn}
-                  onPress={() => handleMoveToWardrobe(wish.wish_id)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Text style={styles.wishAddBtnText}>转入衣橱</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={styles.wishRemoveBtn}
-                  onPress={() => handleRemoveWish(wish.wish_id)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Text style={styles.wishRemoveText}>删除</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
-      <Toast visible={toast.visible} message={toast.message} />
-    </SafeAreaView>
-  );
-
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -201,6 +128,7 @@ export default function WardrobeTab() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
@@ -272,18 +200,8 @@ export default function WardrobeTab() {
       <AddClothingSheet
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onOpenWishlist={() => setShowWishlist(true)}
         wishlistCount={wishlistItems.length}
       />
-
-      {/* Wishlist Overlay (slide-in full page) */}
-      {isWeb ? (
-        showWishlist ? <View style={styles.webLayer}>{wishlistOverlayContent}</View> : null
-      ) : (
-        <Modal visible={showWishlist} animationType="slide" onRequestClose={() => setShowWishlist(false)}>
-          {wishlistOverlayContent}
-        </Modal>
-      )}
     </SafeAreaView>
   );
 }

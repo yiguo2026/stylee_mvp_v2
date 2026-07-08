@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, Image, Alert, Platform, useWindowDimensions,
@@ -9,6 +9,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { Toast } from '@/components/Toast';
 import { useTryOnStore } from '@/stores/tryonStore';
+import { trimWhitespace } from '@/lib/trimImage';
 import * as MediaLibrary from 'expo-media-library';
 // expo-file-system v19 将 downloadAsync / cacheDirectory 移到了 legacy 入口
 import * as FileSystem from 'expo-file-system/legacy';
@@ -93,8 +94,37 @@ export default function TryOnResultScreen() {
 
   const { image, sceneLabel, outfitName, items, meta } = lastResult;
   const imageSource = typeof image === 'string' ? { uri: image } : image;
-  // 大图按屏幕比例自适应，避免固定高度带来的长留白
-  const imageHeight = Math.min(winH * 0.68, winW * 1.3);
+  // 结果图按真实宽高比自适应；并在 Web 端自动裁掉图片自带的四周白边，只留内容区域。
+  const [imageRatio, setImageRatio] = useState(3 / 4);
+  const [trimmedUri, setTrimmedUri] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setTrimmedUri(null);
+    if (typeof image === 'string' && image) {
+      // 先按原图比例兜底
+      Image.getSize(
+        image,
+        (w, h) => { if (!cancelled && w > 0 && h > 0) setImageRatio(w / h); },
+        () => { /* 忽略失败，保留默认 */ },
+      );
+      // Web 端尝试裁掉图片自带的白边，并用裁剪后的内容比例重设展示
+      trimWhitespace(image).then(res => {
+        if (!cancelled && res) {
+          setTrimmedUri(res.uri);
+          setImageRatio(res.ratio);
+        }
+      });
+      return () => { cancelled = true; };
+    }
+    if (image && typeof image !== 'string') {
+      const src: any = Image.resolveAssetSource ? Image.resolveAssetSource(image as any) : null;
+      if (src?.width && src?.height) setImageRatio(src.width / src.height);
+    }
+    return () => { cancelled = true; };
+  }, [image]);
+  const displaySource = trimmedUri ? { uri: trimmedUri } : imageSource;
+  // 给一个最大高度上限（防止极窄比例导致图片顶天立地）。
+  const maxImageHeight = Math.min(winH * 0.72, winW * 1.4);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -109,10 +139,14 @@ export default function TryOnResultScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {meta ? <AIResultBanner {...meta} /> : null}
 
-        {/* 试穿大图（自适应高度，contain 完整展示） */}
-        {imageSource ? (
-          <View style={styles.imageCard}>
-            <Image source={imageSource} style={[styles.resultImage, { height: imageHeight }]} resizeMode="contain" />
+        {/* 试穿大图（Web 端已自动裁掉图片自带的白边，卡片按内容比例填满） */}
+        {displaySource ? (
+          <View style={[styles.imageCard, { aspectRatio: imageRatio, maxHeight: maxImageHeight }]}>
+            <Image
+              source={displaySource}
+              style={styles.resultImage}
+              resizeMode="cover"
+            />
           </View>
         ) : null}
 
@@ -183,7 +217,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
     backgroundColor: Colors.paper,
   },
-  resultImage: { width: '100%', backgroundColor: Colors.paper },
+  resultImage: { width: '100%', height: '100%', backgroundColor: Colors.paper },
 
   infoRow: {
     flexDirection: 'row', backgroundColor: Colors.paperCard,
