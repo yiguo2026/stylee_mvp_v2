@@ -1,24 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
   ScrollView, ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { setPendingImages } from '@/lib/pendingImages';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
 export default function OnboardingStep3() {
   const { user } = useUserStore();
-  const { addItem } = useWardrobeStore();
+  const { addItem, items, fetchItems } = useWardrobeStore();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
-  const [albumImages, setAlbumImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Refresh wardrobe when returning from /wardrobe/add
+  useFocusEffect(useCallback(() => {
+    if (user?.id) fetchItems(user.id);
+  }, [fetchItems, user?.id]));
 
   const toggleItem = (index: number) => {
     const next = new Set(selected);
@@ -35,19 +41,30 @@ export default function OnboardingStep3() {
     }
   };
 
-  const handleBatchImport = async () => {
+  const handleAlbumImport = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('权限', '需要相册权限才能选择图片');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsMultipleSelection: true,
-      mediaTypes: ['images'],
-      quality: 0.7,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
     });
     if (result.canceled) return;
     const uris = result.assets.map(a => a.uri);
-    setAlbumImages(prev => [...new Set([...prev, ...uris])]);
+    console.log('[step3] album import, uris:', uris.length);
+    setPendingImages(uris);
+    router.push('/wardrobe/add');
   };
 
   const handleFinish = async () => {
     if (!user?.id) return;
+    if (selected.size === 0) {
+      router.replace('/(tabs)');
+      return;
+    }
     setLoading(true);
     try {
       for (const index of selected) {
@@ -60,23 +77,10 @@ export default function OnboardingStep3() {
           material: item.material || undefined,
           image_url: item.image_url || undefined,
           source_type: 'manual',
-          source_label: '手动添加',
+          source_label: '快速添加',
           status: 'active',
         });
       }
-      for (const uri of albumImages) {
-        await addItem({
-          user_id: user.id,
-          name: '相册导入',
-          category: '上装',
-          color: '未知',
-          source_type: 'album_ai',
-          source_label: '手动添加',
-          status: 'active',
-          image_url: uri,
-        });
-      }
-
       router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('添加失败', e.message || '请稍后重试');
@@ -84,8 +88,6 @@ export default function OnboardingStep3() {
       setLoading(false);
     }
   };
-
-  const totalCount = selected.size + albumImages.length;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -161,39 +163,50 @@ export default function OnboardingStep3() {
             })}
           </View>
 
-          <Text style={styles.selectedCount}>
-            已选 {totalCount} 件 → 完成后自动加入衣橱
-          </Text>
+          {selected.size > 0 && (
+            <Text style={styles.selectedCount}>
+              已选 {selected.size} 件 → 完成后自动加入衣橱
+            </Text>
+          )}
         </View>
 
-        {/* Batch Import */}
+        {/* Album Import — uses /wardrobe/add for AI detection flow */}
         <View style={styles.batchSection}>
           <View style={styles.batchHeader}>
-            <Text style={styles.batchHeaderTitle}>相册批量导入</Text>
-            <TouchableOpacity onPress={handleBatchImport} style={styles.batchAddBtnWrap}>
-              <Feather name="image" size={15} color={Colors.ink} />
-              <Text style={styles.batchAddBtn}>选择图片</Text>
-            </TouchableOpacity>
+            <Text style={styles.batchHeaderTitle}>相册导入</Text>
           </View>
-          {albumImages.length > 0 ? (
+          <TouchableOpacity style={styles.batchCard} onPress={handleAlbumImport} activeOpacity={0.7}>
+            <Feather name="image" size={20} color={Colors.ink} />
+            <View style={styles.batchCardText}>
+              <Text style={styles.batchCardTitle}>选择衣物照片</Text>
+              <Text style={styles.batchCardSub}>支持一次选择1张或多张，AI后台识别</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={Colors.walnut2} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Already added items from album import */}
+        {items.length > 0 ? (
+          <View style={styles.addedSection}>
+            <Text style={styles.addedTitle}>已添加 {items.length} 件单品</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.albumRow}>
-                {albumImages.map(uri => (
-                  <View key={uri} style={styles.albumThumbWrap}>
-                    <Image source={{ uri }} style={styles.albumThumb} resizeMode="cover" />
-                    <TouchableOpacity style={styles.albumRemove} onPress={() => setAlbumImages(prev => prev.filter(u => u !== uri))}>
-                      <Text style={styles.albumRemoveText}>移除</Text>
-                    </TouchableOpacity>
+              <View style={styles.addedRow}>
+                {items.map(item => (
+                  <View key={item.item_id} style={styles.addedThumbWrap}>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.addedThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.addedThumbPlaceholder}>
+                        <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
+                      </View>
+                    )}
+                    <Text style={styles.addedThumbName} numberOfLines={1}>{item.name}</Text>
                   </View>
                 ))}
               </View>
             </ScrollView>
-          ) : (
-            <TouchableOpacity style={styles.batchCardEmpty} onPress={handleBatchImport}>
-              <Text style={styles.batchEmptyText}>从相册选择衣物图片，一起加入衣橱</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        ) : null}
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -281,23 +294,30 @@ const styles = StyleSheet.create({
   },
   batchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   batchHeaderTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 16, color: Colors.ink },
-  batchAddBtnWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  batchAddBtn: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
-  albumRow: { flexDirection: 'row', gap: Spacing.two },
-  albumThumbWrap: { position: 'relative' },
-  albumThumb: { width: 64, height: 64, borderRadius: Radius.md, backgroundColor: Colors.paperCard },
-  albumRemove: {
-    position: 'absolute', top: -4, right: -4,
-    width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent,
-    alignItems: 'center', justifyContent: 'center',
+  batchCard: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.three,
+    backgroundColor: Colors.paper, borderRadius: Radius.md,
+    padding: Spacing.three, borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
   },
-  albumRemoveText: { fontSize: 10, color: '#fff', fontFamily: Fonts.uiSemiBold },
-  batchCardEmpty: {
-    alignItems: 'center', backgroundColor: Colors.paper,
-    borderRadius: Radius.md, padding: Spacing.three,
-    borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
+  batchCardText: { flex: 1, gap: 2 },
+  batchCardTitle: { ...T.bodyText, fontSize: 14, color: Colors.ink },
+  batchCardSub: { ...T.micro, color: Colors.walnut2 },
+
+  addedSection: {
+    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    padding: Spacing.three, gap: Spacing.two,
+    borderWidth: 1, borderColor: Colors.line,
   },
-  batchEmptyText: { ...T.tag, fontSize: 12, color: Colors.walnut2 },
+  addedTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
+  addedRow: { flexDirection: 'row', gap: Spacing.two },
+  addedThumbWrap: { width: 64, gap: 4, alignItems: 'center' },
+  addedThumb: { width: 64, height: 64, borderRadius: Radius.md },
+  addedThumbPlaceholder: {
+    width: 64, height: 64, borderRadius: Radius.md,
+    backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.line,
+  },
+  addedThumbName: { ...T.micro, fontSize: 10, color: Colors.walnut, textAlign: 'center', maxWidth: 64 },
 
   actions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
   backBtn: {

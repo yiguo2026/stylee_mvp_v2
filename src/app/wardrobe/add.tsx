@@ -12,6 +12,7 @@ import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
+import { consumePendingImages } from '@/lib/pendingImages';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, DetectedItem } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
@@ -79,58 +80,58 @@ export default function AddWardrobeItem() {
 
   const reqTokenRef = useRef(0);
 
-  // Process images passed from AddClothingSheet
+  // Process images passed from AddClothingSheet or onboarding
   useEffect(() => {
-    if (!imagesParam) return;
+    // Prefer global pendingImages (reliable across stacks), fall back to route params
+    const pending = consumePendingImages();
+    const imageUris = pending || (imagesParam ? (() => { try { return JSON.parse(imagesParam); } catch { return null; } })() : null);
+    if (!imageUris || imageUris.length === 0) return;
+    console.log('[wardrobe/add] received images, count:', imageUris.length, 'source:', pending ? 'global' : 'params');
     let cancelled = false;
-    try {
-      const uris: string[] = JSON.parse(imagesParam);
-      if (uris.length === 0) return;
+    const uris = imageUris;
 
-      setImageSources(uris);
-      setImageUri(uris[0]);
+    setImageSources(uris);
+    setImageUri(uris[0]);
 
-      if (uris.length === 1) {
-        // Single image — use existing single-image flow
-        runRecognition(uris[0]);
-      } else {
-        // Multiple images — detect all in parallel, then show combined picker
-        setDetectingImages(true);
-        setRecognizing(true);
-        Promise.all(uris.map(uri => aiDetectMultiItems(uri).catch(() => ({ items: [], meta: { source: 'mock', durationMs: 0, ok: false } }))))
-          .then(results => {
-            if (cancelled) return;
-            setRecognizing(false);
-            setDetectingImages(false);
+    if (uris.length === 1) {
+      // Single image — use existing single-image flow
+      runRecognition(uris[0]);
+    } else {
+      // Multiple images — detect all in parallel, then show combined picker
+      setDetectingImages(true);
+      setRecognizing(true);
+      Promise.all(uris.map((uri: string) => aiDetectMultiItems(uri).catch(() => ({ items: [], meta: { source: 'mock', durationMs: 0, ok: false } }))))
+        .then(results => {
+          if (cancelled) return;
+          setRecognizing(false);
+          setDetectingImages(false);
 
-            // Collect all items, tag each with its source image URI
-            const allItems: (DetectedItem & { sourceImageUri: string })[] = [];
-            results.forEach((result, imgIdx) => {
-              result.items.forEach(item => {
-                allItems.push({ ...item, sourceImageUri: uris[imgIdx] });
-              });
+          // Collect all items, tag each with its source image URI
+          const allItems: (DetectedItem & { sourceImageUri: string })[] = [];
+          results.forEach((result, imgIdx) => {
+            result.items.forEach((item: any) => {
+              allItems.push({ ...item, sourceImageUri: uris[imgIdx] });
             });
-
-            if (allItems.length === 0) {
-              // No items detected — fall back to manual with first image
-              return;
-            }
-
-            if (allItems.length === 1) {
-              const item = allItems[0];
-              setImageUri(item.sourceImageUri);
-              fillFormFromDetected(item);
-              const token = reqTokenRef.current;
-              void runStandardize(item.sourceImageUri, item.category, photoType, token, { color: item.color, material: item.material, description: item.description });
-            } else {
-              // Show combined picker
-              setDetectedItems(allItems as any);
-              setSelectedIndices(new Set(allItems.map((_, i) => i)));
-              setShowItemPicker(true);
-            }
           });
-      }
-    } catch {}
+
+          if (allItems.length === 0) {
+            return;
+          }
+
+          if (allItems.length === 1) {
+            const item = allItems[0];
+            setImageUri(item.sourceImageUri);
+            fillFormFromDetected(item);
+            const token = reqTokenRef.current;
+            void runStandardize(item.sourceImageUri, item.category, photoType, token, { color: item.color, material: item.material, description: item.description });
+          } else {
+            // Show combined picker
+            setDetectedItems(allItems as any);
+            setSelectedIndices(new Set(allItems.map((_, i) => i)));
+            setShowItemPicker(true);
+          }
+        });
+    }
 
     return () => { cancelled = true; };
   }, [imagesParam]);

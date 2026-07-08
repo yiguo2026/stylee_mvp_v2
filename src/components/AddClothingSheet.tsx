@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
+import { setPendingImages } from '@/lib/pendingImages';
 
 const isWeb = Platform.OS === 'web';
 
@@ -38,7 +39,8 @@ function SheetContent({ onClose, onOpenWishlist }: { onClose: () => void; onOpen
       }
       const uris = result.assets.map(a => a.uri);
       onClose();
-      router.push({ pathname: '/wardrobe/add', params: { images: JSON.stringify(uris) } });
+      setPendingImages(uris);
+      router.push('/wardrobe/add');
     } catch {
       setPicking(false);
     }
