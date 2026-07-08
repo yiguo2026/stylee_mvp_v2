@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stylee · AI 用量看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --line:#2a2e38; --txt:#e6e8ec; --muted:#8b909a; --acc:#7aa2ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.5 -apple-system,system-ui,"PingFang SC",sans-serif; }
+  header { padding:16px 24px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:16px; margin:0; }
+  select,button,input { background:var(--card); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:13px; }
+  button { cursor:pointer; }
+  .wrap { padding:24px; max-width:1200px; margin:0 auto; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .kpi .v { font-size:26px; font-weight:600; }
+  .kpi .l { color:var(--muted); font-size:12px; margin-top:2px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  @media(max-width:860px){ .grid{grid-template-columns:1fr;} }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h3 { margin:0 0 12px; font-size:13px; color:var(--muted); font-weight:500; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:500; }
+  .cfg { max-width:460px; margin:80px auto; }
+  .cfg input { width:100%; margin:6px 0; }
+  .muted { color:var(--muted); }
+  .pill { background:#242833; border-radius:6px; padding:1px 7px; font-size:11px; }
+</style>
+</head>
+<body>
+<div id="config" class="cfg card" style="display:none">
+  <h3>连接 Supabase（一次性，存本地）</h3>
+  <input id="cfgUrl" placeholder="Supabase URL, 如 https://xxx.supabase.co" />
+  <input id="cfgKey" placeholder="anon key（公开可用，RLS 保护）" />
+  <button onclick="saveCfg()">连接</button>
+  <p class="muted" style="font-size:12px">读取 <code>ai_usage_logs</code> 表。anon key 是公开密钥，看板只读。</p>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>Stylee · AI 用量看板</h1>
+    <select id="range">
+      <option value="1">今天</option>
+      <option value="7" selected>近 7 天</option>
+      <option value="30">近 30 天</option>
+      <option value="9999">全部</option>
+    </select>
+    <button onclick="load()">刷新</button>
+    <span id="status" class="muted"></span>
+    <button style="margin-left:auto" onclick="resetCfg()">切换项目</button>
+  </header>
+  <div class="wrap">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <div class="card"><h3>成本按功能（元）</h3><canvas id="cFeature"></canvas></div>
+      <div class="card"><h3>成本按模型（元）</h3><canvas id="cModel"></canvas></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h3>每日成本趋势（元）</h3><canvas id="cTrend"></canvas></div>
+      <div class="card"><h3>成本按开发者/环境（元）</h3><canvas id="cDev"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>最近调用（100 条）</h3>
+      <div style="overflow:auto; max-height:360px">
+        <table id="recent"><thead><tr>
+          <th>时间</th><th>provider</th><th>model</th><th>feature</th><th>dev</th>
+          <th>tokens</th><th>reasoning</th><th>图</th><th>成本¥</th><th>ms</th><th>ok</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+let sb = null;
+const charts = {};
+const $ = id => document.getElementById(id);
+
+function initCfg() {
+  const url = localStorage.getItem('sb_url'), key = localStorage.getItem('sb_key');
+  if (url && key) { sb = createClient(url, key); $('app').style.display='block'; load(); }
+  else { $('config').style.display='block'; }
+}
+window.saveCfg = () => {
+  localStorage.setItem('sb_url', $('cfgUrl').value.trim());
+  localStorage.setItem('sb_key', $('cfgKey').value.trim());
+  location.reload();
+};
+window.resetCfg = () => { localStorage.removeItem('sb_url'); localStorage.removeItem('sb_key'); location.reload(); };
+
+function sum(a){return a.reduce((s,x)=>s+(x||0),0);}
+function groupSum(rows, key, val){ const m={}; for(const r of rows){ const k=r[key]||'—'; m[k]=(m[k]||0)+(+r[val]||0);} return m; }
+function bar(id, obj, color){
+  const labels=Object.keys(obj).sort((a,b)=>obj[b]-obj[a]).slice(0,12);
+  const data=labels.map(l=>+obj[l].toFixed(4));
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart($(id),{type:'bar',data:{labels,datasets:[{data,backgroundColor:color}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b909a'}},y:{ticks:{color:'#e6e8ec'}}}}});
+}
+function line(id, obj){
+  const labels=Object.keys(obj).sort();
+  const data=labels.map(l=>+obj[l].toFixed(4));
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart($(id),{type:'line',data:{labels,datasets:[{data,borderColor:'#7aa2ff',tension:.3,fill:false}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b909a'}},y:{ticks:{color:'#8b909a'}}}}});
+}
+
+window.load = async () => {
+  const days = +$('range').value;
+  const since = new Date(Date.now() - days*864e5).toISOString();
+  $('status').textContent = '加载中…';
+  let q = sb.from('ai_usage_logs').select('*').order('created_at',{ascending:false}).limit(20000);
+  if (days < 9999) q = q.gte('created_at', since);
+  const { data: rows, error } = await q;
+  if (error) { $('status').textContent = '错误: '+error.message; return; }
+  $('status').textContent = `${rows.length} 条`;
+
+  const cost = sum(rows.map(r=>+r.cost_cny||0));
+  const tokens = sum(rows.map(r=>+r.total_tokens||0));
+  const images = sum(rows.map(r=>+r.image_count||0));
+  const reasoning = sum(rows.map(r=>+r.reasoning_tokens||0));
+  $('kpis').innerHTML = [
+    ['总成本', '¥'+cost.toFixed(2)], ['调用次数', rows.length],
+    ['总 tokens', tokens.toLocaleString()], ['生图张数', images],
+    ['reasoning tokens', reasoning.toLocaleString()],
+  ].map(([l,v])=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+  bar('cFeature', groupSum(rows,'feature','cost_cny'), '#7aa2ff');
+  bar('cModel', groupSum(rows,'model','cost_cny'), '#7affc1');
+  bar('cDev', groupSum(rows,'dev_tag','cost_cny'), '#ffb37a');
+  const byDay={}; for(const r of rows){ const d=(r.created_at||'').slice(0,10); byDay[d]=(byDay[d]||0)+(+r.cost_cny||0); }
+  line('cTrend', byDay);
+
+  $('#recent tbody').innerHTML = rows.slice(0,100).map(r=>`<tr>
+    <td>${(r.created_at||'').replace('T',' ').slice(5,19)}</td>
+    <td><span class="pill">${r.provider||''}</span></td><td>${r.model||''}</td>
+    <td>${r.feature||''}</td><td>${r.dev_tag||''}</td>
+    <td>${r.total_tokens??'-'}</td><td>${r.reasoning_tokens??'-'}</td><td>${r.image_count??'-'}</td>
+    <td>${(+r.cost_cny||0).toFixed(4)}</td><td>${r.duration_ms??''}</td><td>${r.ok?'✓':'✕'}</td>
+  </tr>`).join('');
+};
+initCfg();
+</script>
+</body>
+</html>
