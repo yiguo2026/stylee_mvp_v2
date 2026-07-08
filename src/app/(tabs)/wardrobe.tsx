@@ -298,7 +298,6 @@ export default function WardrobeTab() {
 
       {/* Add Modal */}
       <AddClothingSheet visible={showAddModal} onClose={() => setShowAddModal(false)} />
-      )}
 
       {/* Wishlist Overlay (slide-in full page) */}
       {isWeb ? (
