@@ -186,6 +186,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `5600173` | 稳定性：添加 ErrorBoundary 防白屏 + 404.html 支持 SPA 深链接路由 |
 | `de21d25` | 修复 onboarding step3 AI 推荐单品无缩略图：用 Supabase Storage 真实图片替代 CategoryIcon |
 | `bfe7c6c` | AI 识别输出精简：单品名称简洁客观，颜色/材质优先匹配标准列表，新增 normalizeColor/normalizeMaterial 归一化函数 |
+| `19cd49b` | 标准图默认模型从 qwen-image-2.0 改为 qwen-image-edit（图生图场景应用 edit 模型） |
 
 ## 项目结构
 
