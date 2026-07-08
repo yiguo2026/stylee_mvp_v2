@@ -256,34 +256,6 @@ export default function WardrobeTab() {
           </View>
         )}
 
-        {/* Wishlist Entry (bottom of page) */}
-        <View style={styles.wishlistEntry}>
-          <TouchableOpacity style={styles.wishlistEntryBtn} onPress={() => setShowWishlist(true)}>
-            <Feather name="heart" size={18} color={Colors.accent} />
-            <Text style={styles.wishlistEntryLabel}>心愿单</Text>
-            {wishlistItems.length > 0 && (
-              <View style={styles.wishlistEntryBadge}>
-                <Text style={styles.wishlistEntryBadgeText}>{wishlistItems.length}</Text>
-              </View>
-            )}
-            <Text style={styles.wishlistEntryArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Add Section */}
-        <View style={styles.quickAddEntry}>
-          <TouchableOpacity style={styles.quickAddEntryBtn} onPress={() => router.push('/wardrobe/quick-add')}>
-            <View style={styles.quickAddEntryIcon}>
-              <Feather name="zap" size={18} color={Colors.paper} />
-            </View>
-            <View style={styles.quickAddEntryInfo}>
-              <Text style={styles.quickAddEntryTitle}>快速添加推荐单品</Text>
-              <Text style={styles.quickAddEntrySub}>从热门基础款中一键补充衣橱</Text>
-            </View>
-            <Text style={styles.quickAddEntryArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -301,6 +273,7 @@ export default function WardrobeTab() {
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         onOpenWishlist={() => setShowWishlist(true)}
+        wishlistCount={wishlistItems.length}
       />
 
       {/* Wishlist Overlay (slide-in full page) */}
