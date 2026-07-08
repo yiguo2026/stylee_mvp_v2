@@ -212,7 +212,7 @@ export default function OutfitResultScreen() {
       saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
       return savedId;
     }
-    setSaving(true);
+    if (!silent) setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -257,7 +257,7 @@ export default function OutfitResultScreen() {
       Alert.alert('保存失败', e.message);
       return null;
     } finally {
-      setSaving(false);
+      if (!silent) setSaving(false);
     }
   };
 
