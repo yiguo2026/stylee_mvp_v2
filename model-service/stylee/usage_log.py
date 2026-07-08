@@ -41,11 +41,11 @@ _PRICING = {
     "qwen-image-edit": {"per_image": 0.3},
     "qwen-image-2.0": {"per_image": 0.2},
     "qwen-image": {"per_image": 0.25},
-    # qwen3-vl-plus 未在价表,按 instruct 档估(2/8);VL 成本占比小,待精确
-    "qwen3-vl-plus": {"in_miss": 2.0, "out": 8.0},
-    "text-embedding-v4": {"in_miss": 0.0, "out": 0.0},           # TODO 待补(便宜)
+    # Qwen 文本/VL/向量(百炼实价,元/百万tokens)
+    "qwen3-vl-plus": {"in_miss": 1.0, "out": 10.0},   # 输出为思维链+回答
+    "text-embedding-v4": {"in_miss": 0.5, "out": 0.0},  # embedding 只输入计费
+    "qwen-plus": {"in_miss": 0.8, "out": 2.0},         # 思考模式输出 8 元
     "qwen-flash": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},   # TODO(若用 qwen provider)
-    "qwen-plus": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},    # TODO
 }
 
 _SIGNATURES = [
