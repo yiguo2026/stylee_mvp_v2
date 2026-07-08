@@ -1,4 +1,6 @@
 // 省钱模式：清空 key 即跳过所有 Ark API 调用，恢复时填回原 key
+import { logAiUsage, detectFeature } from './aiUsage';
+
 const ARK_API_KEY = process.env.EXPO_PUBLIC_ARK_API_KEY ?? '';
 const ARK_VLM_MODEL = 'doubao-seed-2-0-pro-260215';
 const ARK_IMAGE_MODEL = 'doubao-seedream-5-0-260128';
@@ -36,9 +38,13 @@ export async function arkChat(
     return null;
   }
 
+  const t0 = Date.now();
+  const model = options.model || ARK_VLM_MODEL;
+  const feature = detectFeature(messages.map(m => typeof m.content === 'string' ? m.content : (m.content ?? []).map(b => b.text ?? '').join(' ')).join(' '));
+
   try {
     const body: Record<string, unknown> = {
-      model: options.model || ARK_VLM_MODEL,
+      model,
       messages,
       stream: false,
       temperature: options.temperature ?? 0.5,
@@ -61,15 +67,24 @@ export async function arkChat(
 
     if (!res.ok) {
       console.warn('[Ark] API error:', res.status, await res.text().catch(() => ''));
+      logAiUsage({ provider: 'ark', model, feature, callType: 'chat', durationMs: Date.now() - t0, ok: false });
       return null;
     }
 
     const data = await res.json();
+    const u = data.usage ?? {};
     const content = data.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) return null;
+    const ok = typeof content === 'string' && !!content.trim();
+    logAiUsage({
+      provider: 'ark', model, feature, callType: 'chat',
+      promptTokens: u.prompt_tokens, completionTokens: u.completion_tokens,
+      requestId: data.id, durationMs: Date.now() - t0, ok,
+    });
+    if (!ok) return null;
     return content.trim();
   } catch (e) {
     console.warn('[Ark] request failed:', e);
+    logAiUsage({ provider: 'ark', model, feature, callType: 'chat', durationMs: Date.now() - t0, ok: false });
     return null;
   }
 }
@@ -130,6 +145,9 @@ export async function arkGenerateImage(
     return null;
   }
 
+  const t0 = Date.now();
+  const feature = detectFeature(prompt);
+
   try {
     const body: Record<string, unknown> = {
       model: ARK_IMAGE_MODEL,
@@ -152,15 +170,19 @@ export async function arkGenerateImage(
 
     if (!res.ok) {
       console.warn('[Ark] Image gen error:', res.status, await res.text().catch(() => ''));
+      logAiUsage({ provider: 'ark', model: ARK_IMAGE_MODEL, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
       return null;
     }
 
     const data = await res.json();
     const url = data.data?.[0]?.url;
-    if (typeof url !== 'string' || !url.trim()) return null;
+    const ok = typeof url === 'string' && !!url.trim();
+    logAiUsage({ provider: 'ark', model: ARK_IMAGE_MODEL, feature, callType: 'image', imageCount: Array.isArray(data.data) ? data.data.length : 1, durationMs: Date.now() - t0, ok });
+    if (!ok) return null;
     return url.trim();
   } catch (e) {
     console.warn('[Ark] Image gen failed:', e);
+    logAiUsage({ provider: 'ark', model: ARK_IMAGE_MODEL, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
     return null;
   }
 }

@@ -14,12 +14,16 @@ const PRICING: Record<string, Price> = {
   'qwen3-vl-plus': { inMiss: 0, out: 0 },
   'qwen-image-2.0-pro': { perImage: 0 },
   'qwen-image-edit': { perImage: 0 },
+  'text-embedding-v4': { inMiss: 0, out: 0 },
+  // 火山 Ark / doubao（当前 key 默认空停用；填价后成本才准）
+  'doubao-seed-2-0-pro-260215': { inMiss: 0, out: 0 },
+  'doubao-seedream-5-0-260128': { perImage: 0 },
 };
 
 const DEV_TAG = process.env.EXPO_PUBLIC_DEV_TAG ?? 'unknown';
 
 export interface AiUsageRecord {
-  provider: 'deepseek' | 'qwen';
+  provider: 'deepseek' | 'qwen' | 'ark';
   model: string;
   feature: string;
   callType: 'chat' | 'vision' | 'image';

@@ -10,9 +10,12 @@ import hashlib
 import json
 import math
 import os
+import time
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
+
+from .usage_log import log_usage
 
 
 class EmbeddingError(RuntimeError):
@@ -105,14 +108,19 @@ class OpenAICompatEmbedder(EmbeddingClient):
             self.base_url + "/embeddings", data=data, method="POST",
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {self.api_key}"})
+        t0 = time.time()
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
+            log_usage("qwen", self.model, "embedding", "embedding", None, int((time.time() - t0) * 1000), False)
             detail = e.read().decode("utf-8", "replace")[:300]
             raise EmbeddingError(f"HTTP {e.code}: {detail}") from None
         except urllib.error.URLError as e:
+            log_usage("qwen", self.model, "embedding", "embedding", None, int((time.time() - t0) * 1000), False)
             raise EmbeddingError(f"网络错误: {e.reason}") from None
+        log_usage("qwen", self.model, "embedding", "embedding", body.get("usage"),
+                  int((time.time() - t0) * 1000), True)
         return parse_embeddings_response(body)
 
     def embed(self, texts: list[str]) -> list[list[float]]:

@@ -25,6 +25,7 @@ _PRICING = {
     "qwen3-vl-plus": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},  # TODO
     "qwen-image-edit": {"per_image": 0.0},                        # TODO
     "qwen-image-2.0": {"per_image": 0.0},                         # TODO
+    "text-embedding-v4": {"in_miss": 0.0, "out": 0.0},           # TODO 填 embedding 实价
 }
 
 _SIGNATURES = [
