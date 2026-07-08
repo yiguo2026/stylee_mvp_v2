@@ -22,9 +22,10 @@ const PRICING: Record<string, Price> = {
   'qwen-image-edit': { perImage: 0.3 },
   'qwen-image-2.0': { perImage: 0.2 },
   'qwen-image': { perImage: 0.25 },
-  // qwen3-vl-plus 未在价表,按 instruct 档估(2/8);VL 成本占比小,待精确
-  'qwen3-vl-plus': { inMiss: 2, out: 8 },
-  'text-embedding-v4': { inMiss: 0, out: 0 },  // TODO 待补(便宜)
+  // Qwen 文本/VL/向量(百炼实价,元/百万tokens)
+  'qwen3-vl-plus': { inMiss: 1, out: 10 },   // 输出为思维链+回答
+  'text-embedding-v4': { inMiss: 0.5, out: 0 },  // embedding 只输入计费
+  'qwen-plus': { inMiss: 0.8, out: 2 },      // 思考模式输出 8 元
   // 火山 Ark / doubao（当前 key 默认空停用；填价后成本才准）
   'doubao-seed-2-0-pro-260215': { inMiss: 0, out: 0 },
   'doubao-seedream-5-0-260128': { perImage: 0 },
