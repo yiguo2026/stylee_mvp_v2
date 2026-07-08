@@ -16,7 +16,7 @@ function usernameToEmail(username: string) {
 
 function translateRegisterError(msg: string): string {
   const m = msg.toLowerCase();
-  if (m.includes('already registered')) return '该用户名已注册';
+  if (m.includes('already been registered') || m.includes('already registered')) return '该用户名已注册';
   if (m.includes('password') && m.includes('weak')) return '密码太简单，请使用至少6位包含字母和数字的密码';
   if (m.includes('password')) return '密码不符合要求，请使用至少6位密码';
   if (m.includes('rate limit') || m.includes('too many')) return '请求过于频繁，请稍后再试';
@@ -24,7 +24,7 @@ function translateRegisterError(msg: string): string {
   return msg;
 }
 
-const USERNAME_REGEX = /^[一-龥a-zA-Z0-9_]+$/;
+const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
@@ -48,7 +48,7 @@ export default function RegisterScreen() {
     setUsernameError('');
     setError('');
     if (t.trim() && !USERNAME_REGEX.test(t)) {
-      setUsernameError('用户名仅支持中英文字符、数字和下划线');
+      setUsernameError('用户名仅支持英文字母、数字和下划线');
     }
   };
 
@@ -72,7 +72,7 @@ export default function RegisterScreen() {
     setPasswordError('');
 
     if (!username.trim()) { setError('请输入用户名'); return; }
-    if (!USERNAME_REGEX.test(username)) { setUsernameError('用户名仅支持中英文字符、数字和下划线'); return; }
+    if (!USERNAME_REGEX.test(username)) { setUsernameError('用户名仅支持英文字母、数字和下划线'); return; }
     if (!password) { setError('请输入密码'); return; }
     if (password.length < 6) { setError('密码至少需要6位'); return; }
     if (password !== confirmPassword) { setPasswordError('两次密码不一致'); return; }
@@ -88,7 +88,12 @@ export default function RegisterScreen() {
 
       if (authError) {
         setLoading(false);
-        setError(translateRegisterError(authError.message));
+        const translated = translateRegisterError(authError.message);
+        if (translated === '该用户名已注册') {
+          setUsernameError(translated);
+        } else {
+          setError(translated);
+        }
         return;
       }
 
@@ -173,7 +178,7 @@ AI穿搭方案仅为参考建议，不构成穿搭、服饰选购的决定性依
           <View>
             <TextInput
               style={[styles.input, (usernameError || error) && styles.inputError]}
-              placeholder="用户名"
+              placeholder="用户名（英文字母、数字、下划线）"
               placeholderTextColor={Colors.walnut2}
               value={username}
               onChangeText={handleUsernameChange}

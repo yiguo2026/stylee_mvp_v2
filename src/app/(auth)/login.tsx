@@ -67,7 +67,7 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <TextInput
             style={[styles.input, error && styles.inputError]}
-            placeholder="用户名"
+            placeholder="用户名（英文字母、数字、下划线）"
             placeholderTextColor={Colors.walnut2}
             value={username}
             onChangeText={(t) => { setUsername(t); setError(''); }}
