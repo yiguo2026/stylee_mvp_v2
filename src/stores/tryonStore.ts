@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Platform } from 'react-native';
 import { loadSelfie } from '@/lib/bodyModel';
 import { supabase } from '@/lib/supabase';
-import type { TryOnSuggestion } from '@/lib/ai';
+import type { TryOnSuggestion, AIMeta } from '@/lib/ai';
 
 const isWeb = Platform.OS === 'web';
 
@@ -11,6 +11,16 @@ export interface TryOnRecordItem {
   category: string;
   color?: string;
   image_url?: string;
+}
+
+/** Freshly generated result handed off to the full-screen result page. */
+export interface TryOnResultData {
+  image: string | number | null;
+  scene: string;
+  sceneLabel: string;
+  outfitName: string;
+  items: TryOnRecordItem[];
+  meta: AIMeta | null;
 }
 
 export interface TryOnRecord {
@@ -31,6 +41,7 @@ interface TryOnState {
   selectedOutfitId: string | null;
   selectedScene: string;
   tryOnResult: string | null;
+  lastResult: TryOnResultData | null;
   records: TryOnRecord[];
   loaded: boolean;
 
@@ -38,6 +49,7 @@ interface TryOnState {
   setSelectedOutfit: (id: string | null) => void;
   setSelectedScene: (scene: string) => void;
   setTryOnResult: (uri: string | null) => void;
+  setLastResult: (result: TryOnResultData | null) => void;
   addRecord: (record: Omit<TryOnRecord, 'record_id' | 'user_id' | 'createdAt'>, userId: string) => Promise<void>;
   fetchRecords: (userId: string) => Promise<void>;
   loadSelfieFromServer: (userId: string) => Promise<void>;
@@ -80,6 +92,7 @@ export const useTryOnStore = create<TryOnState>()((set, get) => ({
   selectedOutfitId: null,
   selectedScene: loadPersistedScene(),
   tryOnResult: null,
+  lastResult: null,
   records: [],
   loaded: false,
 
@@ -87,6 +100,7 @@ export const useTryOnStore = create<TryOnState>()((set, get) => ({
   setSelectedOutfit: (id) => set({ selectedOutfitId: id }),
   setSelectedScene: (scene) => { set({ selectedScene: scene }); persistScene(scene); },
   setTryOnResult: (uri) => set({ tryOnResult: uri }),
+  setLastResult: (result) => set({ lastResult: result }),
 
   addRecord: async (record, userId) => {
     const { data, error } = await supabase
@@ -136,5 +150,5 @@ export const useTryOnStore = create<TryOnState>()((set, get) => ({
     set({ selfieUri: url, loaded: true });
   },
 
-  clearAll: () => set({ selfieUri: null, selectedOutfitId: null, selectedScene: 'cafe', tryOnResult: null }),
+  clearAll: () => set({ selfieUri: null, selectedOutfitId: null, selectedScene: 'cafe', tryOnResult: null, lastResult: null }),
 }));

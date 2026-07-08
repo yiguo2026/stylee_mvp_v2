@@ -302,9 +302,8 @@ export default function OutfitTab() {
                 multiline
               />
               <TouchableOpacity
-                style={[styles.generateBtn, !query.trim() && styles.generateBtnDisabled]}
+                style={styles.generateBtn}
                 onPress={() => handleGenerate('description')}
-                disabled={!query.trim()}
               >
                 <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
                 <Text style={styles.generateBtnText}>生成穿搭</Text>
@@ -339,9 +338,8 @@ export default function OutfitTab() {
                 </View>
               ))}
               <TouchableOpacity
-                style={[styles.generateBtn, !allTags.some(t => t.selected) && styles.generateBtnDisabled]}
+                style={styles.generateBtn}
                 onPress={() => handleGenerate('tags')}
-                disabled={!allTags.some(t => t.selected)}
               >
                 <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
                 <Text style={styles.generateBtnText}>生成穿搭</Text>
@@ -547,7 +545,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  generateBtnDisabled: { opacity: 0.4 },
   generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
   quotaHint: {
     ...T.micro,

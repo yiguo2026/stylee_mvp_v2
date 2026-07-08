@@ -297,7 +297,11 @@ export default function WardrobeTab() {
       </TouchableOpacity>
 
       {/* Add Modal */}
-      <AddClothingSheet visible={showAddModal} onClose={() => setShowAddModal(false)} />
+      <AddClothingSheet
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onOpenWishlist={() => setShowWishlist(true)}
+      />
 
       {/* Wishlist Overlay (slide-in full page) */}
       {isWeb ? (

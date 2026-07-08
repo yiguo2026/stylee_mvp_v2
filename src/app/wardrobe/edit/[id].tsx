@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert,
@@ -8,8 +8,11 @@ import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { aiRecognizeClothing } from '@/lib/ai';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { AILoading } from '@/components/AILoading';
+import { Toast } from '@/components/Toast';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType } from '@/types';
 
 const COLOR_OPTIONS = [
@@ -51,12 +54,28 @@ export default function EditItemScreen() {
   const [occasionTags, setOccasionTags] = useState<string[]>(item?.occasion_tags ?? []);
   const [purchaseDate, setPurchaseDate] = useState(item?.purchase_date ?? '');
   const [imageUri, setImageUri] = useState(item?.image_url ?? '');
+  // 辅图仅存本地 state：数据模型只有单个 image_url，没有辅图字段，
+  // 故辅图不写 DB，只做 UI 展示（见交付说明）。
+  const [extraPhotos, setExtraPhotos] = useState<string[]>([]);
+  const [recognizing, setRecognizing] = useState(false);
+  const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+
+  const reqTokenRef = useRef(0);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2200);
+  }, []);
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   useEffect(() => {
     const found = items.find(i => i.item_id === id);
@@ -76,13 +95,54 @@ export default function EditItemScreen() {
     }
   }, [id, items]);
 
-  const pickImage = async () => {
+  // 主图识别：识别成功后回填属性；失败/降级不阻断，仅提示
+  const runRecognition = useCallback(async (uri: string) => {
+    const token = ++reqTokenRef.current;
+    setRecognizing(true);
+    try {
+      const { result, meta } = await aiRecognizeClothing(uri);
+      if (reqTokenRef.current !== token) return; // 被更新的图片取代，丢弃旧结果
+      setCategory(result.category);
+      setColor(result.color);
+      if (result.material) setMaterial(result.material);
+      if (result.brand) setBrand(result.brand);
+      if (result.fit_type) setFitType(result.fit_type);
+      if (result.season?.length) setSeasons(result.season);
+      if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
+      setName(result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`);
+      showToast(meta.ok ? '已根据新照片更新商品信息' : '已更新照片，识别信息仅供参考');
+    } catch (e) {
+      // 兜底：保留原属性，仅提示，不阻断保存
+      if (reqTokenRef.current === token) showToast('照片识别失败，已保留原有信息');
+    } finally {
+      if (reqTokenRef.current === token) setRecognizing(false);
+    }
+  }, [showToast]);
+
+  // 更换/设置主图 → 存图并触发 AI 识别
+  const pickMainImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], quality: 0.7, allowsEditing: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setImageUri(uri);
+      void runRecognition(uri);
     }
+  };
+
+  // 添加辅图 → 仅存本地 state 展示，不识别、不改属性
+  const pickAuxImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], quality: 0.7, allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setExtraPhotos(prev => [...prev, result.assets[0].uri]);
+    }
+  };
+
+  const removeAuxPhoto = (uri: string) => {
+    setExtraPhotos(prev => prev.filter(p => p !== uri));
   };
 
   const toggleSeason = (id: string) => {
@@ -148,7 +208,7 @@ export default function EditItemScreen() {
         {/* Photos */}
         <Text style={styles.sectionLabel}>照片</Text>
         <View style={styles.photosRow}>
-          <TouchableOpacity style={[styles.photoSlot, styles.photoSlotCover]} onPress={pickImage}>
+          <TouchableOpacity style={[styles.photoSlot, styles.photoSlotCover]} onPress={pickMainImage}>
             {imageUri ? (
               <>
                 <Image source={{ uri: imageUri }} style={styles.photoImage} resizeMode="contain" />
@@ -162,14 +222,26 @@ export default function EditItemScreen() {
               </View>
             )}
           </TouchableOpacity>
-          {[1, 2, 3].map(i => (
-            <TouchableOpacity key={i} style={styles.photoSlot} onPress={pickImage}>
-              <View style={styles.photoAddSlot}>
-                <Feather name="plus-circle" size={18} color={Colors.walnut2} />
-                <Text style={styles.photoAddLabel}>添加</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {[0, 1, 2].map(i => {
+            const uri = extraPhotos[i];
+            return (
+              <TouchableOpacity key={i} style={styles.photoSlot} onPress={uri ? undefined : pickAuxImage} disabled={!!uri}>
+                {uri ? (
+                  <>
+                    <Image source={{ uri }} style={styles.photoImage} resizeMode="cover" />
+                    <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removeAuxPhoto(uri)}>
+                      <Text style={styles.removePhotoText}>×</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <View style={styles.photoAddSlot}>
+                    <Feather name="plus-circle" size={18} color={Colors.walnut2} />
+                    <Text style={styles.photoAddLabel}>添加</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Form */}
@@ -318,6 +390,19 @@ export default function EditItemScreen() {
         onCancel={() => setShowDeleteConfirm(false)}
         loading={deleting}
       />
+
+      {recognizing ? (
+        <View style={styles.aiLoadingLayer}>
+          <AILoading
+            title="AI 正在识别新照片"
+            subtitle="正在解析单品属性并回填信息..."
+            steps={['读取图片', '识别衣物轮廓', '解析颜色材质', '更新商品信息']}
+            durationMs={8000}
+          />
+        </View>
+      ) : null}
+
+      <Toast visible={!!toast} message={toast} />
     </SafeAreaView>
   );
 }
@@ -325,6 +410,7 @@ export default function EditItemScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  aiLoadingLayer: { ...StyleSheet.absoluteFillObject, zIndex: 300 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,

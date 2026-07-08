@@ -11,11 +11,11 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { useWishlistStore } from '@/stores/wishlistStore';
 import { useOutfitStore } from '@/stores/outfitStore';
 import { aiRecommendOutfits, AIMeta } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
-import { ConfirmModal } from '@/components/ConfirmModal';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { Toast } from '@/components/Toast';
 import { AILoading } from '@/components/AILoading';
@@ -48,9 +48,6 @@ const toCatConcept = (raw: string): CatConcept => {
 const WARDROBE_DB_CAT: Record<CatConcept, string> = {
   top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋履', bag: '包袋', hat: '帽巾', acc: '配饰',
 };
-const WISHLIST_DB_CAT: Record<CatConcept, string> = {
-  top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋履', bag: '包袋', hat: '帽巾', acc: '配饰',
-};
 
 export default function OutfitResultScreen() {
   const params = useLocalSearchParams<{
@@ -68,7 +65,8 @@ export default function OutfitResultScreen() {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [showSavedConfirm, setShowSavedConfirm] = useState(false);
+  const [showSaveGuide, setShowSaveGuide] = useState(false);
+  const saveGuideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [adjustMode, setAdjustMode] = useState(false);
   const [swapTarget, setSwapTarget] = useState<OutfitItem | null>(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -194,6 +192,12 @@ export default function OutfitResultScreen() {
     } else { dotAnim.stopAnimation(); }
   }, [loading, dotAnim]);
 
+  // 卸载时清理定时器，避免 setState after unmount
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
+  }, []);
+
   const currentOutfit = outfits[currentIndex];
 
   const handleWear = async (): Promise<string | null> => {
@@ -229,7 +233,11 @@ export default function OutfitResultScreen() {
         if (itemsError) console.warn('[handleWear] outfit_items insert error:', itemsError.message);
       }
       setSavedId(outfitId);
-      setShowSavedConfirm(true);
+      showToast('已保存到穿搭记录');
+      // 方案B：保存后留在结果页，展示 inline 引导条（可关闭/自动隐藏）
+      setShowSaveGuide(true);
+      if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
+      saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
       if (user?.id) refreshCounts(user.id);
       return outfitId;
     } catch (e: any) {
@@ -250,8 +258,9 @@ export default function OutfitResultScreen() {
     if (isFavorited) {
       await supabase.from('outfit_favorites').delete()
         .eq('user_id', user.id)
-        .eq('outfit_id', currentOutfit.outfit_id);
+        .eq('outfit_id', savedId ?? currentOutfit.outfit_id);
       setIsFavorited(false);
+      showToast('已取消收藏');
       if (user?.id) refreshCounts(user.id);
     } else {
       // Save outfit first if not saved, get real DB outfit_id
@@ -265,8 +274,32 @@ export default function OutfitResultScreen() {
       });
       if (favError) console.warn('[handleFavorite] insert error:', favError.message);
       setIsFavorited(true);
+      showToast('已收藏');
       if (user?.id) refreshCounts(user.id);
     }
+  };
+
+  // 探索确认：试穿页通过 `items`(JSON) 读取搭配单品（name/category/color/image_url）。
+  // 这里把已有单品 + 推荐补位单品一起传过去，试穿看完整 look。
+  const handleGoTryOn = () => {
+    if (!currentOutfit) return;
+    const tryOnItems = [
+      ...(currentOutfit.items ?? []).map(i => ({
+        item_id: i.item_id,
+        name: i.item?.name ?? '单品',
+        category: i.item?.category ?? '',
+        color: i.item?.color ?? '',
+        image_url: i.item?.image_url,
+      })),
+      ...(currentOutfit.recommended_items ?? []).map((r, idx) => ({
+        item_id: `rec_${idx}`,
+        name: r.name,
+        category: r.category,
+        color: r.color,
+        image_url: r.image_url,
+      })),
+    ];
+    router.push({ pathname: '/outfit/try-on', params: { items: JSON.stringify(tryOnItems) } });
   };
 
   const handleSwap = () => {
@@ -348,17 +381,24 @@ export default function OutfitResultScreen() {
 
   const addRecommendedToWishlist = async (rec: RecommendedItem, idx: number) => {
     if (!user?.id) { showToast('请先登录后再添加'); return; }
-    const { error } = await supabase.from('wishlist_items').insert({
-      user_id: user.id, name: rec.name, category: normalizeCategory(WISHLIST_DB_CAT[toCatConcept(rec.category)]),
-      color: rec.color || '', source: 'ai_recommended',
+    // 复用 wishlistStore 的加入心愿单逻辑（内部会归一化 category 到 DB 允许值）
+    const saved = await useWishlistStore.getState().addItem({
+      user_id: user.id,
+      name: rec.name,
+      category: rec.category,
+      color: rec.color || '',
+      image_url: rec.image_url,
+      description: rec.description,
+      source: 'ai_recommended',
     });
-    if (error) {
-      console.warn('[addRecommendedToWishlist] error:', error.message);
-      showToast(`加入心愿单失败：${error.message}`);
+    if (!saved) {
+      const err = useWishlistStore.getState().error;
+      console.warn('[addRecommendedToWishlist] error:', err);
+      showToast(err ? `加入心愿单失败：${err}` : '加入心愿单失败，请稍后重试');
       return;
     }
     setWishlistedRecs(prev => new Set(prev).add(idx));
-    showToast(`「${rec.name}」已加入心愿单`);
+    showToast('已加入心愿单');
   };
 
   const normalizeCategory = (raw: string): string => {
@@ -546,7 +586,7 @@ export default function OutfitResultScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>搭配单品</Text>
             <Text style={styles.comboSub}>
-              {ownedItems.length} 件已有 · {recommendedItems.length} 件推荐添置
+              已用你的 {ownedItems.length} 件单品 · 智能补齐 {recommendedItems.length} 件
             </Text>
             <View style={styles.grid}>
               {ownedItems.map((oi) => (
@@ -554,7 +594,7 @@ export default function OutfitResultScreen() {
                   style={[styles.gridCard, adjustMode && styles.itemCardAdjust]}
                   onPress={() => handleItemTap(oi)} activeOpacity={adjustMode ? 0.6 : 1}
                 >
-                  <Text style={styles.badgeOwned}>已有</Text>
+                  <Text style={styles.badgeOwned}>已拥有</Text>
                   <View style={styles.gridThumb}>
                     {oi.item?.image_url ? (
                       <Image source={{ uri: oi.item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
@@ -573,7 +613,7 @@ export default function OutfitResultScreen() {
                 const recKey = `${rec.name}-${rec.category}-${rec.color}-${rec.image_url ?? ''}`;
                 return (
                   <View key={recKey} style={[styles.gridCard, styles.gridCardRec]}>
-                    <Text style={styles.badgeRec}>推荐</Text>
+                    <Text style={styles.badgeRec}>你还没有</Text>
                     <View style={[styles.gridThumb, { backgroundColor: Colors.signalSoft }]}>
                       {rec.image_url ? (
                         <Image source={{ uri: rec.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
@@ -616,22 +656,30 @@ export default function OutfitResultScreen() {
         {/* ── Try-on Button ── */}
         <TouchableOpacity
           style={styles.tryOnEntry}
-          onPress={() => {
-            const items = (currentOutfit.items ?? []).map(i => ({
-              item_id: i.item_id,
-              name: i.item?.name ?? '单品',
-              category: i.item?.category ?? '',
-              color: i.item?.color ?? '',
-              image_url: i.item?.image_url,
-            }));
-            router.push({ pathname: '/outfit/try-on', params: { items: JSON.stringify(items) } });
-          }}
+          onPress={handleGoTryOn}
         >
           <Ionicons name="person-outline" size={18} color={Colors.ink} />
           <Text style={styles.tryOnEntryText}>AI 试穿看看</Text>
           <Feather name="chevron-right" size={14} color={Colors.ink} />
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ── 保存后引导条（方案B：留在结果页 + 引导试穿）── */}
+      {showSaveGuide ? (
+        <View style={styles.saveGuide}>
+          <Text style={styles.saveGuideText} numberOfLines={1}>已保存 ✓ 想看穿上身的效果吗？</Text>
+          <TouchableOpacity style={styles.saveGuideBtn} onPress={handleGoTryOn} activeOpacity={0.8}>
+            <Text style={styles.saveGuideBtnText}>去试穿 →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.saveGuideClose}
+            onPress={() => setShowSaveGuide(false)}
+            hitSlop={8}
+          >
+            <Feather name="x" size={16} color={Colors.walnut2} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* ── 5. Decision Bar ── */}
       <View style={styles.decisionBar}>
@@ -724,12 +772,6 @@ export default function OutfitResultScreen() {
           </View>
         </Modal>
       )}
-
-      <ConfirmModal visible={showSavedConfirm ? Boolean(savedId) : false} title="已保存"
-        message="这套搭配已保存到你的穿搭记录" confirmText="好的" singleButton
-        onConfirm={() => { setShowSavedConfirm(false); router.back(); }}
-        onCancel={() => setShowSavedConfirm(false)}
-      />
 
       <Toast message={toast} visible={!!toast} />
 
@@ -876,6 +918,21 @@ const styles = StyleSheet.create({
   decisionBtnConfirm: { paddingVertical: 14, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.ink, ...Shadow.two },
   decisionBtnSaved: { backgroundColor: Colors.sage },
   decisionBtnConfirmText: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
+
+  // 保存后引导条（inline，位于操作栏上方，不遮挡主操作）
+  saveGuide: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    backgroundColor: Colors.signalSoft,
+    borderTopWidth: 1, borderTopColor: Colors.line,
+  },
+  saveGuideText: { flex: 1, ...T.bodyText, fontSize: 13, color: Colors.ink },
+  saveGuideBtn: {
+    paddingHorizontal: Spacing.three, paddingVertical: 7,
+    borderRadius: Radius.md, backgroundColor: Colors.terracotta,
+  },
+  saveGuideBtnText: { fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
+  saveGuideClose: { padding: 2 },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   modalSheet: { backgroundColor: Colors.paper, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '60%', ...Shadow.three },

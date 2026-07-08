@@ -1,20 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, ActivityIndicator, Alert, Image, Platform, useWindowDimensions,
+  ScrollView, SafeAreaView, ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
-import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
-import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion, TryOnSuggestion } from '@/lib/ai';
+import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion } from '@/lib/ai';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
-
-const isWeb = Platform.OS === 'web';
 
 const TRYON_SCENES = [
   { id: 'cafe', label: '咖啡馆' },
@@ -44,12 +41,10 @@ type OutfitSummary = {
 };
 
 export default function TryOnScreen() {
-  const { width: winW, height: winH } = useWindowDimensions();
-
   const { items: itemsParam } = useLocalSearchParams<{ items?: string; outfitId?: string }>();
   const isFromResult = !!itemsParam;
 
-  const { selfieUri, selectedScene, setSelectedScene, addRecord, loadSelfieFromServer, loaded } = useTryOnStore();
+  const { selfieUri, selectedScene, setSelectedScene, addRecord, loadSelfieFromServer, loaded, setLastResult } = useTryOnStore();
   const { user } = useUserStore();
 
   // Outfit selection (for home entry)
@@ -65,9 +60,6 @@ export default function TryOnScreen() {
   // Generation
   const [generating, setGenerating] = useState(false);
   const [, setGenStep] = useState(0);
-  const [tryOnImage, setTryOnImage] = useState<string | number | null>(null);
-  const [tryOnMeta, setTryOnMeta] = useState<AIMeta | null>(null);
-  const [tryOnSuggestion, setTryOnSuggestion] = useState<TryOnSuggestion | null>(null);
 
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
 
@@ -157,9 +149,6 @@ export default function TryOnScreen() {
     }
 
     setGenerating(true);
-    setTryOnImage(null);
-    setTryOnMeta(null);
-    setTryOnSuggestion(null);
     setGenStep(0);
 
     // Collect outfit items as ItemBrief[]
@@ -186,49 +175,59 @@ export default function TryOnScreen() {
     setGenStep(3); // "完成"
 
     // Image: use AI URL if available, otherwise fall back to local asset
-    if (imageResult.url) {
-      setTryOnImage(imageResult.url);
-    } else {
-      const assetKey = SCENE_ASSET_MAP[selectedScene] ?? 'casual';
-      setTryOnImage(SCENE_IMAGES[assetKey] || SCENE_IMAGES.casual);
-    }
-
-    // Suggestion
-    setTryOnSuggestion(suggestionResult.suggestion);
+    const resultImage: string | number = imageResult.url
+      ? imageResult.url
+      : (SCENE_IMAGES[SCENE_ASSET_MAP[selectedScene] ?? 'casual'] || SCENE_IMAGES.casual);
 
     // Meta: combine image + suggestion results
     const anyOk = imageResult.meta.ok || suggestionResult.meta.ok;
     const sources: string[] = [];
     if (imageResult.meta.source !== 'mock') sources.push(imageResult.meta.source);
     if (suggestionResult.meta.source !== 'mock' && !sources.includes(suggestionResult.meta.source)) sources.push(suggestionResult.meta.source);
-    setTryOnMeta({
+    const resultMeta: AIMeta = {
       source: sources.length > 0 ? sources.join(' + ') : 'mock',
       durationMs: Math.max(imageResult.meta.durationMs, suggestionResult.meta.durationMs),
       ok: anyOk,
-    });
+    };
 
     setGenerating(false);
 
-    // Save try-on record
+    // Build outfit meta for record + result page
     const sceneObj = TRYON_SCENES.find(s => s.id === selectedScene);
+    const sceneLabel = sceneObj?.label ?? selectedScene;
     const outfitName = isFromResult
       ? resultItems.map(i => i.name).join(' + ')
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.name ?? '自定义搭配');
     const recordItems = isFromResult
       ? resultItems.map(i => ({ name: i.name, category: i.category ?? '', color: i.color, image_url: i.image_url }))
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []);
+
+    // Stash result for the dedicated full-screen result page
+    setLastResult({
+      image: resultImage,
+      scene: selectedScene,
+      sceneLabel,
+      outfitName,
+      items: recordItems,
+      meta: resultMeta,
+    });
+
+    // Save try-on record
     const resultImageUrl = imageResult.url || null;
     if (user?.id) {
       addRecord({
         scene: selectedScene,
-        sceneLabel: sceneObj?.label ?? selectedScene,
+        sceneLabel,
         outfitName,
         items: recordItems,
         selfieUri,
         resultImageUrl,
-        suggestion: tryOnSuggestion,
+        suggestion: suggestionResult.suggestion,
       }, user.id);
     }
+
+    // Navigate to the dedicated result page
+    router.push('/outfit/try-on-result');
   };
 
   return (
@@ -393,26 +392,6 @@ export default function TryOnScreen() {
           <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
         ) : null}
 
-        {/* ── Result ── */}
-        {tryOnMeta && <AIResultBanner {...tryOnMeta} />}
-        {tryOnImage !== null && !generating ? (
-          <View style={styles.resultCard}>
-            <Image
-              source={typeof tryOnImage === 'string' ? { uri: tryOnImage } : tryOnImage}
-              style={[styles.resultImage, { height: Math.min(winH * 0.62, winW * 1.2) }]}
-              resizeMode="contain"
-            />
-            <View style={styles.resultFooter}>
-              <Text style={styles.resultCaption}>AI 试穿效果预览</Text>
-              <TouchableOpacity style={styles.resultSaveBtn} onPress={() => {
-                if (isWeb) { window.alert('图片已保存'); } else { Alert.alert('提示', '图片已保存到相册'); }
-              }}>
-                <Text style={styles.resultSaveBtnText}>保存图片</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
       </ScrollView>
 
       {/* ── Generating Full Screen Overlay ── */}
@@ -559,38 +538,4 @@ const styles = StyleSheet.create({
   progressStepText: { ...T.micro, color: Colors.walnut, textAlign: 'center' },
   progressBar: { width: '100%', height: 6, borderRadius: 3, backgroundColor: Colors.line, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: Colors.terracotta },
-
-  // ── Result ──
-  resultCard: {
-    backgroundColor: Colors.paper, borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
-  resultImage: { width: '100%', backgroundColor: Colors.paper },
-  resultFooter: { padding: Spacing.three, gap: Spacing.two },
-  resultCaption: { ...T.bodyText, color: Colors.ink, fontSize: 13 },
-  resultSaveBtn: {
-    backgroundColor: Colors.ink, borderRadius: Radius.md,
-    paddingVertical: Spacing.two, alignItems: 'center', flexDirection: 'row',
-    justifyContent: 'center', gap: 6,
-  },
-  resultSaveBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
-
-  // ── Suggestion ──
-  suggestionCard: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    padding: Spacing.three, gap: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
-  },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  scoreCircle: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: Colors.signalSoft, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: Colors.signal,
-  },
-  scoreNum: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, color: Colors.signal, fontSize: 16 },
-  scoreLabel: { ...T.bodyText, color: Colors.walnut, fontSize: 13 },
-  suggestionText: { ...T.bodyText, color: Colors.ink, fontSize: 14, lineHeight: 22 },
-  tipsList: { gap: Spacing.one, marginTop: Spacing.one },
-  tipRow: { flexDirection: 'row', gap: Spacing.one, alignItems: 'flex-start' },
-  tipBullet: { ...T.micro, color: Colors.terracotta },
-  tipText: { ...T.micro, color: Colors.walnut, flex: 1, lineHeight: 18 },
 });

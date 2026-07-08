@@ -3,6 +3,7 @@ import { deepseekChat } from '@/lib/deepseek';
 import { qwenVisionChat, isAvailable as isDashScopeAvailable } from '@/lib/dashscope';
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
+import { buildFallbackLook } from '@/lib/fallbackLook';
 
 // ─── AI 元信息 ───────────────────────────────────────────
 
@@ -302,16 +303,18 @@ export async function aiRecommendOutfits(
 ): Promise<{ outfits: Outfit[]; error?: string; meta: AIMeta }> {
   const t0 = Date.now();
   const itemsSummary = buildItemsSummary(wardrobeItems);
-  if (!itemsSummary) return { outfits: [], error: '衣橱中没有衣物，请先添加', meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
-
   const activeItems = wardrobeItems.filter(i => i.status === 'active');
   const hasTop = activeItems.some(i => i.category === '上装' || i.category === '外套');
   const hasBottom = activeItems.some(i => i.category === '下装' || i.category === '连体装');
-  if (!hasTop || !hasBottom) {
-    const missing = [];
-    if (!hasTop) missing.push('上装');
-    if (!hasBottom) missing.push('下装或连体装');
-    return { outfits: [], error: `衣橱中缺少${missing.join('和')}，建议先添加`, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
+  const hasDress = activeItems.some(i => i.category === '连体装');
+
+  // 方案A：空 / 稀疏衣橱不再直接返回空态，改为本地"全品类混搭"兜底：
+  // 用已有单品 + 推荐单品库补位，凑成一套完整 look。
+  if (!itemsSummary || (!hasTop && !hasDress) || (!hasBottom && !hasDress)) {
+    return {
+      outfits: [buildFallbackLook(activeItems, userId, sessionId)],
+      meta: { source: 'fallback', durationMs: Date.now() - t0, ok: true },
+    };
   }
 
   // 需求结构化：把颜色/场合/风格/温度拆成独立字段，标签 ID 先映射回中文
