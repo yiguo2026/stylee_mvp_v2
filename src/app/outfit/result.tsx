@@ -687,7 +687,7 @@ export default function OutfitResultScreen() {
           style={[styles.decisionBtnConfirm, !!savedId && styles.decisionBtnSaved]}
           onPress={handleWear} disabled={saving || !!savedId}
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? '已保存' : '就这么穿'}</Text>}
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? (isFavorited ? '已收藏' : '已保存') : '就这么穿'}</Text>}
         </TouchableOpacity>
         <View style={styles.decisionBtnRow}>
           <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleSwap}>
