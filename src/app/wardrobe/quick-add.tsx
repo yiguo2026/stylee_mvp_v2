@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   builtinIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
     backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden', position: 'relative',
+    position: 'relative',
   },
   builtinIconSelected: { backgroundColor: Colors.signalSoft },
   builtinIconDisabled: { backgroundColor: Colors.lineSoft },
