@@ -10,11 +10,27 @@
 """
 from __future__ import annotations
 
+import getpass
 import json
 import os
+import socket
 import threading
 import urllib.request
 import urllib.error
+
+
+def _auto_dev_tag() -> str:
+    """自动身份：优先 STYLEE_DEV_TAG；否则用 机器名/用户名（跑服务/eval 的人无感被识别）。"""
+    explicit = os.environ.get("STYLEE_DEV_TAG")
+    if explicit:
+        return explicit
+    try:
+        return f"{socket.gethostname()}/{getpass.getuser()}"
+    except Exception:  # noqa: BLE001
+        return "server"
+
+
+_DEV_TAG = _auto_dev_tag()
 
 # 定价（元/百万tokens；图像 元/张）。DeepSeek 官方实价；Qwen 待填。
 _PRICING = {
@@ -103,7 +119,7 @@ def log_usage(provider: str, model: str, feature: str, call_type: str,
         total = (prompt or 0) + (comp or 0)
         row = {
             "provider": provider, "model": model, "feature": feature, "call_type": call_type,
-            "dev_tag": os.environ.get("STYLEE_DEV_TAG", "server"), "user_id": None,
+            "dev_tag": _DEV_TAG, "user_id": None,
             "prompt_tokens": prompt,
             "cached_tokens": usage.get("prompt_cache_hit_tokens") or (usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
             "completion_tokens": comp,

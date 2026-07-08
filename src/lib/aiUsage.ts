@@ -1,7 +1,9 @@
 // AI 用量埋点：统一记录每一次 DeepSeek / Qwen 调用的 usage 与成本。
 // 设计原则：埋在唯一出口（deepseek.ts / dashscope.ts），fire-and-forget，
 // 埋点失败绝不影响主流程。100% 覆盖当前与未来所有调用。
+import * as Device from 'expo-device';
 import { supabase } from './supabase';
+import { useUserStore } from '@/stores/userStore';
 
 // ── 定价（元 / 百万 tokens；图像为 元 / 张）─────────────────────
 // DeepSeek 为官方实价（api-docs.deepseek.com/zh-cn/quick_start/pricing）。
@@ -20,7 +22,27 @@ const PRICING: Record<string, Price> = {
   'doubao-seedream-5-0-260128': { perImage: 0 },
 };
 
-const DEV_TAG = process.env.EXPO_PUBLIC_DEV_TAG ?? 'unknown';
+// 自动身份（同伴零配置）：优先显式 EXPO_PUBLIC_DEV_TAG；否则用设备名（如「张三的 MacBook」）；
+// web 无设备名时持久化一个短 id。谁都不用手动设。
+function resolveDevTag(): string {
+  const explicit = process.env.EXPO_PUBLIC_DEV_TAG;
+  if (explicit) return explicit;
+  if (Device.deviceName) return Device.deviceName;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      let id = localStorage.getItem('ai_usage_device');
+      if (!id) { id = 'web-' + Math.random().toString(36).slice(2, 8); localStorage.setItem('ai_usage_device', id); }
+      return id;
+    }
+  } catch { /* noop */ }
+  return `${Device.osName ?? 'device'}-unknown`;
+}
+const DEV_TAG = resolveDevTag();
+
+// 当前登录账号（零配置的「谁」；同伴测试都要登录）
+function currentUserId(): string | null {
+  try { return useUserStore.getState().user?.id ?? null; } catch { return null; }
+}
 
 export interface AiUsageRecord {
   provider: 'deepseek' | 'qwen' | 'ark';
@@ -81,7 +103,7 @@ export function logAiUsage(r: AiUsageRecord): void {
     );
     const row = {
       provider: r.provider, model: r.model, feature: r.feature, call_type: r.callType,
-      dev_tag: DEV_TAG, user_id: r.userId ?? null,
+      dev_tag: DEV_TAG, user_id: r.userId ?? currentUserId(),
       prompt_tokens: r.promptTokens ?? null, cached_tokens: r.cachedTokens ?? null,
       completion_tokens: r.completionTokens ?? null, reasoning_tokens: r.reasoningTokens ?? null,
       total_tokens: total || null, image_count: r.imageCount ?? null,
