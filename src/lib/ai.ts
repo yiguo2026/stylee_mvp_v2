@@ -601,12 +601,13 @@ export async function aiGenerateTryOnImage(
     ? `${faceInstr}一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`
     : `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`;
 
+  // 试穿生图改用更便宜的 qwen-image-edit(0.5→0.3 元/张),与标准化一致。
+  const { qwenGenerateImage, QWEN_IMAGE_EDIT_MODEL } = await import('@/lib/dashscope');
   try {
-    const { qwenGenerateImage } = await import('@/lib/dashscope');
-    const imageUrl = await qwenGenerateImage(prompt, { refImage: selfieUri || undefined });
-    return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: !!imageUrl } };
+    const imageUrl = await qwenGenerateImage(prompt, { refImage: selfieUri || undefined, model: QWEN_IMAGE_EDIT_MODEL });
+    return { url: imageUrl, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: !!imageUrl } };
   } catch (e) {
     console.warn('[AI] Try-on image generation failed:', e);
-    return { url: null, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: false } };
+    return { url: null, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: false } };
   }
 }
