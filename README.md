@@ -36,8 +36,7 @@
 ### 衣橱管理
 - 紧凑分类标签（上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰，带数量角标）
 - 模糊搜索（支持同义词匹配，如"裤子"→下装/阔腿裤/短裤）
-- 单品详情查看 + 编辑（照片、名称、分类、颜色、材质、品牌、价格、版型、购买日期、季节、场合标签）
-- 单品删除（自定义 ConfirmModal，Web 兼容）
+- 单品详情查看 + 编辑/删除（header 并排按钮，删除后跳回衣橱 tab，自定义 ConfirmModal，Web 兼容）
 - 心愿单（页面底部粉色入口卡片，全屏弹窗展示）
 - 快速添加入口（虚线边框卡片）
 - 单图多品识别：上传包含多件单品的照片时，AI 检测所有单品，用户多选后逐件确认（标准图+属性）批量导入
@@ -187,6 +186,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `de21d25` | 修复 onboarding step3 AI 推荐单品无缩略图：用 Supabase Storage 真实图片替代 CategoryIcon |
 | `bfe7c6c` | AI 识别输出精简：单品名称简洁客观，颜色/材质优先匹配标准列表，新增 normalizeColor/normalizeMaterial 归一化函数 |
 | `19cd49b` | 标准图默认模型从 qwen-image-2.0 改为 qwen-image-edit（图生图场景应用 edit 模型） |
+| — | 修复删除单品：详情页 header 添加「删除」按钮与「编辑」并排；删除后跳回衣橱 tab（router.replace）而非停留在详情页 |
 
 ## 项目结构
 

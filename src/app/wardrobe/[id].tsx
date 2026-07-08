@@ -106,7 +106,7 @@ export default function ItemDetailScreen() {
     setDeleting(true);
     try {
       await deleteItem(item.item_id);
-      router.back();
+      router.replace('/wardrobe');
     } catch (e: any) {
       setDeleting(false);
       if (isWeb) { window.alert('删除失败：' + (e.message || '请稍后重试')); } else { Alert.alert('删除失败', e.message || '请稍后重试'); }
@@ -141,9 +141,14 @@ export default function ItemDetailScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>← 返回</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push(`/wardrobe/edit/${item!.item_id}`)}>
-          <Text style={styles.editBtn}>编辑</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleDelete}>
+            <Text style={styles.deleteBtn}>删除</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push(`/wardrobe/edit/${item!.item_id}`)}>
+            <Text style={styles.editBtn}>编辑</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -255,6 +260,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
   back: { ...T.buttonSecondary, color: Colors.walnut },
+  headerActions: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
+  deleteBtn: { ...T.buttonSecondary, color: Colors.accent },
   editBtn: { ...T.buttonSecondary, color: Colors.terracotta },
   content: { padding: Spacing.four, gap: Spacing.three },
 
