@@ -66,6 +66,7 @@ export default function OutfitResultScreen() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showSaveGuide, setShowSaveGuide] = useState(false);
+  const [confirmedWear, setConfirmedWear] = useState(false);
   const saveGuideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [adjustMode, setAdjustMode] = useState(false);
   const [swapTarget, setSwapTarget] = useState<OutfitItem | null>(null);
@@ -200,8 +201,17 @@ export default function OutfitResultScreen() {
 
   const currentOutfit = outfits[currentIndex];
 
-  const handleWear = async (): Promise<string | null> => {
+  const handleWear = async (silent = false): Promise<string | null> => {
     if (!currentOutfit || !user) return null;
+    // 如果已经保存过（如收藏时静默保存），直接复用 savedId
+    if (savedId && !silent) {
+      setConfirmedWear(true);
+      showToast('已保存到穿搭记录');
+      setShowSaveGuide(true);
+      if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
+      saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
+      return savedId;
+    }
     setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -233,11 +243,14 @@ export default function OutfitResultScreen() {
         if (itemsError) console.warn('[handleWear] outfit_items insert error:', itemsError.message);
       }
       setSavedId(outfitId);
-      showToast('已保存到穿搭记录');
-      // 方案B：保存后留在结果页，展示 inline 引导条（可关闭/自动隐藏）
-      setShowSaveGuide(true);
-      if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
-      saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
+      if (!silent) {
+        setConfirmedWear(true);
+        showToast('已保存到穿搭记录');
+        // 方案B：保存后留在结果页，展示 inline 引导条（可关闭/自动隐藏）
+        setShowSaveGuide(true);
+        if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
+        saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
+      }
       if (user?.id) refreshCounts(user.id);
       return outfitId;
     } catch (e: any) {
@@ -263,10 +276,10 @@ export default function OutfitResultScreen() {
       showToast('已取消收藏');
       if (user?.id) refreshCounts(user.id);
     } else {
-      // Save outfit first if not saved, get real DB outfit_id
+      // Save outfit first if not saved, get real DB outfit_id (silent — don't change button or show guide)
       let outfitId = savedId;
       if (!outfitId) {
-        outfitId = await handleWear();
+        outfitId = await handleWear(true);
         if (!outfitId) return;
       }
       const { error: favError } = await supabase.from('outfit_favorites').insert({
@@ -684,10 +697,10 @@ export default function OutfitResultScreen() {
       {/* ── 5. Decision Bar ── */}
       <View style={styles.decisionBar}>
         <TouchableOpacity
-          style={[styles.decisionBtnConfirm, !!savedId && styles.decisionBtnSaved]}
-          onPress={handleWear} disabled={saving || !!savedId}
+          style={[styles.decisionBtnConfirm, !!confirmedWear && styles.decisionBtnSaved]}
+          onPress={() => handleWear()} disabled={saving || confirmedWear}
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{savedId ? (isFavorited ? '已收藏' : '已保存') : '就这么穿'}</Text>}
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{confirmedWear ? '已保存' : '就这么穿'}</Text>}
         </TouchableOpacity>
         <View style={styles.decisionBtnRow}>
           <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleSwap}>
