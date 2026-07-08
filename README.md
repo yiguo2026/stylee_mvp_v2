@@ -187,6 +187,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `bfe7c6c` | AI 识别输出精简：单品名称简洁客观，颜色/材质优先匹配标准列表，新增 normalizeColor/normalizeMaterial 归一化函数 |
 | `19cd49b` | 标准图默认模型从 qwen-image-2.0 改为 qwen-image-edit（图生图场景应用 edit 模型） |
 | — | 修复删除单品：详情页 header 添加「删除」按钮与「编辑」并排；删除后跳回衣橱 tab（router.replace）而非停留在详情页 |
+| `7788fd5` | 修复快速添加推荐单品页勾选对勾被裁切：移除 overflow:hidden，对勾悬浮于缩略图之上 |
 
 ## 项目结构
 
