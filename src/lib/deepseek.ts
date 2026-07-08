@@ -1,4 +1,5 @@
 import { DEEPSEEK_KEY, DEEPSEEK_HOST } from './secrets';
+import { logAiUsage, detectFeature } from './aiUsage';
 
 const DEEPSEEK_URL = `https://${DEEPSEEK_HOST}/chat/completions`;
 
@@ -20,9 +21,13 @@ export async function deepseekChat(
 ): Promise<string | null> {
   if (!DEEPSEEK_KEY) return null;
 
+  const t0 = Date.now();
+  const model = options.model ?? 'deepseek-v4-flash';
+  const feature = detectFeature(messages.find(m => m.role === 'system')?.content ?? messages[0]?.content ?? '');
+
   try {
     const body: Record<string, unknown> = {
-      model: options.model ?? 'deepseek-v4-flash',
+      model,
       messages,
       stream: false,
       temperature: options.temperature ?? 1,
@@ -43,15 +48,27 @@ export async function deepseekChat(
 
     if (!res.ok) {
       console.warn('[DeepSeek] API error:', res.status, await res.text().catch(() => ''));
+      logAiUsage({ provider: 'deepseek', model, feature, callType: 'chat', durationMs: Date.now() - t0, ok: false });
       return null;
     }
 
     const data = await res.json();
+    const u = data.usage ?? {};
     const content = data.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) return null;
+    const ok = typeof content === 'string' && !!content.trim();
+    logAiUsage({
+      provider: 'deepseek', model, feature, callType: 'chat',
+      promptTokens: u.prompt_tokens,
+      cachedTokens: u.prompt_cache_hit_tokens ?? u.prompt_tokens_details?.cached_tokens,
+      completionTokens: u.completion_tokens,
+      reasoningTokens: u.completion_tokens_details?.reasoning_tokens,
+      requestId: data.id, durationMs: Date.now() - t0, ok,
+    });
+    if (!ok) return null;
     return content.trim();
   } catch (e) {
     console.warn('[DeepSeek] request failed:', e);
+    logAiUsage({ provider: 'deepseek', model, feature, callType: 'chat', durationMs: Date.now() - t0, ok: false });
     return null;
   }
 }

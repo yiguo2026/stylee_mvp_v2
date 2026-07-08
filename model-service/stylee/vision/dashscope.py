@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
+
+from ..usage_log import log_usage
 
 from ..contracts import WardrobeItem
 from ..providers.openai_compat import _chat_completion
@@ -85,13 +88,18 @@ class DashScopeImageStandardizer(ImageStandardizer):
             self.base_url + _MM_URL_PATH, data=data, method="POST",
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {self.api_key}"})
+        t0 = time.time()
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
+            log_usage("qwen", self.model, "standardize", "image", None, int((time.time() - t0) * 1000), False)
             raise VisionError(f"HTTP {e.code}: {e.read().decode('utf-8','replace')[:200]}") from None
         except urllib.error.URLError as e:
+            log_usage("qwen", self.model, "standardize", "image", None, int((time.time() - t0) * 1000), False)
             raise VisionError(f"网络错误: {e.reason}") from None
+        log_usage("qwen", self.model, "standardize", "image", body.get("usage"),
+                  int((time.time() - t0) * 1000), True, body.get("request_id"))
         return parse_edit_response(body)
 
 

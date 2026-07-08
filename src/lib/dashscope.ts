@@ -1,4 +1,5 @@
 import { DASHSCOPE_API_KEY } from './secrets';
+import { logAiUsage, detectFeature } from './aiUsage';
 
 const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const DASHSCOPE_NATIVE_URL = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
@@ -36,6 +37,10 @@ export async function qwenVisionChat(
     console.warn('[DashScope] API Key not set, skipping vision call');
     return null;
   }
+
+  const t0 = Date.now();
+  const model = options?.model || QWEN_VL_MODEL;
+  const feature = detectFeature(prompt);
 
   let imageUrl: string;
   if (imageUri.startsWith('data:')) {
@@ -101,15 +106,25 @@ export async function qwenVisionChat(
 
     if (!res.ok) {
       console.warn('[DashScope] Vision API error:', res.status, await res.text().catch(() => ''));
+      logAiUsage({ provider: 'qwen', model, feature, callType: 'vision', durationMs: Date.now() - t0, ok: false });
       return null;
     }
 
     const data = await res.json();
+    const u = data.usage ?? {};
     const content = data.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) return null;
+    const ok = typeof content === 'string' && !!content.trim();
+    logAiUsage({
+      provider: 'qwen', model, feature, callType: 'vision',
+      promptTokens: u.prompt_tokens, cachedTokens: u.prompt_tokens_details?.cached_tokens,
+      completionTokens: u.completion_tokens, requestId: data.id,
+      durationMs: Date.now() - t0, ok,
+    });
+    if (!ok) return null;
     return content.trim();
   } catch (e) {
     console.warn('[DashScope] Vision request failed:', e);
+    logAiUsage({ provider: 'qwen', model, feature, callType: 'vision', durationMs: Date.now() - t0, ok: false });
     return null;
   }
 }
@@ -129,6 +144,9 @@ export async function qwenGenerateImage(
     console.warn('[DashScope] API Key not set, skipping image generation');
     return null;
   }
+
+  const t0 = Date.now();
+  const feature = detectFeature(prompt);
 
   try {
     // Build content parts: optional reference image + text prompt
@@ -189,25 +207,30 @@ export async function qwenGenerateImage(
 
     if (!res.ok) {
       console.warn('[DashScope] Image gen error:', res.status, await res.text().catch(() => ''));
+      logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
       return null;
     }
 
     const data = await res.json();
+    const imageCount = data.usage?.image_count ?? undefined;
 
     // Native format: output.choices[0].message.content[0].image
     const content = data.output?.choices?.[0]?.message?.content;
     if (Array.isArray(content)) {
       for (const item of content) {
         if (typeof item === 'object' && item.image && typeof item.image === 'string') {
+          logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', imageCount: imageCount ?? 1, requestId: data.request_id, durationMs: Date.now() - t0, ok: true });
           return item.image;
         }
       }
     }
 
     console.warn('[DashScope] Image gen: unexpected response', JSON.stringify(data).slice(0, 300));
+    logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', imageCount, requestId: data.request_id, durationMs: Date.now() - t0, ok: false });
     return null;
   } catch (e) {
     console.warn('[DashScope] Image gen failed:', e);
+    logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
     return null;
   }
 }
