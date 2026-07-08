@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
+from ..usage_log import detect_feature, log_usage
 from ..constraints import CandidatePool
 from ..contracts import (
     Category,
@@ -46,18 +48,28 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
         headers={"Content-Type": "application/json",
                  "Authorization": f"Bearer {api_key}"},
     )
+    # 用量埋点上下文
+    provider = "deepseek" if "deepseek" in url else "qwen"
+    feature = detect_feature(messages)
+    call_type = "vision" if any(isinstance(m.get("content"), list) for m in messages) else "chat"
+    t0 = time.time()
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
+        log_usage(provider, model, feature, call_type, None, int((time.time() - t0) * 1000), False)
         detail = e.read().decode("utf-8", "replace")[:400]
         raise ProviderError(f"HTTP {e.code} from {url}: {detail}") from None
     except urllib.error.URLError as e:
+        log_usage(provider, model, feature, call_type, None, int((time.time() - t0) * 1000), False)
         raise ProviderError(f"网络错误 {url}: {e.reason}") from None
     try:
-        return body["choices"][0]["message"]["content"]
+        content = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError):
+        log_usage(provider, model, feature, call_type, body.get("usage"), int((time.time() - t0) * 1000), False, body.get("id"))
         raise ProviderError(f"返回结构异常: {str(body)[:300]}") from None
+    log_usage(provider, model, feature, call_type, body.get("usage"), int((time.time() - t0) * 1000), True, body.get("id"))
+    return content
 
 
 def _extract_json(content: str) -> dict:
