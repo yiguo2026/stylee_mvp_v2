@@ -81,8 +81,12 @@ let sb = null;
 const charts = {};
 const $ = id => document.getElementById(id);
 
+// 默认指向监控专用库（打开即用；仍可在设置里切换项目）
+const DEFAULT_URL = 'https://nseysksfnfcaioixifbx.supabase.co';
+const DEFAULT_KEY = 'sb_publishable_fBm4EGpa4a1GJL4T2LWKQQ_ISXyIS_Z';
 function initCfg() {
-  const url = localStorage.getItem('sb_url'), key = localStorage.getItem('sb_key');
+  const url = localStorage.getItem('sb_url') || DEFAULT_URL;
+  const key = localStorage.getItem('sb_key') || DEFAULT_KEY;
   if (url && key) { sb = createClient(url, key); $('app').style.display='block'; load(); }
   else { $('config').style.display='block'; }
 }

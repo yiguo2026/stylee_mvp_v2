@@ -2,8 +2,12 @@
 // 设计原则：埋在唯一出口（deepseek.ts / dashscope.ts），fire-and-forget，
 // 埋点失败绝不影响主流程。100% 覆盖当前与未来所有调用。
 import * as Device from 'expo-device';
-import { supabase } from './supabase';
 import { useUserStore } from '@/stores/userStore';
+
+// 用量监控专用库（与 App 主后端解耦：写进模型方自己的 Supabase，独立掌控）。
+// publishable key 公开安全（RLS 仅允许写/读 ai_usage_logs 一张表）。可用 env 覆盖。
+const MON_URL = process.env.EXPO_PUBLIC_USAGE_SUPABASE_URL ?? 'https://nseysksfnfcaioixifbx.supabase.co';
+const MON_KEY = process.env.EXPO_PUBLIC_USAGE_SUPABASE_KEY ?? 'sb_publishable_fBm4EGpa4a1GJL4T2LWKQQ_ISXyIS_Z';
 
 // ── 定价（元 / 百万 tokens；图像为 元 / 张）─────────────────────
 // DeepSeek 为官方实价（api-docs.deepseek.com/zh-cn/quick_start/pricing）。
@@ -109,9 +113,19 @@ export function logAiUsage(r: AiUsageRecord): void {
       total_tokens: total || null, image_count: r.imageCount ?? null,
       cost_cny: cost, duration_ms: r.durationMs, ok: r.ok, request_id: r.requestId ?? null,
     };
-    void supabase.from('ai_usage_logs').insert(row).then(({ error }) => {
-      if (error) console.warn('[ai-usage] insert failed:', error.message);
-    });
+    if (MON_URL && MON_KEY) {
+      // 直连监控库 REST，fire-and-forget；失败只 warn，绝不影响主流程
+      void fetch(`${MON_URL}/rest/v1/ai_usage_logs`, {
+        method: 'POST',
+        headers: {
+          'apikey': MON_KEY,
+          'Authorization': `Bearer ${MON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(row),
+      }).catch((e) => console.warn('[ai-usage] post failed:', e));
+    }
   } catch (e) {
     console.warn('[ai-usage] log error:', e);
   }
