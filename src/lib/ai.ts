@@ -138,13 +138,14 @@ export const aiStandardizeGarment = async (
     : '';
   const prompt = `${isolateInstr}严格保持该${category}${detailInstr}的颜色、材质、纹理、图案、版型等所有视觉细节完全不变，仅将背景替换为纯白色，该单品居中放置，正面平铺展示，无模特，无多余装饰，商品白底图风格，高清摄影`;
 
+  // 标准化=图生图/白底图,用更便宜的 qwen-image-edit(0.5→0.3 元/张);试穿仍走 pro。
+  const { qwenGenerateImage, QWEN_IMAGE_EDIT_MODEL } = await import('@/lib/dashscope');
   try {
-    const { qwenGenerateImage } = await import('@/lib/dashscope');
-    const imageUrl = await qwenGenerateImage(prompt, { refImage: imageUri });
-    return { url: imageUrl, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: !!imageUrl } };
+    const imageUrl = await qwenGenerateImage(prompt, { refImage: imageUri, model: QWEN_IMAGE_EDIT_MODEL });
+    return { url: imageUrl, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: !!imageUrl } };
   } catch (e) {
     console.warn('[AI] Qwen Image standardization failed:', e);
-    return { url: null, meta: { source: 'qwen-image-2.0-pro', durationMs: Date.now() - t0, ok: false } };
+    return { url: null, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: false } };
   }
 };
 

@@ -5,6 +5,9 @@ const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 const DASHSCOPE_NATIVE_URL = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 const QWEN_VL_MODEL = 'qwen3-vl-plus';
 const QWEN_IMAGE_MODEL = 'qwen-image-2.0-pro';
+// 标准化(图生图/白底图)用更便宜的图片编辑模型:0.5→0.3 元/张。
+// 试穿是生成式全身照,继续用 QWEN_IMAGE_MODEL(pro),二者经 options.model 区分。
+export const QWEN_IMAGE_EDIT_MODEL = 'qwen-image-edit';
 
 export interface DashScopeMessage {
   role: 'system' | 'user' | 'assistant';
@@ -138,7 +141,7 @@ export async function qwenVisionChat(
  */
 export async function qwenGenerateImage(
   prompt: string,
-  options?: { size?: string; imageUrl?: string; refImage?: string },
+  options?: { size?: string; imageUrl?: string; refImage?: string; model?: string },
 ): Promise<string | null> {
   if (!isAvailable()) {
     console.warn('[DashScope] API Key not set, skipping image generation');
@@ -147,6 +150,8 @@ export async function qwenGenerateImage(
 
   const t0 = Date.now();
   const feature = detectFeature(prompt);
+  // 默认 pro;调用方可用 options.model 指定(如标准化传 qwen-image-edit 降本)。
+  const model = options?.model ?? QWEN_IMAGE_MODEL;
 
   try {
     // Build content parts: optional reference image + text prompt
@@ -180,7 +185,7 @@ export async function qwenGenerateImage(
     contentParts.push({ text: prompt });
 
     const body = {
-      model: QWEN_IMAGE_MODEL,
+      model,
       input: {
         messages: [
           {
@@ -207,7 +212,7 @@ export async function qwenGenerateImage(
 
     if (!res.ok) {
       console.warn('[DashScope] Image gen error:', res.status, await res.text().catch(() => ''));
-      logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
+      logAiUsage({ provider: 'qwen', model, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
       return null;
     }
 
@@ -219,18 +224,18 @@ export async function qwenGenerateImage(
     if (Array.isArray(content)) {
       for (const item of content) {
         if (typeof item === 'object' && item.image && typeof item.image === 'string') {
-          logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', imageCount: imageCount ?? 1, requestId: data.request_id, durationMs: Date.now() - t0, ok: true });
+          logAiUsage({ provider: 'qwen', model, feature, callType: 'image', imageCount: imageCount ?? 1, requestId: data.request_id, durationMs: Date.now() - t0, ok: true });
           return item.image;
         }
       }
     }
 
     console.warn('[DashScope] Image gen: unexpected response', JSON.stringify(data).slice(0, 300));
-    logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', imageCount, requestId: data.request_id, durationMs: Date.now() - t0, ok: false });
+    logAiUsage({ provider: 'qwen', model, feature, callType: 'image', imageCount, requestId: data.request_id, durationMs: Date.now() - t0, ok: false });
     return null;
   } catch (e) {
     console.warn('[DashScope] Image gen failed:', e);
-    logAiUsage({ provider: 'qwen', model: QWEN_IMAGE_MODEL, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
+    logAiUsage({ provider: 'qwen', model, feature, callType: 'image', durationMs: Date.now() - t0, ok: false });
     return null;
   }
 }
