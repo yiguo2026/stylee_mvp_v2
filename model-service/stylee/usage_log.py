@@ -36,12 +36,16 @@ _DEV_TAG = _auto_dev_tag()
 _PRICING = {
     "deepseek-v4-flash": {"in_hit": 0.02, "in_miss": 1.0, "out": 2.0},
     "deepseek-v4-pro": {"in_hit": 0.025, "in_miss": 3.0, "out": 6.0},
-    "qwen-flash": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},   # TODO 填实价
+    # Qwen 图像(百炼实价,元/张)
+    "qwen-image-2.0-pro": {"per_image": 0.5},
+    "qwen-image-edit": {"per_image": 0.3},
+    "qwen-image-2.0": {"per_image": 0.2},
+    "qwen-image": {"per_image": 0.25},
+    # qwen3-vl-plus 未在价表,按 instruct 档估(2/8);VL 成本占比小,待精确
+    "qwen3-vl-plus": {"in_miss": 2.0, "out": 8.0},
+    "text-embedding-v4": {"in_miss": 0.0, "out": 0.0},           # TODO 待补(便宜)
+    "qwen-flash": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},   # TODO(若用 qwen provider)
     "qwen-plus": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},    # TODO
-    "qwen3-vl-plus": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},  # TODO
-    "qwen-image-edit": {"per_image": 0.0},                        # TODO
-    "qwen-image-2.0": {"per_image": 0.0},                         # TODO
-    "text-embedding-v4": {"in_miss": 0.0, "out": 0.0},           # TODO 填 embedding 实价
 }
 
 _SIGNATURES = [

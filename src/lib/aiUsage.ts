@@ -17,10 +17,14 @@ const PRICING: Record<string, Price> = {
   'deepseek-v4-flash': { inHit: 0.02, inMiss: 1, out: 2 },
   'deepseek-v4-pro': { inHit: 0.025, inMiss: 3, out: 6 },
   // TODO(团队): 填 Qwen 实价后成本才准（现记 token/张数，成本按 0）
-  'qwen3-vl-plus': { inMiss: 0, out: 0 },
-  'qwen-image-2.0-pro': { perImage: 0 },
-  'qwen-image-edit': { perImage: 0 },
-  'text-embedding-v4': { inMiss: 0, out: 0 },
+  // Qwen 图像(百炼实价,元/张)
+  'qwen-image-2.0-pro': { perImage: 0.5 },
+  'qwen-image-edit': { perImage: 0.3 },
+  'qwen-image-2.0': { perImage: 0.2 },
+  'qwen-image': { perImage: 0.25 },
+  // qwen3-vl-plus 未在价表,按 instruct 档估(2/8);VL 成本占比小,待精确
+  'qwen3-vl-plus': { inMiss: 2, out: 8 },
+  'text-embedding-v4': { inMiss: 0, out: 0 },  // TODO 待补(便宜)
   // 火山 Ark / doubao（当前 key 默认空停用；填价后成本才准）
   'doubao-seed-2-0-pro-260215': { inMiss: 0, out: 0 },
   'doubao-seedream-5-0-260128': { perImage: 0 },
