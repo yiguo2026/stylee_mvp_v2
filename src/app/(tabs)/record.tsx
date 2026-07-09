@@ -88,6 +88,8 @@ export default function RecordTab() {
 
   const [outfitsByDay, setOutfitsByDay] = useState<Record<string, SavedOutfit[]>>({});
   const [favorites, setFavorites] = useState<SavedOutfit[]>([]);
+  const [totalOutfits, setTotalOutfits] = useState(0);
+  const [totalFavorites, setTotalFavorites] = useState(0);
   const [loading, setLoading] = useState(false);
 
   // Fetch worn outfits for calendar
@@ -120,6 +122,19 @@ export default function RecordTab() {
     setOutfitsByDay(grouped);
   }, [user?.id, viewYear, viewMonth]);
 
+  // 全站总数（不受当前月切换影响） —— 已穿 & 收藏 分别统计
+  const fetchTotalOutfits = useCallback(async () => {
+    if (!user?.id) return;
+    const [wornRes, favRes] = await Promise.all([
+      supabase.from('outfits').select('outfit_id', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('outfit_favorites').select('favorite_id', { count: 'exact', head: true }).eq('user_id', user.id),
+    ]);
+    if (wornRes.error) console.warn('[Record] fetchTotalOutfits (worn) error:', wornRes.error.message);
+    else setTotalOutfits(wornRes.count ?? 0);
+    if (favRes.error) console.warn('[Record] fetchTotalOutfits (fav) error:', favRes.error.message);
+    else setTotalFavorites(favRes.count ?? 0);
+  }, [user?.id]);
+
   // Fetch favorited outfits
   const fetchFavorites = useCallback(async () => {
     if (!user?.id) return;
@@ -149,8 +164,9 @@ export default function RecordTab() {
       if (params.tab === 'favorite') setActiveTab('favorite');
       else if (params.tab === 'worn') setActiveTab('worn');
       fetchMonthOutfits();
+      fetchTotalOutfits();
       fetchFavorites();
-    }, [fetchMonthOutfits, fetchFavorites, params.tab])
+    }, [fetchMonthOutfits, fetchTotalOutfits, fetchFavorites, params.tab])
   );
 
   const openDetail = (outfit: SavedOutfit) => {
@@ -178,11 +194,6 @@ export default function RecordTab() {
   const selectedOutfits = selectedKey ? (outfitsByDay[selectedKey] ?? []) : [];
 
   const monthTotal = Object.values(outfitsByDay).reduce((sum, arr) => sum + arr.length, 0);
-  const weekCount = Object.entries(outfitsByDay).filter(([key]) => {
-    const d = new Date(key);
-    const now = new Date();
-    return now.getTime() - d.getTime() < 7 * 24 * 3600 * 1000;
-  }).reduce((sum, [, arr]) => sum + arr.length, 0);
 
   // All outfits of the current viewed month, newest first — shown when no specific day is selected.
   const monthOutfits = Object.values(outfitsByDay)
@@ -220,7 +231,7 @@ export default function RecordTab() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.pageTitle}>记录</Text>
-        <Text style={styles.headerStats}>共 {monthTotal} 套 · 本周 {weekCount} 套</Text>
+        <Text style={styles.headerStats}>已穿 {totalOutfits} · 收藏 {totalFavorites}</Text>
       </View>
 
       {/* Month navigator */}
