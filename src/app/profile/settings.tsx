@@ -39,6 +39,7 @@ export default function SettingsPage() {
   const { profile, signOut } = useUserStore();
   const [showSignOut, setShowSignOut] = useState(false);
   const [locationAccess, setLocationAccess] = useState(true);
+  const [cacheSize, setCacheSize] = useState('128 MB');
 
   useEffect(() => {
     loadSetting('locationAccess', true).then(setLocationAccess);
@@ -53,6 +54,7 @@ export default function SettingsPage() {
   const appVersion = Constants.expoConfig?.version ?? '2.1.0';
 
   const handleClearCache = () => {
+    setCacheSize('0 MB');
     if (isWeb) { window.alert('缓存已清除'); } else { Alert.alert('提示', '缓存已清除'); }
   };
 
@@ -121,7 +123,7 @@ export default function SettingsPage() {
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>清除缓存</Text>
             </View>
-            <Text style={styles.rowValue}>128 MB</Text>
+            <Text style={styles.rowValue}>{cacheSize}</Text>
           </TouchableOpacity>
         </View>
 

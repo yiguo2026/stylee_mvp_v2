@@ -91,7 +91,7 @@ function SheetContent({
           </View>
           <View style={styles.optionTextWrap}>
             <Text style={styles.primaryText}>相册导入</Text>
-            <Text style={styles.primarySub}>拍照或多选，AI 自动识别单品</Text>
+            <Text style={styles.primarySub}>选择一张或多张图片，AI 自动识别单品</Text>
           </View>
           {picking
             ? <ActivityIndicator size="small" color={Colors.accent} />
