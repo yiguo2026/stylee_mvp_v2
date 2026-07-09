@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Switch, Alert, Platform,
+  ScrollView, SafeAreaView, Switch, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
@@ -74,7 +74,7 @@ export default function SettingsPage() {
         <Text style={styles.sectionLabel}>账号与安全</Text>
         <View style={styles.group}>
           <TouchableOpacity style={styles.row} onPress={() => {
-            if (isWeb) { window.alert('当前用户名: ' + (profile?.nickname ?? '未设置')); } else { Alert.alert('用户名', '当前用户名: ' + (profile?.nickname ?? '未设置')); }
+            showToast('当前用户名: ' + (profile?.nickname ?? '未设置'));
           }}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>用户名</Text>
@@ -83,7 +83,7 @@ export default function SettingsPage() {
           </TouchableOpacity>
           <View style={styles.rowBorder} />
           <TouchableOpacity style={styles.row} onPress={() => {
-            if (isWeb) { window.alert('请通过登录页面的"忘记密码"功能重置密码'); } else { Alert.alert('修改密码', '请通过登录页面的"忘记密码"功能重置密码'); }
+            showToast('请通过登录页面的"忘记密码"功能重置密码');
           }}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>登录密码</Text>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Image, Alert, Platform, useWindowDimensions,
+  ScrollView, SafeAreaView, Image, Platform, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';

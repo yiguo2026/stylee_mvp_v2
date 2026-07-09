@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Modal, Platform,
+  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Modal, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -10,6 +10,7 @@ import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { Gender } from '@/types';
 import { searchCitiesOnline, CityResult } from '@/lib/weather';
+import { showToast } from '@/components/Toast';
 
 const isWeb = Platform.OS === 'web';
 
@@ -58,7 +59,7 @@ export default function OnboardingStep1() {
       await fetchProfile();
       router.push('/onboarding/step2-style');
     } catch (e: any) {
-      Alert.alert('保存失败', e.message || '请稍后重试');
+      showToast(e.message || '保存失败，请稍后重试', 'error');
     } finally {
       setLoading(false);
     }

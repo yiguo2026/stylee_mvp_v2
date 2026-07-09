@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, SafeAreaView, Modal, Alert,
+  StyleSheet, ScrollView, SafeAreaView, Modal,
   Image, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,6 +18,7 @@ import { getQuota } from '@/lib/dailyQuota';
 import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
+import { showToast } from '@/components/Toast';
 import {
   WeatherData, FilterTag, InspirationCard,
   OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS,
@@ -156,14 +157,14 @@ export default function OutfitTab() {
 
   const handleGenerate = async (modeOverride?: InputMode) => {
     if (!user?.id) {
-      Alert.alert('提示', '请先登录后再生成搭配');
+      showToast('请先登录后再生成搭配');
       return;
     }
 
     const q = await getQuota(user.id, 'recommend');
     setQuota({ remaining: q.remaining, limit: q.limit });
     if (q.remaining <= 0) {
-      Alert.alert('今日推荐次数已用完', `AI 推荐每日 ${q.limit} 次，明天再来`);
+      showToast(`今日推荐次数已用完，AI 推荐每日 ${q.limit} 次，明天再来`);
       return;
     }
 

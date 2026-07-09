@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert,
+  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -172,7 +172,7 @@ export default function EditItemScreen() {
       });
       if (router.canGoBack()) router.back();
     } catch (e: any) {
-      Alert.alert('保存失败', e.message || '请稍后重试');
+      showToast(e.message || '保存失败，请稍后重试');
     } finally {
       setSaving(false);
     }

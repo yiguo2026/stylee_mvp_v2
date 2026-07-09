@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  StyleSheet, Modal, ScrollView, ActivityIndicator, Alert, Platform,
+  StyleSheet, Modal, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { saveSelfie } from '@/lib/bodyModel';
 import { Gender } from '@/types';
+import { showToast } from '@/components/Toast';
 
 const isWeb = Platform.OS === 'web';
 
@@ -82,10 +83,10 @@ export function ProfileEditModal({ visible, onClose }: Props) {
       if (uploadedUrl) {
         setAvatarUrl(uploadedUrl);
       } else {
-        if (isWeb) { window.alert('头像上传失败，请重试'); } else { Alert.alert('上传失败', '头像上传失败，请重试'); }
+        showToast('头像上传失败，请重试', 'error');
       }
     } catch {
-      if (isWeb) { window.alert('头像上传失败，请重试'); } else { Alert.alert('上传失败', '头像上传失败，请重试'); }
+      showToast('头像上传失败，请重试', 'error');
     } finally {
       setUploadingAvatar(false);
     }
@@ -94,7 +95,7 @@ export function ProfileEditModal({ visible, onClose }: Props) {
   const handleSelfiePick = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      if (isWeb) { window.alert('需要相册权限才能选择照片'); } else { Alert.alert('提示', '需要相册权限才能选择照片'); }
+      showToast('需要相册权限才能选择照片', 'error');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -158,7 +159,7 @@ export function ProfileEditModal({ visible, onClose }: Props) {
       } catch {}
       onClose();
     } catch (e: any) {
-      if (isWeb) { window.alert('保存失败：' + (e.message || '请稍后重试')); } else { Alert.alert('保存失败', e.message || '请稍后重试'); }
+      showToast('保存失败：' + (e.message || '请稍后重试'), 'error');
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  ScrollView, ActivityIndicator, SafeAreaView, Alert,
+  ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Feather from '@expo/vector-icons/Feather';
@@ -13,6 +13,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { setPendingImages } from '@/lib/pendingImages';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { showToast } from '@/components/Toast';
 
 export default function OnboardingStep3() {
   const { user } = useUserStore();
@@ -44,7 +45,7 @@ export default function OnboardingStep3() {
   const handleAlbumImport = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('权限', '需要相册权限才能选择图片');
+      showToast('需要相册权限才能选择图片', 'error');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -83,7 +84,7 @@ export default function OnboardingStep3() {
       }
       router.replace('/(tabs)');
     } catch (e: any) {
-      Alert.alert('添加失败', e.message || '请稍后重试');
+      showToast(e.message || '添加失败，请稍后重试', 'error');
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Image, ScrollView, ActivityIndicator, SafeAreaView, Alert,
+  Image, ScrollView, ActivityIndicator, SafeAreaView,
   Animated, Modal, FlatList, Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -219,7 +219,7 @@ export default function OutfitResultScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        Alert.alert('登录已过期', '请重新登录后再保存');
+        showToast('登录已过期，请重新登录后再保存');
         return null;
       }
       const { data, error } = await supabase
@@ -253,7 +253,7 @@ export default function OutfitResultScreen() {
       if (user?.id) refreshCounts(user.id);
       return outfitId;
     } catch (e: any) {
-      Alert.alert('保存失败', e.message);
+      showToast(`保存失败：${e.message}`);
       return null;
     } finally {
       if (!silent) setSaving(false);
@@ -264,7 +264,7 @@ export default function OutfitResultScreen() {
     if (!currentOutfit || !user) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      Alert.alert('登录已过期', '请重新登录后再操作');
+      showToast('登录已过期，请重新登录后再操作');
       return;
     }
     if (isFavorited) {

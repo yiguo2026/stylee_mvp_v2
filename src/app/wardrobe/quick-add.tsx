@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
+  ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
@@ -10,8 +10,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { CategoryIcon } from '@/components/CategoryIcon';
-
-const isWeb = Platform.OS === 'web';
+import { showToast } from '@/components/Toast';
 
 export default function QuickAddPage() {
   const { user } = useUserStore();
@@ -94,14 +93,10 @@ export default function QuickAddPage() {
         });
       }
       await fetchItems(user.id);
-      if (isWeb) {
-        window.alert(`已添加 ${selected.size} 件单品到衣橱`);
-      } else {
-        Alert.alert('添加成功', `已添加 ${selected.size} 件单品到衣橱`);
-      }
+      showToast(`已添加 ${selected.size} 件单品到衣橱`, 'success');
       if (router.canGoBack()) router.back();
     } catch (e: any) {
-      if (isWeb) { window.alert('添加失败：' + (e.message || '请稍后重试')); } else { Alert.alert('添加失败', e.message || '请稍后重试'); }
+      showToast('添加失败：' + (e.message || '请稍后重试'), 'error');
     } finally {
       setLoading(false);
     }

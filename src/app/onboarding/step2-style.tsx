@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, SafeAreaView, Alert,
+  ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
+import { showToast } from '@/components/Toast';
 
 const LIKE_COLOR = Colors.signal;
 
@@ -28,7 +29,7 @@ export default function OnboardingStep2() {
   };
 
   const handleNext = async () => {
-    if (!user?.id) { Alert.alert('提示', '请先完成上一步'); return; }
+    if (!user?.id) { showToast('请先完成上一步'); return; }
     setLoading(true);
     try {
       await supabase.from('user_style_preferences').delete().eq('user_id', user.id);
@@ -40,13 +41,13 @@ export default function OnboardingStep2() {
       }
       await fetchProfile();
       if (from === 'profile') {
-        Alert.alert('保存成功', '风格偏好已更新');
+        showToast('风格偏好已更新', 'success');
         router.back();
       } else {
         router.push('/onboarding/step3-wardrobe');
       }
     } catch (e: any) {
-      Alert.alert('保存失败', e.message || '请稍后重试');
+      showToast(e.message || '保存失败，请稍后重试', 'error');
     } finally {
       setLoading(false);
     }

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, ActivityIndicator, Alert, Image,
+  ScrollView, SafeAreaView, ActivityIndicator, Image,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AILoading } from '@/components/AILoading';
+import { showToast } from '@/components/Toast';
 import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion } from '@/lib/ai';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
@@ -137,14 +138,14 @@ export default function TryOnScreen() {
   const handleGenerate = async () => {
     if (!canGenerate) return;
     if (!user?.id) {
-      Alert.alert('提示', '请先登录后再使用 AI 试穿');
+      showToast('请先登录后再使用 AI 试穿');
       return;
     }
 
     const q = await consumeQuota(user.id, 'tryon');
     setQuota({ used: q.used, limit: q.limit, remaining: q.remaining });
     if (!q.ok) {
-      Alert.alert('今日试穿次数已用完', `AI 试穿每日 ${q.limit} 次，明天再来`);
+      showToast(`今日试穿次数已用完，AI 试穿每日 ${q.limit} 次，明天再来`);
       return;
     }
 

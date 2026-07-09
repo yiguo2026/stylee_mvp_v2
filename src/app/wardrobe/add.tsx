@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Image, ActivityIndicator, Alert, Modal,
+  ScrollView, Image, ActivityIndicator, Modal,
   SafeAreaView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,6 +18,7 @@ import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType,
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { showToast } from '@/components/Toast';
 
 const isWeb = Platform.OS === 'web';
 
@@ -139,7 +140,7 @@ export default function AddWardrobeItem() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('权限', '需要相册权限才能选择图片');
+      showToast('需要相册权限才能选择图片', 'error');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -155,7 +156,7 @@ export default function AddWardrobeItem() {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('权限', '需要相机权限才能拍照');
+      showToast('需要相机权限才能拍照', 'error');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
@@ -277,7 +278,7 @@ export default function AddWardrobeItem() {
 
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
-      Alert.alert('提示', '请填写衣物名称');
+      showToast('请填写衣物名称');
       return;
     }
     if (!user) return;
@@ -307,12 +308,12 @@ export default function AddWardrobeItem() {
         purchase_date: purchaseDate || undefined,
         image_url: finalImageUrl ?? undefined,
         source_type: imageUri ? 'photo_ai' : 'manual',
-        source_label: imageUri ? '拍照识别' : '手动添加',
+        source_label: imageUri ? '相册导入' : '手动添加',
         status: 'active',
       });
 
       if (!saved) {
-        Alert.alert('保存失败', '请稍后重试');
+        showToast('保存失败，请稍后重试', 'error');
         return;
       }
 
@@ -320,7 +321,7 @@ export default function AddWardrobeItem() {
       setPendingAdvance(true);
     } catch (e) {
       console.warn('[AddWardrobe] Save failed:', e);
-      Alert.alert('保存出错', '请稍后重试');
+      showToast('保存出错，请稍后重试', 'error');
     } finally {
       setSaving(false);
     }

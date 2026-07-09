@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, Image, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, Alert, Platform,
+  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
@@ -10,9 +10,8 @@ import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ItemOutfits } from '@/components/ItemOutfits';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { showToast } from '@/components/Toast';
 import { WardrobeItem, RecommendedItem, OCCASION_TAGS } from '@/types';
-
-const isWeb = Platform.OS === 'web';
 
 const SEASON_LABELS: Record<string, string> = { spring: '春', summer: '夏', autumn: '秋', winter: '冬', all_season: '四季' };
 
@@ -109,7 +108,7 @@ export default function ItemDetailScreen() {
       router.replace('/wardrobe');
     } catch (e: any) {
       setDeleting(false);
-      if (isWeb) { window.alert('删除失败：' + (e.message || '请稍后重试')); } else { Alert.alert('删除失败', e.message || '请稍后重试'); }
+      showToast('删除失败：' + (e.message || '请稍后重试'), 'error');
     }
   };
 
@@ -223,8 +222,8 @@ export default function ItemDetailScreen() {
         <Text style={styles.meta}>
           添加于 {new Date(item!.created_at).toLocaleDateString('zh-CN')}
           {item!.source_label ? ` · ${item!.source_label}` :
-            item!.source_type === 'photo_ai' ? ' · 拍照识别' :
-            item!.source_type === 'album_ai' ? ' · 相册识别' : ' · 手动添加'}
+            item!.source_type === 'photo_ai' ? ' · 相册导入' :
+            item!.source_type === 'album_ai' ? ' · 相册导入' : ' · 手动添加'}
         </Text>
       </ScrollView>
 

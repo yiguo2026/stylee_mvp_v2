@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Image, Alert, Platform, ActivityIndicator,
+  ScrollView, SafeAreaView, Image, Platform, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +9,7 @@ import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { saveSelfie } from '@/lib/bodyModel';
+import { showToast } from '@/components/Toast';
 
 const isWeb = Platform.OS === 'web';
 
@@ -44,7 +45,7 @@ export default function TryOnBodyPage() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      if (isWeb) { window.alert('需要相册权限才能选择照片'); } else { Alert.alert('提示', '需要相册权限才能选择照片'); }
+      showToast('需要相册权限才能选择照片', 'error');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({

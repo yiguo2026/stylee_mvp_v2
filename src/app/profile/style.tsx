@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Alert, Platform,
+  ScrollView, SafeAreaView,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
@@ -9,8 +9,8 @@ import { Colors, Spacing, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { PRESET_STYLE_PREFERENCES, StyleTag } from '@/types';
+import { showToast } from '@/components/Toast';
 
-const isWeb = Platform.OS === 'web';
 const LIKE_COLOR = Colors.signal;
 
 export default function StylePreferencePage() {
@@ -68,18 +68,10 @@ export default function StylePreferencePage() {
         if (upsertError) throw new Error(`保存偏好失败 (${pref.tag_id}): ${upsertError.message}`);
       }
       await fetchProfile();
-      if (isWeb) {
-        window.alert('保存成功！你的风格偏好已更新');
-      } else {
-        Alert.alert('保存成功', '你的风格偏好已更新');
-      }
+      showToast('保存成功！你的风格偏好已更新', 'success');
       if (router.canGoBack()) router.back();
     } catch (e: any) {
-      if (isWeb) {
-        window.alert('保存失败：' + (e.message || '请稍后重试'));
-      } else {
-        Alert.alert('保存失败', e.message || '请稍后重试');
-      }
+      showToast('保存失败：' + (e.message || '请稍后重试'), 'error');
     } finally {
       setSaving(false);
     }
