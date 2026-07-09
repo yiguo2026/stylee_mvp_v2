@@ -1,5 +1,6 @@
 import { WeatherData, WeatherCondition } from '@/types';
 import { getMockWeather, searchCities, getTempTag, getConditionIcon, AVAILABLE_CITIES } from '@/lib/mock/weather';
+import { searchChinaCities } from '@/lib/chinaCities';
 import { QWEATHER_KEY, QWEATHER_HOST } from './secrets';
 const WEATHER_API = `https://${QWEATHER_HOST}/v7/weather/now`;
 const GEO_API = `https://${QWEATHER_HOST}/geo/v2/city/lookup`;
@@ -8,32 +9,10 @@ const CACHE_TTL = 15 * 60 * 1000;
 const weatherCache = new Map<string, { data: WeatherData; ts: number }>();
 const cityIdCache = new Map<string, string>();
 
-// Pre-populate city ID cache for our known cities
-const CITY_ID_MAP: Record<string, string> = {
-  '北京': '101010100', '上海': '101020100', '广州': '101280101',
-  '成都': '101270101', '杭州': '101210101', '深圳': '101280601',
-  '武汉': '101200101', '西安': '101110101', '哈尔滨': '101050101',
-  '三亚': '101310201', '南京': '101190101', '重庆': '101040100',
-  '天津': '101030100', '苏州': '101190401', '长沙': '101250101',
-  '大连': '101070201', '青岛': '101120201', '厦门': '101230201',
-  '昆明': '101290101', '郑州': '101180101',
-  '沈阳': '101070101', '长春': '101060101', '呼和浩特': '101080101',
-  '石家庄': '101090101', '太原': '101100101', '济南': '101120101',
-  '合肥': '101220101', '南昌': '101240101', '福州': '101230101',
-  '南宁': '101300101', '贵阳': '101260101', '拉萨': '101140101',
-  '兰州': '101160101', '西宁': '101150101', '银川': '101170101',
-  '乌鲁木齐': '101130101', '珠海': '101280701', '东莞': '101281601',
-  '佛山': '101280800', '宁波': '101210401', '无锡': '101190201',
-  '温州': '101210701', '常州': '101191101', '徐州': '101190801',
-  '烟台': '101120501', '威海': '101121301', '泉州': '101230501',
-  '漳州': '101230601', '赣州': '101240701', '桂林': '101300501',
-  '海口': '101310101', '遵义': '101260201', '洛阳': '101180901',
-  '包头': '101080201', '鞍山': '101070301', '抚顺': '101070401',
-  '锦州': '101070701', '营口': '101070801', '丹东': '101070601',
-  '朝阳': '101071201', '铁岭': '101071101', '盘锦': '101071301',
-  '葫芦岛': '101071401', '辽阳': '101071001', '本溪': '101070501',
-  '阜新': '101070901',
-};
+// Build city ID map from chinaCities data
+import { CHINA_CITIES } from './chinaCities';
+const CITY_ID_MAP: Record<string, string> = {};
+CHINA_CITIES.forEach(c => { CITY_ID_MAP[c.name] = c.wid; });
 Object.entries(CITY_ID_MAP).forEach(([city, id]) => cityIdCache.set(city, id));
 
 const ICON_TO_CONDITION: Record<string, WeatherCondition> = {
@@ -128,29 +107,33 @@ export interface CityResult {
 }
 
 export async function searchCitiesOnline(query: string): Promise<CityResult[]> {
-  const localResults = () => searchCities(query).map(c => ({ name: c, id: CITY_ID_MAP[c] ?? '' }));
+  // Use local full China city list first (covers all prefecture-level cities)
+  const localCities = searchChinaCities(query);
+  if (!query.trim()) {
+    return localCities.map(c => ({ name: c.name, id: CITY_ID_MAP[c.name] ?? '', adm1: c.adm1 }));
+  }
+  if (localCities.length > 0) {
+    return localCities.map(c => ({ name: c.name, id: CITY_ID_MAP[c.name] ?? '', adm1: c.adm1 }));
+  }
 
-  if (!query.trim()) return AVAILABLE_CITIES.map(c => ({ name: c, id: CITY_ID_MAP[c] ?? '' }));
-  if (!QWEATHER_KEY) return localResults();
+  // Try GeoAPI as supplement for cities not in local list
+  if (QWEATHER_KEY) {
+    try {
+      const url = `${GEO_API}?location=${encodeURIComponent(query.trim())}&key=${QWEATHER_KEY}&lang=zh&number=20`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.code === '200' && Array.isArray(json.location) && json.location.length > 0) {
+        json.location.forEach((loc: any) => { cityIdCache.set(loc.name as string, loc.id as string); });
+        return json.location.map((loc: any) => ({
+          name: loc.name as string,
+          id: loc.id as string,
+          adm1: loc.adm1 as string,
+        }));
+      }
+    } catch {}
+  }
 
-  // Try GeoAPI (may be blocked by security restrictions on some plans)
-  try {
-    const url = `${GEO_API}?location=${encodeURIComponent(query.trim())}&key=${QWEATHER_KEY}&lang=zh&number=20`;
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.code === '200' && Array.isArray(json.location)) {
-      // Cache IDs from API results
-      json.location.forEach((loc: any) => { cityIdCache.set(loc.name as string, loc.id as string); });
-      return json.location.map((loc: any) => ({
-        name: loc.name as string,
-        id: loc.id as string,
-        adm1: loc.adm1 as string,
-      }));
-    }
-  } catch {}
-
-  // Fallback to local list
-  return localResults();
+  return [];
 }
 
 export { getMockWeather, searchCities, getTempTag, getConditionIcon, AVAILABLE_CITIES };

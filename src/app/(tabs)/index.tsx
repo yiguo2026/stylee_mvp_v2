@@ -230,20 +230,24 @@ export default function OutfitTab() {
           autoFocus
         />
         <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
-          {cityResults.map(cr => {
-            const isActive = weather.city === cr.name;
-            return (
-              <TouchableOpacity
-                key={cr.id || cr.name}
-                style={[styles.cityRow, isActive && styles.cityRowActive]}
-                onPress={() => selectCity(cr.name)}
-              >
-                <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
-                  {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {citySearch && cityResults.length === 0 ? (
+            <Text style={styles.cityNoResult}>无搜索结果</Text>
+          ) : (
+            cityResults.map(cr => {
+              const isActive = weather.city === cr.name;
+              return (
+                <TouchableOpacity
+                  key={cr.id || cr.name}
+                  style={[styles.cityRow, isActive && styles.cityRowActive]}
+                  onPress={() => selectCity(cr.name)}
+                >
+                  <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
+                    {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </ScrollView>
         <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
           <Feather name="x-circle" size={16} color={Colors.walnut} />
@@ -670,6 +674,7 @@ const styles = StyleSheet.create({
   cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
   cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
+  cityNoResult: { ...T.bodyText, color: Colors.walnut2, fontSize: 14, textAlign: 'center', paddingVertical: Spacing.four },
   modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

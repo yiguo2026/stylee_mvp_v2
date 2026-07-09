@@ -10,7 +10,7 @@
 
 - **前端**：Expo SDK 54 + TypeScript + Expo Router（文件路由）
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
-- **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动 fallback 到本地 mock）
+- **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，180+ 城市本地 ID 映射，API 不可用时自动 fallback 到本地 mock）
 - **AI**：DashScope（Qwen VL 识别 / Qwen Image 生图）+ DeepSeek（意图识别 / 穿搭推荐 / 试穿建议）；不可用时自动回落 mock
 - **部署**：GitHub Pages（yiguo2026.github.io 仓库 gh-pages 分支）+ EAS Build（iOS）
 - **状态管理**：Zustand
@@ -20,11 +20,11 @@
 
 ### 用户系统
 - 注册 / 登录（Supabase Auth，邮箱密码）
-- 个人资料编辑（头像上传、昵称、性别、年龄、城市、职业）
+- 个人资料编辑（头像上传、昵称、性别、年龄、城市搜索、职业下拉选择）
 - 更多设置（通知开关、账号安全、隐私、数据管理、关于）
 
 ### Onboarding 引导（3步）
-- Step1：个人信息（昵称、性别、年龄、职业、城市搜索选择）
+- Step1：个人信息（昵称、性别、年龄1-110校验、职业下拉选择、城市搜索选择）
 - Step2：风格偏好（19个喜欢标签，点击选择）
 - Step3：初始化衣橱（17件AI推荐基础款，Supabase Storage 真实服装图片 + 相册批量导入，可同时选择两类）
 
@@ -45,7 +45,7 @@
 - 标准图失败处理：生成失败时提供「重试」和「用原图保存」按钮，不再卡死
 
 ### 穿搭推荐
-- 实时天气卡片（和风天气 API，55 城市本地 ID 映射 + GeoAPI 远程搜索，自动匹配温度标签）
+- 实时天气卡片（和风天气 API，180+ 城市本地 ID 映射，自动匹配温度标签）
 - 自然语言输入（DeepSeek 意图识别，自动匹配标签）
 - 场合/风格/色系/温度标签筛选（场合10个、风格19个、色系8个、温度4个）
 - AI 穿搭推荐（DeepSeek 生成搭配方案）
@@ -190,6 +190,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `7788fd5` | 修复快速添加推荐单品页勾选对勾被裁切：移除 overflow:hidden，对勾悬浮于缩略图之上 |
 | — | 修复登录/注册页：用户名限制英文+数字+下划线（中文会触发邮箱格式错误）；重复用户名红字提示移至输入框下方；placeholder 提示支持的格式 |
 | `5dd80c5` | 修复 AI 次数计数异常：防止 consumeQuota 重复调用（ref 守卫）；首页 useFocusEffect 刷新配额；AI 试穿过渡动画显示剩余次数 |
+| — | 表单校验增强：年龄允许输入但实时校验格式（非数字/1-110范围红字提示）；职业改为下拉选择（16个预设选项）；城市搜索内置180+地级市数据（修复API 403导致搜索无结果）；ProfileEditModal 打开时同步最新profile数据；城市弹窗独立层级覆盖全屏 |
 
 ## 项目结构
 
@@ -204,7 +205,7 @@ src/
     wardrobe/       # 添加衣物 / 单品详情 / 单品编辑 / 批量导入
   components/       # ConfirmModal / ProfileEditModal / CategoryIcon / WeatherIcon / AddClothingSheet
   constants/        # theme（配色、字体、间距、圆角、阴影）
-  lib/              # supabase / deepseek / dashscope / ai / weather / uploadImage / bodyModel / dailyQuota / mock
+  lib/              # supabase / deepseek / dashscope / ai / weather / chinaCities / uploadImage / bodyModel / dailyQuota / mock
   stores/           # userStore / wardrobeStore / wishlistStore / tryonStore
   types/            # TypeScript 类型 + 统一标签定义
 assets/

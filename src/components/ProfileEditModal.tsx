@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, Modal, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import Feather from '@expo/vector-icons/Feather';
+import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { supabase } from '@/lib/supabase';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { saveSelfie } from '@/lib/bodyModel';
+import { searchCitiesOnline, CityResult } from '@/lib/weather';
 import { Gender } from '@/types';
 import { showToast } from '@/components/Toast';
 
@@ -20,6 +22,13 @@ const GENDERS: { label: string; value: Gender }[] = [
   { label: '男士', value: 'male' },
   { label: '其他', value: 'other' },
   { label: '保密', value: 'private' },
+];
+
+const PROFESSIONS = [
+  '学生', '互联网/科技', '金融/银行', '教育/学术', '医疗/健康',
+  '政府/公共事业', '制造业', '零售/电商', '媒体/广告', '法律/咨询',
+  '设计/艺术', '建筑/房地产', '餐饮/酒店', '物流/交通', '自由职业',
+  '其他',
 ];
 
 // Compress image to small data URL for localStorage
@@ -59,12 +68,31 @@ export function ProfileEditModal({ visible, onClose }: Props) {
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
   const [gender, setGender] = useState<Gender>(profile?.gender ?? 'female');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
+  const [ageError, setAgeError] = useState('');
   const [city, setCity] = useState(profile?.permanent_city ?? '');
+  const [cityModalVisible, setCityModalVisible] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [cityResults, setCityResults] = useState<CityResult[]>([]);
   const [profession, setProfession] = useState(profile?.profession ?? '');
+  const [professionModalVisible, setProfessionModalVisible] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
   const [localSelfieUri, setLocalSelfieUri] = useState<string | null>(selfieUri);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Sync state from profile when modal opens
+  useEffect(() => {
+    if (visible) {
+      setNickname(profile?.nickname ?? '');
+      setGender(profile?.gender ?? 'female');
+      setAge(profile?.age?.toString() ?? '');
+      setAgeError('');
+      setCity(profile?.permanent_city ?? '');
+      setProfession(profile?.profession ?? '');
+      setAvatarUrl(profile?.avatar_url ?? '');
+      setLocalSelfieUri(selfieUri);
+    }
+  }, [visible, profile, selfieUri]);
 
   const handleAvatarPick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -129,6 +157,14 @@ export function ProfileEditModal({ visible, onClose }: Props) {
 
   const handleSave = async () => {
     if (!nickname.trim() || !user?.id) return;
+    setAgeError('');
+    if (age) {
+      const n = parseInt(age);
+      if (isNaN(n) || n < 1 || n > 110) {
+        setAgeError('请输入 1-110 之间的年龄');
+        return;
+      }
+    }
     setSaving(true);
     try {
       const { error } = await supabase.from('users').upsert(
@@ -235,35 +271,48 @@ export function ProfileEditModal({ visible, onClose }: Props) {
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>年龄</Text>
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, ageError && styles.fieldInputError]}
               value={age}
-              onChangeText={setAge}
+              onChangeText={(t) => {
+                setAge(t);
+                if (!t) { setAgeError(''); return; }
+                if (!/^\d+$/.test(t)) {
+                  setAgeError('年龄请输入数字');
+                } else {
+                  const n = parseInt(t);
+                  setAgeError(n < 1 || n > 110 ? '请输入 1-110 之间的年龄' : '');
+                }
+              }}
               placeholder="请输入年龄"
               placeholderTextColor={Colors.walnut2}
-              keyboardType="numeric"
             />
+            {ageError ? <Text style={styles.fieldErrorText}>{ageError}</Text> : null}
           </View>
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>城市</Text>
-            <TextInput
-              style={styles.fieldInput}
-              value={city}
-              onChangeText={setCity}
-              placeholder="请输入城市"
-              placeholderTextColor={Colors.walnut2}
-            />
+            <TouchableOpacity
+              style={styles.citySelect}
+              onPress={() => { setCityModalVisible(true); searchCitiesOnline('').then(setCityResults); }}
+            >
+              <Text style={[styles.citySelectText, !city && styles.placeholder]}>
+                {city || '选择城市'}
+              </Text>
+              <Text style={styles.citySelectArrow}>›</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>职业</Text>
-            <TextInput
-              style={styles.fieldInput}
-              value={profession}
-              onChangeText={setProfession}
-              placeholder="请输入职业"
-              placeholderTextColor={Colors.walnut2}
-            />
+            <TouchableOpacity
+              style={styles.citySelect}
+              onPress={() => setProfessionModalVisible(true)}
+            >
+              <Text style={[styles.citySelectText, !profession && styles.placeholder]}>
+                {profession || '选择职业'}
+              </Text>
+              <Text style={styles.citySelectArrow}>›</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Selfie for AI Try-on */}
@@ -306,15 +355,111 @@ export function ProfileEditModal({ visible, onClose }: Props) {
     </View>
   );
 
+  const citySheet = (
+    <View style={styles.cityModalOverlay}>
+      <View style={styles.cityModalSheet}>
+        <Text style={styles.cityModalTitle}>选择城市</Text>
+        <TextInput
+          style={styles.citySearchInput}
+          placeholder="搜索城市..."
+          placeholderTextColor={Colors.walnut2}
+          value={citySearch}
+          onChangeText={(text) => {
+            setCitySearch(text);
+            searchCitiesOnline(text).then(setCityResults);
+          }}
+          autoFocus
+        />
+        <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
+          {citySearch && cityResults.length === 0 ? (
+            <Text style={styles.cityNoResult}>无搜索结果</Text>
+          ) : (
+            cityResults.map(cr => (
+              <TouchableOpacity
+                key={cr.id || cr.name}
+                style={[styles.cityRow, city === cr.name && styles.cityRowActive]}
+                onPress={() => {
+                  setCity(cr.name);
+                  setCityModalVisible(false);
+                  setCitySearch('');
+                }}
+              >
+                <Text style={[styles.cityRowText, city === cr.name && styles.cityRowTextActive]}>
+                  {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+        <TouchableOpacity style={styles.cityModalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          <Feather name="x-circle" size={16} color={Colors.walnut} />
+          <Text style={styles.cityModalCloseText}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const professionSheet = (
+    <View style={styles.cityModalOverlay}>
+      <View style={styles.cityModalSheet}>
+        <Text style={styles.cityModalTitle}>选择职业</Text>
+        <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
+          {PROFESSIONS.map(p => (
+            <TouchableOpacity
+              key={p}
+              style={[styles.cityRow, profession === p && styles.cityRowActive]}
+              onPress={() => {
+                setProfession(p);
+                setProfessionModalVisible(false);
+              }}
+            >
+              <Text style={[styles.cityRowText, profession === p && styles.cityRowTextActive]}>
+                {p}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity style={styles.cityModalCloseBtn} onPress={() => setProfessionModalVisible(false)}>
+          <Feather name="x-circle" size={16} color={Colors.walnut} />
+          <Text style={styles.cityModalCloseText}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   if (isWeb) {
     if (!visible) return null;
-    return <View style={styles.webLayer}>{content}</View>;
+    return (
+      <>
+        <View style={styles.webLayer}>
+          {content}
+        </View>
+        {cityModalVisible ? (
+          <View style={styles.cityWebLayer}>
+            {citySheet}
+          </View>
+        ) : null}
+        {professionModalVisible ? (
+          <View style={styles.cityWebLayer}>
+            {professionSheet}
+          </View>
+        ) : null}
+      </>
+    );
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
-      {content}
-    </Modal>
+    <>
+      <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
+        {content}
+      </Modal>
+      <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => { setCityModalVisible(false); setCitySearch(''); }}>
+        {citySheet}
+      </Modal>
+      <Modal visible={professionModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => setProfessionModalVisible(false)}>
+        {professionSheet}
+      </Modal>
+    </>
   );
 }
 
@@ -430,4 +575,45 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.6 },
   saveText: { ...T.buttonPrimary, color: Colors.paper },
+
+  // Age validation
+  fieldInputError: { borderColor: Colors.accent },
+  fieldErrorText: { ...T.micro, color: Colors.accent, fontSize: 12, marginTop: 4 },
+
+  // City select
+  citySelect: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
+    borderRadius: Radius.md, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2,
+  },
+  citySelectText: { ...T.inputText, color: Colors.ink },
+  citySelectArrow: { fontSize: 16, color: Colors.walnut2 },
+  placeholder: { color: Colors.walnut2 },
+
+  // City modal
+  cityWebLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 210,
+  },
+  cityModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  cityModalSheet: {
+    backgroundColor: Colors.paper,
+    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
+    maxHeight: '70%', padding: Spacing.four, ...Shadow.two,
+  },
+  cityModalTitle: { ...T.sectionTitle, textAlign: 'center', marginBottom: Spacing.three },
+  citySearchInput: {
+    ...T.inputText, backgroundColor: Colors.paperCard,
+    borderWidth: 1.5, borderColor: Colors.line, borderRadius: 10,
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    fontSize: 13, color: Colors.ink, marginBottom: Spacing.two,
+  },
+  cityList: { maxHeight: 200 },
+  cityRow: { paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three, borderRadius: Radius.sm },
+  cityRowActive: { backgroundColor: Colors.signalSoft },
+  cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
+  cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
+  cityNoResult: { ...T.bodyText, color: Colors.walnut2, fontSize: 14, textAlign: 'center', paddingVertical: Spacing.four },
+  cityModalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.two },
+  cityModalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

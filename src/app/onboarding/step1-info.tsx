@@ -30,12 +30,21 @@ const GENDERS: { label: string; value: Gender }[] = [
   { label: '其他', value: 'other' },
 ];
 
+const PROFESSIONS = [
+  '学生', '互联网/科技', '金融/银行', '教育/学术', '医疗/健康',
+  '政府/公共事业', '制造业', '零售/电商', '媒体/广告', '法律/咨询',
+  '设计/艺术', '建筑/房地产', '餐饮/酒店', '物流/交通', '自由职业',
+  '其他',
+];
+
 export default function OnboardingStep1() {
   const { user, profile, fetchProfile } = useUserStore();
   const [nickname, setNickname] = useState(profile?.nickname ?? randomNickname());
   const [gender, setGender] = useState<Gender>(profile?.gender ?? 'female');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
+  const [ageError, setAgeError] = useState('');
   const [profession, setProfession] = useState(profile?.profession ?? '');
+  const [professionModalVisible, setProfessionModalVisible] = useState(false);
   const [city, setCity] = useState(profile?.permanent_city ?? '北京');
   const [cityModalVisible, setCityModalVisible] = useState(false);
   const [citySearch, setCitySearch] = useState('');
@@ -43,6 +52,18 @@ export default function OnboardingStep1() {
   const [loading, setLoading] = useState(false);
 
   const handleNext = async () => {
+    setAgeError('');
+    if (age) {
+      if (!/^\d+$/.test(age)) {
+        setAgeError('年龄请输入数字');
+        return;
+      }
+      const n = parseInt(age);
+      if (n < 1 || n > 110) {
+        setAgeError('请输入 1-110 之间的年龄');
+        return;
+      }
+    }
     setLoading(true);
     try {
       const { error } = await supabase.from('users').upsert({
@@ -85,26 +106,58 @@ export default function OnboardingStep1() {
           autoFocus
         />
         <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
-          {cityResults.map(cr => {
-            const isActive = city === cr.name;
-            return (
-              <TouchableOpacity
-                key={cr.id || cr.name}
-                style={[styles.cityRow, isActive && styles.cityRowActive]}
-                onPress={() => {
-                  setCity(cr.name);
-                  setCityModalVisible(false);
-                  setCitySearch('');
-                }}
-              >
-                <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
-                  {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {citySearch && cityResults.length === 0 ? (
+            <Text style={styles.cityNoResult}>无搜索结果</Text>
+          ) : (
+            cityResults.map(cr => {
+              const isActive = city === cr.name;
+              return (
+                <TouchableOpacity
+                  key={cr.id || cr.name}
+                  style={[styles.cityRow, isActive && styles.cityRowActive]}
+                  onPress={() => {
+                    setCity(cr.name);
+                    setCityModalVisible(false);
+                    setCitySearch('');
+                  }}
+                >
+                  <Text style={[styles.cityRowText, isActive && styles.cityRowTextActive]}>
+                    {cr.name}{cr.adm1 ? ` (${cr.adm1})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </ScrollView>
         <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
+          <Feather name="x-circle" size={16} color={Colors.walnut} />
+          <Text style={styles.modalCloseText}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const professionSheet = (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalSheet}>
+        <Text style={styles.modalTitle}>选择职业</Text>
+        <ScrollView style={styles.cityList} keyboardShouldPersistTaps="handled">
+          {PROFESSIONS.map(p => (
+            <TouchableOpacity
+              key={p}
+              style={[styles.cityRow, profession === p && styles.cityRowActive]}
+              onPress={() => {
+                setProfession(p);
+                setProfessionModalVisible(false);
+              }}
+            >
+              <Text style={[styles.cityRowText, profession === p && styles.cityRowTextActive]}>
+                {p}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setProfessionModalVisible(false)}>
           <Feather name="x-circle" size={16} color={Colors.walnut} />
           <Text style={styles.modalCloseText}>取消</Text>
         </TouchableOpacity>
@@ -160,24 +213,35 @@ export default function OnboardingStep1() {
       <View style={styles.section}>
         <Text style={styles.label}>年龄</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, ageError && styles.inputError]}
           placeholder="可选"
           placeholderTextColor={Colors.walnut2}
           value={age}
-          onChangeText={setAge}
-          keyboardType="numeric"
+          onChangeText={(t) => {
+            setAge(t);
+            if (!t) { setAgeError(''); return; }
+            if (!/^\d+$/.test(t)) {
+              setAgeError('年龄请输入数字');
+            } else {
+              const n = parseInt(t);
+              setAgeError(n < 1 || n > 110 ? '请输入 1-110 之间的年龄' : '');
+            }
+          }}
         />
+        {ageError ? <Text style={styles.fieldError}>{ageError}</Text> : null}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.label}>职业</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="可选"
-          placeholderTextColor={Colors.walnut2}
-          value={profession}
-          onChangeText={setProfession}
-        />
+        <TouchableOpacity
+          style={styles.citySelect}
+          onPress={() => setProfessionModalVisible(true)}
+        >
+          <Text style={[styles.citySelectText, !profession && styles.placeholder]}>
+            {profession || '选择职业'}
+          </Text>
+          <Text style={styles.citySelectArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -211,11 +275,19 @@ export default function OnboardingStep1() {
     </ScrollView>
 
       {isWeb ? (
-        cityModalVisible ? <View style={styles.webLayer}>{citySheet}</View> : null
+        <>
+          {cityModalVisible ? <View style={styles.webLayer}>{citySheet}</View> : null}
+          {professionModalVisible ? <View style={styles.webLayer}>{professionSheet}</View> : null}
+        </>
       ) : (
-        <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => { setCityModalVisible(false); setCitySearch(''); }}>
-          {citySheet}
-        </Modal>
+        <>
+          <Modal visible={cityModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => { setCityModalVisible(false); setCitySearch(''); }}>
+            {citySheet}
+          </Modal>
+          <Modal visible={professionModalVisible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={() => setProfessionModalVisible(false)}>
+            {professionSheet}
+          </Modal>
+        </>
       )}
     </SafeAreaView>
   );
@@ -247,6 +319,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 2,
     color: Colors.ink,
   },
+  inputError: { borderColor: Colors.accent },
+  fieldError: { ...T.micro, color: Colors.accent, fontSize: 12, marginTop: 4 },
   genderRow: { flexDirection: 'row', gap: Spacing.two },
   genderBtn: {
     flex: 1,
@@ -307,6 +381,7 @@ const styles = StyleSheet.create({
   cityRowActive: { backgroundColor: Colors.signalSoft },
   cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
   cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
+  cityNoResult: { ...T.bodyText, color: Colors.walnut2, fontSize: 14, textAlign: 'center', paddingVertical: Spacing.four },
   modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.two },
   modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
 });

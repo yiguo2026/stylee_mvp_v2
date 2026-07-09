@@ -11,7 +11,7 @@ import { Colors, Spacing, Radius, T } from '@/constants/theme';
 const isWeb = Platform.OS === 'web';
 
 function usernameToEmail(username: string) {
-  return `${username.toLowerCase().trim()}@users.stylee.app`;
+  return `${username.trim()}@users.stylee.app`;
 }
 
 function translateRegisterError(msg: string): string {
