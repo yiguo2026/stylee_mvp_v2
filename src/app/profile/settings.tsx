@@ -7,8 +7,10 @@ import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { NicknameEditModal } from '@/components/NicknameEditModal';
 import Constants from 'expo-constants';
 import { showToast } from '@/components/Toast';
+import { supabase } from '@/lib/supabase';
 
 const isWeb = Platform.OS === 'web';
 const STORAGE_PREFIX = 'stylee_settings_';
@@ -37,8 +39,9 @@ async function saveSetting(key: string, value: boolean): Promise<void> {
 }
 
 export default function SettingsPage() {
-  const { profile, signOut } = useUserStore();
+  const { user, profile, signOut, setProfile } = useUserStore();
   const [showSignOut, setShowSignOut] = useState(false);
+  const [showNicknameEdit, setShowNicknameEdit] = useState(false);
   const [locationAccess, setLocationAccess] = useState(true);
   const [cacheSize, setCacheSize] = useState('128 MB');
 
@@ -59,6 +62,27 @@ export default function SettingsPage() {
     showToast('缓存已清除', 'success');
   };
 
+  const handleSaveNickname = async (newValue: string) => {
+    if (!user?.id) {
+      showToast('未登录，无法修改', 'error');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ nickname: newValue, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+      if (error) throw error;
+      if (profile) {
+        setProfile({ ...profile, nickname: newValue });
+      }
+      setShowNicknameEdit(false);
+      showToast('用户名已更新', 'success');
+    } catch (e: any) {
+      showToast('保存失败：' + (e?.message || '请稍后重试'), 'error');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -73,18 +97,14 @@ export default function SettingsPage() {
         {/* 账号与安全 */}
         <Text style={styles.sectionLabel}>账号与安全</Text>
         <View style={styles.group}>
-          <TouchableOpacity style={styles.row} onPress={() => {
-            showToast('当前用户名: ' + (profile?.nickname ?? '未设置'));
-          }}>
+          <TouchableOpacity style={styles.row} onPress={() => setShowNicknameEdit(true)}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>用户名</Text>
             </View>
             <Text style={styles.rowValue}>{profile?.nickname ?? 'user_1234'} ›</Text>
           </TouchableOpacity>
           <View style={styles.rowBorder} />
-          <TouchableOpacity style={styles.row} onPress={() => {
-            showToast('请通过登录页面的"忘记密码"功能重置密码');
-          }}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/profile/change-password')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>登录密码</Text>
             </View>
@@ -187,6 +207,13 @@ export default function SettingsPage() {
         confirmStyle="destructive"
         onConfirm={() => { setShowSignOut(false); signOut(); }}
         onCancel={() => setShowSignOut(false)}
+      />
+
+      <NicknameEditModal
+        visible={showNicknameEdit}
+        initialValue={profile?.nickname ?? ''}
+        onClose={() => setShowNicknameEdit(false)}
+        onSave={handleSaveNickname}
       />
     </SafeAreaView>
   );
