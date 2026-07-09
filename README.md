@@ -191,6 +191,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | — | 修复登录/注册页：用户名限制英文+数字+下划线（中文会触发邮箱格式错误）；重复用户名红字提示移至输入框下方；placeholder 提示支持的格式 |
 | `5dd80c5` | 修复 AI 次数计数异常：防止 consumeQuota 重复调用（ref 守卫）；首页 useFocusEffect 刷新配额；AI 试穿过渡动画显示剩余次数 |
 | — | 表单校验增强：年龄允许输入但实时校验格式（非数字/1-110范围红字提示）；职业改为下拉选择（16个预设选项）；城市搜索内置180+地级市数据（修复API 403导致搜索无结果）；ProfileEditModal 打开时同步最新profile数据；城市弹窗独立层级覆盖全屏 |
+| — | 修复 onboard step3 选中单品✅被裁切：builtinIcon 移除 overflow:hidden，改为 position:relative，对齐快速添加页 |
 
 ## 项目结构
 
