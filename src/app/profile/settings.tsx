@@ -8,6 +8,7 @@ import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import Constants from 'expo-constants';
+import { showToast } from '@/components/Toast';
 
 const isWeb = Platform.OS === 'web';
 const STORAGE_PREFIX = 'stylee_settings_';
@@ -55,7 +56,7 @@ export default function SettingsPage() {
 
   const handleClearCache = () => {
     setCacheSize('0 MB');
-    if (isWeb) { window.alert('缓存已清除'); } else { Alert.alert('提示', '缓存已清除'); }
+    showToast('缓存已清除', 'success');
   };
 
   return (
@@ -111,7 +112,7 @@ export default function SettingsPage() {
         <Text style={styles.sectionLabel}>数据管理</Text>
         <View style={styles.group}>
           <TouchableOpacity style={styles.row} onPress={() => {
-            if (isWeb) { window.alert('正在备份您的数据...'); } else { Alert.alert('数据备份', '正在备份您的数据...'); }
+            showToast('正在备份您的数据…', 'info');
           }}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>数据备份</Text>
@@ -148,7 +149,7 @@ export default function SettingsPage() {
           <View style={styles.rowBorder} />
           <TouchableOpacity style={styles.row} onPress={() => {
             Linking.openURL('https://yiguo2026.github.io/terms.html').catch(() => {
-              if (isWeb) { window.alert('无法打开用户协议'); } else { Alert.alert('提示', '无法打开用户协议'); }
+              showToast('无法打开用户协议', 'error');
             });
           }}>
             <View style={styles.rowLeft}>

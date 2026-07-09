@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors } from '@/constants/theme';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ToastHost } from '@/components/Toast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -98,6 +99,7 @@ export default function RootLayout() {
         <Stack.Screen name="wardrobe/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="outfit/result" options={{ presentation: 'card' }} />
       </Stack>
+      <ToastHost />
     </ErrorBoundary>
   );
 }
