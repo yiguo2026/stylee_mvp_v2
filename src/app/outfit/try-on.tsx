@@ -402,6 +402,7 @@ export default function TryOnScreen() {
             subtitle="正在合成你的专属试穿图..."
             steps={['分析身体数据', '匹配穿搭单品', '合成试穿效果', '优化画面细节']}
             durationMs={14000}
+            hint={quota ? `今日剩余 ${quota.remaining}/${quota.limit} 次` : undefined}
           />
         </View>
       ) : null}

@@ -79,6 +79,7 @@ export default function OutfitResultScreen() {
   const [toast, setToast] = useState('');
   const [addingRecIdx, setAddingRecIdx] = useState<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quotaConsumedRef = useRef(false);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -128,12 +129,20 @@ export default function OutfitResultScreen() {
       return;
     }
 
-    const q = await consumeQuota(userId, 'recommend');
-    setQuota({ used: q.used, limit: q.limit, remaining: q.remaining });
-    if (!q.ok) {
+    // Consume quota only once per page visit, even if generateOutfits re-runs
+    let quotaResult;
+    if (quotaConsumedRef.current) {
+      const gq = await getQuota(userId, 'recommend');
+      quotaResult = { used: gq.used, limit: gq.limit, remaining: gq.remaining, ok: gq.remaining > 0 };
+    } else {
+      quotaResult = await consumeQuota(userId, 'recommend');
+      quotaConsumedRef.current = true;
+    }
+    setQuota({ used: quotaResult.used, limit: quotaResult.limit, remaining: quotaResult.remaining });
+    if (!quotaResult.ok) {
       finished = true;
       setOutfits([]);
-      setErrorMessage(`今日 AI 推荐次数已用完（${q.limit} 次），明天再来`);
+      setErrorMessage(`今日 AI 推荐次数已用完（${quotaResult.limit} 次），明天再来`);
       setLoading(false);
       return;
     }

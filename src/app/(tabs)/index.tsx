@@ -118,6 +118,13 @@ export default function OutfitTab() {
     getQuota(user.id, 'recommend').then(q => setQuota({ remaining: q.remaining, limit: q.limit }));
   }, [user?.id]);
 
+  // Refresh quota when returning from outfit/result page
+  useFocusEffect(useCallback(() => {
+    if (user?.id) {
+      getQuota(user.id, 'recommend').then(q => setQuota({ remaining: q.remaining, limit: q.limit }));
+    }
+  }, [user?.id]));
+
   useEffect(() => {
     fetchWeather(defaultCity).then(setWeather);
   }, [defaultCity]);
