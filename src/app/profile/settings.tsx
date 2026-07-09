@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Switch, Alert, Linking, Platform,
+  ScrollView, SafeAreaView, Switch, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
@@ -138,31 +138,21 @@ export default function SettingsPage() {
             <Text style={styles.rowValue}>v{appVersion}</Text>
           </View>
           <View style={styles.rowBorder} />
-          <TouchableOpacity style={styles.row} onPress={() => {
-            if (isWeb) { window.alert('感谢您的反馈！请通过邮件联系我们：feedback@stylee.app'); } else { Alert.alert('意见反馈', '感谢您的反馈！请通过邮件联系我们：feedback@stylee.app'); }
-          }}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/profile/feedback')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>意见反馈</Text>
             </View>
             <Text style={styles.rowValue}>›</Text>
           </TouchableOpacity>
           <View style={styles.rowBorder} />
-          <TouchableOpacity style={styles.row} onPress={() => {
-            Linking.openURL('https://yiguo2026.github.io/terms.html').catch(() => {
-              showToast('无法打开用户协议', 'error');
-            });
-          }}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/profile/terms')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>用户协议</Text>
             </View>
             <Text style={styles.rowValue}>›</Text>
           </TouchableOpacity>
           <View style={styles.rowBorder} />
-          <TouchableOpacity style={styles.row} onPress={() => {
-            Linking.openURL('https://yiguo2026.github.io/privacy.html').catch(() => {
-              if (isWeb) { window.alert('无法打开隐私政策'); } else { Alert.alert('提示', '无法打开隐私政策'); }
-            });
-          }}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/profile/privacy')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowLabel}>隐私政策</Text>
             </View>

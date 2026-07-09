@@ -65,9 +65,7 @@ export default function OutfitResultScreen() {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [showSaveGuide, setShowSaveGuide] = useState(false);
   const [confirmedWear, setConfirmedWear] = useState(false);
-  const saveGuideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [adjustMode, setAdjustMode] = useState(false);
   const [swapTarget, setSwapTarget] = useState<OutfitItem | null>(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -205,7 +203,6 @@ export default function OutfitResultScreen() {
   // 卸载时清理定时器，避免 setState after unmount
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
   }, []);
 
   const currentOutfit = outfits[currentIndex];
@@ -216,9 +213,6 @@ export default function OutfitResultScreen() {
     if (savedId && !silent) {
       setConfirmedWear(true);
       showToast('已保存到穿搭记录');
-      setShowSaveGuide(true);
-      if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
-      saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
       return savedId;
     }
     if (!silent) setSaving(true);
@@ -255,10 +249,6 @@ export default function OutfitResultScreen() {
       if (!silent) {
         setConfirmedWear(true);
         showToast('已保存到穿搭记录');
-        // 方案B：保存后留在结果页，展示 inline 引导条（可关闭/自动隐藏）
-        setShowSaveGuide(true);
-        if (saveGuideTimer.current) clearTimeout(saveGuideTimer.current);
-        saveGuideTimer.current = setTimeout(() => setShowSaveGuide(false), 8000);
       }
       if (user?.id) refreshCounts(user.id);
       return outfitId;
@@ -686,23 +676,6 @@ export default function OutfitResultScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* ── 保存后引导条（方案B：留在结果页 + 引导试穿）── */}
-      {showSaveGuide ? (
-        <View style={styles.saveGuide}>
-          <Text style={styles.saveGuideText} numberOfLines={1}>已保存 ✓ 想看穿上身的效果吗？</Text>
-          <TouchableOpacity style={styles.saveGuideBtn} onPress={handleGoTryOn} activeOpacity={0.8}>
-            <Text style={styles.saveGuideBtnText}>去试穿 →</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.saveGuideClose}
-            onPress={() => setShowSaveGuide(false)}
-            hitSlop={8}
-          >
-            <Feather name="x" size={16} color={Colors.walnut2} />
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
       {/* ── 5. Decision Bar ── */}
       <View style={styles.decisionBar}>
         <TouchableOpacity
@@ -940,21 +913,6 @@ const styles = StyleSheet.create({
   decisionBtnConfirm: { paddingVertical: 14, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.ink, ...Shadow.two },
   decisionBtnSaved: { backgroundColor: Colors.sage },
   decisionBtnConfirmText: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
-
-  // 保存后引导条（inline，位于操作栏上方，不遮挡主操作）
-  saveGuide: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
-    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
-    backgroundColor: Colors.signalSoft,
-    borderTopWidth: 1, borderTopColor: Colors.line,
-  },
-  saveGuideText: { flex: 1, ...T.bodyText, fontSize: 13, color: Colors.ink },
-  saveGuideBtn: {
-    paddingHorizontal: Spacing.three, paddingVertical: 7,
-    borderRadius: Radius.md, backgroundColor: Colors.terracotta,
-  },
-  saveGuideBtnText: { fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
-  saveGuideClose: { padding: 2 },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   modalSheet: { backgroundColor: Colors.paper, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, maxHeight: '60%', ...Shadow.three },
