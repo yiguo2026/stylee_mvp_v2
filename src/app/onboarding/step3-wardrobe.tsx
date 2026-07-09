@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   builtinIcon: {
     width: 44, height: 44, borderRadius: Radius.md,
     backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
+    position: 'relative',
   },
   builtinImage: { width: 44, height: 44, borderRadius: Radius.md },
   builtinIconSelected: { backgroundColor: Colors.signalSoft },
