@@ -194,6 +194,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | — | 修复 onboard step3 选中单品✅被裁切：builtinIcon 移除 overflow:hidden，改为 position:relative，对齐快速添加页 |
 | — | 修复灵感详情页单品拆解"已拥有"标记不准确：同类别有衣橱单品即标记已拥有；已拥有单品缩略图和名称优先使用衣橱真实数据 |
 | — | Onboarding 3步均增加"←返回上一步"按钮；"跳过"居中；step2移除多余图例和提示文案 |
+| — | 修复心愿单"加入衣橱"不生效：source_type改为manual避免DB CHECK约束冲突；category做normalize；错误时回滚心愿单UI；成功后刷新衣橱数据 |
 
 ## 项目结构
 
