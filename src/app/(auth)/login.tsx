@@ -9,9 +9,13 @@ import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
-// Supabase Auth only supports email/phone, so we use username@stylee.local as virtual email
+// Encode uppercase letters to preserve case (must match register.tsx encoding)
 function usernameToEmail(username: string) {
-  return `${username.trim()}@users.stylee.app`;
+  const encoded = [...username.trim()].map(c => {
+    if (c >= 'A' && c <= 'Z') return '~' + c.toLowerCase();
+    return c;
+  }).join('');
+  return `${encoded}@users.stylee.app`;
 }
 
 function translateLoginError(msg: string): string {

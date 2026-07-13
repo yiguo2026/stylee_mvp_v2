@@ -10,8 +10,14 @@ import { Colors, Spacing, Radius, T } from '@/constants/theme';
 
 const isWeb = Platform.OS === 'web';
 
+// Supabase Auth normalizes emails to lowercase, so we encode uppercase letters
+// to preserve case: "Test1" → "~test1@...", "test1" → "test1@..." (backward compatible)
 function usernameToEmail(username: string) {
-  return `${username.trim()}@users.stylee.app`;
+  const encoded = [...username.trim()].map(c => {
+    if (c >= 'A' && c <= 'Z') return '~' + c.toLowerCase();
+    return c;
+  }).join('');
+  return `${encoded}@users.stylee.app`;
 }
 
 function translateRegisterError(msg: string): string {
