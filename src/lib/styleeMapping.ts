@@ -1,16 +1,19 @@
-import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory } from '@/types';
+import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory, FitType, SleeveLength } from '@/types';
 
 export interface RecognizeResp {
   category: string; color: string; material: string; style: string;
   brand: string; photo_type: string; needs_review: boolean; confidence: number;
+  fit_type?: string; sleeve_length?: string; season?: string[]; occasion_tags?: string[];
+  provider?: string;
 }
-export interface StandardizeResp { image_ref: string; method: string; verified: boolean; }
+export interface StandardizeResp { image_ref: string; method: string; verified: boolean; provider?: string; }
 export interface RecommendReqItem {
   item_id: string; name: string; category: string; color: string;
   material?: string; sleeve_length?: string; fit?: string; season?: string[]; occasion_tags?: string[];
 }
 export interface RecommendReq {
   input_mode: 'nl'; query: string; n: number;
+  tags?: string[];
   profile: { gender?: string; body_shape?: string; skin_tone?: string; style_prefs?: string[] };
   weather: { temp_c?: number; condition?: string; city?: string; time_of_day?: string };
   wardrobe: RecommendReqItem[];
@@ -20,7 +23,7 @@ export interface RecommendRespOutfit {
   recommended_items: { name: string; category: string; color: string; description?: string }[];
   comment: string;
 }
-export interface RecommendResp { outfits: RecommendRespOutfit[]; trace?: { rag_mode?: string; pool?: number }; }
+export interface RecommendResp { outfits: RecommendRespOutfit[]; trace?: { rag_mode?: string; pool?: number; provider?: string }; }
 
 export type RecommendContext = {
   weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string;
@@ -36,6 +39,10 @@ export function recognizeRespToResult(resp: RecognizeResp): RecognitionResult {
     photo_type: resp.photo_type || undefined,
     needs_review: resp.needs_review ?? undefined,
     confidence: typeof resp.confidence === 'number' ? resp.confidence : undefined,
+    fit_type: resp.fit_type ? resp.fit_type as FitType : undefined,
+    sleeve_length: resp.sleeve_length ? resp.sleeve_length as SleeveLength : undefined,
+    season: Array.isArray(resp.season) ? resp.season : undefined,
+    occasion_tags: Array.isArray(resp.occasion_tags) ? resp.occasion_tags : undefined,
   };
 }
 
@@ -47,6 +54,7 @@ export function toRecommendRequest(items: WardrobeItem[], context?: RecommendCon
     input_mode: 'nl',
     query: context?.query || context?.tags || '',
     n: 3,
+    tags: (context?.tags || '').split(',').map(s => s.trim()).filter(Boolean),
     profile: { style_prefs: prefs.length ? prefs : undefined },
     weather: {
       temp_c: Number.isFinite(temp as number) ? temp : undefined,

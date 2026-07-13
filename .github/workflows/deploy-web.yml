@@ -14,6 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Block server secrets from Expo bundles
+        run: |
+          if git grep -nE 'EXPO_PUBLIC_(DEEPSEEK|DASHSCOPE|ARK|SUPABASE_SERVICE)' -- . ':!docs/**' ':!.github/workflows/deploy-web.yml'; then
+            echo 'Server credentials must never use EXPO_PUBLIC_* variables.'
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -23,17 +30,14 @@ jobs:
 
       - name: Validate deploy env
         env:
-          EXPO_PUBLIC_DEEPSEEK_KEY: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_KEY || vars.EXPO_PUBLIC_DEEPSEEK_KEY }}
-          EXPO_PUBLIC_DEEPSEEK_HOST: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_HOST || vars.EXPO_PUBLIC_DEEPSEEK_HOST }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_SUPABASE_SERVICE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_SERVICE_KEY || vars.EXPO_PUBLIC_SUPABASE_SERVICE_KEY }}
-          EXPO_PUBLIC_DASHSCOPE_API_KEY: ${{ secrets.EXPO_PUBLIC_DASHSCOPE_API_KEY || vars.EXPO_PUBLIC_DASHSCOPE_API_KEY }}
+          EXPO_PUBLIC_STYLEE_API: ${{ vars.EXPO_PUBLIC_STYLEE_API }}
           EXPO_PUBLIC_QWEATHER_KEY: ${{ secrets.EXPO_PUBLIC_QWEATHER_KEY || vars.EXPO_PUBLIC_QWEATHER_KEY }}
           EXPO_PUBLIC_QWEATHER_HOST: ${{ secrets.EXPO_PUBLIC_QWEATHER_HOST || vars.EXPO_PUBLIC_QWEATHER_HOST }}
         run: |
           missing=()
-          for key in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_SERVICE_KEY; do
+          for key in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_STYLEE_API; do
             if [ -z "${!key}" ]; then
               missing+=("$key")
             fi
@@ -46,12 +50,9 @@ jobs:
       - name: Build web
         run: npm run build:web
         env:
-          EXPO_PUBLIC_DEEPSEEK_KEY: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_KEY || vars.EXPO_PUBLIC_DEEPSEEK_KEY }}
-          EXPO_PUBLIC_DEEPSEEK_HOST: ${{ secrets.EXPO_PUBLIC_DEEPSEEK_HOST || vars.EXPO_PUBLIC_DEEPSEEK_HOST }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_SUPABASE_SERVICE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_SERVICE_KEY || vars.EXPO_PUBLIC_SUPABASE_SERVICE_KEY }}
-          EXPO_PUBLIC_DASHSCOPE_API_KEY: ${{ secrets.EXPO_PUBLIC_DASHSCOPE_API_KEY || vars.EXPO_PUBLIC_DASHSCOPE_API_KEY }}
+          EXPO_PUBLIC_STYLEE_API: ${{ vars.EXPO_PUBLIC_STYLEE_API }}
           EXPO_PUBLIC_QWEATHER_KEY: ${{ secrets.EXPO_PUBLIC_QWEATHER_KEY || vars.EXPO_PUBLIC_QWEATHER_KEY }}
           EXPO_PUBLIC_QWEATHER_HOST: ${{ secrets.EXPO_PUBLIC_QWEATHER_HOST || vars.EXPO_PUBLIC_QWEATHER_HOST }}
 

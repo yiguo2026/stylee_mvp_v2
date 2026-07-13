@@ -1,5 +1,7 @@
 # App ↔ 本地推理服务接入 设计（子项目 2）
 
+> **已废弃（安全原因）**：本文记录早期“服务失败后客户端直连模型”的方案。当前实现禁止 App/Web 持有或直连 DeepSeek、DashScope、Ark 及 Supabase service-role key；以根 README、`model-service/README.md` 与 `docs/security/model-api-incident-response.md` 为准。
+
 > Stylee 三大模型能力（服饰识别 / 单品标准化 / Garments2Look 搭配推荐）通过**本地 Python 推理服务**接入 App（`stylee_mvp_v2`）。本文件是子项目 2 的设计规格。子项目 1（推理服务本身）已完成，在模型仓 `style05` 的 `stylee/service/`（`serve.py` 启动）。
 
 ## 目标

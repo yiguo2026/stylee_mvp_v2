@@ -13,7 +13,9 @@ def test_label_and_category():
     assert label("date") == "约会" and label("french") == "法式" and label("unknown_x") == "unknown_x"
     assert model_category("下装") == Category.BOTTOM
     assert model_category("外星") == Category.TOP        # 未命中默认上装
-    assert app_category(Category.SHOES) == "鞋"
+    assert app_category(Category.SHOES) == "鞋履"
+    assert model_category("连体装") == Category.DRESS
+    assert model_category("包袋") == Category.BAG
 
 
 def test_wardrobe_item():
@@ -50,7 +52,7 @@ def test_outfits_to_app():
     ctx = RequestContext(input_mode=InputMode.NL, wardrobe=[])
     app = outfits_to_app(res, ctx)
     assert app["outfits"][0]["owned_item_ids"] == ["i1"]
-    assert app["outfits"][0]["recommended_items"][0]["category"] == "鞋"
+    assert app["outfits"][0]["recommended_items"][0]["category"] == "鞋履"
     assert app["outfits"][0]["comment"] == "上紧下松"
     assert app["trace"]["rag_mode"] == "vector" and app["trace"]["pool"] == 16
 

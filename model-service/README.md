@@ -2,6 +2,8 @@
 
 App 三个 AI 能力的本地推理服务：**服饰识别**（qwen3-vl-plus）、**单品标准化生图**（qwen-image-edit）、**Garments2Look 搭配推荐**（DeepSeek + 向量 RAG）。
 
+安全边界、模型路由、生产部署和双仓同步规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+
 - **纯 Python 标准库，零 pip 依赖**——系统有 `python3`（≥3.9）即可，无需 venv / pip install。
 - API key 只存在服务进程的环境变量里，App 端零 key。
 - 语义向量索引（3000 套穿搭 × 1024 维）已随仓提交，**clone 即完整功能**。
@@ -21,7 +23,30 @@ node scripts/styleeSmoke.ts        # 在仓库根目录跑
 npm start
 ```
 
-App 侧行为：服务在 → 三个能力走真模型；服务不在/挂了 → 自动回落旧逻辑（mock 识别 / 客户端直连 DeepSeek / 用原图），**不会阻塞任何功能**。
+App 侧行为：服务在 → AI 能力走真模型；服务不在/挂了 → 自动回落 mock / 预置结果 / 原图。App 绝不直连 DeepSeek 或 DashScope。
+
+## 生产安全配置
+
+公开监听（例如 `--host 0.0.0.0`）会默认要求 Supabase 用户 JWT。至少设置：
+
+```bash
+SUPABASE_URL=https://xxx.supabase.co \
+SUPABASE_PUBLISHABLE_KEY=<publishable-key> \
+SUPABASE_SECRET_KEY=<server-secret-key> \
+STYLEE_ALLOWED_ORIGINS=https://yiguo2026.github.io \
+STYLEE_REQUIRE_AUTH=true \
+python3 serve.py --host 0.0.0.0 --provider deepseek
+```
+
+`SUPABASE_SECRET_KEY` 只用于服务端注册接口，和模型 key 一样禁止进入 Expo、GitHub Pages 构建变量或客户端日志；旧项目仍兼容 `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`，但新部署应使用可独立轮换的 publishable/secret key。服务默认按用户限流 20 次/分钟，可用 `STYLEE_RATE_LIMIT_PER_MINUTE` 调整。
+
+文本模型默认使用 DeepSeek Flash，并用 `LLM_MAX_TOKENS=2048` 限制单次输出成本；只有经过质量/成本评测后才应显式设置 `DEEPSEEK_MODEL_GEN` 使用更贵模型。
+
+### 获得生产 HTTPS 地址
+
+仓库提供 `Dockerfile` 和 `render.yaml`。在 Render 中用本仓库创建 Blueprint，首次创建时在 Dashboard 填写所有 `sync: false` 的服务端密钥；部署完成后会得到 `https://<service>.onrender.com`。把该 URL 写到 App 仓库的 GitHub Variable `EXPO_PUBLIC_STYLEE_API`，不要写入任何模型 key。
+
+Blueprint 默认关闭自动部署，完成真模型 smoke test 后再手动部署新版。模型请求最长可达 60–120 秒，不建议使用会频繁休眠的免费实例。
 
 ## 端点
 

@@ -1,0 +1,11 @@
+.git
+.env
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.bak
+data/garments2look/polyvore_outfit_*.json
+data/garments2look/mytheresa_outfit_*.json
+data/garments2look/style-guide

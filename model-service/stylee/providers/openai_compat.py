@@ -42,6 +42,10 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
     payload: dict = {"model": model, "messages": messages, "temperature": temperature}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+    # 成本护栏：所有文本/视觉 chat 输出 token 封顶。可用 LLM_MAX_TOKENS 调整，0=不封顶。
+    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+    if max_tokens > 0:
+        payload["max_tokens"] = max_tokens
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=data, method="POST",
@@ -262,13 +266,13 @@ class OpenAICompatProvider(LLMProvider):
 # 便捷构造:读环境变量(model 名可被 env 覆盖,以适配你账号实际开放的型号)
 # ---------------------------------------------------------------------------
 def deepseek(model: str | None = None, api_key: str | None = None) -> OpenAICompatProvider:
-    # 设计稿:主脑/低成本 = V4-Flash(B0),复杂兜底 = V4-Pro(B3 核心)。
+    # 默认 B0/B3 都用 Flash，避免无意烧 Pro；质量评测需要时显式设置 DEEPSEEK_MODEL_GEN。
     override = model or os.environ.get("DEEPSEEK_MODEL")
     return OpenAICompatProvider(
         base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
-        model=override or "deepseek-v4-pro",
+        model=override or "deepseek-v4-flash",
         model_intent=os.environ.get("DEEPSEEK_MODEL_INTENT", override or "deepseek-v4-flash"),
-        model_gen=os.environ.get("DEEPSEEK_MODEL_GEN", override or "deepseek-v4-pro"),
+        model_gen=os.environ.get("DEEPSEEK_MODEL_GEN", override or "deepseek-v4-flash"),
         api_key=api_key or os.environ.get("DEEPSEEK_API_KEY", ""),
         name="deepseek",
     )

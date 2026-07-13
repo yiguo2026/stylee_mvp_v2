@@ -28,6 +28,12 @@ def label(tag_id: str) -> str:
 
 
 def model_category(value: str) -> Category:
+    aliases = {
+        "连体装": Category.DRESS, "鞋履": Category.SHOES, "包袋": Category.BAG,
+        "帽巾": Category.SCARF, "配饰": Category.HAT,
+    }
+    if value in aliases:
+        return aliases[value]
     for c in Category:
         if c.value == value:
             return c
@@ -35,7 +41,10 @@ def model_category(value: str) -> Category:
 
 
 def app_category(cat: Category) -> str:
-    return cat.value
+    return {
+        Category.DRESS: "连体装", Category.SHOES: "鞋履", Category.BAG: "包袋",
+        Category.HAT: "帽巾", Category.SCARF: "帽巾",
+    }.get(cat, cat.value)
 
 
 def _enum(enum_cls, value):
@@ -115,7 +124,7 @@ def outfits_to_app(result, ctx) -> dict:
         for it in o.items:
             if not it.owned and it.suggest:
                 g = it.suggest
-                rec.append({"name": "补:" + g.desc, "category": g.category.value,
+                rec.append({"name": "补:" + g.desc, "category": app_category(g.category),
                             "color": "", "description": g.reason})
         outfits.append({
             "name": o.occasion or f"方案{i + 1}",
@@ -131,11 +140,15 @@ def outfits_to_app(result, ctx) -> dict:
 def ingest_to_app(res) -> dict:
     it = res.item
     return {
-        "category": it.category.value,
+        "category": app_category(it.category),
         "color": it.colors[0] if it.colors else "",
         "material": it.material or "",
         "style": it.style_tags[0] if it.style_tags else "",
         "brand": (res.raw or {}).get("brand", "") or "",
+        "fit_type": it.fit.value if it.fit else None,
+        "sleeve_length": it.sleeve.value if it.sleeve else None,
+        "season": [s.value for s in it.seasons],
+        "occasion_tags": list(it.occasion_tags),
         "photo_type": res.photo_type.value,
         "needs_review": res.needs_review,
         "confidence": res.confidence,

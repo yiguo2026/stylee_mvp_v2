@@ -83,6 +83,9 @@ class DashScopeImageStandardizer(ImageStandardizer):
 
     def standardize(self, image_url: str, item: WardrobeItem, mode: str) -> str:
         prompt = _EDIT_PROMPTS.get(mode, _EDIT_PROMPTS["img2img"])
+        details = "、".join([*item.colors, item.material, item.subcategory]).strip("、")
+        if details:
+            prompt += f" 目标单品特征：{details[:200]}。图片有多件物品时只保留这个目标单品。"
         data = json.dumps(build_edit_payload(self.model, image_url, prompt)).encode("utf-8")
         req = urllib.request.Request(
             self.base_url + _MM_URL_PATH, data=data, method="POST",

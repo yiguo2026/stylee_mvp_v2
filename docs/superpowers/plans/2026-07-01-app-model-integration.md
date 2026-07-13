@@ -1,5 +1,7 @@
 # App ↔ 本地推理服务接入 Implementation Plan（子项目 2）
 
+> **已废弃（安全原因）**：此历史计划包含客户端模型直连回落，不得继续执行。当前所有模型调用只能经过受认证、限流的 model service。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让 App 的服饰识别 / 单品标准化 / Garments2Look 推荐三个能力先打本地推理服务、失败回落今天的行为。

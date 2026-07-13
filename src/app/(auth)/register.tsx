@@ -5,24 +5,10 @@ import {
   ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { serviceRegister } from '@/lib/styleeService';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 
 const isWeb = Platform.OS === 'web';
-
-function usernameToEmail(username: string) {
-  return `${username.trim()}@users.stylee.app`;
-}
-
-function translateRegisterError(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes('already been registered') || m.includes('already registered')) return '该用户名已注册';
-  if (m.includes('password') && m.includes('weak')) return '密码太简单，请使用至少6位包含字母和数字的密码';
-  if (m.includes('password')) return '密码不符合要求，请使用至少6位密码';
-  if (m.includes('rate limit') || m.includes('too many')) return '请求过于频繁，请稍后再试';
-  if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络';
-  return msg;
-}
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 
@@ -79,36 +65,16 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      // Use admin API to create user directly (bypasses email domain validation)
-      const { data, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: usernameToEmail(username),
-        password,
-        email_confirm: true,
-      });
-
-      if (authError) {
+      const result = await serviceRegister(username.trim(), password);
+      if (!result?.ok) {
         setLoading(false);
-        const translated = translateRegisterError(authError.message);
+        const translated = result === null ? '注册服务暂不可用，请稍后再试' : '该用户名已注册';
         if (translated === '该用户名已注册') {
           setUsernameError(translated);
         } else {
           setError(translated);
         }
         return;
-      }
-
-      // Create profile with username
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            user_id: data.user.id,
-            username: username.trim(),
-            nickname: username.trim(),
-          });
-        if (profileError) {
-          console.warn('[Register] profile creation failed:', profileError.message);
-        }
       }
 
       setLoading(false);

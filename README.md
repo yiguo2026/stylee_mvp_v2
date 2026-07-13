@@ -11,7 +11,7 @@
 - **前端**：Expo SDK 54 + TypeScript + Expo Router（文件路由）
 - **后端**：Supabase（Auth / PostgreSQL / Storage / RLS）
 - **天气**：和风天气 API（QWeather 商业版，实时天气数据，15 分钟缓存，180+ 城市本地 ID 映射，API 不可用时自动 fallback 到本地 mock）
-- **AI**：DashScope（Qwen VL 识别 / Qwen Image 生图）+ DeepSeek（意图识别 / 穿搭推荐 / 试穿建议）；不可用时自动回落 mock
+- **AI**：App 只调用 model service；服务端使用 DashScope（Qwen VL / Qwen Image）与 DeepSeek，密钥不会进入 App 或 Web bundle
 - **部署**：GitHub Pages（yiguo2026.github.io 仓库 gh-pages 分支）+ EAS Build（iOS）
 - **状态管理**：Zustand
 - **样式**：Editorial Mark v3.6（冷调中性黑白体系 / 统一字体体系 / 过程态规范）
@@ -109,12 +109,9 @@ npx expo start
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon Key | Supabase Dashboard |
 | `EXPO_PUBLIC_QWEATHER_KEY` | 和风天气 API Key（可选） | [dev.qweather.com](https://dev.qweather.com/) |
 | `EXPO_PUBLIC_QWEATHER_HOST` | 和风天气 API Host（商业版需自定义） | QWeather 控制台 |
-| `EXPO_PUBLIC_DASHSCOPE_API_KEY` | DashScope API Key（Qwen VL / Qwen Image，推荐） | DashScope 控制台 |
-| `EXPO_PUBLIC_DEEPSEEK_KEY` | DeepSeek API Key（可选） | [platform.deepseek.com](https://platform.deepseek.com/) |
-| `EXPO_PUBLIC_DEEPSEEK_HOST` | DeepSeek API Host（可选，默认 api.deepseek.com） | — |
-| `EXPO_PUBLIC_SUPABASE_SERVICE_KEY` | Supabase Service Role Key | Supabase Dashboard |
+| `EXPO_PUBLIC_STYLEE_API` | model service 地址；生产必须为 HTTPS | 服务端部署地址 |
 
-> 不配置 `EXPO_PUBLIC_QWEATHER_KEY` 时，天气数据将使用本地 mock 数据；不配置 `EXPO_PUBLIC_DASHSCOPE_API_KEY` / `EXPO_PUBLIC_DEEPSEEK_KEY` 时，AI 功能会自动回落到 mock/预置结果（不影响衣橱、记录等基础功能）。
+> DeepSeek、DashScope 与 Supabase service-role key 只能配置在 model service 的服务端环境变量中，禁止使用 `EXPO_PUBLIC_*`。model service 不可用时，App 的 AI 功能回落到 mock/预置结果。
 
 ### iOS 构建
 
@@ -216,13 +213,12 @@ assets/
 
 ## AI 模型配置
 
-App 直接调用云端 API，无需本地模型服务：
+App 不直连任何模型 API，全部能力通过 model service：
 
 | 能力 | 模型 | 端点 |
 |------|------|------|
-| 服饰识别（拍照→属性） | qwen3-vl-plus | DashScope compatible-mode chat/completions |
-| 多品检测（单图→多件单品） | qwen3-vl-plus | DashScope compatible-mode chat/completions |
-| 标准图/试穿图生成 | qwen-image-2.0-pro | DashScope 原生 MultiModalConversation |
-| 意图识别 / 穿搭推荐 / 试穿建议 | deepseek-v4-flash | DeepSeek chat/completions |
+| 服饰识别（单品/多品） | qwen3-vl-plus | model service `/recognize` / `/recognize-multi` |
+| 标准图/试穿图生成 | qwen-image-edit | model service `/standardize` / `/tryon-image` |
+| 意图识别 / 搭配推荐 / 试穿建议 | DeepSeek | model service 专用端点 |
 
-API 不可用时自动回落到 mock 数据，不影响基础功能。
+生产部署时 model service 会校验 Supabase 用户 JWT、限制来源域名与每分钟请求数。模型 API 不可用时自动回落到 mock 数据，不影响基础功能。
