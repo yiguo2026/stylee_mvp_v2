@@ -2,7 +2,7 @@
 
 App 三个 AI 能力的本地推理服务：**服饰识别**（qwen3-vl-plus）、**单品标准化生图**（qwen-image-edit）、**Garments2Look 搭配推荐**（DeepSeek + 向量 RAG）。
 
-安全边界、模型路由、生产部署和双仓同步规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。第一次配置 key 可逐步照着 [`LOCAL_SETUP.md`](LOCAL_SETUP.md) 操作。
+安全边界、模型路由、生产部署和双仓同步规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。用户模型权限与次数的权威设计见 [`QUOTA_ARCHITECTURE.md`](QUOTA_ARCHITECTURE.md)。第一次配置 key 可逐步照着 [`LOCAL_SETUP.md`](LOCAL_SETUP.md) 操作。
 
 - **纯 Python 标准库，零 pip 依赖**——系统有 `python3`（≥3.9）即可，无需 venv / pip install。
 - API key 只存在服务进程的环境变量里，App 端零 key。
