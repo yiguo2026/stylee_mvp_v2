@@ -46,7 +46,7 @@ python3 serve.py --host 0.0.0.0 --provider deepseek
 
 仓库提供 `Dockerfile` 和 `render.yaml`。在 Render 中用本仓库创建 Blueprint，首次创建时在 Dashboard 填写所有 `sync: false` 的服务端密钥；部署完成后会得到 `https://<service>.onrender.com`。把该 URL 写到 App 仓库的 GitHub Variable `EXPO_PUBLIC_STYLEE_API`，不要写入任何模型 key。
 
-Blueprint 默认关闭自动部署，完成真模型 smoke test 后再手动部署新版。模型请求最长可达 60–120 秒，不建议使用会频繁休眠的免费实例。
+Blueprint 默认关闭自动部署，首次使用免费实例完成 HTTPS 与真模型 smoke test，不会自动产生实例费用。免费实例会休眠并产生冷启动，正式承载用户流量前应评估并由管理员明确升级实例。模型请求最长可达 60–120 秒。
 
 ## 端点
 

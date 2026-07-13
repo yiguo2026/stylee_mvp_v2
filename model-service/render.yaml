@@ -2,7 +2,7 @@ services:
   - type: web
     name: stylee-model-service
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     autoDeployTrigger: off
