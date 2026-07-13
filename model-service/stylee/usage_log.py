@@ -96,10 +96,10 @@ def _cost(model: str, usage: dict) -> float:
     return c
 
 
-# 用量监控专用库（与 App 主后端解耦）。默认指向模型方自己的 Supabase，env 可覆盖。
-# publishable key 公开安全（RLS 仅允许写/读 ai_usage_logs）。
-_MON_URL = os.environ.get("STYLEE_SUPABASE_URL") or "https://nseysksfnfcaioixifbx.supabase.co"
-_MON_KEY = os.environ.get("STYLEE_SUPABASE_KEY") or "sb_publishable_fBm4EGpa4a1GJL4T2LWKQQ_ISXyIS_Z"
+# 可选的用量监控专用库（与 App 主后端解耦）。必须显式配置；
+# 未配置时只打印本地 usage，不向任何固定第三方项目上传。
+_MON_URL = os.environ.get("STYLEE_SUPABASE_URL", "").rstrip("/")
+_MON_KEY = os.environ.get("STYLEE_SUPABASE_KEY", "")
 
 
 def _post(row: dict) -> None:
@@ -108,7 +108,7 @@ def _post(row: dict) -> None:
         return
     try:
         req = urllib.request.Request(
-            url.rstrip("/") + "/rest/v1/ai_usage_logs",
+            url + "/rest/v1/ai_usage_logs",
             data=json.dumps(row).encode("utf-8"), method="POST",
             headers={"Content-Type": "application/json", "apikey": key,
                      "Authorization": f"Bearer {key}", "Prefer": "return=minimal"})

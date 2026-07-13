@@ -3,6 +3,7 @@ import json
 import urllib.request
 
 from stylee.service.security import RateLimiter, TokenVerifier, allowed_origins, env_bool, register_user
+from stylee import usage_log
 
 
 def test_defaults_and_missing_credentials():
@@ -79,11 +80,28 @@ def test_new_supabase_secret_is_never_sent_as_bearer():
                 os.environ[key] = value
 
 
+def test_usage_monitoring_is_opt_in():
+    saved_url, saved_key = usage_log._MON_URL, usage_log._MON_KEY
+    original = urllib.request.urlopen
+    calls = []
+    usage_log._MON_URL = ""
+    usage_log._MON_KEY = ""
+    urllib.request.urlopen = lambda *args, **kwargs: calls.append((args, kwargs))
+    try:
+        usage_log._post({"provider": "test"})
+        assert calls == []
+    finally:
+        usage_log._MON_URL = saved_url
+        usage_log._MON_KEY = saved_key
+        urllib.request.urlopen = original
+
+
 def main():
     test_defaults_and_missing_credentials()
     test_rate_limit()
     test_register_requires_server_configuration()
     test_new_supabase_secret_is_never_sent_as_bearer()
+    test_usage_monitoring_is_opt_in()
     print("ok")
 
 

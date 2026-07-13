@@ -116,6 +116,11 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 Anything prefixed `EXPO_PUBLIC_` is considered public. A provider key or
 Supabase secret/service-role key must never use that prefix.
 
+API usage monitoring is a separate, optional data sink. It uses
+`STYLEE_SUPABASE_URL` / `STYLEE_SUPABASE_KEY`, never the authentication variables
+above. If they are unset, usage is printed locally and no remote monitoring
+request is made; the service must not contain a hard-coded monitoring project.
+
 ## 5. Runtime and deployment
 
 The production artifact is the repository `Dockerfile`. It starts the stdlib
