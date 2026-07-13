@@ -19,7 +19,7 @@ check_path() {
 }
 
 check_path stylee
-for path in serve.py Dockerfile .dockerignore render.yaml .env.example ARCHITECTURE.md; do
+for path in serve.py Dockerfile .dockerignore render.yaml .env.example ARCHITECTURE.md LOCAL_SETUP.md; do
   check_path "$path"
 done
 
