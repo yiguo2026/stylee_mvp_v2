@@ -6,7 +6,6 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     autoDeployTrigger: off
-    maxShutdownDelaySeconds: 120
     envVars:
       - key: STYLEE_PROVIDER
         value: deepseek
