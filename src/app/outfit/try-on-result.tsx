@@ -76,16 +76,16 @@ export default function TryOnResultScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.headerBack}>← 返回</Text>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')} hitSlop={12}>
+            <Text style={styles.headerBack}>← 返回首页</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>试穿效果</Text>
-          <View style={{ width: 60 }} />
+          <View />
         </View>
         <View style={styles.center}>
           <Text style={styles.emptyText}>还没有试穿结果，快去生成一张吧</Text>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backLink}>← 返回</Text>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+            <Text style={styles.backLink}>← 返回首页</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -129,8 +129,8 @@ export default function TryOnResultScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.headerBack}>← 返回</Text>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')} hitSlop={12}>
+          <Text style={styles.headerBack}>← 返回首页</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>试穿效果</Text>
         <View style={{ width: 60 }} />
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
     borderBottomWidth: 1, borderBottomColor: Colors.line,
   },
-  headerBack: { ...T.bodyText, color: Colors.ink, width: 60 },
+  headerBack: { ...T.bodyText, color: Colors.ink },
   headerTitle: { ...T.sectionTitle },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 
