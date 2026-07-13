@@ -91,7 +91,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
           color: item.color || '',
           image_url: item.image_url || null,
           source_type: 'manual',
-          source_label: '来自心愿单',
+          source_label: '心愿单添加',
           status: 'active',
         });
       if (insertError) {

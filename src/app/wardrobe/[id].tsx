@@ -13,6 +13,24 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { WardrobeItem, RecommendedItem, OCCASION_TAGS } from '@/types';
 
+// Unified add-source labels for display
+function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
+  const label = (item as WardrobeItem).source_label;
+  const type = (item as WardrobeItem).source_type;
+
+  if (label) {
+    if (label === '相册导入' || label === '批量导入' || label === '手动添加') return '相册导入';
+    if (label === '来自心愿单') return '心愿单添加';
+    if (label === '灵感推荐添加') return '灵感推荐添加';
+    if (label === 'AI推荐添加') return 'AI推荐添加';
+    if (label === '快速添加') return '快速添加';
+    if (label === '心愿单添加') return '心愿单添加';
+    return label;
+  }
+  if (type === 'photo_ai' || type === 'album_ai') return '相册导入';
+  return '快速添加';
+}
+
 const SEASON_LABELS: Record<string, string> = { spring: '春', summer: '夏', autumn: '秋', winter: '冬', all_season: '四季' };
 
 export default function ItemDetailScreen() {
@@ -218,12 +236,10 @@ export default function ItemDetailScreen() {
           <ItemOutfits itemId={item!.item_id} />
         </View>
 
-        {/* Source */}
+        {/* Source — unified labels: 相册导入 / 心愿单添加 / 快速添加 */}
         <Text style={styles.meta}>
           添加于 {new Date(item!.created_at).toLocaleDateString('zh-CN')}
-          {item!.source_label ? ` · ${item!.source_label}` :
-            item!.source_type === 'photo_ai' ? ' · 相册导入' :
-            item!.source_type === 'album_ai' ? ' · 相册导入' : ' · 手动添加'}
+          {` · ${getAddSourceLabel(item!)}`}
         </Text>
       </ScrollView>
 
