@@ -111,7 +111,11 @@ npx expo start
 | `EXPO_PUBLIC_QWEATHER_HOST` | 和风天气 API Host（商业版需自定义） | QWeather 控制台 |
 | `EXPO_PUBLIC_STYLEE_API` | model service 地址；生产必须为 HTTPS | 服务端部署地址 |
 
-> DeepSeek、DashScope 与 Supabase service-role key 只能配置在 model service 的服务端环境变量中，禁止使用 `EXPO_PUBLIC_*`。model service 不可用时，App 的 AI 功能回落到 mock/预置结果。
+> DeepSeek、DashScope key 只能配置在 model service 的服务端环境变量中。Supabase secret/service-role key 不属于 model service，也禁止进入 App/Web；用户注册继续使用主仓的 Supabase Auth。model service 不可用时，App 的 AI 功能回落到 mock/预置结果。
+
+### 用户注册安全配置
+
+用户管理由主仓 Supabase Auth 承担，不经过 model service。现有 Supabase 项目需在 SQL Editor 执行一次 `supabase-auth-registration.sql`，并在 Authentication → Providers → Email 中关闭 `Confirm email`（项目使用 `username@users.stylee.app` 虚拟邮箱）。该方案通过数据库 trigger 创建 `users` 资料行，不需要任何客户端或 model service 的 service-role key。
 
 ### iOS 构建
 

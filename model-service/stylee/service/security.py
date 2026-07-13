@@ -12,7 +12,6 @@ import threading
 import time
 import urllib.error
 import urllib.request
-import re
 from collections import defaultdict, deque
 
 
@@ -86,49 +85,3 @@ def allowed_origins() -> set[str]:
         "http://localhost:8081", "http://127.0.0.1:8081",
         "https://yiguo2026.github.io",
     }
-
-
-def register_user(username: str, password: str) -> tuple[int, dict]:
-    """Create the synthetic-email account with the service role kept server-side."""
-    if not re.fullmatch(r"[A-Za-z0-9_]+", username or "") or len(password) < 6:
-        return 200, {"ok": False, "error": "invalid username or password"}
-    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
-    service_key = (os.environ.get("SUPABASE_SECRET_KEY")
-                   or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
-    if not url or not service_key:
-        return 503, {"error": "registration service is not configured"}
-    email = f"{username}@users.stylee.app"
-    body = json.dumps({"email": email, "password": password, "email_confirm": True}).encode()
-    admin_headers = {"Content-Type": "application/json", "apikey": service_key}
-    if not service_key.startswith("sb_secret_"):
-        admin_headers["Authorization"] = f"Bearer {service_key}"
-    req = urllib.request.Request(
-        url + "/auth/v1/admin/users", data=body, method="POST",
-        headers=admin_headers,
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            user = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        e.read()
-        if e.code in {400, 409, 422}:
-            return 200, {"ok": False, "error": "username already exists"}
-        return e.code, {"error": "authentication service rejected the request"}
-    except urllib.error.URLError:
-        return 502, {"error": "authentication service unavailable"}
-    user_id = str(user.get("id") or "")
-    if user_id:
-        profile = json.dumps({"user_id": user_id, "username": username, "nickname": username}).encode()
-        profile_headers = {"Content-Type": "application/json", "apikey": service_key,
-                           "Prefer": "return=minimal"}
-        if not service_key.startswith("sb_secret_"):
-            profile_headers["Authorization"] = f"Bearer {service_key}"
-        profile_req = urllib.request.Request(
-            url + "/rest/v1/users", data=profile, method="POST",
-            headers=profile_headers,
-        )
-        try:
-            urllib.request.urlopen(profile_req, timeout=10).close()
-        except (urllib.error.HTTPError, urllib.error.URLError):
-            pass
-    return 201, {"ok": bool(user_id)}

@@ -5,12 +5,25 @@ import {
   ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { serviceRegister } from '@/lib/styleeService';
+import { supabase } from '@/lib/supabase';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 
 const isWeb = Platform.OS === 'web';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
+
+function usernameToEmail(username: string) {
+  return `${username.trim()}@users.stylee.app`;
+}
+
+function translateRegisterError(msg: string): string {
+  const m = msg.toLowerCase();
+  if (m.includes('already') || m.includes('duplicate') || m.includes('database error')) return '该用户名已注册';
+  if (m.includes('password')) return '密码不符合要求，请使用至少6位密码';
+  if (m.includes('rate limit') || m.includes('too many')) return '请求过于频繁，请稍后再试';
+  if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络';
+  return '注册失败，请稍后重试';
+}
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
@@ -65,17 +78,34 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const result = await serviceRegister(username.trim(), password);
-      if (!result?.ok) {
+      const normalizedUsername = username.trim();
+      const { data: existing } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('username', normalizedUsername)
+        .maybeSingle();
+      if (existing) {
         setLoading(false);
-        const translated = result === null ? '注册服务暂不可用，请稍后再试' : '该用户名已注册';
-        if (translated === '该用户名已注册') {
-          setUsernameError(translated);
-        } else {
-          setError(translated);
-        }
+        setUsernameError('该用户名已注册');
         return;
       }
+
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: usernameToEmail(normalizedUsername),
+        password,
+        options: { data: { username: normalizedUsername } },
+      });
+      if (authError || !data.user) {
+        setLoading(false);
+        const translated = translateRegisterError(authError?.message || 'registration failed');
+        if (translated === '该用户名已注册') setUsernameError(translated);
+        else setError(translated);
+        return;
+      }
+
+      // 项目使用虚拟邮箱登录；Supabase 必须关闭 email confirmation。
+      // signUp 可能自动建立 session，保持原 UX：注册后退出并回到登录页。
+      if (data.session) await supabase.auth.signOut();
 
       setLoading(false);
       // 注册成功，跳转登录页（不自动登录）

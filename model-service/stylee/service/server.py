@@ -16,7 +16,7 @@ from ..rag import default_retriever
 from ..vision import build_image_standardizer, build_vision_provider
 from . import adapter
 from . import ai_features
-from .security import RateLimiter, TokenVerifier, allowed_origins, env_bool, register_user
+from .security import RateLimiter, TokenVerifier, allowed_origins, env_bool
 
 _CORS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -82,7 +82,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(403, {"error": "origin not allowed"})
             return
         user_id = "local"
-        if self.require_auth and self.path != "/register":
+        if self.require_auth:
             user_id = self.verifier.verify(self.headers.get("Authorization") or "") or ""
             if not user_id:
                 self._send(401, {"error": "valid user access token required"})
@@ -103,9 +103,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/recommend":
                 self._send(200, self._recommend(payload))
-            elif self.path == "/register":
-                status, result = register_user(str(payload.get("username") or ""), str(payload.get("password") or ""))
-                self._send(status, result)
             elif self.path == "/recognize":
                 self._send(200, self._recognize(payload))
             elif self.path == "/standardize":

@@ -82,10 +82,6 @@ export async function serviceFeature<T>(path: string, body: unknown, timeoutMs =
   return _postJson<T>(path, body, timeoutMs);
 }
 
-export async function serviceRegister(username: string, password: string): Promise<{ ok: boolean } | null> {
-  return _postJson<{ ok: boolean }>('/register', { username, password }, 15000);
-}
-
 // RN/web 専用：本地 uri → base64（Node 無 FileReader，故不在 node --test 覆蓋，靠集成 smoke/手動驗証）
 export async function uriToBase64(uri: string): Promise<{ b64: string; mime: string } | null> {
   try {

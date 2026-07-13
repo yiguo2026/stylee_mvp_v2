@@ -34,8 +34,7 @@ the developer's machine, and an HTTPS page cannot safely depend on an HTTP API.
 2. The client sends `Authorization: Bearer <user-access-token>` to the service.
 3. `TokenVerifier` validates the token through Supabase Auth and caches the
    resulting user id for 60 seconds.
-4. The service rate-limits by user id. `/register` is the only unauthenticated
-   mutation and is rate-limited by source address.
+4. The service rate-limits every model request by user id.
 5. The HTTP adapter converts App payloads into the model contracts.
 6. The model pipeline invokes providers with server-only environment variables.
 7. Deterministic validation and scoring reject invalid model output before the
@@ -61,7 +60,6 @@ Production controls:
 | Intent and reasons | `POST /intent`, `/reason` | DeepSeek |
 | Product extraction | `POST /product-extract` | DeepSeek |
 | Try-on helpers | `POST /tryon-suggestion`, `/tryon-image` | DeepSeek / DashScope |
-| Server-side registration | `POST /register` | Supabase Admin API |
 
 The recommendation path keeps deterministic work in code:
 
@@ -85,7 +83,6 @@ Server-only variables:
 ```text
 DEEPSEEK_API_KEY
 DASHSCOPE_API_KEY
-SUPABASE_SECRET_KEY
 ```
 
 Service configuration:
@@ -99,11 +96,12 @@ STYLEE_RATE_LIMIT_PER_MINUTE=20
 LLM_MAX_TOKENS=2048
 ```
 
-The Supabase publishable key is not a provider secret, but it remains service
-configuration because the service uses it to validate user tokens. The
-`sb_secret_...` key is used only in the `apikey` header for Supabase Admin/REST
-calls and is never sent as a Bearer token. Legacy anon/service-role names remain
-temporarily compatible for migration only.
+The Supabase URL and publishable key are the same public authentication
+configuration already present in the App. The model service uses them only to
+validate access tokens through Supabase Auth; it does not manage users or read
+Stylee profile/wardrobe tables. Registration remains in the App's existing
+Supabase Auth boundary, with a database trigger creating the profile row. The
+model service must never receive a Supabase secret/service-role key.
 
 The client receives only:
 
