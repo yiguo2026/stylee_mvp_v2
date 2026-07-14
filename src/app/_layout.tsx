@@ -62,7 +62,9 @@ export default function RootLayout() {
       setSession(session);
       await fetchProfile();
       const { profile } = useUserStore.getState();
-      if (profile) {
+      // DB trigger auto-creates users with gender='private'; onboarding sets it to female/male/other.
+      // Only skip onboarding if profile exists AND user has explicitly set gender.
+      if (profile && profile.gender !== 'private') {
         router.replace('/(tabs)');
       } else {
         router.replace('/onboarding/step1-info');

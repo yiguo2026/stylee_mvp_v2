@@ -196,6 +196,7 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | — | 修复灵感详情页单品拆解"已拥有"标记不准确：同类别有衣橱单品即标记已拥有；已拥有单品缩略图和名称优先使用衣橱真实数据 |
 | — | Onboarding 3步均增加"←返回上一步"按钮；"跳过"居中；step2移除多余图例和提示文案 |
 | — | 修复心愿单"加入衣橱"不生效：source_type改为manual避免DB CHECK约束冲突；category做normalize；错误时回滚心愿单UI；成功后刷新衣橱数据 |
+| — | 修复新用户注册后跳过onboarding：DB触发器自动创建users记录(gender='private')导致路由判断profile存在即跳过；改为检查gender!=='private'判断是否完成onboarding；跳过onboarding时更新gender为'other'避免下次登录再跳转 |
 
 ## 项目结构
 

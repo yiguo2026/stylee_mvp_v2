@@ -86,7 +86,16 @@ export default function OnboardingStep1() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // DB trigger creates users with gender='private'; update to 'other' so
+    // the routing logic doesn't redirect back to onboarding on next login.
+    if (user?.id) {
+      await supabase.from('users').update({
+        gender: 'other',
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', user.id);
+      await fetchProfile();
+    }
     router.replace('/(tabs)');
   };
 

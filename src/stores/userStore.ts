@@ -41,7 +41,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         .select('*')
         .eq('user_id', user.id)
         .single();
-      if (data) set({ profile: data as UserProfile });
+      set({ profile: data ? (data as UserProfile) : null });
 
       const { data: prefs } = await supabase
         .from('user_style_preferences')
