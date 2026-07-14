@@ -9,11 +9,12 @@ import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
+import { isItemVisibleForGender } from '@/lib/genderFilter';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast } from '@/components/Toast';
 
 export default function QuickAddPage() {
-  const { user } = useUserStore();
+  const { user, profile } = useUserStore();
   const { items, addItem, fetchItems } = useWardrobeStore();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
@@ -33,9 +34,15 @@ export default function QuickAddPage() {
     return existingKeys.has(`${item.name}||${item.category}`);
   };
 
+  // 先按用户性别过滤推荐单品（缺省 for_gender = 中性/不限）
+  const genderVisibleItems = useMemo(
+    () => PRESET_BASIC_ITEMS.filter(i => isItemVisibleForGender(i, profile?.gender)),
+    [profile?.gender],
+  );
+
   const filteredItems = filterCategory === '全部'
-    ? PRESET_BASIC_ITEMS
-    : PRESET_BASIC_ITEMS.filter(i => i.category === filterCategory);
+    ? genderVisibleItems
+    : genderVisibleItems.filter(i => i.category === filterCategory);
 
   const filteredIndices = useMemo(() =>
     filteredItems.map(item => PRESET_BASIC_ITEMS.indexOf(item)),
@@ -50,10 +57,10 @@ export default function QuickAddPage() {
     [filteredIndices, existingKeys]
   );
 
-  // 全部推荐单品（不受分类过滤影响）都已加入衣橱？→ 展示空态引导。
+  // 当前性别下可见的推荐单品都已加入衣橱？→ 展示空态引导。
   const allPresetAdded = useMemo(
-    () => PRESET_BASIC_ITEMS.every(it => existingKeys.has(`${it.name}||${it.category}`)),
-    [existingKeys],
+    () => genderVisibleItems.every(it => existingKeys.has(`${it.name}||${it.category}`)),
+    [genderVisibleItems, existingKeys],
   );
 
   const toggleItem = (index: number) => {

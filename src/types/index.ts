@@ -393,9 +393,11 @@ export interface PresetWardrobeItem {
   material?: string;
   image_url?: string;
   desc?: string;
+  for_gender?: ('male' | 'female')[];   // 新增：缺省 = 中性/不限；只写一个 = 该性别专属
 }
 
 export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
+  // ── 中性（原有） ─────────────────────────────
   // 上装
   { name: '白色T恤', category: '上装', color: '白色', material: '纯棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-tshirt.png', desc: '百搭必备·四季' },
   { name: '黑色T恤', category: '上装', color: '黑色', material: '纯棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-tshirt.png', desc: '酷感基础·四季' },
@@ -406,8 +408,8 @@ export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
   { name: '黑色长裤', category: '下装', color: '黑色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-trousers.png', desc: '显瘦百搭·四季' },
   { name: '短裤', category: '下装', color: '卡其', material: '棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/beige-shorts.png', desc: '清爽夏日·春夏' },
   // 连体装
-  { name: '白色连衣裙', category: '连体装', color: '白色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-dress.png', desc: '清新优雅·春夏' },
-  { name: '黑色连衣裙', category: '连体装', color: '黑色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-dress.png', desc: '经典小黑裙·四季' },
+  { name: '白色连衣裙', category: '连体装', color: '白色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-dress.png', desc: '清新优雅·春夏', for_gender: ['female'] },
+  { name: '黑色连衣裙', category: '连体装', color: '黑色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-dress.png', desc: '经典小黑裙·四季', for_gender: ['female'] },
   // 外套
   { name: '黑色羽绒服', category: '外套', color: '黑色', material: '尼龙', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-puffer.png', desc: '保暖必备·秋冬' },
   { name: '牛仔外套', category: '外套', color: '浅蓝', material: '牛仔布', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/denim-jacket.png', desc: '休闲利器·春秋' },
@@ -420,6 +422,22 @@ export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
   { name: '纯色针织围巾', category: '帽巾', color: '米色', material: '针织', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/beige-scarf.png', desc: '温暖配饰·秋冬' },
   // 包袋
   { name: '双肩包', category: '包袋', color: '黑色', material: '尼龙', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-backpack.png', desc: '通勤实用·四季' },
+
+  // ── 男专属（新增） ─────────────────────────────
+  { name: '男士短袖衬衫', category: '上装', color: '白色', material: '棉', image_url: '/preset-items/mens-shirt.png', desc: '通勤日常·春夏', for_gender: ['male'] },
+  { name: '男士休闲西装', category: '外套', color: '米色', material: '棉麻', image_url: '/preset-items/mens-blazer.png', desc: '商务约会·四季', for_gender: ['male'] },
+  { name: '男士工装裤', category: '下装', color: '卡其', material: '棉', image_url: '/preset-items/mens-cargo.png', desc: '街头休闲·春秋', for_gender: ['male'] },
+  { name: '男士皮鞋', category: '鞋履', color: '黑色', material: '真皮', image_url: '/preset-items/mens-leather-shoes.png', desc: '商务正装·四季', for_gender: ['male'] },
+
+  // ── 女专属（新增） ─────────────────────────────
+  { name: 'A字半身裙', category: '下装', color: '白色', material: '棉', image_url: '/preset-items/a-line-skirt.png', desc: '通勤日常·春夏', for_gender: ['female'] },
+  { name: '高跟鞋', category: '鞋履', color: '黑色', material: '真皮', image_url: '/preset-items/high-heels.png', desc: '正式约会·四季', for_gender: ['female'] },
+  { name: '女款乐福鞋', category: '鞋履', color: '白色', material: '真皮', image_url: '/preset-items/womens-loafers.png', desc: '通勤学院·四季', for_gender: ['female'] },
+
+  // ── 中性补充（新增） ─────────────────────────────
+  { name: '工装长裤', category: '下装', color: '黑色', material: '灯芯绒', image_url: '/preset-items/cargo-trousers.png', desc: '直筒街头·春秋' },
+  { name: '帆布鞋', category: '鞋履', color: '白色', material: '帆布', image_url: '/preset-items/canvas-shoes.png', desc: '校园休闲·春秋' },
+  { name: '棒球帽', category: '帽巾', color: '白色', material: '棉', image_url: '/preset-items/baseball-cap.png', desc: '街头日常·四季' },
 ];
 
 // ── Category options for pickers ────────────────────────

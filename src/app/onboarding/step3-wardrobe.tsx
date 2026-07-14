@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
   ScrollView, ActivityIndicator, SafeAreaView,
@@ -12,15 +12,25 @@ import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { setPendingImages } from '@/lib/pendingImages';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
+import { isItemVisibleForGender } from '@/lib/genderFilter';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast } from '@/components/Toast';
 
 export default function OnboardingStep3() {
-  const { user } = useUserStore();
+  const { user, profile } = useUserStore();
   const { addItem, items, fetchItems } = useWardrobeStore();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filterCategory, setFilterCategory] = useState<ClothingCategory | '全部'>('全部');
   const [loading, setLoading] = useState(false);
+
+  // 按用户性别过滤推荐单品可见的下标（缺省 for_gender = 中性/不限）
+  const genderVisibleIndices = useMemo(
+    () => PRESET_BASIC_ITEMS
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => isItemVisibleForGender(item, profile?.gender))
+      .map(({ index }) => index),
+    [profile?.gender],
+  );
 
   // Refresh wardrobe when returning from /wardrobe/add
   useFocusEffect(useCallback(() => {
@@ -35,10 +45,10 @@ export default function OnboardingStep3() {
   };
 
   const selectAll = () => {
-    if (selected.size === PRESET_BASIC_ITEMS.length) {
+    if (selected.size === genderVisibleIndices.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(PRESET_BASIC_ITEMS.map((_, i) => i)));
+      setSelected(new Set(genderVisibleIndices));
     }
   };
 
@@ -108,7 +118,7 @@ export default function OnboardingStep3() {
             <Text style={styles.builtinHeaderTitle}>AI 推荐单品</Text>
             <TouchableOpacity onPress={selectAll}>
               <Text style={styles.builtinSelectAll}>
-                {selected.size === PRESET_BASIC_ITEMS.length ? '取消全选' : '全选添加'}
+                {selected.size === genderVisibleIndices.length ? '取消全选' : '全选添加'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -132,6 +142,7 @@ export default function OnboardingStep3() {
 
           <View style={styles.builtinGrid}>
             {PRESET_BASIC_ITEMS.map((item, index) => {
+              if (!isItemVisibleForGender(item, profile?.gender)) return null;
               if (filterCategory !== '全部' && item.category !== filterCategory) return null;
               const isSelected = selected.has(index);
               return (

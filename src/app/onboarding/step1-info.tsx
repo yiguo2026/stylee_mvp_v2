@@ -28,6 +28,7 @@ const GENDERS: { label: string; value: Gender }[] = [
   { label: '女士', value: 'female' },
   { label: '男士', value: 'male' },
   { label: '其他', value: 'other' },
+  { label: '保密', value: 'private' },
 ];
 
 const PROFESSIONS = [
