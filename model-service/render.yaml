@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: stylee-model-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: STYLEE_PROVIDER
+        value: deepseek
+      - key: STYLEE_REQUIRE_AUTH
+        value: "true"
+      - key: STYLEE_RATE_LIMIT_PER_MINUTE
+        value: "20"
+      - key: LLM_MAX_TOKENS
+        value: "2048"
+      - key: STYLEE_ALLOWED_ORIGINS
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DASHSCOPE_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false

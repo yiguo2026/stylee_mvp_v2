@@ -118,7 +118,7 @@ export interface WardrobeItem {
   season?: Season[];      // v2: 多选季节
   purchase_date?: string;  // v2
   occasion_tags?: string[]; // v2: 场合标签
-  ai_recognized_attrs?: Record<string, string>;
+  ai_recognized_attrs?: Record<string, unknown>;
   status: ItemStatus;
   tags?: StyleTag[];
   wear_count?: number;    // v2: 穿搭次数（含此单品的搭配数，计算字段）
@@ -200,7 +200,7 @@ export interface RecognitionResult {
   fit_type?: FitType;
   season?: string[];        // AI识别：['spring','summer',...]
   occasion_tags?: string[]; // AI识别：['daily_commute','date',...]
-  photo_type?: string;      // 服务返回：on_body|flat|product
+  photo_type?: PhotoType;   // 服务返回：flatlay|on_body|web|angled
   needs_review?: boolean;   // 服务返回：低置信需人工确认
   confidence?: number;      // 服务返回：0-1
 }
@@ -216,8 +216,14 @@ export interface DetectedItem {
   fit_type?: FitType;
   season?: string[];
   occasion_tags?: string[];
+  photo_type?: PhotoType;
+  needs_review?: boolean;
+  confidence?: number;
+  sourceImageUri?: string;
   description: string;
 }
+
+export type PhotoType = 'flatlay' | 'on_body' | 'web' | 'angled';
 
 // ── v2 New Types ───────────────────────────────────────
 

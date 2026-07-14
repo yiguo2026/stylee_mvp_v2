@@ -1,7 +1,8 @@
 from stylee.service.adapter import (
     label, model_category, app_category, wardrobe_item, to_request_context,
-    outfits_to_app, ingest_to_app, std_to_app
+    compact_recommended_name, outfits_to_app, ingest_to_app, std_to_app
 )
+from stylee.service.ai_features import normalize_multi_item
 from stylee.contracts import (
     Category, InputMode, Sleeve, Fit, Season, BodyShape,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
@@ -13,7 +14,9 @@ def test_label_and_category():
     assert label("date") == "约会" and label("french") == "法式" and label("unknown_x") == "unknown_x"
     assert model_category("下装") == Category.BOTTOM
     assert model_category("外星") == Category.TOP        # 未命中默认上装
-    assert app_category(Category.SHOES) == "鞋"
+    assert app_category(Category.SHOES) == "鞋履"
+    assert model_category("连体装") == Category.DRESS
+    assert model_category("包袋") == Category.BAG
 
 
 def test_wardrobe_item():
@@ -50,9 +53,18 @@ def test_outfits_to_app():
     ctx = RequestContext(input_mode=InputMode.NL, wardrobe=[])
     app = outfits_to_app(res, ctx)
     assert app["outfits"][0]["owned_item_ids"] == ["i1"]
-    assert app["outfits"][0]["recommended_items"][0]["category"] == "鞋"
+    assert app["outfits"][0]["recommended_items"][0]["category"] == "鞋履"
     assert app["outfits"][0]["comment"] == "上紧下松"
     assert app["trace"]["rag_mode"] == "vector" and app["trace"]["pool"] == 16
+
+
+def test_compact_recommended_name():
+    assert compact_recommended_name(
+        "补：建议购买一件适合海岛度假的浅蓝色牛仔短裤", Category.BOTTOM
+    ) == "浅蓝色牛仔短裤"
+    assert compact_recommended_name(
+        "建议选择一双透气轻便的白色帆布鞋", Category.SHOES
+    ) == "白色帆布鞋"
 
 
 def test_ingest_to_app():
@@ -66,6 +78,19 @@ def test_ingest_to_app():
 def test_std_to_app():
     assert std_to_app(StandardizedImage(image_ref="http://o/x.png", method="img2img", verified=True)) == {
         "image_ref": "http://o/x.png", "method": "img2img", "verified": True}
+
+
+def test_normalize_multi_item_contract():
+    item = normalize_multi_item({
+        "category": "上装", "color": "白色", "material": "棉",
+        "description": "白色T恤", "photo_type": "flat",
+    }, 0)
+    assert item["photo_type"] == "flatlay" and item["needs_review"] is False
+    assert item["confidence"] == 0.95 and item["index"] == 1
+
+    invalid = normalize_multi_item({"category": "?", "photo_type": "?"}, 2)
+    assert invalid["category"] == "上装" and invalid["photo_type"] == "on_body"
+    assert invalid["needs_review"] is True and invalid["confidence"] == 0.4
 
 
 import json as _json
@@ -107,6 +132,10 @@ def test_server_smoke():
                       {"image_url": "mock://x", "photo_type": "flatlay", "item": {"category": "上装"}})
         assert st == 200 and b["method"] == "cutout"
 
+        st, b = _post(base + "/standardize",
+                      {"image_url": "mock://x", "photo_type": "flat", "item": {"category": "上装"}})
+        assert st == 200 and b["method"] == "cutout"
+
         st, b = _post(base + "/recommend", {
             "input_mode": "nl", "query": "周末约会", "n": 2,
             "wardrobe": [
@@ -130,6 +159,7 @@ def main():
     test_outfits_to_app()
     test_ingest_to_app()
     test_std_to_app()
+    test_normalize_multi_item_contract()
     test_server_smoke()
     print("ok")
 

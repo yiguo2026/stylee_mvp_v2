@@ -14,7 +14,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
 import { consumePendingImages } from '@/lib/pendingImages';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
-import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, DetectedItem } from '@/types';
+import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, SleeveLength, DetectedItem, PhotoType } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -51,6 +51,7 @@ export default function AddWardrobeItem() {
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
   const [fitType, setFitType] = useState<string>('');
+  const [sleeveLength, setSleeveLength] = useState<SleeveLength | undefined>();
   const [seasons, setSeasons] = useState<string[]>([]);
   const [occasionTags, setOccasionTags] = useState<string[]>([]);
   const [purchaseDate, setPurchaseDate] = useState('');
@@ -72,7 +73,8 @@ export default function AddWardrobeItem() {
   const [pendingAdvance, setPendingAdvance] = useState(false); // set true after save, effect handles advance
 
   // Standardization state
-  const [photoType, setPhotoType] = useState<string>('flat');
+  const [photoType, setPhotoType] = useState<PhotoType>('on_body');
+  const [recognizedAttrs, setRecognizedAttrs] = useState<Record<string, unknown> | null>(null);
   const [standardizedUri, setStandardizedUri] = useState<string | null>(null);
   const [stdState, setStdState] = useState<'idle' | 'generating' | 'done' | 'failed'>('idle');
   const [useStandardized, setUseStandardized] = useState(true);
@@ -89,7 +91,7 @@ export default function AddWardrobeItem() {
     if (!imageUris || imageUris.length === 0) return;
     console.log('[wardrobe/add] received images, count:', imageUris.length, 'source:', pending ? 'global' : 'params');
     let cancelled = false;
-    const uris = imageUris;
+    const uris = imageUris as string[];
 
     setImageSources(uris);
     setImageUri(uris[0]);
@@ -101,16 +103,18 @@ export default function AddWardrobeItem() {
       // Multiple images — detect all in parallel, then show combined picker
       setDetectingImages(true);
       setRecognizing(true);
-      Promise.all(uris.map((uri: string) => aiDetectMultiItems(uri).catch(() => ({ items: [], meta: { source: 'mock', durationMs: 0, ok: false } }))))
+      Promise.all(uris.map((uri: string) => aiDetectMultiItems(uri).catch((): { items: DetectedItem[]; meta: AIMeta } => ({
+        items: [], meta: { source: 'mock', durationMs: 0, ok: false },
+      }))))
         .then(results => {
           if (cancelled) return;
           setRecognizing(false);
           setDetectingImages(false);
 
           // Collect all items, tag each with its source image URI
-          const allItems: (DetectedItem & { sourceImageUri: string })[] = [];
+          const allItems: DetectedItem[] = [];
           results.forEach((result, imgIdx) => {
-            result.items.forEach((item: any) => {
+            result.items.forEach((item) => {
               allItems.push({ ...item, sourceImageUri: uris[imgIdx] });
             });
           });
@@ -121,13 +125,14 @@ export default function AddWardrobeItem() {
 
           if (allItems.length === 1) {
             const item = allItems[0];
-            setImageUri(item.sourceImageUri);
-            fillFormFromDetected(item);
+            const sourceUri = item.sourceImageUri || uris[0];
+            setImageUri(sourceUri);
+            const detectedPhotoType = fillFormFromDetected(item);
             const token = reqTokenRef.current;
-            void runStandardize(item.sourceImageUri, item.category, photoType, token, { color: item.color, material: item.material, description: item.description });
+            void runStandardize(sourceUri, item.category, detectedPhotoType, token, { color: item.color, material: item.material, description: item.description });
           } else {
             // Show combined picker
-            setDetectedItems(allItems as any);
+            setDetectedItems(allItems);
             setSelectedIndices(new Set(allItems.map((_, i) => i)));
             setShowItemPicker(true);
           }
@@ -184,20 +189,33 @@ export default function AddWardrobeItem() {
 
   const resetForm = () => {
     setName(''); setCategory('上装'); setColor(''); setMaterial('');
-    setBrand(''); setPrice(''); setFitType(''); setSeasons([]);
+    setBrand(''); setPrice(''); setFitType(''); setSleeveLength(undefined); setSeasons([]);
     setOccasionTags([]); setPurchaseDate('');
+    setPhotoType('on_body'); setRecognizedAttrs(null);
     setStandardizedUri(null); setStdState('idle'); setUseStandardized(true);
     setStdMeta(null);
   };
 
-  const fillFormFromDetected = (item: DetectedItem) => {
+  const fillFormFromDetected = (item: DetectedItem): PhotoType => {
+    const detectedPhotoType = item.photo_type ?? 'on_body';
     setCategory(item.category);
     setColor(item.color);
     if (item.material) setMaterial(item.material);
     setName(item.description || `${item.color}${item.category}`);
+    setBrand(item.brand || '');
     if (item.fit_type) setFitType(item.fit_type);
+    setSleeveLength(item.sleeve_length);
     if (item.season?.length) setSeasons(item.season);
     if (item.occasion_tags?.length) setOccasionTags(item.occasion_tags);
+    setPhotoType(detectedPhotoType);
+    setRecognizedAttrs({
+      style: item.style || null,
+      photo_type: detectedPhotoType,
+      needs_review: item.needs_review ?? false,
+      confidence: item.confidence ?? null,
+      detection_index: item.index,
+    });
+    return detectedPhotoType;
   };
 
   const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string; description?: string }) => {
@@ -222,8 +240,7 @@ export default function AddWardrobeItem() {
 
       if (items.length === 1) {
         // Single item — skip picker, fill form directly
-        fillFormFromDetected(items[0]);
-        const pt = photoType;
+        const pt = fillFormFromDetected(items[0]);
         void runStandardize(uri, items[0].category, pt, token, { color: items[0].color, material: items[0].material, description: items[0].description });
       } else {
         // Multiple items — show picker
@@ -245,13 +262,14 @@ export default function AddWardrobeItem() {
     setShowItemPicker(false);
 
     // Fill form with first item and start standardization using its source image
-    const firstItem = queue[0] as any;
+    const firstItem = queue[0];
     const sourceUri = firstItem.sourceImageUri ?? imageUri;
+    if (!sourceUri) return;
     setImageUri(sourceUri);
     resetForm();
-    fillFormFromDetected(firstItem);
+    const detectedPhotoType = fillFormFromDetected(firstItem);
     const token = reqTokenRef.current;
-    void runStandardize(sourceUri, firstItem.category, photoType, token, { color: firstItem.color, material: firstItem.material, description: firstItem.description });
+    void runStandardize(sourceUri, firstItem.category, detectedPhotoType, token, { color: firstItem.color, material: firstItem.material, description: firstItem.description });
   };
 
   // useEffect drives the queue advance after a successful save.
@@ -263,13 +281,14 @@ export default function AddWardrobeItem() {
     setItemQueue(remainingQueue);
 
     if (remainingQueue.length > 0) {
-      const nextItem = remainingQueue[0] as any;
+      const nextItem = remainingQueue[0];
       const sourceUri = nextItem.sourceImageUri ?? imageUri;
+      if (!sourceUri) return;
       setImageUri(sourceUri);
       resetForm();
-      fillFormFromDetected(nextItem);
+      const detectedPhotoType = fillFormFromDetected(nextItem);
       const token = reqTokenRef.current;
-      void runStandardize(sourceUri, nextItem.category, photoType, token, { color: nextItem.color, material: nextItem.material, description: nextItem.description });
+      void runStandardize(sourceUri, nextItem.category, detectedPhotoType, token, { color: nextItem.color, material: nextItem.material, description: nextItem.description });
     } else {
       setQueueTotal(0);
       router.back();
@@ -286,12 +305,24 @@ export default function AddWardrobeItem() {
 
     try {
       // Determine the image to save
-      let finalImageUrl = imageUri;
-      const chosen = (useStandardized && standardizedUri) ? standardizedUri : imageUri;
+      let finalImageUrl: string | null = null;
+      const usingStandardized = Boolean(useStandardized && standardizedUri);
+      const chosen = usingStandardized ? standardizedUri : imageUri;
       if (chosen) {
-        const uploaded = await uploadWardrobeImage(chosen, user.id);
-        if (uploaded) finalImageUrl = uploaded;
-        else finalImageUrl = imageUri;
+        finalImageUrl = await uploadWardrobeImage(chosen, user.id, undefined, {
+          persistRemote: usingStandardized,
+        });
+
+        // Never store an expiring provider URL. If copying the standardized
+        // image fails, preserve the import by uploading the original instead.
+        if (!finalImageUrl && usingStandardized && imageUri) {
+          showToast('标准图保存失败，已改用原图', 'error');
+          finalImageUrl = await uploadWardrobeImage(imageUri, user.id);
+        }
+        if (!finalImageUrl) {
+          showToast('图片上传失败，请检查网络后重试', 'error');
+          return;
+        }
       }
 
       const saved = await addItem({
@@ -303,10 +334,12 @@ export default function AddWardrobeItem() {
         brand: brand || undefined,
         price: price ? parseFloat(price) : undefined,
         fit_type: (fitType || undefined) as FitType | undefined,
+        sleeve_length: sleeveLength,
         season: seasons.length > 0 ? seasons as any : undefined,
         occasion_tags: occasionTags.length > 0 ? occasionTags : undefined,
         purchase_date: purchaseDate || undefined,
         image_url: finalImageUrl ?? undefined,
+        ai_recognized_attrs: recognizedAttrs ?? undefined,
         source_type: imageUri ? 'photo_ai' : 'manual',
         source_label: '相册导入',
         status: 'active',
@@ -325,7 +358,7 @@ export default function AddWardrobeItem() {
     } finally {
       setSaving(false);
     }
-  }, [user, name, category, color, material, brand, price, fitType, seasons, occasionTags, purchaseDate, imageUri, useStandardized, standardizedUri, addItem]);
+  }, [user, name, category, color, material, brand, price, fitType, sleeveLength, seasons, occasionTags, purchaseDate, imageUri, useStandardized, standardizedUri, recognizedAttrs, addItem]);
 
   const pickerOptions: Record<PickerField, string[]> = {
     category: CATEGORY_OPTIONS,

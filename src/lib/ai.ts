@@ -1,9 +1,9 @@
-import { WardrobeItem, Outfit, OutfitItem, ClothingCategory, RecommendedItem, RecognitionResult, DetectedItem, FilterTag, OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS, TEMP_TAGS, normalizeColor, normalizeMaterial } from '@/types';
-import { deepseekChat } from '@/lib/deepseek';
-import { qwenVisionChat, isAvailable as isDashScopeAvailable } from '@/lib/dashscope';
+import { WardrobeItem, Outfit, ClothingCategory, RecognitionResult, DetectedItem, normalizeColor, normalizeMaterial } from '@/types';
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 import { buildFallbackLook } from '@/lib/fallbackLook';
+import { serviceFeature, serviceRecognize, serviceRecognizeMulti, serviceRecommend, serviceStandardize, uriToBase64 } from '@/lib/styleeService';
+import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
 
 // ─── AI 元信息 ───────────────────────────────────────────
 
@@ -14,47 +14,18 @@ export interface AIMeta {
 }
 
 // ─── 衣服识别 ───────────────────────────────────────────
-// 优先使用 Qwen VL (DashScope)，不可用时降级到 mock
-
-const RECOGNIZE_PROMPT = `请识别这件衣物的属性，返回JSON格式：
-{
-  "category": "上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰",
-  "color": "颜色，优先从以下选项选：白色/黑色/灰色/米色/蓝色/深蓝/浅蓝/红色/酒红/粉色/绿色/军绿/卡其/棕色/驼色/焦糖/橙色/黄色/紫色/条纹/格纹/印花。匹配不到再用简短描述，不要括号补充",
-  "material": "材质，优先从以下选项选：纯棉/精梳棉/亚麻/天丝/莫代尔/真丝/羊毛/羊绒/醋酸/涤纶/冰丝/雪纺/灯芯绒/金丝绒/牛仔/帆布/PU皮/麂皮/摇粒绒/网纱/空气层/棉氨混纺/毛混纺/羽绒/羊羔毛/针织/西装料/尼龙/合成革。匹配不到再用简短描述，不要括号补充，如'聚酯纤维/混纺'不要写成'聚酯纤维/混纺(挺括感面料)'",
-  "style": "风格",
-  "sleeve_length": "无袖/短袖/长袖（仅上装需要）",
-  "fit_type": "超紧身/修身/常规合身/宽松/廓形",
-  "brand": "品牌（可见的话）",
-  "season": ["适合的季节，从 spring/summer/autumn/winter/all_season 中选择1-3个"],
-  "occasion_tags": ["适合的场合，从 daily_commute/date/travel/business/sport/ceremony/beach/hiking/home/party 中选择1-3个"]
-}
-只返回JSON，不要其他文字。`;
+// 所有 Qwen/DeepSeek 请求只由 model-service 发起；App 永不持有模型 key。
 
 export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: RecognitionResult; meta: AIMeta }> => {
   const t0 = Date.now();
-  if (isDashScopeAvailable()) {
-    try {
-      const raw = await qwenVisionChat(imageUri, RECOGNIZE_PROMPT, { jsonMode: true, temperature: 0.3 });
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          result: {
-            category: parsed.category || '上装',
-            color: normalizeColor(parsed.color),
-            material: normalizeMaterial(parsed.material),
-            style: parsed.style || '',
-            brand: parsed.brand || '',
-            fit_type: parsed.fit_type || undefined,
-            sleeve_length: parsed.sleeve_length || undefined,
-            season: Array.isArray(parsed.season) ? parsed.season : undefined,
-            occasion_tags: Array.isArray(parsed.occasion_tags) ? parsed.occasion_tags : undefined,
-          },
-          meta: { source: 'qwen3-vl-plus', durationMs: Date.now() - t0, ok: true },
-        };
-      }
-    } catch (e) {
-      console.warn('[AI] Qwen VL recognition failed, falling back to mock:', e);
-    }
+  const encoded = await uriToBase64(imageUri);
+  const response = encoded ? await serviceRecognize(encoded.b64, encoded.mime) : null;
+  if (response) {
+    const result = recognizeRespToResult(response);
+    result.color = normalizeColor(result.color);
+    result.material = normalizeMaterial(result.material);
+    const provider = response.provider || 'model';
+    return { result, meta: { source: `model-service/${provider}`, durationMs: Date.now() - t0, ok: provider !== 'mock' } };
   }
   const result = await mockRecognizeClothing(imageUri);
   return { result, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
@@ -62,55 +33,21 @@ export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: R
 
 // ─── 多品识别 ────────────────────────────────────────────
 
-const MULTI_DETECT_PROMPT = `请识别这张照片中所有可辨认的衣物/配饰单品，返回JSON格式：
-{
-  "items": [
-    {
-      "index": 1,
-      "category": "上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰",
-      "color": "颜色，优先从以下选项选：白色/黑色/灰色/米色/蓝色/深蓝/浅蓝/红色/酒红/粉色/绿色/军绿/卡其/棕色/驼色/焦糖/橙色/黄色/紫色/条纹/格纹/印花。匹配不到再用简短描述，不要括号补充",
-      "material": "材质，优先从以下选项选：纯棉/精梳棉/亚麻/天丝/莫代尔/真丝/羊毛/羊绒/醋酸/涤纶/冰丝/雪纺/灯芯绒/金丝绒/牛仔/帆布/PU皮/麂皮/摇粒绒/网纱/空气层/棉氨混纺/毛混纺/羽绒/羊羔毛/针织/西装料/尼龙/合成革。匹配不到再用简短描述，不要括号补充，如'聚酯纤维/混纺'不要写成'聚酯纤维/混纺(挺括感面料)'",
-      "style": "风格",
-      "sleeve_length": "无袖/短袖/长袖（仅上装需要）",
-      "fit_type": "超紧身/修身/常规合身/宽松/廓形",
-      "brand": "品牌（可见的话）",
-      "season": ["适合的季节，从 spring/summer/autumn/winter/all_season 中选择1-3个"],
-      "occasion_tags": ["适合的场合，从 daily_commute/date/travel/business/sport/ceremony/beach/hiking/home/party 中选择1-3个"],
-      "description": "简洁客观的单品名称，如'白色圆领T恤''深蓝色直筒牛仔裤''浅灰色高腰A字中长裙'，不要加主观描述或搭配建议，不要逗号分隔多个描述"
-    }
-  ]
-}
-如果图中只有一件单品，返回只含一个元素的数组。只返回JSON，不要其他文字。`;
-
 export const aiDetectMultiItems = async (
   imageUri: string,
 ): Promise<{ items: DetectedItem[]; meta: AIMeta }> => {
   const t0 = Date.now();
-  if (isDashScopeAvailable()) {
-    try {
-      const raw = await qwenVisionChat(imageUri, MULTI_DETECT_PROMPT, { jsonMode: true, temperature: 0.3 });
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-          const items: DetectedItem[] = parsed.items.map((p: any, i: number) => ({
-            index: p.index ?? i + 1,
-            category: p.category || '上装',
-            color: normalizeColor(p.color),
-            material: normalizeMaterial(p.material),
-            style: p.style || undefined,
-            brand: p.brand || undefined,
-            sleeve_length: p.sleeve_length || undefined,
-            fit_type: p.fit_type || undefined,
-            season: Array.isArray(p.season) ? p.season : undefined,
-            occasion_tags: Array.isArray(p.occasion_tags) ? p.occasion_tags : undefined,
-            description: p.description || `${p.color || '未知'}${p.category || '单品'}`,
-          }));
-          return { items, meta: { source: 'qwen3-vl-plus', durationMs: Date.now() - t0, ok: true } };
-        }
-      }
-    } catch (e) {
-      console.warn('[AI] Multi-item detection failed, falling back to single:', e);
-    }
+  const encoded = await uriToBase64(imageUri);
+  const parsed = encoded ? await serviceRecognizeMulti(encoded.b64, encoded.mime) : null;
+  if (Array.isArray(parsed?.items) && parsed.items.length > 0) {
+          const items: DetectedItem[] = parsed.items.map((p, i) => {
+            const item = recognizeManyItemToDetected(p, i);
+            item.color = normalizeColor(item.color);
+            item.material = normalizeMaterial(item.material);
+            return item;
+          });
+          const provider = parsed.provider || 'model';
+          return { items, meta: { source: `model-service/${provider}`, durationMs: Date.now() - t0, ok: provider !== 'mock' } };
   }
   // Fallback: use single-item recognition, wrap as array
   const { result, meta: singleMeta } = await aiRecognizeClothing(imageUri);
@@ -129,24 +66,13 @@ export const aiStandardizeGarment = async (
   extras?: { color?: string; material?: string; description?: string },
 ): Promise<{ url: string | null; meta: AIMeta }> => {
   const t0 = Date.now();
-  if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
-
-  const detail = [extras?.color, extras?.material].filter(Boolean).join('、');
-  const detailInstr = detail ? `（${detail}）` : '';
-  const isolateInstr = extras?.description
-    ? `图片中可能存在多件衣物，你只需要提取「${extras.description}」这一件单品，去掉其他所有衣物和物品，`
-    : '';
-  const prompt = `${isolateInstr}严格保持该${category}${detailInstr}的颜色、材质、纹理、图案、版型等所有视觉细节完全不变，仅将背景替换为纯白色，该单品居中放置，正面平铺展示，无模特，无多余装饰，商品白底图风格，高清摄影`;
-
-  // 标准化=图生图/白底图,用更便宜的 qwen-image-edit(0.5→0.3 元/张);试穿仍走 pro。
-  const { qwenGenerateImage, QWEN_IMAGE_EDIT_MODEL } = await import('@/lib/dashscope');
-  try {
-    const imageUrl = await qwenGenerateImage(prompt, { refImage: imageUri, model: QWEN_IMAGE_EDIT_MODEL });
-    return { url: imageUrl, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: !!imageUrl } };
-  } catch (e) {
-    console.warn('[AI] Qwen Image standardization failed:', e);
-    return { url: null, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: false } };
-  }
+  const encoded = await uriToBase64(imageUri);
+  const response = encoded
+    ? await serviceStandardize(encoded.b64, encoded.mime, photoType, category, extras)
+    : null;
+  const usable = response?.verified && response.image_ref?.startsWith('http')
+    ? response.image_ref : null;
+  return { url: usable, meta: { source: usable ? 'model-service/qwen-image-edit' : 'mock', durationMs: Date.now() - t0, ok: !!usable } };
 };
 
 // Re-export static option lists used by pickers
@@ -154,147 +80,15 @@ export { CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS } from '@/lib/mock/re
 
 // ─── 意图识别 ───────────────────────────────────────────
 
-const INTENT_SYSTEM_PROMPT = `你是一个穿搭意图识别助手。根据用户的描述，从以下标签中提取匹配的标签ID。
-
-标签ID列表（必须使用这些ID，不要使用其他值）：
-- 场合：daily_commute, date, travel, business, sport, ceremony, beach, hiking, home, party
-- 风格：quiet_luxury, minimalist, commute_style, french, preppy, safari, vintage, street, sporty_casual, rock, goth, sweet, romantic, bohemian, western, utility, wabi_sabi, avantgarde, urban_cool
-- 色系：light, nude, khaki, champagne, silver, floral, plaid, morandi, white, black_gray, red, orange, yellow, green, blue, purple, pink
-- 温度：temp_hot, temp_warm, temp_cool, temp_cold
-
-示例：
-用户说"周末去约会"→ { "tags": ["date", "sweet", "warm"] }
-用户说"上班穿什么"→ { "tags": ["commute", "commute_style", "minimalist"] }
-用户说"今天很热想穿得休闲点"→ { "tags": ["casual", "temp_hot"] }
-用户说"面试需要正式一点"→ { "tags": ["work", "quiet_luxury", "black"] }
-用户说"海边度假"→ { "tags": ["travel", "bohemian", "warm"] }
-用户说"想走老钱风"→ { "tags": ["quiet_luxury", "minimalist"] }
-用户说"喜欢摇滚酷感"→ { "tags": ["rock", "urban_cool", "black"] }
-
-只返回匹配的标签ID，不要翻译或修改ID。请严格返回JSON：{ "tags": ["id1", "id2"] }`;
-
 export async function aiExtractTags(query: string): Promise<string[]> {
   if (!query.trim()) return [];
-
-  const raw = await deepseekChat(
-    [
-      { role: 'system', content: INTENT_SYSTEM_PROMPT },
-      { role: 'user', content: query },
-    ],
-    { jsonMode: true, temperature: 0.3, maxTokens: 256 },
-  );
-
-  if (!raw) return extractTagsFromQuery(query);
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.tags)) return parsed.tags.filter((t: unknown) => typeof t === 'string');
-  } catch {}
+  const parsed = await serviceFeature<{ tags?: unknown[] }>('/intent', { query }, 30000);
+  if (Array.isArray(parsed?.tags)) return parsed.tags.filter((t): t is string => typeof t === 'string');
 
   return extractTagsFromQuery(query);
 }
 
 // ─── 穿搭推荐 + 穿搭理由 ────────────────────────────────
-
-function buildItemsSummary(items: WardrobeItem[]): string {
-  return items
-    .filter(i => i.status === 'active')
-    .map(i => {
-      const parts = [`ID:${i.item_id}`, i.category, i.color];
-      if (i.material) parts.push(i.material);
-      if (i.fit_type) parts.push(`版型:${i.fit_type}`);
-      if (i.sleeve_length) parts.push(`袖长:${i.sleeve_length}`);
-      if (Array.isArray(i.season) && i.season.length) parts.push(`季节:${i.season.join('/')}`);
-      const styleNames = i.tags?.map(t => t.tag_name).filter(Boolean) ?? [];
-      if (styleNames.length) parts.push(`风格:${styleNames.join('/')}`);
-      if (Array.isArray(i.occasion_tags) && i.occasion_tags.length) parts.push(`场合:${i.occasion_tags.join('/')}`);
-      if (i.name) parts.unshift(i.name);
-      return parts.join(' | ');
-    })
-    .join('\n');
-}
-
-// tag ID → { 中文label, 类型 }，用于把前端传来的英文标签 ID 映射回中文需求
-const TAG_LOOKUP: Record<string, { label: string; type: FilterTag['type'] }> = (() => {
-  const map: Record<string, { label: string; type: FilterTag['type'] }> = {};
-  for (const t of [...OCCASION_TAGS, ...STYLE_TAGS, ...COLOR_TAGS, ...TEMP_TAGS]) {
-    map[t.id] = { label: t.label, type: t.type };
-  }
-  return map;
-})();
-
-interface StructuredTags { occasion: string[]; style: string[]; color: string[]; temp: string[] }
-
-function structureTags(tagsRaw?: string): StructuredTags {
-  const result: StructuredTags = { occasion: [], style: [], color: [], temp: [] };
-  if (!tagsRaw) return result;
-  for (const raw of tagsRaw.split(',').map(s => s.trim()).filter(Boolean)) {
-    const t = TAG_LOOKUP[raw];
-    if (!t) continue;
-    if (t.type === 'occasion') result.occasion.push(t.label);
-    else if (t.type === 'style') result.style.push(t.label);
-    else if (t.type === 'color_system') result.color.push(t.label);
-    else if (t.type === 'temperature') result.temp.push(t.label);
-  }
-  return result;
-}
-
-function tempToWarmthGuide(tempStr?: string): string | null {
-  const t = parseInt(tempStr ?? '', 10);
-  if (Number.isNaN(t)) return null;
-  if (t >= 25) return `当前约${t}°C（炎热）：优先短袖/无袖/薄款、透气面料与凉鞋，禁止厚外套、针织、羽绒`;
-  if (t >= 15) return `当前约${t}°C（温暖）：优先长袖/薄针织/衬衫，可搭薄外套或夹克，避免厚羽绒、加绒`;
-  if (t >= 5) return `当前约${t}°C（凉爽）：优先针织衫、风衣/夹克等中等保暖单品，鼓励叠穿`;
-  return `当前约${t}°C（寒冷）：优先厚外套/大衣/羽绒服、加厚下装与保暖配饰`;
-}
-
-const RECOMMEND_SYSTEM_PROMPT = `你是一个专业穿搭顾问。根据用户的衣橱单品和穿搭场景，生成1套最佳搭配方案。
-
-【硬约束｜必须严格满足，违反视为无效方案】
-- 温度：必须匹配"保暖度指引"。炎热天禁止厚外套/针织/羽绒；寒冷天必须包含足够保暖的外套或加厚单品。
-- 场合：所选单品的正式度/风格必须贴合指定场合（如"职场商务"不搭运动裤/拖鞋；"运动健身"不搭正装/高跟鞋）。
-- 颜色：若用户指定了色系，整套主色调必须落在该色系内（可少量中性色点缀），不得偏离到无关色系。
-- 风格：若用户指定了风格，整套风格气质必须与之统一。
-
-【温度→保暖度参考】
-- ≥25°C 炎热：短袖/无袖/薄款、透气面料、凉鞋
-- 15–24°C 温暖：长袖/薄针织/衬衫，可薄外套叠穿
-- 5–14°C 凉爽：针织衫、风衣/夹克等中等保暖，鼓励叠穿
-- <5°C 寒冷：厚外套/大衣/羽绒、加厚下装与保暖配饰
-
-【搭配规则】
-1. 只生成1套搭配方案，选择最贴合上述硬约束的最佳组合
-2. 搭配必须包含上装和下装（或连体装），可选配外套/鞋履/包袋/帽巾/配饰，共3-5件单品
-3. 优先使用衣橱中已有的单品，通过ID引用（owned_item_ids）
-4. recommended_items 中可推荐1-2件衣橱中没有的单品作为搭配补充；补充单品同样要满足温度/场合/颜色/风格约束
-5. recommended_items 每件需要 name、category（上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰）、color、description（简短描述，如"百搭内搭·四季"）
-6. comment 必须2-3句话具体说明：这套如何满足用户的温度/场合/颜色/风格需求，以及为什么好看
-
-分类可选值：上装、下装、连体装、外套、鞋履、包袋、帽巾、配饰
-
-请严格返回JSON：
-{
-  "outfits": [
-    {
-      "name": "方案名称（3-5字）",
-      "owned_item_ids": ["item_id_1", "item_id_2"],
-      "recommended_items": [
-        {"name": "丝质围巾", "category": "帽巾", "color": "米色", "description": "点睛配饰·四季"}
-      ],
-      "comment": "搭配理由"
-    }
-  ]
-}
-
-【示例】
-示例1（场合:职场商务 / 色系:黑灰色系 / 约22°C 温暖）→
-{"outfits":[{"name":"利落通勤","owned_item_ids":["a1","a2"],"recommended_items":[{"name":"尖头乐福鞋","category":"鞋履","color":"黑色","description":"通勤利落·三季"}],"comment":"黑灰主色调稳重专业，贴合职场商务；22°C选薄西装外套+衬衫叠穿不闷热；整体极简利落。"}]}
-示例2（场合:运动健身 / 约28°C 炎热）→
-{"outfits":[{"name":"清爽运动","owned_item_ids":["b1","b2","b3"],"recommended_items":[],"comment":"28°C炎热选速干短袖+运动短裤，透气排汗；配跑鞋适合健身；整套机能清爽不拖沓。"}]}
-示例3（场合:逛街约会 / 风格:法式慵懒 / 色系:白色系 / 约12°C 凉爽）→
-{"outfits":[{"name":"法式温柔","owned_item_ids":["c1","c2"],"recommended_items":[{"name":"米白针织开衫","category":"外套","color":"米白","description":"慵懒叠穿·春秋"}],"comment":"白色系清爽干净，12°C加针织开衫保暖；碎褶半裙+开衫透着法式慵懒；约会显温柔。"}]}
-
-重要：只返回1套最佳方案。如果衣橱单品不够完整搭配，多推荐recommended_items来补足，且补充单品必须满足全部硬约束。`;
 
 export async function aiRecommendOutfits(
   wardrobeItems: WardrobeItem[],
@@ -303,7 +97,16 @@ export async function aiRecommendOutfits(
   context?: { weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string },
 ): Promise<{ outfits: Outfit[]; error?: string; meta: AIMeta }> {
   const t0 = Date.now();
-  const itemsSummary = buildItemsSummary(wardrobeItems);
+  const serviceResult = await serviceRecommend(toRecommendRequest(wardrobeItems, context));
+  if (Array.isArray(serviceResult?.outfits)) {
+    const serviceOutfits = outfitsRespToApp(serviceResult.outfits, wardrobeItems, userId, sessionId);
+    if (serviceOutfits.length > 0) {
+      return {
+        outfits: serviceOutfits,
+        meta: { source: `model-service/${serviceResult.trace?.provider || 'model'}`, durationMs: Date.now() - t0, ok: serviceResult.trace?.provider !== 'mock' },
+      };
+    }
+  }
   const activeItems = wardrobeItems.filter(i => i.status === 'active');
   const hasTop = activeItems.some(i => i.category === '上装' || i.category === '外套');
   const hasBottom = activeItems.some(i => i.category === '下装' || i.category === '连体装');
@@ -311,122 +114,18 @@ export async function aiRecommendOutfits(
 
   // 方案A：空 / 稀疏衣橱不再直接返回空态，改为本地"全品类混搭"兜底：
   // 用已有单品 + 推荐单品库补位，凑成一套完整 look。
-  if (!itemsSummary || (!hasTop && !hasDress) || (!hasBottom && !hasDress)) {
+  if (activeItems.length === 0 || (!hasTop && !hasDress) || (!hasBottom && !hasDress)) {
     return {
       outfits: [buildFallbackLook(activeItems, userId, sessionId)],
       meta: { source: 'fallback', durationMs: Date.now() - t0, ok: true },
     };
   }
 
-  // 需求结构化：把颜色/场合/风格/温度拆成独立字段，标签 ID 先映射回中文
-  const st = structureTags(context?.tags);
-  const warmthGuide = tempToWarmthGuide(context?.temp);
-
-  const contextParts: string[] = [];
-  if (context?.weather) contextParts.push(`天气：${context.weather}`);
-  if (context?.temp) contextParts.push(`温度：${context.temp}°C`);
-  if (warmthGuide) contextParts.push(`保暖度指引：${warmthGuide}`);
-  if (context?.city) contextParts.push(`城市：${context.city}`);
-  if (st.occasion.length) contextParts.push(`【场合｜硬约束】${st.occasion.join('、')}`);
-  if (st.style.length) contextParts.push(`【风格｜硬约束】${st.style.join('、')}`);
-  if (st.color.length) contextParts.push(`【色系｜硬约束】${st.color.join('、')}`);
-  if (st.temp.length) contextParts.push(`【温度档｜硬约束】${st.temp.join('、')}`);
-  if (context?.stylePreferences) contextParts.push(`用户长期风格偏好（软性参考）：${context.stylePreferences}`);
-  if (context?.query) contextParts.push(`用户需求：${context.query}`);
-
-  const userMessage = `我的衣橱单品（格式：名称 | ID | 类别 | 颜色 | 材质 | 版型 | 袖长 | 季节 | 风格 | 场合）：\n${itemsSummary}\n\n${contextParts.length > 0 ? '穿搭场景：\n' + contextParts.join('\n') : '请推荐日常搭配'}`;
-
-  const raw = await deepseekChat(
-    [
-      { role: 'system', content: RECOMMEND_SYSTEM_PROMPT },
-      { role: 'user', content: userMessage },
-    ],
-    { jsonMode: true, temperature: 0.6, maxTokens: 4096 },
-  );
-
-  if (!raw) {
-    const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.outfits) || parsed.outfits.length === 0) {
-      const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-      return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
-    }
-
-    const itemMap = new Map(wardrobeItems.map(i => [i.item_id, i]));
-    const outfits: Outfit[] = [];
-
-    for (const o of parsed.outfits) {
-      const ownedIds: string[] = Array.isArray(o.owned_item_ids) ? o.owned_item_ids
-        : Array.isArray(o.item_ids) ? o.item_ids : [];
-
-      const outfitItems: OutfitItem[] = [];
-      let order = 0;
-      let hasTop = false;
-      let hasBottom = false;
-
-      for (const id of ownedIds as string[]) {
-        const item = itemMap.get(id);
-        if (!item) continue;
-        if (item.category === '上装' || item.category === '外套') hasTop = true;
-        if (item.category === '下装' || item.category === '连体装') hasBottom = true;
-        outfitItems.push({
-          item_id: id,
-          outfit_id: '',
-          display_order: order++,
-          item,
-        });
-      }
-
-      const recommended: RecommendedItem[] = Array.isArray(o.recommended_items)
-        ? o.recommended_items.map((r: any) => ({
-            name: String(r.name || ''),
-            category: String(r.category || '配饰') as ClothingCategory,
-            color: String(r.color || ''),
-            image_url: r.image_url ? String(r.image_url) : undefined,
-            description: r.description ? String(r.description) : undefined,
-          }))
-        : [];
-
-      for (const r of recommended) {
-        if (r.category === '上装' || r.category === '外套') hasTop = true;
-        if (r.category === '下装' || r.category === '连体装') hasBottom = true;
-      }
-
-      if (!hasTop && !hasBottom && outfitItems.length === 0 && recommended.length === 0) continue;
-
-      const outfit_id = `ai_outfit_${outfits.length}_${Date.now()}`;
-      outfits.push({
-        outfit_id,
-        user_id: userId,
-        session_id: sessionId,
-        name: o.name || `方案 ${outfits.length + 1}`,
-        ai_comment: o.comment || '',
-        source: 'ai_generated',
-        items: outfitItems.map(i => ({ ...i, outfit_id })),
-        recommended_items: recommended.length > 0 ? recommended : undefined,
-        created_at: new Date().toISOString(),
-      });
-    }
-
-    if (outfits.length === 0) {
-      const fallback = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-      return { outfits: fallback, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
-    }
-
-    return { outfits, meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0, ok: true } };
-  } catch {
-    const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-    return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
-  }
+  const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
+  return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
 }
 
 // ─── 穿搭理由（独立生成）─────────────────────────────────
-
-const REASON_SYSTEM_PROMPT = `你是一个穿搭顾问。根据给定的搭配方案和场景，生成一段2-3句话的搭配理由，要具体提到颜色协调、风格统一、场景适配等方面。请严格返回JSON：{ "reason": "搭配理由" }`;
 
 export async function aiGetOutfitReason(
   outfitItems: WardrobeItem[],
@@ -440,21 +139,10 @@ export async function aiGetOutfitReason(
 
   const userMessage = `搭配单品：${itemsDesc}\n场景：${contextParts.join('，') || '日常'}`;
 
-  const raw = await deepseekChat(
-    [
-      { role: 'system', content: REASON_SYSTEM_PROMPT },
-      { role: 'user', content: userMessage },
-    ],
-    { jsonMode: true, temperature: 0.8, maxTokens: 512 },
-  );
-
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed.reason === 'string' ? parsed.reason : null;
-  } catch {
-    return null;
-  }
+  const parsed = await serviceFeature<{ reason?: string }>('/reason', {
+    items: itemsDesc, context: contextParts.join('，') || '日常', userMessage,
+  });
+  return typeof parsed?.reason === 'string' ? parsed.reason : null;
 }
 
 // ─── 链接导入商品识别 ──────────────────────────────────────
@@ -469,29 +157,10 @@ export interface ProductExtraction {
   description?: string;
 }
 
-const LINK_EXTRACT_PROMPT = `根据以下商品链接URL，推断商品信息并返回JSON：
-{
-  "name": "商品名称",
-  "category": "上装/下装/连体装/外套/鞋履/包袋/帽巾/配饰",
-  "color": "颜色",
-  "material": "材质（可选）",
-  "brand": "品牌（可选）",
-  "price": 价格数字（可选）,
-  "description": "简短描述（可选）"
-}
-只返回JSON。如果无法确定某字段，留空字符串。`;
-
 export async function aiExtractProductFromLink(url: string): Promise<ProductExtraction | null> {
   try {
-    const raw = await deepseekChat(
-      [
-        { role: 'system', content: LINK_EXTRACT_PROMPT },
-        { role: 'user', content: `商品链接：${url}` },
-      ],
-      { jsonMode: true, temperature: 0.3, maxTokens: 512 },
-    );
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    const parsed = await serviceFeature<any>('/product-extract', { url });
+    if (parsed) {
       return {
         name: parsed.name || '链接导入商品',
         category: parsed.category || '上装',
@@ -529,34 +198,21 @@ export async function aiGenerateTryOnSuggestion(
   const t0 = Date.now();
   const itemsDesc = outfitItems.map(i => `${i.name || i.category}（${i.color}）`).join('、');
 
-  const systemPrompt = `你是一个专业穿搭顾问。根据搭配单品和用户体型，给出试穿建议。
-返回JSON：
-{
-  "suggestion": "2-3句试穿效果描述，具体提到颜色搭配和风格",
-  "compatibility_score": 85,
-  "tips": ["穿搭小贴士1", "穿搭小贴士2", "穿搭小贴士3"]
-}`;
-
   const bodyInfo = bodyShape ? `\n用户体型：${bodyShape}` : '';
   const userMsg = `搭配单品：${itemsDesc}${bodyInfo}`;
 
   try {
-    const raw = await deepseekChat(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMsg },
-      ],
-      { jsonMode: true, temperature: 0.8, maxTokens: 1024 },
-    );
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    const parsed = await serviceFeature<any>('/tryon-suggestion', {
+      items: outfitItems, body_shape: bodyShape, user_message: userMsg,
+    });
+    if (parsed && parsed.provider !== 'mock') {
       return {
         suggestion: {
           suggestion: parsed.suggestion ?? '这套搭配整体协调，适合日常穿着。',
           compatibility_score: parsed.compatibility_score ?? 80,
           tips: Array.isArray(parsed.tips) ? parsed.tips : ['搭配和谐', '颜色协调'],
         },
-        meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0, ok: true },
+        meta: { source: `model-service/${parsed.provider || 'deepseek'}`, durationMs: Date.now() - t0, ok: true },
       };
     }
   } catch {}
@@ -567,19 +223,11 @@ export async function aiGenerateTryOnSuggestion(
       compatibility_score: 82,
       tips: ['可以加一条围巾增加层次感', '建议搭配简约配饰', '适合日常通勤和休闲场景'],
     },
-    meta: { source: 'deepseek-v4-flash', durationMs: Date.now() - t0, ok: false },
+    meta: { source: 'mock', durationMs: Date.now() - t0, ok: false },
   };
 }
 
 // ─── AI 试穿图生成 ──────────────────────────────────────────
-
-const SCENE_PROMPTS: Record<string, string> = {
-  cafe: '坐在咖啡馆里，暖色调灯光，悠闲氛围',
-  street: '站在城市街头，自然光线，都市感',
-  office: '在办公室内，专业场景，干净光线',
-  park: '在公园草地旁，自然阳光，绿意盎然',
-  home: '在家中沙发上，温馨居家氛围，柔和光线',
-};
 
 export async function aiGenerateTryOnImage(
   outfitItems: ItemBrief[],
@@ -588,26 +236,13 @@ export async function aiGenerateTryOnImage(
   selfieUri?: string | null,
 ): Promise<{ url: string | null; meta: AIMeta }> {
   const t0 = Date.now();
-  if (!isDashScopeAvailable()) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
 
-  const itemsDesc = outfitItems.map(i => `${i.color}${i.name || i.category}`).join('、');
-  const bodyDesc = bodyShape ? `，${bodyShape}身材` : '';
-  const sceneDesc = scene && SCENE_PROMPTS[scene] ? `，${SCENE_PROMPTS[scene]}` : '，站在城市街头，自然光线';
-
-  const faceInstr = selfieUri
-    ? '严格保持参考照片中人物的面部五官、脸型轮廓、肤色和发型完全一致，不可替换或改变面部任何特征，'
-    : '';
-  const prompt = selfieUri
-    ? `${faceInstr}一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`
-    : `时尚穿搭照片，一位${bodyDesc}的年轻女性穿着${itemsDesc}${sceneDesc}，全身照，时尚杂志风格，高质量摄影`;
-
-  // 试穿生图改用更便宜的 qwen-image-edit(0.5→0.3 元/张),与标准化一致。
-  const { qwenGenerateImage, QWEN_IMAGE_EDIT_MODEL } = await import('@/lib/dashscope');
-  try {
-    const imageUrl = await qwenGenerateImage(prompt, { refImage: selfieUri || undefined, model: QWEN_IMAGE_EDIT_MODEL });
-    return { url: imageUrl, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: !!imageUrl } };
-  } catch (e) {
-    console.warn('[AI] Try-on image generation failed:', e);
-    return { url: null, meta: { source: QWEN_IMAGE_EDIT_MODEL, durationMs: Date.now() - t0, ok: false } };
-  }
+  const encoded = selfieUri ? await uriToBase64(selfieUri) : null;
+  if (!encoded) return { url: null, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
+  const response = await serviceFeature<{ image_ref?: string }>('/tryon-image', {
+    image_b64: encoded.b64, mime: encoded.mime,
+    items: outfitItems, body_shape: bodyShape, scene,
+  }, 120000);
+  const imageUrl = response?.image_ref || null;
+  return { url: imageUrl, meta: { source: imageUrl ? 'model-service/qwen-image-edit' : 'mock', durationMs: Date.now() - t0, ok: !!imageUrl } };
 }

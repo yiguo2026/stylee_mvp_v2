@@ -87,11 +87,14 @@ export default function OutfitResultScreen() {
 
   const dotAnim = useRef(new Animated.Value(0)).current;
 
-  const generateOutfits = useCallback(async () => {
+  const generateOutfits = useCallback(async (options?: { keepCurrentOnFallback?: boolean }) => {
+    const keepCurrentOnFallback = options?.keepCurrentOnFallback === true;
     setLoading(true);
-    setSavedId(null);
-    setIsFavorited(false);
-    setCurrentIndex(0);
+    if (!keepCurrentOnFallback) {
+      setSavedId(null);
+      setIsFavorited(false);
+      setCurrentIndex(0);
+    }
     setErrorMessage(null);
     setWishlistedRecs(new Set());
     setGenStep(0);
@@ -121,7 +124,7 @@ export default function OutfitResultScreen() {
     const userId = useUserStore.getState().user?.id;
     if (!userId) {
       finished = true;
-      setOutfits([]);
+      if (!keepCurrentOnFallback) setOutfits([]);
       setErrorMessage('请先登录后再生成搭配');
       setLoading(false);
       return;
@@ -139,7 +142,7 @@ export default function OutfitResultScreen() {
     setQuota({ used: quotaResult.used, limit: quotaResult.limit, remaining: quotaResult.remaining });
     if (!quotaResult.ok) {
       finished = true;
-      setOutfits([]);
+      if (!keepCurrentOnFallback) setOutfits([]);
       setErrorMessage(`今日 AI 推荐次数已用完（${quotaResult.limit} 次），明天再来`);
       setLoading(false);
       return;
@@ -172,11 +175,16 @@ export default function OutfitResultScreen() {
     await animPromise;
 
     finished = true;
+    if (keepCurrentOnFallback && aiResult.meta.source === 'fallback') {
+      showToast('模型服务暂时没有生成新方案，已保留当前搭配');
+      setLoading(false);
+      return;
+    }
     setOutfits(aiResult.outfits);
     setAiMeta(aiResult.meta);
     if (aiResult.error) setErrorMessage(aiResult.error);
     setLoading(false);
-  }, [params.city, params.query, params.tags, params.temp, params.weather]);
+  }, [params.city, params.query, params.tags, params.temp, params.weather, showToast]);
 
   useEffect(() => {
     const init = async () => {
@@ -315,7 +323,10 @@ export default function OutfitResultScreen() {
   };
 
   const handleSwap = () => {
-    if (outfits.length <= 1) { generateOutfits(); return; }
+    if (outfits.length <= 1) {
+      void generateOutfits({ keepCurrentOnFallback: true });
+      return;
+    }
     setCurrentIndex((currentIndex + 1) % outfits.length);
     setSavedId(null);
     setIsFavorited(false);

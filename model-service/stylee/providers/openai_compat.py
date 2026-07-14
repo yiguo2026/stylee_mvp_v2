@@ -17,6 +17,7 @@ import urllib.request
 from ..usage_log import detect_feature, log_usage
 from ..constraints import CandidatePool
 from ..contracts import (
+    CATEGORY_SLOT,
     Category,
     Formality,
     GapSuggestion,
@@ -42,6 +43,10 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
     payload: dict = {"model": model, "messages": messages, "temperature": temperature}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+    # 成本护栏：所有文本/视觉 chat 输出 token 封顶。可用 LLM_MAX_TOKENS 调整，0=不封顶。
+    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+    if max_tokens > 0:
+        payload["max_tokens"] = max_tokens
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=data, method="POST",
@@ -142,7 +147,9 @@ def build_gen_messages(ctx: RequestContext, scene: SceneSpec, pool: CandidatePoo
         "3) 鞋恰好 1 双;外套至多 1 件(冷天/需外套时要有);配饰可选;\n"
         "4) 某个必需槽位候选池为空时,用 gap 给出补买建议(不要硬塞不合适的);\n"
         "5) 参考给的『审美范例』的搭配套路,但只用用户自己的衣物;\n"
-        "6) 兼顾:身材修饰 > 场景适配 > 风格塑造 > 色彩适配。\n"
+        "6) 兼顾:身材修饰 > 场景适配 > 风格塑造 > 色彩适配;\n"
+        "7) gap.desc 只写简短单品名(如‘白色帆布鞋’),最多 12 个汉字,"
+        "不要写‘建议购买/选择一件/适合某场景的’等句子。\n"
         f"输出严格 JSON,出 {k} 套且彼此尽量多样。schema:" + _GEN_SCHEMA
     )
     usr = json.dumps({
@@ -203,9 +210,11 @@ def parse_outfits_json(data: dict) -> list[Outfit]:
             role = _as_slot(it.get("role", "accessory"))
             if it.get("gap"):
                 g = it["gap"]
+                category = _as_category(g.get("category", "上装"))
                 items.append(OutfitItemRef(
-                    role=role, owned=False,
-                    suggest=GapSuggestion(_as_category(g.get("category", "上装")),
+                    # gap 槽位由固定品类映射决定；忽略模型可能自相矛盾的 role。
+                    role=CATEGORY_SLOT[category], owned=False,
+                    suggest=GapSuggestion(category,
                                           g.get("desc", ""), g.get("reason", "")),
                 ))
             elif it.get("id"):
@@ -262,13 +271,13 @@ class OpenAICompatProvider(LLMProvider):
 # 便捷构造:读环境变量(model 名可被 env 覆盖,以适配你账号实际开放的型号)
 # ---------------------------------------------------------------------------
 def deepseek(model: str | None = None, api_key: str | None = None) -> OpenAICompatProvider:
-    # 设计稿:主脑/低成本 = V4-Flash(B0),复杂兜底 = V4-Pro(B3 核心)。
+    # 默认 B0/B3 都用 Flash，避免无意烧 Pro；质量评测需要时显式设置 DEEPSEEK_MODEL_GEN。
     override = model or os.environ.get("DEEPSEEK_MODEL")
     return OpenAICompatProvider(
         base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
-        model=override or "deepseek-v4-pro",
+        model=override or "deepseek-v4-flash",
         model_intent=os.environ.get("DEEPSEEK_MODEL_INTENT", override or "deepseek-v4-flash"),
-        model_gen=os.environ.get("DEEPSEEK_MODEL_GEN", override or "deepseek-v4-pro"),
+        model_gen=os.environ.get("DEEPSEEK_MODEL_GEN", override or "deepseek-v4-flash"),
         api_key=api_key or os.environ.get("DEEPSEEK_API_KEY", ""),
         name="deepseek",
     )

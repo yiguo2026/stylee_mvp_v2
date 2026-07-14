@@ -1,5 +1,7 @@
 # App ↔ 本地推理服务接入 设计（子项目 2）
 
+> **已废弃（安全原因）**：本文记录早期“服务失败后客户端直连模型”的方案。当前实现禁止 App/Web 持有或直连 DeepSeek、DashScope、Ark 及 Supabase service-role key；以根 README、`model-service/README.md` 与 `docs/security/model-api-incident-response.md` 为准。
+
 > Stylee 三大模型能力（服饰识别 / 单品标准化 / Garments2Look 搭配推荐）通过**本地 Python 推理服务**接入 App（`stylee_mvp_v2`）。本文件是子项目 2 的设计规格。子项目 1（推理服务本身）已完成，在模型仓 `style05` 的 `stylee/service/`（`serve.py` 启动）。
 
 ## 目标
@@ -54,14 +56,14 @@ uriToBase64(uri): Promise<{ b64: string; mime: string } | null>
   // 复用 ark.ts 里 fetch→blob→FileReader 的写法，去掉 data: 前缀
 
 serviceRecognize(b64, mime): Promise<RecognizeResp | null>       // POST /recognize, timeout 20s
-serviceStandardize(b64, mime, photoType, category): Promise<StandardizeResp | null>  // POST /standardize, timeout 40s
+serviceStandardize(b64, mime, photoType, category): Promise<StandardizeResp | null>  // POST /standardize, timeout 90s
 serviceRecommend(payload: RecommendReq): Promise<RecommendResp | null>  // POST /recommend, timeout 40s
 ```
 - 每个 POST 用 `AbortController` 超时；`!res.ok` 或异常 → `null` + `console.warn`。
 - 首个失败触发一次**轻提示**（全局一次性 flag，见组件 4）。
 
 ### 2. `src/lib/ai.ts`（改，仅动相关函数体，不碰 `INTENT_SYSTEM_PROMPT`）
-- `aiRecognizeClothing(uri)`：`uriToBase64` → `serviceRecognize` → 命中则回填并**把 `photo_type`/`needs_review` 也带出**（扩 `RecognitionResult` 可选字段）；未命中 → 现有 Ark → mock。
+- `aiRecognizeClothing(uri)`：`uriToBase64` → `serviceRecognize` → 命中则回填并**把 `photo_type`/`needs_review` 也带出**（扩 `RecognitionResult` 可选字段）；未命中 → 本地 mock，客户端不得直连模型供应商。
 - `aiStandardizeGarment(uri, category, photoType): Promise<string | null>`（新）：`uriToBase64` → `serviceStandardize` → 返回临时 OSS URL 或 `null`。
 - `aiRecommendOutfits(...)`（签名不变）：先 `WardrobeItem[]`+`context` → `RecommendReq`（`fit_type`→`fit`，`stylePreferences` 拆成 `style_prefs`，`temp`→`temp_c`，`input_mode:"nl"`，`n:3`）→ `serviceRecommend`；命中则把 `resp.outfits` 喂**现有解析循环**产出 `Outfit[]`；未命中 → 现有 DeepSeek → mock。
 
@@ -72,7 +74,7 @@ serviceRecommend(payload: RecommendReq): Promise<RecommendResp | null>  // POST 
   - `generating`：图上叠一层非阻塞"标准化中…"角标 + spinner；**表单可继续编辑**（不锁）。
   - `done`：预览**自动切到标准图** + 出现分段切换 `原图 | 标准图`（默认选标准图）+ 小字"✓ 已生成标准图"。→ 用户可感知"完成"并可切换。
   - `failed`：不出切换，小字"标准图生成失败，用原图"（即"轻提示"）。
-- 保存：对**当前选中的图**（原图或标准图）`uploadWardrobeImage` 转存 Supabase（标准图是临时 OSS URL，靠这一步持久化）→ `addItem`。若标准化仍 `generating`，保存用当前选中（此时是原图），不阻塞。
+- 保存：对**当前选中的图**（原图或标准图）`uploadWardrobeImage` 转存 Supabase（标准图是临时 OSS URL，必须强制下载并持久化）→ `addItem`。标准图转存失败时改传原图；原图也上传失败则停止入库，禁止保存临时 URL 或设备本地 URI。若标准化仍 `generating`，保存用当前选中（此时是原图），不阻塞。
 
 ### 4. 轻提示（服务不可达）
 一个极简的全局一次性提示：`styleeService` 首次探测到服务不可达时，`console.warn` + 触发一个轻量非阻塞 UI 反馈（RN `ToastAndroid` 仅安卓；跨端用页面内小 banner/角标，不弹 `Alert`）。文案："未连接本地模型服务，已用备用方案"。同一会话只提示一次。
@@ -90,8 +92,8 @@ serviceRecommend(payload: RecommendReq): Promise<RecommendResp | null>  // POST 
 ## 错误处理
 
 - 三个能力任一服务调用失败/超时 → `null` → 走现有回落（mock 识别 / 客户端 DeepSeek 推荐 / 跳过标准化用原图）+ 一次轻提示。
-- `uploadWardrobeImage` 失败 → 保留原逻辑（本地 uri 兜底）。
-- 标准化临时 URL 转存失败 → 回退用原图保存（不阻断入库）。
+- 标准化临时 URL 转存失败 → 回退上传原图。
+- 原图上传也失败 → 停止入库并提示重试，不得保存本地 URI。
 
 ## 测试策略
 

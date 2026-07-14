@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import type { WardrobeItem } from '@/types';
-import { recognizeRespToResult, toRecommendRequest, outfitsRespToApp } from './styleeMapping.ts';
+import { compactRecommendedName, normalizePhotoType, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest, outfitsRespToApp } from './styleeMapping.ts';
 
 const item = (o: Partial<WardrobeItem>): WardrobeItem => ({
   item_id: 'x', user_id: 'u', name: '', category: '上装', color: '白',
@@ -17,6 +17,22 @@ test('recognizeRespToResult 映射并带出 photo_type/needs_review', () => {
   assert.equal(r.color, '白色');
   assert.equal(r.photo_type, 'on_body');
   assert.equal(r.needs_review, false);
+});
+
+test('photo_type 旧值归一化，多品识别元数据不丢失', () => {
+  assert.equal(normalizePhotoType('flat'), 'flatlay');
+  assert.equal(normalizePhotoType('product'), 'web');
+  assert.equal(normalizePhotoType('unknown'), 'on_body');
+  const item = recognizeManyItemToDetected({
+    category: '上装', color: '白色', brand: 'A', sleeve_length: '短袖',
+    style: '简约', photo_type: 'flatlay', needs_review: true, confidence: 0.7,
+    description: '白色T恤',
+  }, 0);
+  assert.equal(item.photo_type, 'flatlay');
+  assert.equal(item.brand, 'A');
+  assert.equal(item.sleeve_length, '短袖');
+  assert.equal(item.needs_review, true);
+  assert.equal(item.confidence, 0.7);
 });
 
 test('toRecommendRequest 映射 fit_type→fit、拆 style_prefs、temp→temp_c', () => {
@@ -60,4 +76,15 @@ test('outfitsRespToApp 用 itemMap 还原已有单品、映射补充件与理由
   assert.equal(outfits[0].source, 'ai_generated');
   assert.equal(outfits[0].items?.length, 2); // 'nope' 被丢弃
   assert.equal(outfits[0].recommended_items?.[0].name, '丝巾');
+});
+
+test('推荐补位名称去掉购买建议句，只保留简短单品名', () => {
+  assert.equal(
+    compactRecommendedName('补：建议购买一件适合海岛度假的浅蓝色牛仔短裤', '下装'),
+    '浅蓝色牛仔短裤',
+  );
+  assert.equal(
+    compactRecommendedName('建议选择一双透气轻便的白色帆布鞋', '鞋履'),
+    '白色帆布鞋',
+  );
 });

@@ -1,4 +1,4 @@
-import type { RecognizeResp, StandardizeResp, RecommendReq, RecommendResp } from './styleeMapping.ts';
+import type { RecognizeResp, RecognizeManyResp, StandardizeResp, RecommendReq, RecommendResp } from './styleeMapping.ts';
 
 export const STYLEE_API = process.env.EXPO_PUBLIC_STYLEE_API ?? 'http://127.0.0.1:8000';
 
@@ -16,9 +16,13 @@ async function _postJson<T>(path: string, body: unknown, timeoutMs: number): Pro
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
+    const token = await _accessToken();
     const res = await fetch(`${STYLEE_API}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
@@ -29,6 +33,18 @@ async function _postJson<T>(path: string, body: unknown, timeoutMs: number): Pro
     _fireUnavailable();
     return null;
   } finally { clearTimeout(timer); }
+}
+
+async function _accessToken(): Promise<string | null> {
+  // Do not import the Supabase client in Node-only mapping/service tests.
+  if (typeof navigator === 'undefined' && typeof window === 'undefined') return null;
+  try {
+    const { supabase } = await import('./supabase');
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function serviceHealth(): Promise<boolean> {
@@ -44,17 +60,27 @@ export async function serviceRecognize(b64: string, mime: string): Promise<Recog
   return _postJson<RecognizeResp>('/recognize', { image_b64: b64, mime }, 20000);
 }
 
+export async function serviceRecognizeMulti(b64: string, mime: string): Promise<RecognizeManyResp | null> {
+  return _postJson<RecognizeManyResp>('/recognize-multi', { image_b64: b64, mime }, 60000);
+}
+
 export async function serviceStandardize(
   b64: string, mime: string, photoType: string, category: string,
+  extras?: { color?: string; material?: string; description?: string },
 ): Promise<StandardizeResp | null> {
-  // /standardize 走图生图，给足余量（图像生成偶有尖峰）
+  // Backend performs image edit followed by visual verification. Its defaults are
+  // 60s + 20s, so keep the client deadline above the complete server operation.
   return _postJson<StandardizeResp>('/standardize',
-    { image_b64: b64, mime, photo_type: photoType, item: { category } }, 60000);
+    { image_b64: b64, mime, photo_type: photoType, item: { category, ...extras } }, 90000);
 }
 
 export async function serviceRecommend(req: RecommendReq): Promise<RecommendResp | null> {
   // /recommend 走真实 LLM 生成搭配，实测 ~55s，给足余量避免误触发回落
   return _postJson<RecommendResp>('/recommend', req, 90000);
+}
+
+export async function serviceFeature<T>(path: string, body: unknown, timeoutMs = 60000): Promise<T | null> {
+  return _postJson<T>(path, body, timeoutMs);
 }
 
 // RN/web 専用：本地 uri → base64（Node 無 FileReader，故不在 node --test 覆蓋，靠集成 smoke/手動驗証）

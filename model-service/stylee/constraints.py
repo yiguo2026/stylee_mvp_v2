@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .contracts import (
+    CATEGORY_SLOT,
     Category,
     Outfit,
     RequestContext,
@@ -151,10 +152,14 @@ def validate_outfit(outfit: Outfit, ctx: RequestContext, scene: SceneSpec,
         if not it.ref or it.ref not in item_index:
             errors.append(f"引用了不存在的单品 id: {it.ref}")
 
-    # 槽位计数(只统计 owned;缺口建议按其 category 归槽)
+    # 槽位计数：已有单品信任衣橱里的真实品类；缺口建议必须由 category
+    # 推导槽位，不能信任模型同时生成的 role。否则模型把第二条短裤误标成
+    # accessory 时，会绕过“下装恰好一件”的硬约束。
     def slot_of(it) -> Slot:
         if it.owned:
             return item_index[it.ref].slot if it.ref in item_index else it.role
+        if it.suggest:
+            return CATEGORY_SLOT[it.suggest.category]
         return it.role
 
     items_by_slot: dict[Slot, list] = {}
@@ -162,7 +167,8 @@ def validate_outfit(outfit: Outfit, ctx: RequestContext, scene: SceneSpec,
         items_by_slot.setdefault(slot_of(it), []).append(it)
 
     has_dress = any(
-        it.owned and it.ref in item_index and covers_bottom(item_index[it.ref])
+        (it.owned and it.ref in item_index and covers_bottom(item_index[it.ref]))
+        or (not it.owned and it.suggest and it.suggest.category == Category.DRESS)
         for it in outfit.items
     )
 

@@ -83,6 +83,9 @@ class DashScopeImageStandardizer(ImageStandardizer):
 
     def standardize(self, image_url: str, item: WardrobeItem, mode: str) -> str:
         prompt = _EDIT_PROMPTS.get(mode, _EDIT_PROMPTS["img2img"])
+        details = "、".join([*item.colors, item.material, item.subcategory]).strip("、")
+        if details:
+            prompt += f" 目标单品特征：{details[:200]}。图片有多件物品时只保留这个目标单品。"
         data = json.dumps(build_edit_payload(self.model, image_url, prompt)).encode("utf-8")
         req = urllib.request.Request(
             self.base_url + _MM_URL_PATH, data=data, method="POST",
@@ -106,21 +109,21 @@ class DashScopeImageStandardizer(ImageStandardizer):
 _DASHSCOPE = "https://dashscope.aliyuncs.com"
 
 
-def build_vision_provider() -> VisionProvider:
+def build_vision_provider(timeout: int = 60) -> VisionProvider:
     key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not key:
         print("[vision] 无 key → MockVisionProvider 降级")
         return MockVisionProvider()
     return DashScopeVisionProvider(
         base_url=os.environ.get("VL_BASE_URL", _DASHSCOPE + "/compatible-mode/v1"),
-        api_key=key, model=os.environ.get("VL_MODEL", "qwen3-vl-plus"))
+        api_key=key, model=os.environ.get("VL_MODEL", "qwen3-vl-plus"), timeout=timeout)
 
 
-def build_image_standardizer() -> ImageStandardizer:
+def build_image_standardizer(timeout: int = 60) -> ImageStandardizer:
     key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not key:
         print("[vision] 无 key → MockImageStandardizer 降级")
         return MockImageStandardizer()
     return DashScopeImageStandardizer(
         base_url=os.environ.get("IMG_BASE_URL", _DASHSCOPE + "/api/v1"),
-        api_key=key, model=os.environ.get("IMG_EDIT_MODEL", "qwen-image-edit"))
+        api_key=key, model=os.environ.get("IMG_EDIT_MODEL", "qwen-image-edit"), timeout=timeout)

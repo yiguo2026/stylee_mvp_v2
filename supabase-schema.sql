@@ -27,6 +27,34 @@ CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid
 -- Allow reading username for uniqueness check during registration
 CREATE POLICY "Username is publicly readable" ON users FOR SELECT USING (true);
 
+-- Registration stays inside Supabase Auth. The App passes `username` in
+-- signUp metadata; this SECURITY DEFINER trigger creates the matching profile
+-- without exposing a service-role key to App/Web or model service.
+CREATE OR REPLACE FUNCTION public.handle_new_stylee_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  requested_username TEXT;
+BEGIN
+  requested_username := COALESCE(
+    NULLIF(NEW.raw_user_meta_data ->> 'username', ''),
+    split_part(COALESCE(NEW.email, ''), '@', 1)
+  );
+  INSERT INTO public.users (user_id, username, nickname)
+  VALUES (NEW.id, requested_username, requested_username)
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_stylee_user();
+
 -- ─────────────────────────────────────────
 -- tags (Style tag system — v2 updated)
 -- ─────────────────────────────────────────
