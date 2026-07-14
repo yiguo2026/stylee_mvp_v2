@@ -65,13 +65,6 @@ export default function OnboardingStep2() {
       <Text style={styles.title}>你的风格偏好</Text>
       <Text style={styles.subtitle}>选择你喜欢的风格，让我们更懂你的审美</Text>
 
-      <View style={styles.legend}>
-        <View style={[styles.legendDot, { backgroundColor: LIKE_COLOR }]} />
-        <Text style={styles.legendText}>喜欢</Text>
-      </View>
-
-      {/* Like section — 看图选风格，双列 */}
-      <Text style={styles.sectionLabel}>点击选择喜欢的风格</Text>
       <View style={styles.tagsGrid}>
         {PRESET_STYLE_PREFERENCES.map(tag => {
           const isLiked = liked.has(tag.tag_id);
@@ -106,6 +99,9 @@ export default function OnboardingStep2() {
       </View>
 
       <View style={styles.actions}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.finishBtn, loading && styles.disabled]}
           onPress={handleNext}
@@ -116,10 +112,10 @@ export default function OnboardingStep2() {
             : <Text style={styles.finishText}>下一步</Text>
           }
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
-          <Text style={styles.skipText}>跳过</Text>
-        </TouchableOpacity>
       </View>
+      <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipWrap}>
+        <Text style={styles.skipText}>跳过</Text>
+      </TouchableOpacity>
     </ScrollView>
     </SafeAreaView>
   );
@@ -165,12 +161,19 @@ const styles = StyleSheet.create({
   previewLabel: { ...T.formLabel },
   previewValue: { ...T.bodyText, fontSize: 13, flex: 1 },
 
-  actions: { gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
+  actions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
+  backBtn: {
+    width: 48, height: 48, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.line,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard,
+  },
+  backText: { ...T.bodyText, color: Colors.ink, fontSize: 18 },
   finishBtn: {
-    backgroundColor: Colors.ink, borderRadius: Radius.md,
-    paddingVertical: Spacing.two + 4, width: '100%', alignItems: 'center',
+    flex: 1, backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingVertical: Spacing.two + 4, alignItems: 'center',
   },
   disabled: { opacity: 0.6 },
   finishText: { ...T.buttonPrimary, color: Colors.paper },
   skipText: { ...T.buttonSecondary, color: Colors.walnut },
+  skipWrap: { alignItems: 'center', marginTop: Spacing.two },
 });

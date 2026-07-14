@@ -225,7 +225,7 @@ export default function OnboardingStep3() {
             }
           </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipWrap}>
           <Text style={styles.skipText}>跳过</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -333,5 +333,6 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.6 },
   finishText: { ...T.buttonPrimary, color: Colors.paper },
-  skipText: { ...T.buttonSecondary, color: Colors.walnut, textAlign: 'center', marginTop: Spacing.two },
+  skipText: { ...T.buttonSecondary, color: Colors.walnut, textAlign: 'center' },
+  skipWrap: { alignItems: 'center', marginTop: Spacing.two },
 });

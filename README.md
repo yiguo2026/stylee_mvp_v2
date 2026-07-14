@@ -193,6 +193,9 @@ npm run build:web        # 构建到 dist/（含 post-build patch）
 | `5dd80c5` | 修复 AI 次数计数异常：防止 consumeQuota 重复调用（ref 守卫）；首页 useFocusEffect 刷新配额；AI 试穿过渡动画显示剩余次数 |
 | — | 表单校验增强：年龄允许输入但实时校验格式（非数字/1-110范围红字提示）；职业改为下拉选择（16个预设选项）；城市搜索内置180+地级市数据（修复API 403导致搜索无结果）；ProfileEditModal 打开时同步最新profile数据；城市弹窗独立层级覆盖全屏 |
 | — | 修复 onboard step3 选中单品✅被裁切：builtinIcon 移除 overflow:hidden，改为 position:relative，对齐快速添加页 |
+| — | 修复灵感详情页单品拆解"已拥有"标记不准确：同类别有衣橱单品即标记已拥有；已拥有单品缩略图和名称优先使用衣橱真实数据 |
+| — | Onboarding 3步均增加"←返回上一步"按钮；"跳过"居中；step2移除多余图例和提示文案 |
+| — | 修复心愿单"加入衣橱"不生效：source_type改为manual避免DB CHECK约束冲突；category做normalize；错误时回滚心愿单UI；成功后刷新衣橱数据 |
 
 ## 项目结构
 

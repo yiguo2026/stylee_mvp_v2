@@ -258,6 +258,9 @@ export default function OnboardingStep1() {
       </View>
 
       <View style={styles.actions}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.nextBtn, loading && styles.disabled]}
           onPress={handleNext}
@@ -268,10 +271,10 @@ export default function OnboardingStep1() {
             : <Text style={styles.nextText}>下一步</Text>
           }
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleSkip}>
-          <Text style={styles.skipText}>跳过</Text>
-        </TouchableOpacity>
       </View>
+      <TouchableOpacity onPress={handleSkip} style={styles.skipWrap}>
+        <Text style={styles.skipText}>跳过</Text>
+      </TouchableOpacity>
     </ScrollView>
 
       {isWeb ? (
@@ -335,17 +338,23 @@ const styles = StyleSheet.create({
   genderBtnActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   genderText: { ...T.tag, color: Colors.ink },
   genderTextActive: { ...T.tag, color: Colors.paper },
-  actions: { gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
+  actions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three, alignItems: 'center' },
+  backBtn: {
+    width: 48, height: 48, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.line,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard,
+  },
+  backText: { ...T.bodyText, color: Colors.ink, fontSize: 18 },
   nextBtn: {
-    backgroundColor: Colors.ink,
+    flex: 1, backgroundColor: Colors.ink,
     borderRadius: Radius.md,
     paddingVertical: Spacing.two + 4,
-    width: '100%',
     alignItems: 'center',
   },
   disabled: { opacity: 0.6 },
   nextText: { ...T.buttonPrimary, color: Colors.paper },
   skipText: { ...T.buttonSecondary, color: Colors.walnut },
+  skipWrap: { alignItems: 'center', marginTop: Spacing.two },
   citySelect: {
     backgroundColor: Colors.paperCard,
     borderWidth: 1, borderColor: Colors.line,

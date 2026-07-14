@@ -72,18 +72,20 @@ export default function InspirationDetailScreen() {
   } catch {}
 
   // Match each inspiration item against user's wardrobe
-  const ownedIds = new Set(wardrobeItems.map(i => i.item_id));
+  // Same category = owned (user has something that can serve the same role)
+  // Same category + same color = exact match (click navigates to that wardrobe item)
   const matchedItems = breakdownItems.map((bi) => {
     const normalizedCat = normalizeCategory(bi.category);
-    const matched = wardrobeItems.find(wi =>
-      normalizeCategory(wi.category) === normalizedCat &&
-      (wi.color === bi.color || wi.name === bi.name)
-    );
+    const sameCatItems = wardrobeItems.filter(wi => normalizeCategory(wi.category) === normalizedCat);
+    const colorMatch = sameCatItems.find(wi => wi.color === bi.color);
+    const anyMatch = colorMatch ?? sameCatItems[0];
     return {
       ...bi,
       normalizedCategory: normalizedCat,
-      owned: !!matched,
-      wardrobeItemId: matched?.item_id ?? null,
+      owned: sameCatItems.length > 0,
+      wardrobeItemId: anyMatch?.item_id ?? null,
+      wardrobeImageUrl: anyMatch?.image_url ?? null,
+      wardrobeName: anyMatch?.name ?? null,
     };
   });
 
@@ -207,13 +209,15 @@ export default function InspirationDetailScreen() {
                     >
                       <Text style={styles.badgeOwned}>已拥有</Text>
                       <View style={styles.gridThumb}>
-                        {item.image_url ? (
+                        {item.wardrobeImageUrl ? (
+                          <Image source={{ uri: item.wardrobeImageUrl }} style={styles.gridThumbImg} resizeMode="cover" />
+                        ) : item.image_url ? (
                           <Image source={{ uri: item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
                         ) : (
                           <CategoryIcon category={item.normalizedCategory} size={26} color={Colors.walnut2} />
                         )}
                       </View>
-                      <Text style={styles.gridName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.gridName} numberOfLines={1}>{item.wardrobeName || item.name}</Text>
                       <Text style={styles.gridMeta} numberOfLines={1}>{item.normalizedCategory} · {item.color}</Text>
                     </TouchableOpacity>
                   );

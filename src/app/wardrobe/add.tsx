@@ -341,7 +341,7 @@ export default function AddWardrobeItem() {
         image_url: finalImageUrl ?? undefined,
         ai_recognized_attrs: recognizedAttrs ?? undefined,
         source_type: imageUri ? 'photo_ai' : 'manual',
-        source_label: imageUri ? '相册导入' : '手动添加',
+        source_label: '相册导入',
         status: 'active',
       });
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { WishlistItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useWardrobeStore } from '@/stores/wardrobeStore';
 
 interface WishlistState {
   items: WishlistItem[];
@@ -76,6 +77,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
     if (!item) return;
 
     // Optimistic UI: remove from wishlist locally first.
+    const prevItems = get().items;
     set(state => ({ items: state.items.filter(i => i.wish_id !== wishId) }));
 
     try {
@@ -85,25 +87,35 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
         .insert({
           user_id: item.user_id,
           name: item.name,
-          category: item.category,
-          color: item.color,
-          image_url: item.image_url,
-          source_type: 'ai_recommended',
-          source_label: item.source === 'ai_recommended' ? '来自心愿单' : '手动添加',
+          category: normalizeCategory(item.category),
+          color: item.color || '',
+          image_url: item.image_url || null,
+          source_type: 'manual',
+          source_label: '心愿单添加',
           status: 'active',
         });
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('[wishlistStore.moveToWardrobe] insert failed:', insertError.message);
+        set({ items: prevItems, error: insertError.message });
+        return;
+      }
 
       // Remove from wishlist server-side
       const { error: deleteError } = await supabase
         .from('wishlist_items')
         .delete()
         .eq('wish_id', wishId);
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('[wishlistStore.moveToWardrobe] delete failed:', deleteError.message);
+        set({ error: deleteError.message });
+        return;
+      }
+
+      // Refresh wardrobe so the new item appears
+      try { await useWardrobeStore.getState().fetchItems(item.user_id); } catch {}
     } catch (e: any) {
-      // Keep UI change; log failure so the demo flow still feels responsive.
-      console.warn('[wishlistStore.moveToWardrobe] supabase failed:', e?.message);
-      set({ error: e.message });
+      console.error('[wishlistStore.moveToWardrobe] unexpected error:', e?.message);
+      set({ items: prevItems, error: e.message });
     }
   },
 }));
