@@ -3,7 +3,7 @@ import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/r
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 import { buildFallbackLook } from '@/lib/fallbackLook';
 import { serviceFeature, serviceRecognize, serviceRecognizeMulti, serviceRecommend, serviceStandardize, uriToBase64 } from '@/lib/styleeService';
-import { outfitsRespToApp, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
+import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
 
 // ─── AI 元信息 ───────────────────────────────────────────
 
@@ -40,19 +40,12 @@ export const aiDetectMultiItems = async (
   const encoded = await uriToBase64(imageUri);
   const parsed = encoded ? await serviceRecognizeMulti(encoded.b64, encoded.mime) : null;
   if (Array.isArray(parsed?.items) && parsed.items.length > 0) {
-          const items: DetectedItem[] = parsed.items.map((p: any, i: number) => ({
-            index: p.index ?? i + 1,
-            category: p.category || '上装',
-            color: normalizeColor(p.color),
-            material: normalizeMaterial(p.material),
-            style: p.style || undefined,
-            brand: p.brand || undefined,
-            sleeve_length: p.sleeve_length || undefined,
-            fit_type: p.fit_type || undefined,
-            season: Array.isArray(p.season) ? p.season : undefined,
-            occasion_tags: Array.isArray(p.occasion_tags) ? p.occasion_tags : undefined,
-            description: p.description || `${p.color || '未知'}${p.category || '单品'}`,
-          }));
+          const items: DetectedItem[] = parsed.items.map((p, i) => {
+            const item = recognizeManyItemToDetected(p, i);
+            item.color = normalizeColor(item.color);
+            item.material = normalizeMaterial(item.material);
+            return item;
+          });
           const provider = parsed.provider || 'model';
           return { items, meta: { source: `model-service/${provider}`, durationMs: Date.now() - t0, ok: provider !== 'mock' } };
   }

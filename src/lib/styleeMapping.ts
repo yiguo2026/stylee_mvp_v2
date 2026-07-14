@@ -1,4 +1,4 @@
-import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory, FitType, SleeveLength } from '@/types';
+import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory, FitType, SleeveLength, PhotoType, DetectedItem } from '@/types';
 
 export interface RecognizeResp {
   category: string; color: string; material: string; style: string;
@@ -6,6 +6,13 @@ export interface RecognizeResp {
   fit_type?: string; sleeve_length?: string; season?: string[]; occasion_tags?: string[];
   provider?: string;
 }
+export interface RecognizeManyItemResp {
+  index?: number; category?: string; color?: string; material?: string; style?: string;
+  brand?: string; photo_type?: string; needs_review?: boolean; confidence?: number;
+  fit_type?: string; sleeve_length?: string; season?: string[]; occasion_tags?: string[];
+  description?: string;
+}
+export interface RecognizeManyResp { items: RecognizeManyItemResp[]; provider?: string; }
 export interface StandardizeResp { image_ref: string; method: string; verified: boolean; provider?: string; }
 export interface RecommendReqItem {
   item_id: string; name: string; category: string; color: string;
@@ -28,6 +35,33 @@ export interface RecommendResp { outfits: RecommendRespOutfit[]; trace?: { rag_m
 export type RecommendContext = {
   weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string;
 };
+
+/** Normalize legacy/client aliases to the model-service PhotoType contract. */
+export function normalizePhotoType(value?: string | null): PhotoType {
+  if (value === 'flat' || value === 'flatlay') return 'flatlay';
+  if (value === 'product' || value === 'web') return 'web';
+  if (value === 'angled') return 'angled';
+  return 'on_body';
+}
+
+export function recognizeManyItemToDetected(item: RecognizeManyItemResp, index: number): DetectedItem {
+  return {
+    index: item.index ?? index + 1,
+    category: String(item.category || '上装') as ClothingCategory,
+    color: String(item.color || ''),
+    material: item.material || undefined,
+    style: item.style || undefined,
+    brand: item.brand || undefined,
+    sleeve_length: item.sleeve_length ? item.sleeve_length as SleeveLength : undefined,
+    fit_type: item.fit_type ? item.fit_type as FitType : undefined,
+    season: Array.isArray(item.season) ? item.season : undefined,
+    occasion_tags: Array.isArray(item.occasion_tags) ? item.occasion_tags : undefined,
+    photo_type: normalizePhotoType(item.photo_type),
+    needs_review: item.needs_review ?? false,
+    confidence: typeof item.confidence === 'number' ? item.confidence : undefined,
+    description: item.description || `${item.color || '未知'}${item.category || '单品'}`,
+  };
+}
 
 const RECOMMENDED_ITEM_TERMS = [
   '牛仔短裤', '牛仔长裤', '牛仔裤', '西装长裤', '半身裙', '连衣裙',
@@ -72,7 +106,7 @@ export function recognizeRespToResult(resp: RecognizeResp): RecognitionResult {
     material: resp.material || '',
     style: resp.style || '',
     brand: resp.brand || '',
-    photo_type: resp.photo_type || undefined,
+    photo_type: normalizePhotoType(resp.photo_type),
     needs_review: resp.needs_review ?? undefined,
     confidence: typeof resp.confidence === 'number' ? resp.confidence : undefined,
     fit_type: resp.fit_type ? resp.fit_type as FitType : undefined,

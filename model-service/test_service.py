@@ -2,6 +2,7 @@ from stylee.service.adapter import (
     label, model_category, app_category, wardrobe_item, to_request_context,
     compact_recommended_name, outfits_to_app, ingest_to_app, std_to_app
 )
+from stylee.service.ai_features import normalize_multi_item
 from stylee.contracts import (
     Category, InputMode, Sleeve, Fit, Season, BodyShape,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
@@ -79,6 +80,19 @@ def test_std_to_app():
         "image_ref": "http://o/x.png", "method": "img2img", "verified": True}
 
 
+def test_normalize_multi_item_contract():
+    item = normalize_multi_item({
+        "category": "上装", "color": "白色", "material": "棉",
+        "description": "白色T恤", "photo_type": "flat",
+    }, 0)
+    assert item["photo_type"] == "flatlay" and item["needs_review"] is False
+    assert item["confidence"] == 0.95 and item["index"] == 1
+
+    invalid = normalize_multi_item({"category": "?", "photo_type": "?"}, 2)
+    assert invalid["category"] == "上装" and invalid["photo_type"] == "on_body"
+    assert invalid["needs_review"] is True and invalid["confidence"] == 0.4
+
+
 import json as _json
 import threading
 import urllib.error
@@ -118,6 +132,10 @@ def test_server_smoke():
                       {"image_url": "mock://x", "photo_type": "flatlay", "item": {"category": "上装"}})
         assert st == 200 and b["method"] == "cutout"
 
+        st, b = _post(base + "/standardize",
+                      {"image_url": "mock://x", "photo_type": "flat", "item": {"category": "上装"}})
+        assert st == 200 and b["method"] == "cutout"
+
         st, b = _post(base + "/recommend", {
             "input_mode": "nl", "query": "周末约会", "n": 2,
             "wardrobe": [
@@ -141,6 +159,7 @@ def main():
     test_outfits_to_app()
     test_ingest_to_app()
     test_std_to_app()
+    test_normalize_multi_item_contract()
     test_server_smoke()
     print("ok")
 

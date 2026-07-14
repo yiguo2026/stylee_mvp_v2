@@ -103,6 +103,33 @@ Stylee profile/wardrobe tables. Registration remains in the App's existing
 Supabase Auth boundary, with a database trigger creating the profile row. The
 model service must never receive a Supabase secret/service-role key.
 
+### Clothing import contract
+
+The App imports a garment through one controlled path:
+
+```text
+local image -> /recognize-multi -> normalized attributes + photo_type
+            -> /standardize -> Qwen image edit -> bounded VL verification
+            -> App copies the verified temporary URL to Supabase Storage
+            -> wardrobe_items + ai_recognized_attrs
+```
+
+`photo_type` uses `flatlay|on_body|web|angled`; legacy `flat` and `product`
+aliases are normalized at both HTTP boundaries. Unknown values use `on_body`
+and set `needs_review`, rather than incorrectly selecting the destructive
+cutout path. Multi-item recognition returns a deterministic completeness
+confidence and review flag; the App persists these with style/photo metadata
+in `ai_recognized_attrs` and persists sleeve length in its typed column.
+
+Provider image URLs are temporary. The App must copy a verified standard image
+to its own Storage bucket before inserting the wardrobe row. If that copy
+fails, it uploads the original image; if the original upload also fails, the
+insert is stopped so a device-local or expiring URL is never stored.
+
+Standardization is sequential. Production defaults bound image edit to 60s
+(`IMG_EDIT_TIMEOUT_SECONDS`) and verification to 20s
+(`VL_VERIFY_TIMEOUT_SECONDS`); the App request deadline is 90s.
+
 The client receives only:
 
 ```text

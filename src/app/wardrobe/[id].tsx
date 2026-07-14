@@ -206,7 +206,7 @@ export default function ItemDetailScreen() {
           <View style={styles.aiCard}>
             <Text style={styles.aiTitle}>AI 识别属性</Text>
             {Object.entries(item!.ai_recognized_attrs).map(([k, v]) => (
-              <Text key={k} style={styles.aiAttr}>{k}：{v}</Text>
+              <Text key={k} style={styles.aiAttr}>{k}：{String(v ?? '')}</Text>
             ))}
           </View>
         )}

@@ -22,6 +22,40 @@ _SCENES = {
     "home": "在家中沙发上，温馨居家氛围，柔和光线",
 }
 
+_CATEGORIES = {"上装", "下装", "连体装", "外套", "鞋履", "包袋", "帽巾", "配饰"}
+_PHOTO_TYPE_ALIASES = {
+    "flat": "flatlay", "flatlay": "flatlay",
+    "product": "web", "web": "web",
+    "on_body": "on_body", "angled": "angled",
+}
+
+
+def normalize_multi_item(raw: dict, index: int) -> dict:
+    """Keep /recognize-multi compatible with the typed App contract.
+
+    Confidence is a deterministic completeness score, not an ungrounded model
+    self-assessment. Invalid fields are retained only through needs_review.
+    """
+    item = dict(raw) if isinstance(raw, dict) else {}
+    category = str(item.get("category") or "")
+    color = str(item.get("color") or "").strip()
+    photo_raw = str(item.get("photo_type") or "")
+    photo_type = _PHOTO_TYPE_ALIASES.get(photo_raw, "on_body")
+    needs_review = category not in _CATEGORIES or not color or photo_raw not in _PHOTO_TYPE_ALIASES
+    if category not in _CATEGORIES:
+        category = "上装"
+    completeness = sum(bool(item.get(key)) for key in ("category", "color", "material", "description"))
+    confidence = 0.95 if not needs_review and completeness >= 3 else (0.7 if completeness >= 2 else 0.4)
+    item.update({
+        "index": item.get("index") or index + 1,
+        "category": category,
+        "color": color,
+        "photo_type": photo_type,
+        "needs_review": needs_review,
+        "confidence": confidence,
+    })
+    return item
+
 
 def _deepseek_json(system: str, user: str, temperature: float = 0.5) -> dict:
     key = os.environ.get("DEEPSEEK_API_KEY", "")
@@ -57,7 +91,9 @@ def recognize_many(image_url: str) -> dict:
         key, os.environ.get("VL_MODEL", "qwen3-vl-plus"), messages, 0.2, 60, True,
     )
     data = _extract_json(content)
-    return {"items": data.get("items") if isinstance(data.get("items"), list) else [],
+    raw_items = data.get("items") if isinstance(data.get("items"), list) else []
+    items = [normalize_multi_item(item, i) for i, item in enumerate(raw_items) if isinstance(item, dict)]
+    return {"items": items,
             "provider": os.environ.get("VL_MODEL", "qwen3-vl-plus")}
 
 

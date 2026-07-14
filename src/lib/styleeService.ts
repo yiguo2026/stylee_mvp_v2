@@ -1,4 +1,4 @@
-import type { RecognizeResp, StandardizeResp, RecommendReq, RecommendResp } from './styleeMapping.ts';
+import type { RecognizeResp, RecognizeManyResp, StandardizeResp, RecommendReq, RecommendResp } from './styleeMapping.ts';
 
 export const STYLEE_API = process.env.EXPO_PUBLIC_STYLEE_API ?? 'http://127.0.0.1:8000';
 
@@ -60,17 +60,18 @@ export async function serviceRecognize(b64: string, mime: string): Promise<Recog
   return _postJson<RecognizeResp>('/recognize', { image_b64: b64, mime }, 20000);
 }
 
-export async function serviceRecognizeMulti(b64: string, mime: string): Promise<{ items: any[]; provider?: string } | null> {
-  return _postJson<{ items: any[]; provider?: string }>('/recognize-multi', { image_b64: b64, mime }, 60000);
+export async function serviceRecognizeMulti(b64: string, mime: string): Promise<RecognizeManyResp | null> {
+  return _postJson<RecognizeManyResp>('/recognize-multi', { image_b64: b64, mime }, 60000);
 }
 
 export async function serviceStandardize(
   b64: string, mime: string, photoType: string, category: string,
   extras?: { color?: string; material?: string; description?: string },
 ): Promise<StandardizeResp | null> {
-  // /standardize 走图生图，给足余量（图像生成偶有尖峰）
+  // Backend performs image edit followed by visual verification. Its defaults are
+  // 60s + 20s, so keep the client deadline above the complete server operation.
   return _postJson<StandardizeResp>('/standardize',
-    { image_b64: b64, mime, photo_type: photoType, item: { category, ...extras } }, 60000);
+    { image_b64: b64, mime, photo_type: photoType, item: { category, ...extras } }, 90000);
 }
 
 export async function serviceRecommend(req: RecommendReq): Promise<RecommendResp | null> {

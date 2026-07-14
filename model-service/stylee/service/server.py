@@ -25,6 +25,7 @@ _CORS = {
 
 
 def _photo_type(value):
+    value = {"flat": "flatlay", "product": "web"}.get(value, value)
     for p in PhotoType:
         if p.value == value:
             return p
@@ -146,8 +147,12 @@ class Handler(BaseHTTPRequestHandler):
                             subcategory=str(d.get("description") or "")[:100],
                             colors=[d["color"]] if d.get("color") else [],
                             material=str(d.get("material") or "")[:100])
-        vision = build_vision_provider()
-        standardizer = build_image_standardizer()
+        # Standardization is sequential: edit, then visual verification. Bound
+        # verification separately so a slow verifier cannot double total time.
+        verify_timeout = int(os.environ.get("VL_VERIFY_TIMEOUT_SECONDS", "20"))
+        edit_timeout = int(os.environ.get("IMG_EDIT_TIMEOUT_SECONDS", "60"))
+        vision = build_vision_provider(timeout=verify_timeout)
+        standardizer = build_image_standardizer(timeout=edit_timeout)
         si = standardize_item(_image_url(payload), item, _photo_type(payload.get("photo_type")),
                               vision, standardizer)
         response = adapter.std_to_app(si)
