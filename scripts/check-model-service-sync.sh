@@ -27,7 +27,7 @@ for path in scripts/build_exemplars.py scripts/build_index.py scripts/download_g
   check_path "$path"
 done
 
-for path in test_ai_features.py test_embeddings.py test_provider_http.py test_provider_parse.py test_rag.py test_scoring.py test_security.py test_service.py test_vision.py; do
+for path in test_ai_features.py test_embeddings.py test_gamma.py test_provider_http.py test_provider_parse.py test_rag.py test_scoring.py test_security.py test_service.py test_vision.py; do
   check_path "$path"
 done
 

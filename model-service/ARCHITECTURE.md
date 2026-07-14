@@ -146,7 +146,38 @@ API usage monitoring is a separate, optional data sink. It uses
 above. If they are unset, usage is printed locally and no remote monitoring
 request is made; the service must not contain a hard-coded monitoring project.
 
-## 5. Runtime and deployment
+## 5. Gamma direct-model experiment
+
+Gamma is an opt-in path beside the production B0-B6/RAG engine. It keeps the
+same security boundary—the App sends an authenticated request to model-service
+and provider keys remain server-side—but intentionally removes intermediate
+retrieval, candidate ranking and visual verification:
+
+```text
+Gamma import: image -> one Qwen VL recognition -> one Qwen image edit
+Gamma outfit: instruction + wardrobe -> one DeepSeek JSON completion
+                                      -> parallel Qwen images for recommended gaps
+```
+
+The HTTP contracts are `POST /gamma/import` and `POST /gamma/outfit`. Outfit
+actions are `generate`, `replace_item` and `replace_all`; replacement requests
+carry the previous outfit so the model can preserve or replace the correct
+scope. Existing wardrobe items retain their real `item_id` and image. Only
+newly recommended items trigger image generation.
+
+Gamma does not replace or call the production pipeline. It has separate App
+routes and can be disabled by removing its navigation entry without changing
+the existing import or recommendation flows. Provider image URLs are still
+temporary: the App copies any Gamma image into Stylee Storage before inserting
+a wardrobe row. Partial failures are explicit: import can return recognized
+attributes without a standardized image, and an outfit remains usable when one
+of its generated item images fails.
+
+Gamma uses the existing server-side `DEEPSEEK_API_KEY` and
+`DASHSCOPE_API_KEY`. Optional model overrides are `GAMMA_TEXT_MODEL`,
+`GAMMA_VL_MODEL`, `GAMMA_EDIT_MODEL` and `GAMMA_IMAGE_MODEL`.
+
+## 6. Runtime and deployment
 
 The production artifact is the repository `Dockerfile`. It starts the stdlib
 HTTP server on `0.0.0.0:$PORT`, exposes `/health`, and runs as a non-root user.
@@ -163,7 +194,7 @@ HTTP server on `0.0.0.0:$PORT`, exposes `/health`, and runs as a non-root user.
 The Dockerfile is portable to another container host. Render is a deployment
 choice, not an application dependency.
 
-## 6. Repository ownership and synchronization
+## 7. Repository ownership and synchronization
 
 `fitzw/style-model` is the single source of truth for Python source, HTTP
 contracts, provider adapters, deployment files and shared tests. The App repo
@@ -184,7 +215,7 @@ until an index is built or fetched from controlled artifact storage. README text
 may be repository-specific, but this architecture file and executable service
 surface must remain identical.
 
-## 7. Rotation and incident response
+## 8. Rotation and incident response
 
 If a model or Supabase secret is exposed:
 
@@ -196,7 +227,7 @@ If a model or Supabase secret is exposed:
 6. Treat historical Git copies as permanently exposed unless history cleanup is
    coordinated; rotation is required regardless of cleanup.
 
-## 8. Verification gates
+## 9. Verification gates
 
 Before merge or deployment:
 

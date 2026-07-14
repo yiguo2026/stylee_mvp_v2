@@ -16,6 +16,7 @@ from ..rag import default_retriever
 from ..vision import build_image_standardizer, build_vision_provider
 from . import adapter
 from . import ai_features
+from . import gamma
 from .security import RateLimiter, TokenVerifier, allowed_origins, env_bool
 
 _CORS = {
@@ -121,6 +122,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/tryon-image":
                 payload["image_url"] = _image_url(payload)
                 self._send(200, {"image_ref": ai_features.tryon_image(payload)})
+            elif self.path == "/gamma/import":
+                self._send(200, gamma.import_garment(payload))
+            elif self.path == "/gamma/outfit":
+                self._send(200, gamma.outfit(payload))
             else:
                 self._send(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001

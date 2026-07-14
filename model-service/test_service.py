@@ -98,6 +98,7 @@ import threading
 import urllib.error
 import urllib.request
 from stylee.service.server import run_server
+from stylee.service import gamma as gamma_service
 
 
 def _post(url, payload):
@@ -116,6 +117,16 @@ def _get(url):
 
 
 def test_server_smoke():
+    original_gamma_import = gamma_service.import_garment
+    original_gamma_outfit = gamma_service.outfit
+    gamma_service.import_garment = lambda payload: {
+        "item": {"name": "白T恤", "category": "上装"},
+        "standardized": True, "standardized_image_url": "mock://gamma.png",
+    }
+    gamma_service.outfit = lambda payload: {
+        "outfit": {"name": "Gamma", "comment": "ok", "items": []},
+        "trace": {"engine": "gamma"},
+    }
     srv = run_server("127.0.0.1", 8765, "mock")
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
@@ -145,10 +156,18 @@ def test_server_smoke():
             ]})
         assert st == 200 and isinstance(b["outfits"], list) and len(b["outfits"]) >= 1
 
+        st, b = _post(base + "/gamma/import", {"image_url": "mock://x"})
+        assert st == 200 and b["standardized"] is True
+
+        st, b = _post(base + "/gamma/outfit", {"instruction": "海岛度假"})
+        assert st == 200 and b["trace"]["engine"] == "gamma"
+
         st, b = _post(base + "/nope", {})
         assert st == 404
     finally:
         srv.shutdown()
+        gamma_service.import_garment = original_gamma_import
+        gamma_service.outfit = original_gamma_outfit
 
 
 def main():
