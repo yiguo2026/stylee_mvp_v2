@@ -160,6 +160,17 @@ export default function SettingsPage() {
           </TouchableOpacity>
         </View>
 
+        {/* 独立模型实验 */}
+        <Text style={styles.sectionLabel}>实验功能</Text>
+        <View style={styles.group}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/gamma')}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowLabel}>Gamma 直接模型版</Text>
+            </View>
+            <Text style={styles.rowValue}>独立入口 ›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 退出登录 */}
         <View style={styles.signOutGroup}>
           <TouchableOpacity style={styles.signOutBtn} onPress={() => setShowSignOut(true)}>

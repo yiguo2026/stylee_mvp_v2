@@ -229,3 +229,15 @@ App 不直连任何模型 API，全部能力通过 model service：
 | 意图识别 / 搭配推荐 / 试穿建议 | DeepSeek | model service 专用端点 |
 
 生产部署时 model service 会校验 Supabase 用户 JWT、限制来源域名与每分钟请求数。模型 API 不可用时自动回落到 mock 数据，不影响基础功能。
+
+### Gamma 直接模型实验
+
+设置页提供独立的 `Gamma 直接模型版` 入口，不替换现有导入或 B0–B6/RAG
+推荐流程。Gamma 仍只通过受鉴权的 model service 调用供应商：
+
+- 导入：`POST /gamma/import`，一次 Qwen VL 识别后直接执行一次 Qwen 图片编辑。
+- 搭配：`POST /gamma/outfit`，一次 DeepSeek JSON 生成完整搭配；仅衣橱缺失的新推荐单品并行调用 Qwen 文生图。
+- 调整：`action=replace_item|replace_all` 携带上一套结果和用户的新要求，实现换单件或换整套。
+- 持久化：Qwen 输出的临时图片只有在用户加入衣橱时才会复制到 Stylee Storage，数据库不保存临时供应商 URL。
+
+Gamma 与现有端点和页面完全并行，便于对比端到端耗时、质量和模型成本；完整边界与失败策略见 `model-service/ARCHITECTURE.md`。
