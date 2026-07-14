@@ -17,6 +17,7 @@ import urllib.request
 from ..usage_log import detect_feature, log_usage
 from ..constraints import CandidatePool
 from ..contracts import (
+    CATEGORY_SLOT,
     Category,
     Formality,
     GapSuggestion,
@@ -146,7 +147,9 @@ def build_gen_messages(ctx: RequestContext, scene: SceneSpec, pool: CandidatePoo
         "3) 鞋恰好 1 双;外套至多 1 件(冷天/需外套时要有);配饰可选;\n"
         "4) 某个必需槽位候选池为空时,用 gap 给出补买建议(不要硬塞不合适的);\n"
         "5) 参考给的『审美范例』的搭配套路,但只用用户自己的衣物;\n"
-        "6) 兼顾:身材修饰 > 场景适配 > 风格塑造 > 色彩适配。\n"
+        "6) 兼顾:身材修饰 > 场景适配 > 风格塑造 > 色彩适配;\n"
+        "7) gap.desc 只写简短单品名(如‘白色帆布鞋’),最多 12 个汉字,"
+        "不要写‘建议购买/选择一件/适合某场景的’等句子。\n"
         f"输出严格 JSON,出 {k} 套且彼此尽量多样。schema:" + _GEN_SCHEMA
     )
     usr = json.dumps({
@@ -207,9 +210,11 @@ def parse_outfits_json(data: dict) -> list[Outfit]:
             role = _as_slot(it.get("role", "accessory"))
             if it.get("gap"):
                 g = it["gap"]
+                category = _as_category(g.get("category", "上装"))
                 items.append(OutfitItemRef(
-                    role=role, owned=False,
-                    suggest=GapSuggestion(_as_category(g.get("category", "上装")),
+                    # gap 槽位由固定品类映射决定；忽略模型可能自相矛盾的 role。
+                    role=CATEGORY_SLOT[category], owned=False,
+                    suggest=GapSuggestion(category,
                                           g.get("desc", ""), g.get("reason", "")),
                 ))
             elif it.get("id"):

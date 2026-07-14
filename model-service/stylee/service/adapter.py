@@ -5,6 +5,8 @@ App 发它原生形状(中文品类/颜色单值/英文标签 ID/Outfit 形状),
 """
 from __future__ import annotations
 
+import re
+
 from ..contracts import (
     BodyShape, Category, FilterTags, Fit, InputMode, RequestContext,
     Season, Sleeve, UserProfile, WardrobeItem, Weather,
@@ -45,6 +47,46 @@ def app_category(cat: Category) -> str:
         Category.DRESS: "连体装", Category.SHOES: "鞋履", Category.BAG: "包袋",
         Category.HAT: "帽巾", Category.SCARF: "帽巾",
     }.get(cat, cat.value)
+
+
+_ITEM_TERMS = (
+    "牛仔短裤", "牛仔长裤", "牛仔裤", "西装长裤", "半身裙", "连衣裙",
+    "针织衫", "防晒衫", "白衬衫", "衬衫", "T恤", "背心", "吊带", "卫衣",
+    "毛衣", "上衣", "短裤", "长裤", "阔腿裤", "运动裤", "外套", "夹克",
+    "风衣", "西装", "帆布鞋", "运动鞋", "小白鞋", "凉鞋", "拖鞋", "乐福鞋",
+    "高跟鞋", "鞋", "托特包", "斜挎包", "双肩包", "包", "草帽", "帽子",
+    "丝巾", "围巾", "墨镜", "耳饰", "项链", "手链", "腰带",
+)
+
+
+def compact_recommended_name(value: str, category: Category) -> str:
+    """把模型的购买建议句压成适合标签展示的简短单品名。"""
+    text = str(value or "").strip()
+    text = re.sub(r"^(?:补\s*[:：]?\s*)", "", text)
+    text = re.sub(
+        r"^(?:建议|推荐|可以|可|请|考虑)?\s*(?:购买|选择|搭配|准备)?\s*"
+        r"(?:一件|一条|一双|一个|一顶|一款|一套|一只)?\s*",
+        "",
+        text,
+    )
+    text = re.split(r"[，,。；;！!]", text, maxsplit=1)[0].strip()
+
+    # 模型常写“适合海岛度假的浅蓝色牛仔短裤”。从最右侧服饰名向前
+    # 最多保留 12 个字，再丢掉最后一个“的”之前的场景修饰语。
+    hits = [(text.rfind(term) + len(term), len(term)) for term in _ITEM_TERMS if term in text]
+    if hits:
+        end, _ = max(hits)
+        candidate = text[max(0, end - 12):end]
+        if "的" in candidate:
+            candidate = candidate.rsplit("的", 1)[-1]
+        text = candidate
+
+    text = text.strip(" -—:：·")
+    if len(text) > 12:
+        text = text[-12:]
+        if "的" in text:
+            text = text.rsplit("的", 1)[-1]
+    return text or app_category(category)
 
 
 def _enum(enum_cls, value):
@@ -124,7 +166,8 @@ def outfits_to_app(result, ctx) -> dict:
         for it in o.items:
             if not it.owned and it.suggest:
                 g = it.suggest
-                rec.append({"name": "补:" + g.desc, "category": app_category(g.category),
+                rec.append({"name": compact_recommended_name(g.desc, g.category),
+                            "category": app_category(g.category),
                             "color": "", "description": g.reason})
         outfits.append({
             "name": o.occasion or f"方案{i + 1}",

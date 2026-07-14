@@ -11,7 +11,7 @@ from __future__ import annotations
 from stylee import recommend
 from stylee.constraints import build_candidate_pool, validate_outfit
 from stylee.contracts import Formality, InputMode, Slot
-from stylee.pipeline import _item_index
+from stylee.pipeline import _item_index, _signature
 from stylee.providers import ProviderError, deepseek, qwen
 from stylee.providers.openai_compat import (
     OpenAICompatProvider,
@@ -98,6 +98,27 @@ def main() -> None:
     ]}]}
     go = parse_outfits_json(gap)[0]
     _check(go.has_gap() and go.items[-1].suggest.desc == "小白鞋", "gap JSON → GapSuggestion")
+
+    # gap 的 role 不能由模型任意填写；两个下装即使其中一个伪装成 accessory，
+    # 也必须按 category 归为 bottom 并被硬校验拒绝。
+    duplicated_bottom = {"outfits": [{"items": [
+        {"role": "torso", "gap": {"category": "上装", "desc": "白色T恤", "reason": "清爽"}},
+        {"role": "bottom", "gap": {"category": "下装", "desc": "牛仔短裤", "reason": "轻便"}},
+        {"role": "accessory", "gap": {"category": "下装", "desc": "另一条短裤", "reason": "错误重复"}},
+        {"role": "feet", "gap": {"category": "鞋", "desc": "帆布鞋", "reason": "舒适"}},
+    ]}]}
+    dup_outfit = parse_outfits_json(duplicated_bottom)[0]
+    dup_errors = validate_outfit(dup_outfit, ctx, scene, idx)
+    _check(any("下身(BOTTOM)应恰好 1 件,实为 2" in e for e in dup_errors),
+           "重复下装即使 role 伪装成 accessory 也被 B4 拒绝")
+
+    another_gap = parse_outfits_json({"outfits": [{"items": [
+        {"role": "torso", "gap": {"category": "上装", "desc": "亚麻衬衫", "reason": "透气"}},
+        {"role": "bottom", "gap": {"category": "下装", "desc": "白色短裤", "reason": "轻便"}},
+        {"role": "feet", "gap": {"category": "鞋", "desc": "凉鞋", "reason": "海边"}},
+    ]}]} )[0]
+    _check(_signature(go) != _signature(another_gap),
+           "不同的全推荐方案拥有不同签名，不会被空 owned id 折叠")
 
     print("\n[5] FakeProvider 走完整 pipeline(复用真 provider 解析路径)")
     fake = _FakeProvider(

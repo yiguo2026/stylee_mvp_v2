@@ -26,7 +26,21 @@ def _item_index(wardrobe: list[WardrobeItem]) -> dict[str, WardrobeItem]:
 
 
 def _signature(outfit: Outfit) -> frozenset[str]:
-    return frozenset(outfit.owned_refs())
+    """整套的稳定签名，覆盖已有单品和推荐补位单品。
+
+    旧实现只使用 owned id。空/稀疏衣橱下所有方案的 owned id 都为空，
+    导致模型生成的多套全推荐方案被错误折叠成一套，“换一套”只能再次请求模型。
+    """
+    parts: list[str] = []
+    for item in outfit.items:
+        if item.owned and item.ref:
+            parts.append(f"owned:{item.ref}")
+        elif item.suggest:
+            desc = "".join(item.suggest.desc.lower().split())
+            parts.append(f"gap:{item.suggest.category.value}:{desc}")
+        else:
+            parts.append(f"role:{item.role.value}")
+    return frozenset(parts)
 
 
 def _jaccard(a: frozenset, b: frozenset) -> float:
@@ -97,7 +111,7 @@ def recommend(
             n_clash += 1
         valid.append(o)
 
-    # 去重:同一组真实单品只留信心最高的一份,备用池才有意义
+    # 去重:同一组真实/推荐单品只留信心最高的一份,备用池才有意义
     best_by_sig: dict[frozenset[str], Outfit] = {}
     for o in valid:
         sig = _signature(o)

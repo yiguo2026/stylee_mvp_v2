@@ -29,6 +29,42 @@ export type RecommendContext = {
   weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string;
 };
 
+const RECOMMENDED_ITEM_TERMS = [
+  '牛仔短裤', '牛仔长裤', '牛仔裤', '西装长裤', '半身裙', '连衣裙',
+  '针织衫', '防晒衫', '白衬衫', '衬衫', 'T恤', '背心', '吊带', '卫衣',
+  '毛衣', '上衣', '短裤', '长裤', '阔腿裤', '运动裤', '外套', '夹克',
+  '风衣', '西装', '帆布鞋', '运动鞋', '小白鞋', '凉鞋', '拖鞋', '乐福鞋',
+  '高跟鞋', '鞋', '托特包', '斜挎包', '双肩包', '包', '草帽', '帽子',
+  '丝巾', '围巾', '墨镜', '耳饰', '项链', '手链', '腰带',
+];
+
+/** 兼容旧服务响应：把“补：建议购买一件……”压成简短单品名。 */
+export function compactRecommendedName(value: string, category = '单品'): string {
+  let text = String(value || '').trim()
+    .replace(/^补\s*[:：]?\s*/, '')
+    .replace(/^(?:建议|推荐|可以|可|请|考虑)?\s*(?:购买|选择|搭配|准备)?\s*(?:一件|一条|一双|一个|一顶|一款|一套|一只)?\s*/, '')
+    .split(/[，,。；;！!]/, 1)[0]
+    .trim();
+
+  let bestEnd = -1;
+  for (const term of RECOMMENDED_ITEM_TERMS) {
+    const idx = text.lastIndexOf(term);
+    if (idx >= 0) bestEnd = Math.max(bestEnd, idx + term.length);
+  }
+  if (bestEnd >= 0) {
+    text = text.slice(Math.max(0, bestEnd - 12), bestEnd);
+    const lastDe = text.lastIndexOf('的');
+    if (lastDe >= 0) text = text.slice(lastDe + 1);
+  }
+  text = text.trim().replace(/^[-—:：·]+|[-—:：·]+$/g, '');
+  if (text.length > 12) {
+    text = text.slice(-12);
+    const lastDe = text.lastIndexOf('的');
+    if (lastDe >= 0) text = text.slice(lastDe + 1);
+  }
+  return text || category || '单品';
+}
+
 export function recognizeRespToResult(resp: RecognizeResp): RecognitionResult {
   return {
     category: (resp.category || '上装') as ClothingCategory,
@@ -88,7 +124,7 @@ export function outfitsRespToApp(
     }
     const recommended: RecommendedItem[] = Array.isArray(o.recommended_items)
       ? o.recommended_items.map(r => ({
-          name: String(r.name || ''),
+          name: compactRecommendedName(String(r.name || ''), String(r.category || '配饰')),
           category: String(r.category || '配饰') as ClothingCategory,
           color: String(r.color || ''),
           description: r.description ? String(r.description) : undefined,

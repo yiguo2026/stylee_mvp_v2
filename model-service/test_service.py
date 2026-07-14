@@ -1,6 +1,6 @@
 from stylee.service.adapter import (
     label, model_category, app_category, wardrobe_item, to_request_context,
-    outfits_to_app, ingest_to_app, std_to_app
+    compact_recommended_name, outfits_to_app, ingest_to_app, std_to_app
 )
 from stylee.contracts import (
     Category, InputMode, Sleeve, Fit, Season, BodyShape,
@@ -55,6 +55,15 @@ def test_outfits_to_app():
     assert app["outfits"][0]["recommended_items"][0]["category"] == "鞋履"
     assert app["outfits"][0]["comment"] == "上紧下松"
     assert app["trace"]["rag_mode"] == "vector" and app["trace"]["pool"] == 16
+
+
+def test_compact_recommended_name():
+    assert compact_recommended_name(
+        "补：建议购买一件适合海岛度假的浅蓝色牛仔短裤", Category.BOTTOM
+    ) == "浅蓝色牛仔短裤"
+    assert compact_recommended_name(
+        "建议选择一双透气轻便的白色帆布鞋", Category.SHOES
+    ) == "白色帆布鞋"
 
 
 def test_ingest_to_app():
