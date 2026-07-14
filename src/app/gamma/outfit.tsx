@@ -65,6 +65,23 @@ export default function GammaOutfitScreen() {
   };
 
   const outfit: GammaOutfit | null = response?.outfit ?? null;
+  const openTryOn = () => {
+    if (!outfit) return;
+    router.push({
+      pathname: '/outfit/try-on',
+      params: {
+        engine: 'gamma',
+        items: JSON.stringify(outfit.items.map(item => ({
+          item_id: item.item_id,
+          name: item.name,
+          category: item.category,
+          color: item.color,
+          description: item.description,
+          image_url: item.image_url,
+        }))),
+      },
+    });
+  };
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -114,6 +131,9 @@ export default function GammaOutfitScreen() {
               {loading && !targetKey ? <ActivityIndicator color={Colors.ink} /> : <Text style={styles.replaceAllText}>按新要求换整套</Text>}
             </TouchableOpacity>
           </View>
+          <TouchableOpacity style={styles.tryOnButton} onPress={openTryOn}>
+            <Text style={styles.tryOnButtonText}>用 Gamma AI 试穿这套</Text>
+          </TouchableOpacity>
           <Text style={styles.trace}>{response!.trace.text_model} · {response!.trace.image_model} · {response!.trace.action}</Text>
         </View>}
       </ScrollView>
@@ -147,6 +167,8 @@ const styles = StyleSheet.create({
   smallButtonText: { ...T.buttonSecondary, color: Colors.ink },
   addButton: { marginTop: 7, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.sm, backgroundColor: Colors.ink },
   addButtonText: { ...T.buttonSecondary, color: Colors.paper },
+  tryOnButton: { marginTop: Spacing.three, height: 48, borderRadius: Radius.md, backgroundColor: Colors.signal, alignItems: 'center', justifyContent: 'center' },
+  tryOnButtonText: { ...T.buttonPrimary, color: Colors.paper },
   changeBox: { marginTop: Spacing.four, padding: Spacing.three, backgroundColor: Colors.paperRaised, borderRadius: Radius.lg },
   changeTitle: { ...T.subTitle, fontFamily: Fonts.uiSemiBold },
   changeInput: { ...T.inputText, marginTop: Spacing.two, borderRadius: Radius.md, backgroundColor: Colors.paper, paddingHorizontal: 12, paddingVertical: 11, color: Colors.ink },

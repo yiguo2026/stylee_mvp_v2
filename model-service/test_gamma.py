@@ -1,5 +1,6 @@
 from stylee.service.gamma import (
-    build_outfit_messages, import_garment, normalize_import_item, outfit,
+    build_outfit_messages, build_tryon_prompt, import_garment, normalize_import_item,
+    normalize_tryon_items, outfit, tryon, tryon_reference_images,
 )
 
 
@@ -62,12 +63,48 @@ def test_outfit_drops_duplicate_core_slot():
     assert [x["category"] for x in result["outfit"]["items"]] == ["下装", "上装"]
 
 
+def test_tryon_is_one_direct_edit_with_bounded_references():
+    calls = []
+    payload = {
+        "image_url": "data:image/jpeg;base64,PERSON",
+        "scene": "cafe",
+        "items": [
+            {"name": "白衬衫", "category": "上装", "color": "白色", "image_url": "https://x/top.png"},
+            {"name": "黑长裤", "category": "下装", "color": "黑色", "image_url": "https://x/bottom.png"},
+            {"name": "乐福鞋", "category": "鞋履", "color": "棕色", "image_url": "https://x/shoes.png"},
+        ],
+    }
+
+    def generate(person, items, scene, body_shape, references):
+        calls.append((person, items, scene, body_shape, references))
+        return "https://oss.example/tryon.png"
+
+    result = tryon(payload, generate)
+    assert result["image_url"].endswith("tryon.png")
+    assert result["trace"]["engine"] == "gamma" and result["trace"]["input_image_count"] == 3
+    assert len(calls) == 1 and calls[0][4] == ["https://x/top.png", "https://x/bottom.png"]
+
+
+def test_tryon_prompt_and_normalization():
+    items = normalize_tryon_items([
+        {"name": "吊带裙", "category": "连体装", "color": "蓝色", "image_url": "https://x/dress.png"},
+        {"name": "草编包", "category": "包袋", "color": "米色", "image_url": "https://x/bag.png"},
+        {"name": "坏数据", "category": "unknown"},
+    ])
+    assert items[2]["category"] == "配饰"
+    assert tryon_reference_images(items) == ["https://x/dress.png", "https://x/bag.png"]
+    prompt = build_tryon_prompt(items, "park", "梨形", 2)
+    assert "唯一人物主体" in prompt and "吊带裙" in prompt and "城市公园" in prompt
+
+
 def main():
     test_normalize_import_item()
     test_import_is_one_direct_recognize_plus_edit()
     test_outfit_prefers_known_ids_and_generates_gap_image()
     test_replace_prompt_is_explicit()
     test_outfit_drops_duplicate_core_slot()
+    test_tryon_is_one_direct_edit_with_bounded_references()
+    test_tryon_prompt_and_normalization()
     print("ok")
 
 

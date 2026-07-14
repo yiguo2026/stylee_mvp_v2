@@ -119,6 +119,7 @@ def _get(url):
 def test_server_smoke():
     original_gamma_import = gamma_service.import_garment
     original_gamma_outfit = gamma_service.outfit
+    original_gamma_tryon = gamma_service.tryon
     gamma_service.import_garment = lambda payload: {
         "item": {"name": "白T恤", "category": "上装"},
         "standardized": True, "standardized_image_url": "mock://gamma.png",
@@ -126,6 +127,10 @@ def test_server_smoke():
     gamma_service.outfit = lambda payload: {
         "outfit": {"name": "Gamma", "comment": "ok", "items": []},
         "trace": {"engine": "gamma"},
+    }
+    gamma_service.tryon = lambda payload: {
+        "image_url": "mock://gamma-tryon.png",
+        "trace": {"engine": "gamma", "input_image_count": 2},
     }
     srv = run_server("127.0.0.1", 8765, "mock")
     t = threading.Thread(target=srv.serve_forever, daemon=True)
@@ -162,12 +167,18 @@ def test_server_smoke():
         st, b = _post(base + "/gamma/outfit", {"instruction": "海岛度假"})
         assert st == 200 and b["trace"]["engine"] == "gamma"
 
+        st, b = _post(base + "/gamma/tryon", {
+            "image_url": "mock://person", "items": [{"name": "白T恤", "category": "上装"}],
+        })
+        assert st == 200 and b["trace"]["engine"] == "gamma"
+
         st, b = _post(base + "/nope", {})
         assert st == 404
     finally:
         srv.shutdown()
         gamma_service.import_garment = original_gamma_import
         gamma_service.outfit = original_gamma_outfit
+        gamma_service.tryon = original_gamma_tryon
 
 
 def main():

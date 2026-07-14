@@ -59,6 +59,21 @@ export interface GammaOutfitRequest {
   generate_images?: boolean;
 }
 
+export interface GammaTryOnResponse {
+  image_url: string;
+  trace: {
+    engine: 'gamma';
+    image_model: string;
+    input_image_count: number;
+    duration_ms: number;
+  };
+}
+
+export type GammaTryOnItem = Pick<
+  GammaOutfitItem,
+  'name' | 'category' | 'color' | 'description' | 'image_url'
+>;
+
 export function toGammaWardrobe(items: WardrobeItem[]) {
   return items.map(item => ({
     item_id: item.item_id,
@@ -84,4 +99,30 @@ export async function gammaImport(uri: string): Promise<GammaImportResponse | nu
 
 export async function gammaOutfit(request: GammaOutfitRequest): Promise<GammaOutfitResponse | null> {
   return serviceFeature<GammaOutfitResponse>('/gamma/outfit', request, 150000);
+}
+
+export async function gammaTryOn(
+  items: GammaTryOnItem[],
+  scene: string,
+  selfieUri: string,
+  bodyShape?: string,
+): Promise<GammaTryOnResponse | null> {
+  const person = selfieUri.startsWith('http://') || selfieUri.startsWith('https://')
+    ? { image_url: selfieUri }
+    : await uriToBase64(selfieUri).then(encoded => encoded
+      ? { image_b64: encoded.b64, mime: encoded.mime }
+      : null);
+  if (!person) return null;
+  return serviceFeature<GammaTryOnResponse>('/gamma/tryon', {
+    ...person,
+    scene,
+    body_shape: bodyShape,
+    items: items.map(item => ({
+      name: item.name,
+      category: item.category,
+      color: item.color,
+      description: item.description,
+      image_url: item.image_url,
+    })),
+  }, 150000);
 }

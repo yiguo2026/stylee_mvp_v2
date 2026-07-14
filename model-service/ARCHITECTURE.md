@@ -157,13 +157,21 @@ retrieval, candidate ranking and visual verification:
 Gamma import: image -> one Qwen VL recognition -> one Qwen image edit
 Gamma outfit: instruction + wardrobe -> one DeepSeek JSON completion
                                       -> parallel Qwen images for recommended gaps
+Gamma try-on: body photo + outfit + scene -> one Qwen multi-image edit
 ```
 
-The HTTP contracts are `POST /gamma/import` and `POST /gamma/outfit`. Outfit
+The HTTP contracts are `POST /gamma/import`, `POST /gamma/outfit` and
+`POST /gamma/tryon`. Outfit
 actions are `generate`, `replace_item` and `replace_all`; replacement requests
 carry the previous outfit so the model can preserve or replace the correct
 scope. Existing wardrobe items retain their real `item_id` and image. Only
 newly recommended items trigger image generation.
+
+Gamma try-on uses the body photo as image 1 and, within Qwen's three-input-image
+limit, selects up to two garment images by visual importance. Every outfit item
+is also included in the text instruction. The service does not persist the body
+photo; the authenticated request is forwarded directly to Qwen and only the
+temporary generated image URL is returned.
 
 Gamma does not replace or call the production pipeline. It has separate App
 routes and can be disabled by removing its navigation entry without changing
@@ -175,7 +183,8 @@ of its generated item images fails.
 
 Gamma uses the existing server-side `DEEPSEEK_API_KEY` and
 `DASHSCOPE_API_KEY`. Optional model overrides are `GAMMA_TEXT_MODEL`,
-`GAMMA_VL_MODEL`, `GAMMA_EDIT_MODEL` and `GAMMA_IMAGE_MODEL`.
+`GAMMA_VL_MODEL`, `GAMMA_EDIT_MODEL`, `GAMMA_IMAGE_MODEL` and
+`GAMMA_TRYON_MODEL`.
 
 ## 6. Runtime and deployment
 
