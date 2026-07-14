@@ -238,6 +238,7 @@ App 不直连任何模型 API，全部能力通过 model service：
 - 导入：`POST /gamma/import`，一次 Qwen VL 识别后直接执行一次 Qwen 图片编辑。
 - 搭配：`POST /gamma/outfit`，一次 DeepSeek JSON 生成完整搭配；仅衣橱缺失的新推荐单品并行调用 Qwen 文生图。
 - 调整：`action=replace_item|replace_all` 携带上一套结果和用户的新要求，实现换单件或换整套。
-- 持久化：Qwen 输出的临时图片只有在用户加入衣橱时才会复制到 Stylee Storage，数据库不保存临时供应商 URL。
+- 试穿：从 Gamma 搭配结果进入 `POST /gamma/tryon`，身体照、搭配与场景只经过 Model Service，一次调用 Qwen 多图编辑生成试穿图。
+- 持久化：导入标准图和加入衣橱的新推荐单品会复制到 Stylee Storage；Gamma 试穿当前直接展示并记录供应商临时 URL，后续需迁移到私有图片存储以长期保留。
 
 Gamma 与现有端点和页面完全并行，便于对比端到端耗时、质量和模型成本；完整边界与失败策略见 `model-service/ARCHITECTURE.md`。

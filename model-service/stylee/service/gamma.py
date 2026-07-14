@@ -22,6 +22,17 @@ _PHOTO_TYPES = {"flatlay", "on_body", "web", "angled"}
 _PHOTO_ALIASES = {"flat": "flatlay", "product": "web"}
 _MM_PATH = "/services/aigc/multimodal-generation/generation"
 _SINGLE_SLOT_CATEGORIES = {"上装", "下装", "连体装", "外套", "鞋履", "包袋", "帽巾"}
+_TRYON_CATEGORY_PRIORITY = {
+    "连体装": 0, "外套": 1, "上装": 2, "下装": 3,
+    "鞋履": 4, "包袋": 5, "帽巾": 6, "配饰": 7,
+}
+_TRYON_SCENES = {
+    "cafe": "自然采光的现代咖啡馆",
+    "street": "真实城市街道",
+    "office": "明亮整洁的现代办公室",
+    "park": "自然光下的城市公园",
+    "home": "温暖简洁的居家空间",
+}
 
 
 def _image_url(payload: dict) -> str:
@@ -296,6 +307,103 @@ def outfit(payload: dict, complete=None, generate_image=None) -> dict:
             "action": str(payload.get("action") or "generate"),
             "text_model": os.environ.get("GAMMA_TEXT_MODEL", os.environ.get("DEEPSEEK_MODEL_GEN", "deepseek-v4-flash")),
             "image_model": os.environ.get("GAMMA_IMAGE_MODEL", "qwen-image-2.0"),
+            "duration_ms": int((time.time() - started) * 1000),
+        },
+    }
+
+
+def normalize_tryon_items(values: list[dict]) -> list[dict]:
+    items = []
+    for value in values[:8]:
+        if not isinstance(value, dict):
+            continue
+        name = str(value.get("name") or "").strip()[:60]
+        category = str(value.get("category") or "配饰")
+        if category not in _CATEGORIES:
+            category = "配饰"
+        items.append({
+            "name": name or category,
+            "category": category,
+            "color": str(value.get("color") or "")[:30],
+            "description": str(value.get("description") or "")[:160],
+            "image_url": str(value.get("image_url") or "")[:3000] or None,
+        })
+    return items
+
+
+def tryon_reference_images(items: list[dict]) -> list[str]:
+    """Select at most two garment references; Qwen accepts three images total."""
+    ranked = sorted(
+        enumerate(items),
+        key=lambda pair: (_TRYON_CATEGORY_PRIORITY.get(pair[1].get("category"), 99), pair[0]),
+    )
+    refs = []
+    for _, item in ranked:
+        url = str(item.get("image_url") or "")
+        if url and url not in refs:
+            refs.append(url)
+        if len(refs) == 2:
+            break
+    return refs
+
+
+def build_tryon_prompt(items: list[dict], scene: str, body_shape: str, reference_count: int) -> str:
+    garments = []
+    for item in items:
+        detail = " ".join(x for x in [item["color"], item["name"], item["description"]] if x)
+        garments.append(f"{item['category']}：{detail}"[:220])
+    reference_note = (
+        f"图片2到图片{reference_count + 1}是服饰参考图，严格保留它们的颜色、版型、材质和图案。"
+        if reference_count else "本次没有服饰参考图，请严格依据服饰文字清单生成。"
+    )
+    scene_text = _TRYON_SCENES.get(scene, scene or "自然光下的简洁室内空间")
+    body_note = f"用户体型信息：{body_shape[:100]}。" if body_shape else ""
+    return (
+        "图片1是真实用户本人，也是唯一人物主体。生成一张写实的全身虚拟试穿照片。"
+        "保持图片1人物的脸型、五官、发型、肤色、年龄感和真实体型，不美化成其他人，不改变身份。"
+        f"{reference_note}{body_note}"
+        f"让人物完整穿上以下搭配：{'；'.join(garments)}。"
+        f"场景为{scene_text}，自然站姿，真实摄影光线，服装比例和遮挡关系合理。"
+        "不要增加清单以外的外套或下装，不要出现第二个人、拼贴、商品平铺、文字、水印、畸形肢体或多余手指。"
+    )
+
+
+def _qwen_tryon(person_image: str, items: list[dict], scene: str, body_shape: str,
+                 references: list[str]) -> str:
+    content = [{"image": person_image}]
+    content.extend({"image": url} for url in references)
+    content.append({"text": build_tryon_prompt(items, scene, body_shape, len(references))})
+    model = os.environ.get(
+        "GAMMA_TRYON_MODEL", os.environ.get("GAMMA_IMAGE_MODEL", "qwen-image-2.0")
+    )
+    return _qwen_image(
+        content, model, "gamma_tryon",
+        {"size": "1024*1536", "n": 1, "prompt_extend": True, "watermark": False},
+    )
+
+
+def tryon(payload: dict, generate=None) -> dict:
+    started = time.time()
+    person_image = _image_url(payload)
+    if not person_image:
+        raise ValueError("image_url or image_b64 is required")
+    items = normalize_tryon_items(payload.get("items") or [])
+    if not items:
+        raise ValueError("at least one outfit item is required")
+    scene = str(payload.get("scene") or "")[:100]
+    body_shape = str(payload.get("body_shape") or "")[:100]
+    references = tryon_reference_images(items)
+    image_url = (generate or _qwen_tryon)(person_image, items, scene, body_shape, references)
+    if not image_url:
+        raise RuntimeError("Gamma try-on returned no image")
+    return {
+        "image_url": image_url,
+        "trace": {
+            "engine": "gamma",
+            "image_model": os.environ.get(
+                "GAMMA_TRYON_MODEL", os.environ.get("GAMMA_IMAGE_MODEL", "qwen-image-2.0")
+            ),
+            "input_image_count": 1 + len(references),
             "duration_ms": int((time.time() - started) * 1000),
         },
     }

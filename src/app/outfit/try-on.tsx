@@ -9,10 +9,12 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { AILoading } from '@/components/AILoading';
 import { showToast } from '@/components/Toast';
 import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion } from '@/lib/ai';
+import { gammaTryOn } from '@/lib/gammaService';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
+import type { ClothingCategory } from '@/types';
 
 const TRYON_SCENES = [
   { id: 'cafe', label: '咖啡馆' },
@@ -42,8 +44,9 @@ type OutfitSummary = {
 };
 
 export default function TryOnScreen() {
-  const { items: itemsParam } = useLocalSearchParams<{ items?: string; outfitId?: string }>();
+  const { items: itemsParam, engine } = useLocalSearchParams<{ items?: string; outfitId?: string; engine?: string }>();
   const isFromResult = !!itemsParam;
+  const isGamma = engine === 'gamma';
 
   const { selfieUri, selectedScene, setSelectedScene, addRecord, loadSelfieFromServer, loaded, setLastResult } = useTryOnStore();
   const { user } = useUserStore();
@@ -154,8 +157,14 @@ export default function TryOnScreen() {
 
     // Collect outfit items as ItemBrief[]
     const items = isFromResult
-      ? resultItems.map(i => ({ name: i.name ?? '', category: i.category ?? '上装' as const, color: i.color ?? '' }))
-      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []).map(i => ({ name: i.name ?? '', category: i.category ?? '上装' as const, color: '' }));
+      ? resultItems.map(i => ({
+          name: i.name ?? '', category: (i.category ?? '上装') as ClothingCategory, color: i.color ?? '',
+          description: i.description ?? '', image_url: i.image_url ?? null,
+        }))
+      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []).map(i => ({
+          name: i.name ?? '', category: (i.category ?? '上装') as ClothingCategory, color: '',
+          image_url: i.image_url ?? null,
+        }));
 
     const bodyShape = undefined; // TODO: extract from selfieUri / user profile
 
@@ -164,11 +173,33 @@ export default function TryOnScreen() {
 
     setGenStep(1); // "生成试穿效果图..."
 
-    // Call both AI functions in parallel, pass selfie for face reference
-    const [imageResult, suggestionResult] = await Promise.all([
-      aiGenerateTryOnImage(items, bodyShape, selectedScene, selfieUri),
-      aiGenerateTryOnSuggestion(items, bodyShape),
-    ]);
+    let imageResult: { url: string | null; meta: AIMeta };
+    let suggestionResult: Awaited<ReturnType<typeof aiGenerateTryOnSuggestion>>;
+    if (isGamma) {
+      const gammaResult = await gammaTryOn(items, selectedScene, selfieUri!, bodyShape);
+      imageResult = {
+        url: gammaResult?.image_url ?? null,
+        meta: {
+          source: gammaResult ? `model-service/gamma/${gammaResult.trace.image_model}` : 'mock',
+          durationMs: gammaResult?.trace.duration_ms ?? 0,
+          ok: !!gammaResult?.image_url,
+        },
+      };
+      suggestionResult = {
+        suggestion: { suggestion: 'Gamma 已按所选搭配和场景生成试穿效果。', compatibility_score: 0, tips: [] },
+        meta: imageResult.meta,
+      };
+      if (!imageResult.url) {
+        setGenerating(false);
+        showToast('Gamma AI 试穿生成失败，请重试');
+        return;
+      }
+    } else {
+      [imageResult, suggestionResult] = await Promise.all([
+        aiGenerateTryOnImage(items, bodyShape, selectedScene, selfieUri),
+        aiGenerateTryOnSuggestion(items, bodyShape),
+      ]);
+    }
 
     setGenStep(2); // "优化画面细节..."
     await new Promise(r => setTimeout(r, 200));
@@ -237,7 +268,7 @@ export default function TryOnScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>← 返回</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>AI 试穿</Text>
+        <Text style={styles.title}>{isGamma ? 'Gamma AI 试穿' : 'AI 试穿'}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -385,10 +416,12 @@ export default function TryOnScreen() {
               <Text style={styles.generateBtnText}>生成中…</Text>
             </View>
           ) : (
-            <Text style={styles.generateBtnText}>生成试穿效果图</Text>
+            <Text style={styles.generateBtnText}>{isGamma ? 'Gamma 直接生成试穿图' : '生成试穿效果图'}</Text>
           )}
         </TouchableOpacity>
-        <Text style={styles.generateHint}>AI 将结合身体信息 + 搭配方案 + 场景氛围生成效果图</Text>
+        <Text style={styles.generateHint}>{isGamma
+          ? '身体照和搭配将经 Model Service 直接交给 Qwen 多图编辑'
+          : 'AI 将结合身体信息 + 搭配方案 + 场景氛围生成效果图'}</Text>
         {quota ? (
           <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
         ) : null}

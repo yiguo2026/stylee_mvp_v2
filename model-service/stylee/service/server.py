@@ -126,6 +126,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, gamma.import_garment(payload))
             elif self.path == "/gamma/outfit":
                 self._send(200, gamma.outfit(payload))
+            elif self.path == "/gamma/tryon":
+                self._send(200, gamma.tryon(payload))
             else:
                 self._send(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001
