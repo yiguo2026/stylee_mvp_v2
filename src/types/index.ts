@@ -399,29 +399,29 @@ export interface PresetWardrobeItem {
 export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
   // ── 中性（原有） ─────────────────────────────
   // 上装
-  { name: '白色T恤', category: '上装', color: '白色', material: '纯棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-tshirt.png', desc: '百搭必备·四季' },
-  { name: '黑色T恤', category: '上装', color: '黑色', material: '纯棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-tshirt.png', desc: '酷感基础·四季' },
-  { name: '白衬衫', category: '上装', color: '白色', material: '棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-shirt.png', desc: '通勤百搭·四季' },
-  { name: '灰色卫衣', category: '上装', color: '灰色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/gray-sweatshirt.png', desc: '休闲舒适·秋冬' },
+  { name: '白色T恤', category: '上装', color: '白色', material: '纯棉', image_url: '/preset-items/white-tshirt.png', desc: '百搭必备·四季' },
+  { name: '黑色T恤', category: '上装', color: '黑色', material: '纯棉', image_url: '/preset-items/black-tshirt.png', desc: '酷感基础·四季' },
+  { name: '白衬衫', category: '上装', color: '白色', material: '棉', image_url: '/preset-items/white-shirt.png', desc: '通勤百搭·四季' },
+  { name: '灰色卫衣', category: '上装', color: '灰色', material: '棉混纺', image_url: '/preset-items/gray-sweatshirt.png', desc: '休闲舒适·秋冬' },
   // 下装
-  { name: '蓝色牛仔裤', category: '下装', color: '蓝色', material: '牛仔布', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/blue-jeans.png', desc: '经典百搭·四季' },
-  { name: '黑色长裤', category: '下装', color: '黑色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-trousers.png', desc: '显瘦百搭·四季' },
-  { name: '短裤', category: '下装', color: '卡其', material: '棉', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/beige-shorts.png', desc: '清爽夏日·春夏' },
+  { name: '蓝色牛仔裤', category: '下装', color: '蓝色', material: '牛仔布', image_url: '/preset-items/blue-jeans.png', desc: '经典百搭·四季' },
+  { name: '黑色长裤', category: '下装', color: '黑色', material: '棉混纺', image_url: '/preset-items/black-trousers.png', desc: '显瘦百搭·四季' },
+  { name: '短裤', category: '下装', color: '卡其', material: '棉', image_url: '/preset-items/beige-shorts.png', desc: '清爽夏日·春夏' },
   // 连体装
-  { name: '白色连衣裙', category: '连体装', color: '白色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-dress.png', desc: '清新优雅·春夏', for_gender: ['female'] },
-  { name: '黑色连衣裙', category: '连体装', color: '黑色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-dress.png', desc: '经典小黑裙·四季', for_gender: ['female'] },
+  { name: '白色连衣裙', category: '连体装', color: '白色', material: '棉混纺', image_url: '/preset-items/white-dress.png', desc: '清新优雅·春夏', for_gender: ['female'] },
+  { name: '黑色连衣裙', category: '连体装', color: '黑色', material: '棉混纺', image_url: '/preset-items/black-dress.png', desc: '经典小黑裙·四季', for_gender: ['female'] },
   // 外套
-  { name: '黑色羽绒服', category: '外套', color: '黑色', material: '尼龙', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-puffer.png', desc: '保暖必备·秋冬' },
-  { name: '牛仔外套', category: '外套', color: '浅蓝', material: '牛仔布', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/denim-jacket.png', desc: '休闲利器·春秋' },
-  { name: '米色风衣', category: '外套', color: '米色', material: '棉混纺', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/khaki-trench.png', desc: '气质优雅·春秋' },
+  { name: '黑色羽绒服', category: '外套', color: '黑色', material: '尼龙', image_url: '/preset-items/black-puffer.png', desc: '保暖必备·秋冬' },
+  { name: '牛仔外套', category: '外套', color: '浅蓝', material: '牛仔布', image_url: '/preset-items/denim-jacket.png', desc: '休闲利器·春秋' },
+  { name: '米色风衣', category: '外套', color: '米色', material: '棉混纺', image_url: '/preset-items/khaki-trench.png', desc: '气质优雅·春秋' },
   // 鞋履
-  { name: '小白鞋', category: '鞋履', color: '白色', material: '合成革', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-sneakers.png', desc: '休闲万能·四季' },
-  { name: '白色运动鞋', category: '鞋履', color: '白色', material: '网面', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/white-running-shoes.png', desc: '活力百搭·四季' },
+  { name: '小白鞋', category: '鞋履', color: '白色', material: '合成革', image_url: '/preset-items/white-sneakers.png', desc: '休闲万能·四季' },
+  { name: '白色运动鞋', category: '鞋履', color: '白色', material: '网面', image_url: '/preset-items/white-running-shoes.png', desc: '活力百搭·四季' },
   // 帽巾
-  { name: '针织冷帽', category: '帽巾', color: '黑色', material: '针织', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/beanie.png', desc: '保暖有型·秋冬' },
-  { name: '纯色针织围巾', category: '帽巾', color: '米色', material: '针织', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/beige-scarf.png', desc: '温暖配饰·秋冬' },
+  { name: '针织冷帽', category: '帽巾', color: '黑色', material: '针织', image_url: '/preset-items/beanie.png', desc: '保暖有型·秋冬' },
+  { name: '纯色针织围巾', category: '帽巾', color: '米色', material: '针织', image_url: '/preset-items/beige-scarf.png', desc: '温暖配饰·秋冬' },
   // 包袋
-  { name: '双肩包', category: '包袋', color: '黑色', material: '尼龙', image_url: 'https://pdgocqjvncxkwfrcdhtj.supabase.co/storage/v1/object/public/wardrobe-images/preset-items/black-backpack.png', desc: '通勤实用·四季' },
+  { name: '双肩包', category: '包袋', color: '黑色', material: '尼龙', image_url: '/preset-items/black-backpack.png', desc: '通勤实用·四季' },
 
   // ── 男专属（新增） ─────────────────────────────
   { name: '男士短袖衬衫', category: '上装', color: '白色', material: '棉', image_url: '/preset-items/mens-shirt.png', desc: '通勤日常·春夏', for_gender: ['male'] },
