@@ -20,11 +20,11 @@ function usernameToEmail(username: string) {
 
 function translateLoginError(msg: string): string {
   const m = msg.toLowerCase();
-  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '用户名或密码错误';
+  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '密码错误';
   if (m.includes('email not confirmed')) return '账号未验证';
   if (m.includes('too many requests') || m.includes('rate limit')) return '尝试次数过多，请稍后再试';
   if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络';
-  return '用户名或密码错误，请重试';
+  return '密码错误，请重试';
 }
 
 export default function LoginScreen() {
@@ -41,6 +41,19 @@ export default function LoginScreen() {
     if (!password) { setError('请输入密码'); return; }
 
     setLoading(true);
+
+    // Check if username exists before attempting login
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('user_id')
+      .ilike('username', username.trim())
+      .maybeSingle();
+    if (!existingUser) {
+      setLoading(false);
+      setError('账号不存在');
+      return;
+    }
+
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: usernameToEmail(username),
       password,
