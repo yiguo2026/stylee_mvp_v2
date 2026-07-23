@@ -45,28 +45,26 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Check if username exists before attempting login (case-insensitive)
+    // Check if username exists (case-sensitive)
     const { data: existingUser } = await supabase
       .from('users')
-      .select('user_id, username')
-      .ilike('username', username.trim())
+      .select('user_id')
+      .eq('username', username.trim())
       .maybeSingle();
     if (!existingUser) {
       setLoading(false);
       setError('账号不存在');
       return;
     }
-    // Use the actual casing stored in DB for email encoding
-    const actualUsername = existingUser.username;
 
     // Try new encoded email first, fall back to legacy lowercase for old accounts
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: usernameToEmail(actualUsername),
+      email: usernameToEmail(username),
       password,
     });
     if (authError) {
-      const legacyEmail = legacyUsernameToEmail(actualUsername);
-      if (legacyEmail !== usernameToEmail(actualUsername)) {
+      const legacyEmail = legacyUsernameToEmail(username);
+      if (legacyEmail !== usernameToEmail(username)) {
         const { data: data2, error: authError2 } = await supabase.auth.signInWithPassword({
           email: legacyEmail,
           password,
