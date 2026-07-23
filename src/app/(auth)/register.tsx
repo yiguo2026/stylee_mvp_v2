@@ -108,11 +108,19 @@ export default function RegisterScreen() {
         else setError(translated);
         return;
       }
-      // Don't create profile here — DB trigger auto-creates users row with gender='private';
-      // onboarding step1 will upsert with user's real data.
+      // Ensure username is saved in users table (trigger may miss it)
+      const { error: profileError } = await supabase
+        .from('users')
+        .upsert({
+          user_id: data.user.id,
+          username: normalizedUsername,
+          nickname: normalizedUsername,
+          gender: 'private',
+        }, { onConflict: 'user_id' });
+      if (profileError) {
+        console.warn('[Register] profile upsert failed:', profileError.message);
+      }
 
-      // 项目使用虚拟邮箱登录；Supabase 必须关闭 email confirmation。
-      // signUp 可能自动建立 session，保持原 UX：注册后退出并回到登录页。
       if (data.session) await supabase.auth.signOut();
 
       setLoading(false);

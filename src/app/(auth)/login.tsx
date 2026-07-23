@@ -46,7 +46,7 @@ export default function LoginScreen() {
     const { data: existingUser } = await supabase
       .from('users')
       .select('user_id')
-      .ilike('username', username.trim())
+      .eq('username', username.trim())
       .maybeSingle();
     if (!existingUser) {
       setLoading(false);
