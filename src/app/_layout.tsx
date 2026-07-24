@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Stack, router } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Session } from '@supabase/supabase-js';
 import * as SplashScreen from 'expo-splash-screen';
@@ -22,14 +22,23 @@ import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { Colors } from '@/constants/theme';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ToastHost } from '@/components/Toast';
+import { ToastHost, showToast } from '@/components/Toast';
+import { useImportStore } from '@/stores/importStore';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const pathname = usePathname();
+  const pendingSelectionCount = useImportStore((state) => state.pendingSelectionCount);
+  const tasks = useImportStore((state) => state.tasks);
+  const pendingToastCountRef = useRef(0);
   const { setSession, fetchProfile } = useUserStore();
 
   const [fontsLoaded, fontError] = useFonts({
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
     PlayfairDisplay_400Regular,
     PlayfairDisplay_400Regular_Italic,
     PlayfairDisplay_500Medium,
@@ -48,7 +57,7 @@ export default function RootLayout() {
     if (fontError) {
       console.warn('[Fonts] load error (graceful degradation):', fontError);
     } else if (fontsLoaded) {
-      console.log('[Fonts] PlayfairDisplay + Inter loaded');
+      console.log('[Fonts] Icon fonts + PlayfairDisplay + Inter loaded');
     }
     if (fontsReady) {
       SplashScreen.hideAsync();
@@ -87,6 +96,26 @@ export default function RootLayout() {
 
     return () => subscription.unsubscribe();
   }, [fontsReady]);
+
+  useEffect(() => {
+    const shouldNotify = pendingSelectionCount > pendingToastCountRef.current && pathname !== '/wardrobe';
+    if (shouldNotify) {
+      const firstPendingTask = tasks.find((task) => task.status === 'needs_selection');
+      showToast(`${pendingSelectionCount}张照片待确认`, 'info', 2600, {
+        onPress: () => {
+          if (firstPendingTask?.id) {
+            router.push({
+              pathname: '/(tabs)/wardrobe',
+              params: { scrollTop: '1', openImportTask: firstPendingTask.id },
+            });
+            return;
+          }
+          router.push('/(tabs)/wardrobe?scrollTop=1');
+        },
+      });
+    }
+    pendingToastCountRef.current = pendingSelectionCount;
+  }, [pathname, pendingSelectionCount, tasks]);
 
   if (!fontsReady) return null;
 
