@@ -10,11 +10,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, T, Fonts, Shadow } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { setPendingImages } from '@/lib/pendingImages';
 import { PRESET_BASIC_ITEMS, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
 import { isItemVisibleForGender } from '@/lib/genderFilter';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast } from '@/components/Toast';
+
+import { useImportStore } from '@/stores/importStore';
 
 export default function OnboardingStep3() {
   const { user, profile } = useUserStore();
@@ -52,6 +53,8 @@ export default function OnboardingStep3() {
     }
   };
 
+  const { startImport } = useImportStore();
+
   const handleAlbumImport = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -65,9 +68,10 @@ export default function OnboardingStep3() {
     });
     if (result.canceled) return;
     const uris = result.assets.map(a => a.uri);
-    console.log('[step3] album import, uris:', uris.length);
-    setPendingImages(uris);
-    router.push('/wardrobe/add');
+    if (user?.id) {
+      startImport(uris, user.id);
+      showToast('已加入衣橱导入队列', 'info', 2000);
+    }
   };
 
   const handleFinish = async () => {

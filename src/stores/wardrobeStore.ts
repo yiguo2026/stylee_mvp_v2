@@ -45,6 +45,18 @@ async function fetchItemUsageStats(userId: string): Promise<Record<string, { wea
   return stats;
 }
 
+function sortWardrobeItemsNewestFirst(items: WardrobeItem[]): WardrobeItem[] {
+  return [...items].sort((a, b) => {
+    const createdDiff = new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+    if (createdDiff !== 0) return createdDiff;
+
+    const updatedDiff = new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime();
+    if (updatedDiff !== 0) return updatedDiff;
+
+    return 0;
+  });
+}
+
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   items: [],
   isLoading: false,
@@ -64,7 +76,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       if (error) throw error;
       const rawItems = (data ?? []) as WardrobeItem[];
 
-      // 附加穿搭/收藏次数，并按（穿搭 + 收藏）次数倒序排序（同分按最近添加）
+      // 附加穿搭/收藏次数，但衣橱列表始终保持按最新创建时间倒序展示
       let items = rawItems;
       try {
         const stats = await fetchItemUsageStats(userId);
@@ -75,12 +87,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       } catch (statErr) {
         console.warn('[wardrobeStore.fetchItems] usage stats failed:', statErr);
       }
-      items = [...items].sort((a, b) => {
-        const scoreA = (a.wear_count ?? 0) + (a.favorite_count ?? 0);
-        const scoreB = (b.wear_count ?? 0) + (b.favorite_count ?? 0);
-        if (scoreB !== scoreA) return scoreB - scoreA;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
+      items = sortWardrobeItemsNewestFirst(items);
 
       set({ items });
     } catch (e: any) {
@@ -93,14 +100,21 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   addItem: async (item) => {
     set({ isLoading: true, error: null });
     try {
+      const now = new Date().toISOString();
+      const payload = {
+        ...item,
+        category: normalizeCategory(item.category),
+        created_at: (item as Partial<WardrobeItem>).created_at ?? now,
+        updated_at: (item as Partial<WardrobeItem>).updated_at ?? now,
+      };
       const { data, error } = await supabase
         .from('wardrobe_items')
-        .insert({ ...item, category: normalizeCategory(item.category) })
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
       const newItem = data as WardrobeItem;
-      set(state => ({ items: [newItem, ...state.items] }));
+      set(state => ({ items: sortWardrobeItemsNewestFirst([newItem, ...state.items]) }));
       return newItem;
     } catch (e: any) {
       set({ error: e.message });

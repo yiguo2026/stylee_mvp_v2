@@ -2,12 +2,15 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
-import { setPendingImages } from '@/lib/pendingImages';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { PRESET_BASIC_ITEMS } from '@/types';
+import { showToast } from '@/components/Toast';
+
+import { useImportStore } from '@/stores/importStore';
+import { useUserStore } from '@/stores/userStore';
 
 const isWeb = Platform.OS === 'web';
 
@@ -36,6 +39,10 @@ function SheetContent({
     return PRESET_BASIC_ITEMS.every(it => keys.has(`${it.name}||${it.category}`));
   }, [items]);
 
+  const { user } = useUserStore();
+  const pathname = usePathname();
+  const { startImport } = useImportStore();
+
   // 相册导入 — 主入口
   const handlePickImages = async () => {
     setPicking(true);
@@ -56,8 +63,12 @@ function SheetContent({
       }
       const uris = result.assets.map(a => a.uri);
       onClose();
-      setPendingImages(uris);
-      router.push('/wardrobe/add');
+      if (user?.id) {
+        startImport(uris, user.id);
+        if (pathname !== '/wardrobe') {
+          showToast('已加入衣橱导入队列', 'info', 2000);
+        }
+      }
     } catch {
       setPicking(false);
     }

@@ -2,7 +2,30 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import { router } from 'expo-router';
 import { Colors, Fonts, Radius, Spacing, T } from '@/constants/theme';
 
+import * as ImagePicker from 'expo-image-picker';
+import { showToast } from '@/components/Toast';
+import { useImportStore } from '@/stores/importStore';
+import { useUserStore } from '@/stores/userStore';
+
 export default function GammaHome() {
+  const { user } = useUserStore();
+  const { startImport } = useImportStore();
+
+  const handleGammaImport = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsMultipleSelection: true,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    if (user?.id) {
+      startImport(result.assets.map(a => a.uri), user.id);
+      showToast('已加入衣橱导入队列', 'info', 2000);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -15,7 +38,7 @@ export default function GammaHome() {
         <Text style={styles.title}>更短的模型路径</Text>
         <Text style={styles.desc}>独立于现有识别、标准化和 B0–B6/RAG 搭配流程。App 仍只访问 Model Service，模型密钥不会进入客户端。</Text>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push('/gamma/import')}>
+        <TouchableOpacity style={styles.card} onPress={handleGammaImport}>
           <Text style={styles.cardIndex}>01</Text>
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>导入 + 标准化</Text>

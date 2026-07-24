@@ -1,45 +1,82 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Image, SafeAreaView, RefreshControl,
-  TextInput, ScrollView,
+  Animated,
+  Image,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { Colors, Fonts, Radius, Shadow, Spacing, T } from '@/constants/theme';
+import { AddClothingSheet } from '@/components/AddClothingSheet';
+import { CategoryIcon } from '@/components/CategoryIcon';
+import ImportSkeletonCard from '@/components/ImportSkeletonCard';
+import ItemSelectionSheet from '@/components/ItemSelectionSheet';
+import { useImportStore, type ImportTaskStatus } from '@/stores/importStore';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
-import { CategoryIcon } from '@/components/CategoryIcon';
-import { AddClothingSheet } from '@/components/AddClothingSheet';
-import { WardrobeItem, ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL } from '@/types';
+import { CLOTHING_CATEGORIES_WITH_ALL, ClothingCategory, WardrobeItem } from '@/types';
 
-function ItemCard({ item }: { item: WardrobeItem }) {
+function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?: boolean }) {
+  const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
+  const scale = useRef(new Animated.Value(animateIn ? 1.02 : 1)).current;
+
+  useEffect(() => {
+    if (!animateIn) {
+      opacity.setValue(1);
+      scale.setValue(1);
+      return;
+    }
+
+    opacity.setValue(0);
+    scale.setValue(1.02);
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [animateIn, item.item_id, opacity, scale]);
+
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
-    >
-      <View style={styles.cardImage}>
-        {item.image_url
-          ? <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
-          : (
+    <Animated.View style={[styles.gridItem, { opacity, transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
+      >
+        <View style={styles.cardImage}>
+          {item.image_url ? (
+            <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
+          ) : (
             <View style={styles.imagePlaceholder}>
               <CategoryIcon category={item.category} size={44} color={Colors.walnut2} />
             </View>
-          )
-        }
-      </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.cardMeta}>
-          {item.color} · {item.category}
-          {item.wear_count ? ` · 穿过${item.wear_count}次` : ''}
-        </Text>
-      </View>
-    </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.cardMeta}>
+            {item.color} · {item.category}
+            {item.wear_count ? ` · 穿过${item.wear_count}次` : ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -47,21 +84,25 @@ export default function WardrobeTab() {
   const { user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
   const { items: wishlistItems, fetchItems: fetchWishlist } = useWishlistStore();
+  const tasks = useImportStore((state) => state.tasks);
+  const retryFailed = useImportStore((state) => state.retryFailed);
+
   const [selectedCategory, setSelectedCategory] = useState<ClothingCategory | '全部'>('全部');
   const [searchText, setSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectionTaskId, setSelectionTaskId] = useState<string | null>(null);
+  const [dismissedSelectionIds, setDismissedSelectionIds] = useState<string[]>([]);
+  const [recentlyCompletedUris, setRecentlyCompletedUris] = useState<string[]>([]);
 
-  // 支持从「查看全部」入口回到顶部
-  const params = useLocalSearchParams<{ scrollTop?: string }>();
-  const scrollRef = React.useRef<ScrollView>(null);
-  // 从「查看全部」进入时滚动回顶部（衣橱页在 Tab 间保持挂载，滚动位置会被保留）
-  useEffect(() => {
-    if (params.scrollTop) {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-      router.setParams({ scrollTop: undefined });
-    }
-  }, [params.scrollTop]);
+  const pendingSelectionTasks = useMemo(
+    () => tasks.filter((task) => task.status === 'needs_selection'),
+    [tasks],
+  );
+
+  const previousTaskStatusRef = useRef<Record<string, ImportTaskStatus>>({});
+  const scrollRef = useRef<ScrollView>(null);
+  const params = useLocalSearchParams<{ scrollTop?: string; openImportTask?: string }>();
 
   useFocusEffect(useCallback(() => {
     if (user) {
@@ -69,6 +110,80 @@ export default function WardrobeTab() {
       fetchWishlist(user.id);
     }
   }, [fetchItems, fetchWishlist, user]));
+
+  useEffect(() => {
+    if (params.scrollTop) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      router.setParams({ scrollTop: undefined });
+    }
+  }, [params.scrollTop]);
+
+  useEffect(() => {
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const nextStatusMap: Record<string, ImportTaskStatus> = {};
+
+    tasks.forEach((task) => {
+      nextStatusMap[task.id] = task.status;
+      const previousStatus = previousTaskStatusRef.current[task.id];
+      if (previousStatus && previousStatus !== 'done' && task.status === 'done') {
+        const completedKeys = [task.sourceUri, task.standardizedImageUri].filter((uri): uri is string => Boolean(uri));
+        setRecentlyCompletedUris((prev) => Array.from(new Set([...completedKeys, ...prev])));
+        const timeout = setTimeout(() => {
+          setRecentlyCompletedUris((prev) => prev.filter((uri) => !completedKeys.includes(uri)));
+        }, 520);
+        timeouts.push(timeout);
+      }
+    });
+
+    previousTaskStatusRef.current = nextStatusMap;
+    return () => timeouts.forEach(clearTimeout);
+  }, [tasks]);
+
+  useEffect(() => {
+    if (!selectionTaskId) return;
+    const stillPending = tasks.some((task) => task.id === selectionTaskId && task.status === 'needs_selection');
+    if (!stillPending) {
+      setSelectionTaskId(null);
+    }
+  }, [selectionTaskId, tasks]);
+
+  // 检测到多件单品时主动弹出选择面板（对齐线上「识别到多件即弹确认」的体验），
+  // 不再依赖用户去发现骨架卡上的小字提示。用户点「稍后再说」后记入 dismissed，
+  // 避免被反复弹起；之后仍可从顶部横幅/骨架卡再次进入确认。
+  useEffect(() => {
+    if (selectionTaskId) return;
+    const next = pendingSelectionTasks.find((task) => !dismissedSelectionIds.includes(task.id));
+    if (next) setSelectionTaskId(next.id);
+  }, [pendingSelectionTasks, selectionTaskId, dismissedSelectionIds]);
+
+  const handleCloseSelection = useCallback(() => {
+    setSelectionTaskId((current) => {
+      if (current) {
+        setDismissedSelectionIds((prev) => (prev.includes(current) ? prev : [...prev, current]));
+      }
+      return null;
+    });
+  }, []);
+
+  const openPendingConfirmation = useCallback(() => {
+    const first = pendingSelectionTasks[0];
+    if (!first) return;
+    setDismissedSelectionIds((prev) => prev.filter((id) => id !== first.id));
+    setSelectionTaskId(first.id);
+  }, [pendingSelectionTasks]);
+
+  useEffect(() => {
+    if (!params.openImportTask) return;
+
+    const targetTask = tasks.find(
+      (task) => task.id === params.openImportTask && task.status === 'needs_selection',
+    ) ?? tasks.find((task) => task.status === 'needs_selection');
+
+    if (targetTask) {
+      setSelectionTaskId(targetTask.id);
+      router.setParams({ openImportTask: undefined });
+    }
+  }, [params.openImportTask, tasks]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -78,41 +193,62 @@ export default function WardrobeTab() {
     setRefreshing(false);
   };
 
-  const categoryCounts = useCallback(() => {
-    const counts: Record<string, number> = { '全部': items.length };
-    for (const cat of CLOTHING_CATEGORIES_WITH_ALL) {
-      if (cat !== '全部') counts[cat] = items.filter(i => i.category === cat).length;
+  const counts = useMemo(() => {
+    const allCounts: Record<string, number> = { 全部: items.length };
+    for (const category of CLOTHING_CATEGORIES_WITH_ALL) {
+      if (category !== '全部') {
+        allCounts[category] = items.filter((item) => item.category === category).length;
+      }
     }
-    return counts;
+    return allCounts;
   }, [items]);
-  const counts = categoryCounts();
 
-  const filtered = items
-    .filter(i => selectedCategory === '全部' || i.category === selectedCategory)
-    .filter(i => {
+  const filteredItems = useMemo(() => items
+    .filter((item) => selectedCategory === '全部' || item.category === selectedCategory)
+    .filter((item) => {
       if (!searchText) return true;
-      const q = searchText.trim();
+      const query = searchText.trim();
       const SEARCH_ALIASES: Record<string, string[]> = {
-        '裤子': ['裤', '下装'],
-        '上衣': ['上装', '衬衫', 'T恤', '卫衣', '针织', '开衫'],
-        '衣服': ['上装', '外套', '衬衫', 'T恤', '卫衣'],
-        '裙子': ['裙', '连体装'],
-        '鞋': ['鞋', '靴', '鞋履'],
-        '包': ['包', '挎', '背包', '包袋'],
+        裤子: ['裤', '下装'],
+        上衣: ['上装', '衬衫', 'T恤', '卫衣', '针织', '开衫'],
+        衣服: ['上装', '外套', '衬衫', 'T恤', '卫衣'],
+        裙子: ['裙', '连体装'],
+        鞋: ['鞋', '靴', '鞋履'],
+        包: ['包', '挎', '背包', '包袋'],
       };
-      const terms = [q, ...(SEARCH_ALIASES[q] ?? [])];
-      const haystack = [i.name, i.category, i.color, i.brand ?? '', i.material ?? ''].join(' ');
-      return terms.some(t => haystack.includes(t));
-    });
+      const terms = [query, ...(SEARCH_ALIASES[query] ?? [])];
+      const haystack = [item.name, item.category, item.color, item.brand ?? '', item.material ?? ''].join(' ');
+      return terms.some((term) => haystack.includes(term));
+    }), [items, searchText, selectedCategory]);
+
+  const skeletonTasks = useMemo(
+    () => [...tasks].reverse().filter((task) => task.status !== 'done'),
+    [tasks],
+  );
+
+  const gridEntries = useMemo(() => [
+    ...skeletonTasks.map((task) => ({ type: 'task' as const, key: `task:${task.id}`, task })),
+    ...filteredItems.map((item) => ({ type: 'item' as const, key: `item:${item.item_id}`, item })),
+  ], [filteredItems, skeletonTasks]);
+
+  const handleSkeletonPress = useCallback((taskId: string, status: ImportTaskStatus) => {
+    if (status === 'needs_selection') {
+      setSelectionTaskId(taskId);
+      return;
+    }
+    if (status === 'failed') {
+      retryFailed(taskId);
+    }
+  }, [retryFailed]);
+
+  const showEmptyState = gridEntries.length === 0;
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>衣橱</Text>
       </View>
 
-      {/* Search */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
           <Feather name="search" size={15} color={Colors.walnut2} style={styles.searchIcon} />
@@ -127,42 +263,64 @@ export default function WardrobeTab() {
         </View>
       </View>
 
+      {pendingSelectionTasks.length > 0 && (
+        <TouchableOpacity
+          style={styles.confirmBanner}
+          onPress={openPendingConfirmation}
+          activeOpacity={0.88}
+        >
+          <View style={styles.confirmBannerIcon}>
+            <MaterialCommunityIcons name="hanger" size={18} color="#3A2E17" />
+          </View>
+          <View style={styles.confirmBannerText}>
+            <Text style={styles.confirmBannerTitle} numberOfLines={1}>
+              {pendingSelectionTasks.length > 1
+                ? `${pendingSelectionTasks.length} 张照片识别到多件单品`
+                : `识别到 ${pendingSelectionTasks[0].allDetectedItems?.length ?? 0} 件单品，待你确认`}
+            </Text>
+            <Text style={styles.confirmBannerSub} numberOfLines={1}>选择要导入衣橱的单品</Text>
+          </View>
+          <View style={styles.confirmBannerBtn}>
+            <Text style={styles.confirmBannerBtnText}>去确认</Text>
+            <Feather name="chevron-right" size={14} color="#3A2E17" />
+          </View>
+        </TouchableOpacity>
+      )}
+
       <ScrollView
         ref={scrollRef}
         style={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Category Pills — text only, count badge, fixed height */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryList}
         >
-          {CLOTHING_CATEGORIES_WITH_ALL.map(cat => {
-            const count = counts[cat] ?? 0;
+          {CLOTHING_CATEGORIES_WITH_ALL.map((category) => {
+            const count = counts[category] ?? 0;
             return (
               <TouchableOpacity
-                key={cat}
-                style={[styles.catPill, selectedCategory === cat && styles.catPillActive]}
-                onPress={() => setSelectedCategory(cat)}
+                key={category}
+                style={[styles.catPill, selectedCategory === category && styles.catPillActive]}
+                onPress={() => setSelectedCategory(category)}
               >
-                <Text style={[styles.catPillText, selectedCategory === cat && styles.catPillTextActive]}>
-                  {cat}
+                <Text style={[styles.catPillText, selectedCategory === category && styles.catPillTextActive]}>
+                  {category}
                 </Text>
-                {count > 0 && (
-                  <View style={[styles.catCount, selectedCategory === cat && styles.catCountActive]}>
-                    <Text style={[styles.catCountText, selectedCategory === cat && styles.catCountTextActive]}>
+                {count > 0 ? (
+                  <View style={[styles.catCount, selectedCategory === category && styles.catCountActive]}>
+                    <Text style={[styles.catCountText, selectedCategory === category && styles.catCountTextActive]}>
                       {count}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {/* My Wardrobe Grid (first) */}
-        {filtered.length === 0 ? (
+        {showEmptyState ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="hanger" size={56} color={Colors.walnut2} />
             {selectedCategory === '全部' ? (
@@ -178,8 +336,24 @@ export default function WardrobeTab() {
           </View>
         ) : (
           <View style={styles.grid}>
-            {filtered.map(item => (
-              <ItemCard key={item.item_id} item={item} />
+            {gridEntries.map((entry) => (
+              entry.type === 'task' ? (
+                <ImportSkeletonCard
+                  key={entry.key}
+                  task={entry.task}
+                  onPress={
+                    entry.task.status === 'needs_selection' || entry.task.status === 'failed'
+                      ? (task) => handleSkeletonPress(task.id, task.status)
+                      : undefined
+                  }
+                />
+              ) : (
+                <ItemCard
+                  key={entry.key}
+                  item={entry.item}
+                  animateIn={!!entry.item.image_url && recentlyCompletedUris.includes(entry.item.image_url)}
+                />
+              )
             ))}
           </View>
         )}
@@ -187,7 +361,6 @@ export default function WardrobeTab() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Floating Add Button */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => setShowAddModal(true)}
@@ -196,21 +369,22 @@ export default function WardrobeTab() {
         <Feather name="plus" size={24} color={Colors.paper} />
       </TouchableOpacity>
 
-      {/* Add Modal */}
       <AddClothingSheet
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         wishlistCount={wishlistItems.length}
+      />
+
+      <ItemSelectionSheet
+        visible={!!selectionTaskId}
+        taskId={selectionTaskId}
+        onClose={handleCloseSelection}
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  webLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 220,
-  },
   safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
   header: {
     flexDirection: 'row',
@@ -222,8 +396,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   title: { ...T.pageTitle },
-
-  // Search
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -231,128 +403,117 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   searchBar: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    paddingHorizontal: Spacing.two, borderWidth: 1, borderColor: Colors.line,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.paperCard,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.two,
+    borderWidth: 1,
+    borderColor: Colors.line,
   },
   searchIcon: { marginRight: Spacing.one },
   searchInput: { ...T.inputText, flex: 1, paddingVertical: Spacing.two, color: Colors.ink },
 
-  // Category pills — fixed 32px height, text only, count badge
+  // 待确认横幅 —— 识别到多件单品时置顶提示，明显且常驻
+  confirmBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginHorizontal: Spacing.four,
+    marginBottom: Spacing.two,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.md,
+    backgroundColor: '#F5EAD2',
+    borderWidth: 1,
+    borderColor: '#E4CE9C',
+    ...Shadow.one,
+  },
+  confirmBannerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EBD9AF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBannerText: { flex: 1, gap: 2 },
+  confirmBannerTitle: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: '#3A2E17', letterSpacing: 0.2 },
+  confirmBannerSub: { fontFamily: Fonts.body, fontSize: 11, color: '#7A6A47' },
+  confirmBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#E4CE9C',
+  },
+  confirmBannerBtnText: { fontFamily: Fonts.uiSemiBold, fontSize: 12.5, color: '#3A2E17', letterSpacing: 0.3 },
+
   categoryList: { paddingHorizontal: Spacing.four, gap: Spacing.one, paddingBottom: Spacing.two },
   catPill: {
     position: 'relative',
     height: 32,
     paddingHorizontal: 10,
-    borderRadius: 10, borderWidth: 1, borderColor: Colors.lineStrong,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.lineStrong,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   catPillActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   catPillText: { fontSize: 12, fontFamily: Fonts.ui, color: Colors.ink },
   catPillTextActive: { color: '#fff' },
   catCount: {
-    position: 'absolute', top: -5, right: -5,
-    minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: Colors.line, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 4,
   },
   catCountActive: { backgroundColor: Colors.line },
   catCountText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: Colors.gray1 },
   catCountTextActive: { color: Colors.gray1 },
-
   scrollContent: { flex: 1 },
-
-  // Wardrobe grid
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.four, gap: Spacing.two },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: Spacing.four, rowGap: Spacing.two },
+  gridItem: { width: '47.5%' },
   card: {
-    width: '47.5%',
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    overflow: 'hidden', ...Shadow.one,
+    width: '100%',
+    backgroundColor: Colors.paperCard,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.06)',
+    ...Shadow.one,
   },
   cardImage: { width: '100%', aspectRatio: 1, backgroundColor: Colors.paperCard },
   image: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
-  cardInfo: { padding: Spacing.two },
+  cardInfo: { minHeight: 54, padding: Spacing.two, justifyContent: 'center' },
   cardName: { ...T.itemName },
   cardMeta: { ...T.micro, marginTop: 2 },
-
   emptyState: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.six, marginTop: Spacing.six },
   emptyTitle: { ...T.emptyTitle },
   emptySub: { ...T.itemDesc, textAlign: 'center' },
-
-  // Wishlist entry (bottom of page)
-  wishlistEntry: { paddingHorizontal: Spacing.four, marginTop: Spacing.three },
-  wishlistEntryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14, backgroundColor: Colors.accentSoft, borderRadius: 14,
-    borderWidth: 1, borderColor: Colors.accentSoft,
-  },
-  wishlistEntryIcon: { fontSize: 20, color: Colors.accent },
-  wishlistEntryLabel: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.accent },
-  wishlistEntryBadge: {
-    minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 5,
-  },
-  wishlistEntryBadgeText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
-  wishlistEntryArrow: { marginLeft: 'auto', fontSize: 16, color: Colors.accent },
-
-  // Quick add entry
-  quickAddEntry: { paddingHorizontal: Spacing.four, marginTop: Spacing.two, marginBottom: Spacing.four },
-  quickAddEntryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 14, backgroundColor: Colors.paperCard, borderRadius: 14,
-    borderWidth: 1.5, borderColor: Colors.line, borderStyle: 'dashed',
-  },
-  quickAddEntryIcon: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: Colors.signal, alignItems: 'center', justifyContent: 'center',
-  },
-  quickAddEntryIconText: { fontSize: 18 },
-  quickAddEntryInfo: { flex: 1 },
-  quickAddEntryTitle: { fontSize: 13, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
-  quickAddEntrySub: { fontSize: 11, color: Colors.gray1, marginTop: 2 },
-  quickAddEntryArrow: { fontSize: 14, color: Colors.gray1 },
-
   fab: {
-    position: 'absolute', bottom: Spacing.four + 60, right: Spacing.four,
-    width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.ink,
-    alignItems: 'center', justifyContent: 'center', ...Shadow.two,
-  },
-
-  // Wishlist overlay (full page)
-  wishlistOverlay: { flex: 1, backgroundColor: Colors.paper },
-  wishlistHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
-    borderBottomWidth: 1, borderBottomColor: Colors.line,
-  },
-  wishlistBack: { fontSize: 16, fontFamily: Fonts.uiSemiBold, color: Colors.ink },
-  wishlistTitle: { fontSize: 18, fontFamily: Fonts.titleSerif, color: Colors.ink },
-  wishlistCountText: { fontSize: 13, color: Colors.walnut2, marginLeft: 'auto' },
-  wishlistBody: { flex: 1, padding: Spacing.four },
-  wishlistEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  wishlistEmptyText: { fontSize: 14, color: Colors.walnut2, textAlign: 'center', lineHeight: 24 },
-  wishItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: Colors.paperCard, borderRadius: 16, padding: 14, marginBottom: 12,
-    ...Shadow.one,
-  },
-  wishItemImg: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.paperCard },
-  wishImgPlaceholder: { width: 64, height: 64, borderRadius: 12, backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center' },
-  wishItemInfo: { flex: 1, minWidth: 0 },
-  wishItemName: { fontSize: 14, fontFamily: Fonts.uiSemiBold, color: Colors.ink, marginBottom: 4 },
-  wishItemMeta: { fontSize: 12, color: Colors.walnut2 },
-  wishItemActions: { flexDirection: 'column', gap: 6, flexShrink: 0 },
-  wishAddBtn: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+    position: 'absolute',
+    bottom: Spacing.four + 60,
+    right: Spacing.four,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.two,
   },
-  wishAddBtnText: { fontSize: 11, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
-  wishRemoveBtn: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.line,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  wishRemoveText: { fontSize: 11, color: Colors.accent, textAlign: 'center' },
 });
