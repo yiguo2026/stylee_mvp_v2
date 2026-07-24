@@ -374,10 +374,7 @@ export default function EditItemScreen() {
           {saving ? <ActivityIndicator color={Colors.paper} /> : <Text style={styles.saveText}>保存修改</Text>}
         </TouchableOpacity>
 
-        {/* Delete */}
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteConfirm(true)} disabled={deleting}>
-          {deleting ? <ActivityIndicator color={Colors.accent} /> : <Text style={styles.deleteText}>删除此单品</Text>}
-        </TouchableOpacity>
+        {/* Delete button removed — already available on detail page header */}
       </ScrollView>
 
       <ConfirmModal
