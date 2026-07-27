@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal,
@@ -18,7 +18,9 @@ import { getQuota } from '@/lib/dailyQuota';
 import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
+import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import { showToast } from '@/components/Toast';
+import { useImportStore } from '@/stores/importStore';
 import {
   WeatherData, FilterTag, InspirationCard,
   OCCASION_TAGS, STYLE_TAGS, COLOR_TAGS,
@@ -259,6 +261,21 @@ export default function OutfitTab() {
 
   const recentItems = items.slice(0, 8);
 
+  // 异步导入中的任务——在首页「我的衣橱」横向列表里展示进度
+  const tasks = useImportStore((state) => state.tasks);
+  const retryFailed = useImportStore((state) => state.retryFailed);
+  const previewTasks = useMemo(
+    () => [...tasks].reverse().filter((task) => task.status !== 'done'),
+    [tasks],
+  );
+  const previewEntries = useMemo(() => {
+    const entries = [
+      ...previewTasks.map((task) => ({ type: 'task' as const, key: `task:${task.id}`, task })),
+      ...recentItems.map((item) => ({ type: 'item' as const, key: `item:${item.item_id}`, item })),
+    ];
+    return entries.slice(0, 8);
+  }, [recentItems, previewTasks]);
+
   const tagSections = [
     { title: '场合', tags: allTags.filter(t => t.type === 'occasion') },
     { title: '风格', tags: allTags.filter(t => t.type === 'style') },
@@ -372,7 +389,7 @@ export default function OutfitTab() {
             </TouchableOpacity>
           </View>
 
-          {recentItems.length === 0 ? (
+          {previewEntries.length === 0 ? (
             <TouchableOpacity
               style={styles.wardrobeEmpty}
               onPress={() => setShowAddSheet(true)}
@@ -394,21 +411,36 @@ export default function OutfitTab() {
                   </TouchableOpacity>
                   <Text style={styles.wardrobeAddText} numberOfLines={1}>添加</Text>
                 </View>
-                {recentItems.map(item => (
-                  <TouchableOpacity
-                    key={item.item_id}
-                    style={styles.wardrobeThumb}
-                    onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
-                  >
-                    {item.image_url ? (
-                      <Image source={{ uri: item.image_url }} style={styles.wardrobeThumbImg} resizeMode="cover" />
-                    ) : (
-                      <View style={styles.wardrobeThumbPlaceholder}>
-                        <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
-                      </View>
-                    )}
-                    <Text style={styles.wardrobeThumbName} numberOfLines={1}>{item.name}</Text>
-                  </TouchableOpacity>
+                {previewEntries.map((entry) => (
+                  entry.type === 'task' ? (
+                    <ImportSkeletonCard
+                      key={entry.key}
+                      task={entry.task}
+                      variant="preview"
+                      onPress={
+                        entry.task.status === 'needs_selection'
+                          ? (task) => router.push({ pathname: '/(tabs)/wardrobe', params: { scrollTop: '1', openImportTask: task.id } })
+                          : entry.task.status === 'failed'
+                            ? (task) => retryFailed(task.id)
+                            : () => router.push('/(tabs)/wardrobe?scrollTop=1')
+                      }
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      key={entry.key}
+                      style={styles.wardrobeThumb}
+                      onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: entry.item.item_id } })}
+                    >
+                      {entry.item.image_url ? (
+                        <Image source={{ uri: entry.item.image_url }} style={styles.wardrobeThumbImg} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.wardrobeThumbPlaceholder}>
+                          <CategoryIcon category={entry.item.category} size={20} color={Colors.walnut2} />
+                        </View>
+                      )}
+                      <Text style={styles.wardrobeThumbName} numberOfLines={1}>{entry.item.name}</Text>
+                    </TouchableOpacity>
+                  )
                 ))}
               </View>
             </ScrollView>
