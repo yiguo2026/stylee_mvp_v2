@@ -196,11 +196,21 @@ async function handleDetection(taskId: string) {
     console.warn('[importStore] aiDetectMultiItems failed, using local fallback:', err);
   }
 
-  // 当真实模型服务不可用时（demo / 离线），aiDetectMultiItems 只会兜底成 1 件，
-  // 无法反映「这张图到底有几件单品」。此时改用基于图片稳定哈希的离线识别，
-  // 让单品数量真正由图片本身决定（同图同结果），从而能进入多单品选择流程。
-  if (!detectionOk || items.length === 0) {
-    items = buildMockDetectedItems(task.sourceUri);
+  // 单品数量完全由真实模型服务（serviceRecognizeMulti）识别结果决定，不再用假数据造多件。
+  // 真实服务不可用时，aiDetectMultiItems 已在内部兜底为「单件识别」（1 件），
+  // 因此不会误弹多单品选择；只有模型真的识别到 >1 件，才进入多选流程。
+  void detectionOk;
+
+  // 极端情况（图片无法编码 / 服务完全无响应且单件兜底也为空）：标记失败让用户重试，
+  // 而不是伪造数据。
+  if (items.length === 0) {
+    store.setState(state => ({
+      tasks: state.tasks.map(t => t.id === taskId
+        ? { ...t, status: 'failed' as const, error: '识别失败，请重试' }
+        : t),
+      failedCount: state.failedCount + 1,
+    }));
+    return;
   }
 
   // 完全按「这张图片识别出几件单品」来决定走哪个流程：
