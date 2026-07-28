@@ -74,7 +74,7 @@ export default function LoginScreen() {
           await useUserStore.getState().fetchProfile();
           setLoading(false);
           const { profile } = useUserStore.getState();
-          router.replace(profile ? '/(tabs)' : '/onboarding/step1-info');
+          router.replace(profile?.gender === 'private' ? '/onboarding/step1-info' : '/(tabs)');
           return;
         }
       }
@@ -88,7 +88,7 @@ export default function LoginScreen() {
       setLoading(false);
       const { profile } = useUserStore.getState();
       // DB trigger auto-creates users with gender='private'; onboarding sets it to female/male/other.
-      router.replace(profile && profile.gender !== 'private' ? '/(tabs)' : '/onboarding/step1-info');
+      router.replace(profile?.gender === 'private' ? '/onboarding/step1-info' : '/(tabs)');
     }
   };
 

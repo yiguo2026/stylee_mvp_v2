@@ -293,7 +293,7 @@ async function handleFinalize(taskId: string, userId: string) {
       const { addItem } = useWardrobeStore.getState();
       await addItem({
         user_id: userId,
-        name: item.description || `${item.color}${item.category}`,
+        name: (item.description || `${item.color}${item.category}`).slice(0, 10),
         category: item.category,
         color: normalizeColor(item.color),
         material: item.material ? normalizeMaterial(item.material) : undefined,
@@ -366,7 +366,7 @@ function buildMockDetectedItems(sourceUri: string): DetectedItem[] {
       index: i,
       category,
       color: MOCK_COLORS[hashString(`${seed}c${i}`) % MOCK_COLORS.length],
-      description: MOCK_CLOTHING_NAMES[hashString(`${seed}n${i}`) % MOCK_CLOTHING_NAMES.length],
+      description: MOCK_CLOTHING_NAMES[hashString(`${seed}n${i}`) % MOCK_CLOTHING_NAMES.length].slice(0, 10),
       sourceImageUri: sourceUri,
       photo_type: 'on_body',
     };

@@ -8,7 +8,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { aiRecognizeClothing } from '@/lib/ai';
+import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
+import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { AILoading } from '@/components/AILoading';
@@ -54,10 +55,8 @@ export default function EditItemScreen() {
   const [occasionTags, setOccasionTags] = useState<string[]>(item?.occasion_tags ?? []);
   const [purchaseDate, setPurchaseDate] = useState(item?.purchase_date ?? '');
   const [imageUri, setImageUri] = useState(item?.image_url ?? '');
-  // 辅图仅存本地 state：数据模型只有单个 image_url，没有辅图字段，
-  // 故辅图不写 DB，只做 UI 展示（见交付说明）。
-  const [extraPhotos, setExtraPhotos] = useState<string[]>([]);
   const [recognizing, setRecognizing] = useState(false);
+  const [standardizing, setStandardizing] = useState(false);
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -109,7 +108,7 @@ export default function EditItemScreen() {
       if (result.fit_type) setFitType(result.fit_type);
       if (result.season?.length) setSeasons(result.season);
       if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
-      setName(result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`);
+      setName((result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`).slice(0, 10));
       showToast(meta.ok ? '已根据新照片更新商品信息' : '已更新照片，识别信息仅供参考');
     } catch (e) {
       // 兜底：保留原属性，仅提示，不阻断保存
@@ -119,30 +118,45 @@ export default function EditItemScreen() {
     }
   }, [showToast]);
 
-  // 更换/设置主图 → 存图并触发 AI 识别
+  // 更换主图 → 标准化 + 存图并触发 AI 识别
   const pickMainImage = async () => {
+    if (!item) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], quality: 0.7, allowsEditing: true,
     });
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      setImageUri(uri);
-      void runRecognition(uri);
-    }
-  };
+    if (result.canceled || !result.assets[0]) return;
 
-  // 添加辅图 → 仅存本地 state 展示，不识别、不改属性
-  const pickAuxImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], quality: 0.7, allowsEditing: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setExtraPhotos(prev => [...prev, result.assets[0].uri]);
-    }
-  };
+    const localUri = result.assets[0].uri;
+    setImageUri(localUri); // 立即预览
+    setStandardizing(true);
 
-  const removeAuxPhoto = (uri: string) => {
-    setExtraPhotos(prev => prev.filter(p => p !== uri));
+    let finalUrl = localUri;
+    let standardized = false;
+    try {
+      const { url } = await aiStandardizeGarment(localUri, category, 'flat_lay', {
+        color, material, description: name || item.name,
+      });
+      if (url) {
+        // 标准化成功，上传标准图
+        const uploaded = await uploadWardrobeImage(url, item.user_id, undefined, { persistRemote: true, timeoutMs: 45000 });
+        if (uploaded) { finalUrl = uploaded; standardized = true; }
+      }
+      if (!standardized) {
+        // 标准化失败或上传失败，用原图上传
+        const uploaded = await uploadWardrobeImage(localUri, item.user_id);
+        if (uploaded) finalUrl = uploaded;
+      }
+      setImageUri(finalUrl);
+      await updateItem(item.item_id, { image_url: finalUrl });
+      showToast(standardized ? '已更新为标准图' : '图片标准化未成功，已使用原图');
+    } catch (e) {
+      console.warn('[EditItem] pickMainImage error:', e);
+      setImageUri(localUri);
+      showToast('换图处理失败，已使用原图');
+    } finally {
+      setStandardizing(false);
+      void runRecognition(finalUrl);
+    }
   };
 
   const toggleSeason = (id: string) => {
@@ -205,43 +219,22 @@ export default function EditItemScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
-        {/* Photos */}
+        {/* Photos — single main image */}
         <Text style={styles.sectionLabel}>照片</Text>
-        <View style={styles.photosRow}>
-          <TouchableOpacity style={[styles.photoSlot, styles.photoSlotCover]} onPress={pickMainImage}>
+        <View style={styles.mainPhotoRow}>
+          <View style={[styles.photoSlot, styles.photoSlotCover]}>
             {imageUri ? (
-              <>
-                <Image source={{ uri: imageUri }} style={styles.photoImage} resizeMode="contain" />
-                <TouchableOpacity style={styles.removePhotoBtn} onPress={() => setImageUri('')}>
-                  <Text style={styles.removePhotoText}>×</Text>
-                </TouchableOpacity>
-              </>
+              <Image source={{ uri: imageUri }} style={styles.photoImage} resizeMode="contain" />
             ) : (
               <View style={styles.photoEmpty}>
                 <CategoryIcon category={category} size={40} color={Colors.walnut2} />
               </View>
             )}
+          </View>
+          <TouchableOpacity style={styles.changePhotoBtn} onPress={pickMainImage} disabled={standardizing}>
+            <Feather name="refresh-cw" size={16} color={Colors.ink} style={{ marginBottom: 4 }} />
+            <Text style={styles.changePhotoText}>{standardizing ? '处理中...' : '换图'}</Text>
           </TouchableOpacity>
-          {[0, 1, 2].map(i => {
-            const uri = extraPhotos[i];
-            return (
-              <TouchableOpacity key={i} style={styles.photoSlot} onPress={uri ? undefined : pickAuxImage} disabled={!!uri}>
-                {uri ? (
-                  <>
-                    <Image source={{ uri }} style={styles.photoImage} resizeMode="cover" />
-                    <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removeAuxPhoto(uri)}>
-                      <Text style={styles.removePhotoText}>×</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <View style={styles.photoAddSlot}>
-                    <Feather name="plus-circle" size={18} color={Colors.walnut2} />
-                    <Text style={styles.photoAddLabel}>添加</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
         </View>
 
         {/* Form */}
@@ -388,12 +381,14 @@ export default function EditItemScreen() {
         loading={deleting}
       />
 
-      {recognizing ? (
+      {(recognizing || standardizing) ? (
         <View style={styles.aiLoadingLayer}>
           <AILoading
-            title="AI 正在识别新照片"
-            subtitle="正在解析单品属性并回填信息..."
-            steps={['读取图片', '识别衣物轮廓', '解析颜色材质', '更新商品信息']}
+            title={standardizing ? '标准化处理中...' : 'AI 正在识别新照片'}
+            subtitle={standardizing ? '正在生成标准图，请稍候...' : '正在解析单品属性并回填信息...'}
+            steps={standardizing
+              ? ['上传图片', '生成标准图', '更新衣橱图片']
+              : ['读取图片', '识别衣物轮廓', '解析颜色材质', '更新商品信息']}
             durationMs={8000}
           />
         </View>
@@ -420,7 +415,7 @@ const styles = StyleSheet.create({
   inner: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 
   sectionLabel: { ...T.formLabel },
-  photosRow: { flexDirection: 'row', gap: Spacing.two },
+  mainPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   photoSlot: {
     width: 80, height: 80, borderRadius: Radius.md,
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
@@ -428,15 +423,13 @@ const styles = StyleSheet.create({
   },
   photoSlotCover: { width: 120, height: 120 },
   photoImage: { width: '100%', height: '100%', borderRadius: Radius.md, backgroundColor: Colors.paperCard },
-  removePhotoBtn: {
-    position: 'absolute', top: 4, right: 4,
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
-  },
-  removePhotoText: { color: '#fff', fontSize: 14, fontFamily: Fonts.uiSemiBold },
   photoEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
-  photoAddSlot: { alignItems: 'center', gap: 4 },
-  photoAddLabel: { ...T.micro, color: Colors.walnut2 },
+  changePhotoBtn: {
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line,
+    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
+  },
+  changePhotoText: { ...T.tag, color: Colors.ink },
 
   formSection: { gap: Spacing.three },
   field: { gap: Spacing.one },
