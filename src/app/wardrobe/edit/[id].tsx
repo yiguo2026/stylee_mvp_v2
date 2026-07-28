@@ -12,7 +12,6 @@ import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { AILoading } from '@/components/AILoading';
 import { Toast } from '@/components/Toast';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType } from '@/types';
 
@@ -219,7 +218,7 @@ export default function EditItemScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.inner}>
-        {/* Photos — single main image */}
+        {/* Photos — single main image, 换图入口叠在主图右下角 */}
         <Text style={styles.sectionLabel}>照片</Text>
         <View style={styles.mainPhotoRow}>
           <View style={[styles.photoSlot, styles.photoSlotCover]}>
@@ -230,11 +229,29 @@ export default function EditItemScreen() {
                 <CategoryIcon category={category} size={40} color={Colors.walnut2} />
               </View>
             )}
+
+            {/* 处理中：异步局部过程态，不阻塞其它字段编辑（参考新建单品导入体验） */}
+            {(standardizing || recognizing) ? (
+              <View style={styles.photoProcessing}>
+                <ActivityIndicator size="small" color={Colors.paper} />
+                <Text style={styles.photoProcessingText}>
+                  {standardizing ? '标准化中…' : '识别中…'}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* 右下角换图按钮 */}
+            <TouchableOpacity
+              style={styles.changePhotoFab}
+              onPress={pickMainImage}
+              disabled={standardizing || recognizing}
+              activeOpacity={0.85}
+              hitSlop={8}
+            >
+              <Feather name="camera" size={15} color={Colors.paper} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.changePhotoBtn} onPress={pickMainImage} disabled={standardizing}>
-            <Feather name="refresh-cw" size={16} color={Colors.ink} style={{ marginBottom: 4 }} />
-            <Text style={styles.changePhotoText}>{standardizing ? '处理中...' : '换图'}</Text>
-          </TouchableOpacity>
+          <Text style={styles.photoHint}>换图后将自动扣背景、标准化，可继续编辑其它信息</Text>
         </View>
 
         {/* Form */}
@@ -381,19 +398,6 @@ export default function EditItemScreen() {
         loading={deleting}
       />
 
-      {(recognizing || standardizing) ? (
-        <View style={styles.aiLoadingLayer}>
-          <AILoading
-            title={standardizing ? '标准化处理中...' : 'AI 正在识别新照片'}
-            subtitle={standardizing ? '正在生成标准图，请稍候...' : '正在解析单品属性并回填信息...'}
-            steps={standardizing
-              ? ['上传图片', '生成标准图', '更新衣橱图片']
-              : ['读取图片', '识别衣物轮廓', '解析颜色材质', '更新商品信息']}
-            durationMs={8000}
-          />
-        </View>
-      ) : null}
-
       <Toast visible={!!toast} message={toast} />
     </SafeAreaView>
   );
@@ -402,7 +406,6 @@ export default function EditItemScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  aiLoadingLayer: { ...StyleSheet.absoluteFillObject, zIndex: 300 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.four, paddingVertical: Spacing.three,
@@ -415,7 +418,7 @@ const styles = StyleSheet.create({
   inner: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
 
   sectionLabel: { ...T.formLabel },
-  mainPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  mainPhotoRow: { alignItems: 'flex-start', gap: Spacing.two },
   photoSlot: {
     width: 80, height: 80, borderRadius: Radius.md,
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
@@ -424,12 +427,22 @@ const styles = StyleSheet.create({
   photoSlotCover: { width: 120, height: 120 },
   photoImage: { width: '100%', height: '100%', borderRadius: Radius.md, backgroundColor: Colors.paperCard },
   photoEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
-  changePhotoBtn: {
-    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
-    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line,
-    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
+  // 右下角圆形换图按钮，叠在主图上
+  changePhotoFab: {
+    position: 'absolute', bottom: 6, right: 6,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: Colors.paper,
   },
-  changePhotoText: { ...T.tag, color: Colors.ink },
+  // 换图处理中局部浮层（异步，不阻塞其它字段）
+  photoProcessing: {
+    ...StyleSheet.absoluteFillObject, borderRadius: Radius.md,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  photoProcessingText: { ...T.micro, color: Colors.paper, fontFamily: Fonts.uiSemiBold },
+  photoHint: { ...T.micro, color: Colors.walnut2, maxWidth: 200 },
 
   formSection: { gap: Spacing.three },
   field: { gap: Spacing.one },
