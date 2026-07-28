@@ -308,7 +308,7 @@ async function handleFinalize(taskId: string, userId: string) {
           detection_index: item.index,
         },
         source_type: 'album_ai',
-        source_label: usingStandardized ? '相册导入 · 标准图' : '相册导入 · 原图兜底',
+        source_label: '相册导入',
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

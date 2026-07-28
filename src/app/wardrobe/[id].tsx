@@ -19,7 +19,7 @@ function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
   const type = (item as WardrobeItem).source_type;
 
   if (label) {
-    if (label === '相册导入' || label === '批量导入' || label === '手动添加' || label === '拍照识别' || label === '相册识别') return '相册导入';
+    if (label.startsWith('相册导入') || label === '批量导入' || label === '手动添加' || label === '拍照识别' || label === '相册识别') return '相册导入';
     if (label === '来自心愿单') return '心愿单添加';
     if (label === '灵感推荐添加') return '灵感推荐添加';
     if (label === 'AI推荐添加') return 'AI推荐添加';
@@ -218,16 +218,6 @@ export default function ItemDetailScreen() {
             </View>
           )}
         </View>
-
-        {/* AI attrs */}
-        {item!.ai_recognized_attrs && Object.keys(item!.ai_recognized_attrs).length > 0 && (
-          <View style={styles.aiCard}>
-            <Text style={styles.aiTitle}>AI 识别属性</Text>
-            {Object.entries(item!.ai_recognized_attrs).map(([k, v]) => (
-              <Text key={k} style={styles.aiAttr}>{k}：{String(v ?? '')}</Text>
-            ))}
-          </View>
-        )}
 
         {/* 穿着记录 */}
         <View style={styles.wearSection}>
