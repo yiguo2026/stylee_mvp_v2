@@ -23,11 +23,11 @@ function legacyUsernameToEmail(username: string) {
 
 function translateLoginError(msg: string): string {
   const m = msg.toLowerCase();
-  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '密码错误';
+  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '账号或密码错误';
   if (m.includes('email not confirmed')) return '账号未验证';
   if (m.includes('too many requests') || m.includes('rate limit')) return '尝试次数过多，请稍后再试';
   if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络';
-  return '密码错误，请重试';
+  return '账号或密码错误，请重试';
 }
 
 export default function LoginScreen() {
@@ -45,18 +45,8 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Check if username exists (case-sensitive)
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('user_id')
-      .eq('username', username.trim())
-      .maybeSingle();
-    if (!existingUser) {
-      setLoading(false);
-      setError('账号不存在');
-      return;
-    }
-
+    // 不再前置查 users 表（大小写敏感 + 可能与 auth 不同步会误杀已注册账号）。
+    // 直接交给 Supabase Auth 判定账号/密码。
     // Try new encoded email first, fall back to legacy lowercase for old accounts
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: usernameToEmail(username),
