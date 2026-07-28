@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import { T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { fetchWeather, getMockWeather, searchCitiesOnline, getTempTag, CityResult } from '@/lib/weather';
@@ -20,6 +20,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import { showToast } from '@/components/Toast';
+import { ds, StyleeButton } from '@/design-system';
 import { useImportStore } from '@/stores/importStore';
 import {
   WeatherData, FilterTag, InspirationCard,
@@ -226,7 +227,7 @@ export default function OutfitTab() {
         <TextInput
           style={styles.citySearchInput}
           placeholder="搜索城市..."
-          placeholderTextColor={Colors.walnut2}
+          placeholderTextColor={ds.color.semantic.text.tertiary}
           value={citySearch}
           onChangeText={handleCitySearch}
           autoFocus
@@ -252,7 +253,7 @@ export default function OutfitTab() {
           )}
         </ScrollView>
         <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setCityModalVisible(false); setCitySearch(''); }}>
-          <Feather name="x-circle" size={16} color={Colors.walnut} />
+          <Feather name="x-circle" size={16} color={ds.color.semantic.text.secondary} />
           <Text style={styles.modalCloseText}>取消</Text>
         </TouchableOpacity>
       </View>
@@ -288,10 +289,16 @@ export default function OutfitTab() {
         {/* ── Section 0: Weather Bar ── */}
         <View style={styles.weatherBar}>
           <Text style={styles.brandText}>Stylee</Text>
-          <TouchableOpacity style={styles.weatherBtn} onPress={openCityModal}>
-            <WeatherIcon condition={weather.condition} size={16} color={Colors.ink} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`当前城市 ${weather.city}，${weather.temp} 度`}
+            accessibilityHint="选择其他城市"
+            style={styles.weatherBtn}
+            onPress={openCityModal}
+          >
+            <WeatherIcon condition={weather.condition} size={16} color={ds.color.semantic.text.primary} />
             <Text style={styles.weatherBtnText}>{weather.temp}°C · {weather.city}</Text>
-            <Feather name="chevron-down" size={12} color={Colors.walnut2} />
+            <Feather name="chevron-down" size={12} color={ds.color.semantic.text.tertiary} />
           </TouchableOpacity>
         </View>
 
@@ -300,19 +307,23 @@ export default function OutfitTab() {
           {/* Tab switcher */}
           <View style={styles.inputTabRow}>
             <TouchableOpacity
+              accessibilityRole="tab"
+              accessibilityState={{ selected: inputMode === 'description' }}
               style={[styles.inputTab, inputMode === 'description' && styles.inputTabActive]}
               onPress={() => setInputMode('description')}
             >
-              <Ionicons name="chatbubble-outline" size={14} color={inputMode === 'description' ? Colors.paper : Colors.walnut} />
+              <Ionicons name="chatbubble-outline" size={16} color={inputMode === 'description' ? ds.color.semantic.text.inverse : ds.color.semantic.text.secondary} />
               <Text style={[styles.inputTabText, inputMode === 'description' && styles.inputTabTextActive]}>
                 描述需求
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityRole="tab"
+              accessibilityState={{ selected: inputMode === 'tags' }}
               style={[styles.inputTab, inputMode === 'tags' && styles.inputTabActive]}
               onPress={() => setInputMode('tags')}
             >
-              <Feather name="tag" size={14} color={inputMode === 'tags' ? Colors.paper : Colors.walnut} />
+              <Feather name="tag" size={16} color={inputMode === 'tags' ? ds.color.semantic.text.inverse : ds.color.semantic.text.secondary} />
               <Text style={[styles.inputTabText, inputMode === 'tags' && styles.inputTabTextActive]}>
                 标签筛选
               </Text>
@@ -325,18 +336,18 @@ export default function OutfitTab() {
               <TextInput
                 style={styles.queryInput}
                 placeholder="周末约会穿什么？"
-                placeholderTextColor={Colors.walnut2}
+                placeholderTextColor={ds.color.semantic.text.tertiary}
                 value={query}
                 onChangeText={setQuery}
                 multiline
               />
-              <TouchableOpacity
-                style={styles.generateBtn}
-                onPress={() => handleGenerate('description')}
-              >
-                <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
-                <Text style={styles.generateBtnText}>生成穿搭</Text>
-              </TouchableOpacity>
+              <StyleeButton
+                label="生成穿搭"
+                size="large"
+                onPress={() => { void handleGenerate('description'); }}
+                leadingIcon={<Ionicons name="sparkles-outline" size={16} color={ds.color.semantic.text.inverse} />}
+                accessibilityHint="根据你的描述生成穿搭建议"
+              />
               {quota ? (
                 <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
               ) : null}
@@ -354,6 +365,8 @@ export default function OutfitTab() {
                       {section.tags.map(tag => (
                         <TouchableOpacity
                           key={tag.id}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: tag.selected }}
                           style={[styles.tag, tag.selected && styles.tagSelected]}
                           onPress={() => toggleTag(tag.id)}
                         >
@@ -366,13 +379,13 @@ export default function OutfitTab() {
                   </ScrollView>
                 </View>
               ))}
-              <TouchableOpacity
-                style={styles.generateBtn}
-                onPress={() => handleGenerate('tags')}
-              >
-                <Ionicons name="sparkles-outline" size={14} color={Colors.paper} />
-                <Text style={styles.generateBtnText}>生成穿搭</Text>
-              </TouchableOpacity>
+              <StyleeButton
+                label="生成穿搭"
+                size="large"
+                onPress={() => { void handleGenerate('tags'); }}
+                leadingIcon={<Ionicons name="sparkles-outline" size={16} color={ds.color.semantic.text.inverse} />}
+                accessibilityHint="根据已选标签生成穿搭建议"
+              />
               {quota ? (
                 <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
               ) : null}
@@ -394,7 +407,7 @@ export default function OutfitTab() {
               style={styles.wardrobeEmpty}
               onPress={() => setShowAddSheet(true)}
             >
-              <Feather name="camera" size={24} color={Colors.walnut2} />
+              <Feather name="camera" size={24} color={ds.color.semantic.text.tertiary} />
               <Text style={styles.wardrobeEmptyText}>拍一件衣服开始你的穿搭之旅</Text>
             </TouchableOpacity>
           ) : (
@@ -407,7 +420,7 @@ export default function OutfitTab() {
                     onPress={() => setShowAddSheet(true)}
                     activeOpacity={0.8}
                   >
-                    <Feather name="plus" size={22} color={Colors.terracotta} />
+                    <Feather name="plus" size={22} color={ds.color.semantic.text.accent} />
                   </TouchableOpacity>
                   <Text style={styles.wardrobeAddText} numberOfLines={1}>添加</Text>
                 </View>
@@ -435,7 +448,7 @@ export default function OutfitTab() {
                         <Image source={{ uri: entry.item.image_url }} style={styles.wardrobeThumbImg} resizeMode="cover" />
                       ) : (
                         <View style={styles.wardrobeThumbPlaceholder}>
-                          <CategoryIcon category={entry.item.category} size={20} color={Colors.walnut2} />
+                          <CategoryIcon category={entry.item.category} size={20} color={ds.color.semantic.text.tertiary} />
                         </View>
                       )}
                       <Text style={styles.wardrobeThumbName} numberOfLines={1}>{entry.item.name}</Text>
@@ -462,7 +475,7 @@ export default function OutfitTab() {
                     <Image source={{ uri: card.image_url }} style={styles.inspirationImage} resizeMode="cover" />
                   ) : (
                     <View style={styles.inspirationImage}>
-                      <MaterialCommunityIcons name="hanger" size={32} color={Colors.walnut2} />
+                      <MaterialCommunityIcons name="hanger" size={32} color={ds.color.semantic.text.tertiary} />
                     </View>
                   )}
                   <View style={styles.inspirationInfo}>
@@ -512,13 +525,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 220,
   },
-  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
+  safe: { flex: 1, backgroundColor: ds.color.semantic.surface.base, position: 'relative' },
   container: { flex: 1 },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: Spacing.two,
-    gap: 12,
-    paddingBottom: Spacing.four + 8,
+    paddingHorizontal: ds.layout.screenPaddingCompact,
+    paddingTop: ds.space[2],
+    gap: ds.space[3],
+    paddingBottom: ds.space[6],
   },
 
   // ── Weather Bar ──
@@ -529,184 +542,180 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayItalic,
     fontSize: 26,
     letterSpacing: 0,
-    color: Colors.ink,
+    color: ds.color.semantic.text.primary,
   },
   weatherBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    paddingHorizontal: Spacing.two + 2, paddingVertical: Spacing.one + 1,
-    borderWidth: 1, borderColor: Colors.lineStrong,
+    minHeight: ds.size.control.minimumTouch,
+    flexDirection: 'row', alignItems: 'center', gap: ds.space[1],
+    backgroundColor: ds.color.semantic.surface.card, borderRadius: ds.radius.xl,
+    paddingHorizontal: ds.space[3],
+    borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
-  weatherBtnText: { ...T.tag, color: Colors.ink },
+  weatherBtnText: { ...T.tag, color: ds.color.semantic.text.primary },
 
   // ── Input Section ──
-  inputSection: { gap: 6 },
-  inputTabRow: { flexDirection: 'row', gap: Spacing.one },
+  inputSection: { gap: ds.space[2] },
+  inputTabRow: { flexDirection: 'row', gap: ds.space[2] },
   inputTab: {
+    minHeight: ds.size.control.minimumTouch,
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 6,
-    borderRadius: Radius.md, borderWidth: 1,
-    borderColor: Colors.line, backgroundColor: Colors.paperCard,
+    gap: ds.space[2],
+    borderRadius: ds.radius.xl, borderWidth: 1,
+    borderColor: ds.color.semantic.border.default, backgroundColor: ds.color.semantic.surface.card,
   },
-  inputTabActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  inputTabText: { ...T.tag, color: Colors.walnut },
-  inputTabTextActive: { ...T.tag, color: Colors.paper },
+  inputTabActive: { backgroundColor: ds.color.semantic.action.primary, borderColor: ds.color.semantic.action.primary },
+  inputTabText: { ...T.tag, color: ds.color.semantic.text.secondary },
+  inputTabTextActive: { ...T.tag, color: ds.color.semantic.text.inverse },
 
   descCard: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.three,
-    paddingTop: 12,
-    paddingBottom: 10,
-    gap: 8,
-    borderWidth: 1, borderColor: Colors.line,
+    backgroundColor: ds.color.semantic.surface.card, borderRadius: ds.radius.xxl,
+    padding: ds.space[3],
+    gap: ds.space[3],
+    borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
   queryInput: {
-    ...T.bodyText, color: Colors.ink, minHeight: 48,
+    ...T.bodyText, color: ds.color.semantic.text.primary, minHeight: ds.size.control.hero,
     textAlignVertical: 'top',
   },
   tagsCard: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.three,
-    paddingTop: 12,
-    paddingBottom: 10,
-    gap: 8,
-    borderWidth: 1, borderColor: Colors.line,
+    backgroundColor: ds.color.semantic.surface.card, borderRadius: ds.radius.xxl,
+    padding: ds.space[3],
+    gap: ds.space[3],
+    borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
-  tagSection: { gap: Spacing.one },
+  tagSection: { gap: ds.space[1] },
   tagSectionTitle: { ...T.formLabel, letterSpacing: 1.56 },
-  tagRow: { flexDirection: 'row', gap: Spacing.one },
+  tagRow: { flexDirection: 'row', gap: ds.space[2] },
   tag: {
-    paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.one + 2,
-    borderRadius: 10, borderWidth: 1,
-    borderColor: Colors.lineStrong, backgroundColor: Colors.paper,
+    minHeight: ds.size.control.minimumTouch,
+    paddingHorizontal: ds.space[3],
+    borderRadius: ds.radius.lg, borderWidth: 1,
+    borderColor: ds.color.semantic.border.strong, backgroundColor: ds.color.semantic.surface.base,
+    alignItems: 'center', justifyContent: 'center',
   },
-  tagSelected: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  tagText: { ...T.tag, color: Colors.ink },
-  tagTextSelected: { ...T.tag, color: Colors.paper },
-
-  generateBtn: {
-    backgroundColor: Colors.ink, borderRadius: Radius.md,
-    paddingVertical: 9, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center', gap: 6,
-  },
-  generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 14 },
+  tagSelected: { backgroundColor: ds.color.semantic.action.primary, borderColor: ds.color.semantic.action.primary },
+  tagText: { ...T.tag, color: ds.color.semantic.text.primary },
+  tagTextSelected: { ...T.tag, color: ds.color.semantic.text.inverse },
   quotaHint: {
     ...T.micro,
     textAlign: 'center',
-    color: Colors.walnut2,
+    color: ds.color.semantic.text.tertiary,
     marginTop: 2,
     lineHeight: 14,
   },
 
   // ── Wardrobe Preview ──
-  wardrobeSection: { gap: 10 },
+  wardrobeSection: { gap: ds.space[3] },
   wardrobeHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   wardrobeTitle: { ...T.subTitle },
-  wardrobeViewAll: { ...T.tag, color: Colors.terracotta },
+  wardrobeViewAll: { ...T.tag, color: ds.color.semantic.text.accent },
   wardrobeEmpty: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
+    backgroundColor: ds.color.semantic.surface.card, borderRadius: ds.radius.xxl,
     paddingVertical: 18,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center', gap: 6,
-    borderWidth: 1, borderColor: Colors.line, borderStyle: 'dashed',
+    paddingHorizontal: ds.space[4],
+    alignItems: 'center', gap: ds.space[2],
+    borderWidth: 1, borderColor: ds.color.semantic.border.default, borderStyle: 'dashed',
   },
   wardrobeEmptyText: { ...T.emptyTitle, fontSize: 14 },
-  wardrobeRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  wardrobeRow: { flexDirection: 'row', gap: ds.layout.gridGap, alignItems: 'flex-start' },
   wardrobeAddBox: {
-    width: 80, height: 80, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.lineStrong,
-    backgroundColor: Colors.paperCard,
+    width: 80, height: 80, borderRadius: ds.radius.xl,
+    borderWidth: 1, borderColor: ds.color.semantic.border.strong,
+    backgroundColor: ds.color.semantic.surface.card,
     alignItems: 'center', justifyContent: 'center',
   },
-  wardrobeAddText: { ...T.micro, fontSize: 10, textAlign: 'center', color: Colors.terracotta },
+  wardrobeAddText: { ...T.micro, fontSize: 10, textAlign: 'center', color: ds.color.semantic.text.accent },
   wardrobeThumb: { width: 80, gap: 4 },
-  wardrobeThumbImg: { width: 80, height: 80, borderRadius: Radius.md, backgroundColor: Colors.paperCard },
+  wardrobeThumbImg: { width: 80, height: 80, borderRadius: ds.radius.xl, backgroundColor: ds.color.semantic.surface.card },
   wardrobeThumbPlaceholder: {
-    width: 80, height: 80, borderRadius: Radius.md,
-    backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center',
+    width: 80, height: 80, borderRadius: ds.radius.xl,
+    backgroundColor: ds.color.semantic.surface.card, alignItems: 'center', justifyContent: 'center',
   },
   wardrobeThumbName: { ...T.micro, fontSize: 10, textAlign: 'center' },
 
   // ── Inspiration ──
-  inspirationSection: { gap: 10 },
+  inspirationSection: { gap: ds.space[3] },
   inspirationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   inspirationTitle: { ...T.subTitle },
-  inspirationRow: { flexDirection: 'row', gap: 12, paddingRight: Spacing.three },
+  inspirationRow: { flexDirection: 'row', gap: ds.layout.gridGap, paddingRight: ds.space[3] },
   inspirationCard: {
-    width: 156, backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.line,
+    width: 156, backgroundColor: ds.color.semantic.surface.card,
+    borderRadius: ds.radius.xxl, overflow: 'hidden',
+    borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
   inspirationImage: {
-    width: '100%', aspectRatio: 4 / 3, backgroundColor: Colors.paperCard,
+    width: '100%', aspectRatio: 4 / 3, backgroundColor: ds.color.semantic.surface.card,
     alignItems: 'center', justifyContent: 'center',
   },
-  inspirationInfo: { paddingHorizontal: Spacing.two, paddingTop: 6, paddingBottom: Spacing.one + 2, gap: 4 },
+  inspirationInfo: { paddingHorizontal: ds.space[2], paddingTop: ds.space[2], paddingBottom: ds.space[2], gap: ds.space[1] },
   inspirationTags: { flexDirection: 'row', gap: 4 },
   inspirationTag: {
-    backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 5,
-    borderWidth: 1, borderColor: Colors.lineStrong,
+    backgroundColor: ds.color.semantic.surface.floating, borderRadius: ds.radius.sm,
+    borderWidth: 1, borderColor: ds.color.semantic.border.strong,
     paddingHorizontal: 7, paddingVertical: 2,
   },
   inspirationTagText: {
-    ...T.micro, color: Colors.inkSoft, fontSize: 10,
+    ...T.micro, color: ds.color.semantic.text.primary, fontSize: 10,
     textTransform: 'uppercase',
   },
   inspirationComment: {
     ...T.bodyText, fontSize: 12, lineHeight: 18,
-    color: Colors.walnut,
+    color: ds.color.semantic.text.secondary,
   },
 
   // ── AI Try-on (P2) ──
   tryOnSection: {
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    gap: 3,
+    minHeight: ds.size.control.large,
+    backgroundColor: ds.color.semantic.surface.card,
+    borderRadius: ds.radius.xxl,
+    paddingVertical: ds.space[3],
+    paddingHorizontal: ds.space[4],
+    gap: ds.space[1],
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: ds.color.semantic.border.default,
   },
   tryOnTitle: {
     fontFamily: Fonts.titleSerif,
     fontSize: 16,
     letterSpacing: 0,
     lineHeight: 20,
-    color: Colors.gray1,
+    color: ds.color.semantic.text.primary,
   },
   tryOnSubtitle: {
     fontFamily: Fonts.body,
     fontSize: 12,
     letterSpacing: 0,
     lineHeight: 18,
-    color: Colors.gray1,
+    color: ds.color.semantic.text.secondary,
   },
 
   // ── City Modal ──
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: ds.color.semantic.overlay.scrim, justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: Colors.paper,
-    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
-    maxHeight: '70%', padding: Spacing.four,
+    backgroundColor: ds.color.semantic.surface.floating,
+    borderTopLeftRadius: ds.radius.xxxl, borderTopRightRadius: ds.radius.xxxl,
+    maxHeight: '70%', padding: ds.space[4],
   },
-  modalTitle: { ...T.sectionTitle, textAlign: 'center', marginBottom: Spacing.three },
+  modalTitle: { ...T.sectionTitle, textAlign: 'center', marginBottom: ds.space[3] },
   citySearchInput: {
     ...T.inputText,
-    backgroundColor: Colors.paperCard, borderWidth: 1.5, borderColor: Colors.line,
-    borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
-    fontSize: 13, color: Colors.ink, marginBottom: Spacing.two,
+    minHeight: ds.size.control.minimumTouch,
+    backgroundColor: ds.color.semantic.surface.input, borderWidth: 1, borderColor: ds.color.semantic.border.default,
+    borderRadius: ds.radius.lg, paddingHorizontal: ds.space[3], paddingVertical: ds.space[2],
+    fontSize: 13, color: ds.color.semantic.text.primary, marginBottom: ds.space[2],
   },
   cityList: { maxHeight: 200 },
   cityRow: {
-    paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three,
-    borderRadius: Radius.sm,
+    minHeight: ds.size.control.minimumTouch,
+    paddingVertical: ds.space[2], paddingHorizontal: ds.space[3],
+    borderRadius: ds.radius.sm,
   },
-  cityRowActive: { backgroundColor: Colors.signalSoft },
-  cityRowText: { ...T.bodyText, color: Colors.walnut, fontSize: 14 },
-  cityRowTextActive: { color: Colors.ink, fontFamily: Fonts.ui },
-  cityNoResult: { ...T.bodyText, color: Colors.walnut2, fontSize: 14, textAlign: 'center', paddingVertical: Spacing.four },
-  modalCloseBtn: { marginTop: Spacing.three, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingVertical: Spacing.two },
-  modalCloseText: { ...T.buttonSecondary, color: Colors.walnut },
+  cityRowActive: { backgroundColor: ds.color.semantic.status.neutralSubtle },
+  cityRowText: { ...T.bodyText, color: ds.color.semantic.text.secondary, fontSize: 14 },
+  cityRowTextActive: { color: ds.color.semantic.text.primary, fontFamily: Fonts.ui },
+  cityNoResult: { ...T.bodyText, color: ds.color.semantic.text.tertiary, fontSize: 14, textAlign: 'center', paddingVertical: ds.space[4] },
+  modalCloseBtn: { minHeight: ds.size.control.minimumTouch, marginTop: ds.space[3], alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: ds.space[2], paddingVertical: ds.space[2] },
+  modalCloseText: { ...T.buttonSecondary, color: ds.color.semantic.text.secondary },
 });

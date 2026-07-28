@@ -15,11 +15,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Fonts, Radius, Shadow, Spacing, T } from '@/constants/theme';
+import { Fonts, T } from '@/constants/theme';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import ItemSelectionSheet from '@/components/ItemSelectionSheet';
+import { ds, dsShadow } from '@/design-system';
 import { useImportStore, type ImportTaskStatus } from '@/stores/importStore';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
@@ -56,6 +57,8 @@ function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?:
   return (
     <Animated.View style={[styles.gridItem, { opacity, transform: [{ scale }] }]}>
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}，${item.color}，${item.category}`}
         style={styles.card}
         onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
       >
@@ -64,7 +67,7 @@ function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?:
             <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <CategoryIcon category={item.category} size={44} color={Colors.walnut2} />
+              <CategoryIcon category={item.category} size={44} color={ds.color.semantic.text.tertiary} />
             </View>
           )}
         </View>
@@ -251,11 +254,11 @@ export default function WardrobeTab() {
 
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
-          <Feather name="search" size={15} color={Colors.walnut2} style={styles.searchIcon} />
+          <Feather name="search" size={16} color={ds.color.semantic.text.tertiary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="搜索单品..."
-            placeholderTextColor={Colors.walnut2}
+            placeholderTextColor={ds.color.semantic.text.tertiary}
             value={searchText}
             onChangeText={setSearchText}
             clearButtonMode="while-editing"
@@ -265,12 +268,14 @@ export default function WardrobeTab() {
 
       {pendingSelectionTasks.length > 0 && (
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="确认识别到的多件单品"
           style={styles.confirmBanner}
           onPress={openPendingConfirmation}
           activeOpacity={0.88}
         >
           <View style={styles.confirmBannerIcon}>
-            <MaterialCommunityIcons name="hanger" size={18} color="#3A2E17" />
+            <MaterialCommunityIcons name="hanger" size={18} color={ds.color.semantic.text.accent} />
           </View>
           <View style={styles.confirmBannerText}>
             <Text style={styles.confirmBannerTitle} numberOfLines={1}>
@@ -282,7 +287,7 @@ export default function WardrobeTab() {
           </View>
           <View style={styles.confirmBannerBtn}>
             <Text style={styles.confirmBannerBtnText}>去确认</Text>
-            <Feather name="chevron-right" size={14} color="#3A2E17" />
+            <Feather name="chevron-right" size={14} color={ds.color.semantic.text.accent} />
           </View>
         </TouchableOpacity>
       )}
@@ -302,6 +307,8 @@ export default function WardrobeTab() {
             return (
               <TouchableOpacity
                 key={category}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selectedCategory === category }}
                 style={[styles.catPill, selectedCategory === category && styles.catPillActive]}
                 onPress={() => setSelectedCategory(category)}
               >
@@ -322,7 +329,7 @@ export default function WardrobeTab() {
 
         {showEmptyState ? (
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="hanger" size={56} color={Colors.walnut2} />
+            <MaterialCommunityIcons name="hanger" size={56} color={ds.color.semantic.text.tertiary} />
             {selectedCategory === '全部' ? (
               <>
                 <Text style={styles.emptyTitle}>还没有衣物</Text>
@@ -362,11 +369,13 @@ export default function WardrobeTab() {
       </ScrollView>
 
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="添加衣物"
         style={styles.fab}
         onPress={() => setShowAddModal(true)}
         activeOpacity={0.8}
       >
-        <Feather name="plus" size={24} color={Colors.paper} />
+        <Feather name="plus" size={24} color={ds.color.semantic.text.inverse} />
       </TouchableOpacity>
 
       <AddClothingSheet
@@ -385,89 +394,92 @@ export default function WardrobeTab() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.paper, position: 'relative' },
+  safe: { flex: 1, backgroundColor: ds.color.semantic.surface.base, position: 'relative' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.two,
-    minHeight: 44,
+    paddingHorizontal: ds.layout.screenPaddingCompact,
+    paddingTop: ds.space[2],
+    paddingBottom: ds.space[2],
+    minHeight: ds.size.control.minimumTouch,
   },
   title: { ...T.pageTitle },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    marginBottom: Spacing.two,
+    paddingHorizontal: ds.layout.screenPaddingCompact,
+    marginBottom: ds.space[2],
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.two,
+    minHeight: ds.size.control.minimumTouch,
+    backgroundColor: ds.color.semantic.surface.input,
+    borderRadius: ds.radius.xl,
+    paddingHorizontal: ds.space[3],
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: ds.color.semantic.border.default,
   },
-  searchIcon: { marginRight: Spacing.one },
-  searchInput: { ...T.inputText, flex: 1, paddingVertical: Spacing.two, color: Colors.ink },
+  searchIcon: { marginRight: ds.space[2] },
+  searchInput: { ...T.inputText, flex: 1, paddingVertical: ds.space[2], color: ds.color.semantic.text.primary },
 
   // 待确认横幅 —— 识别到多件单品时置顶提示，明显且常驻
   confirmBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    marginHorizontal: Spacing.four,
-    marginBottom: Spacing.two,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Radius.md,
-    backgroundColor: '#F5EAD2',
+    minHeight: ds.component.inlineStatus.minimumHeight,
+    gap: ds.space[2],
+    marginHorizontal: ds.layout.screenPaddingCompact,
+    marginBottom: ds.space[2],
+    paddingVertical: ds.space[3],
+    paddingHorizontal: ds.space[3],
+    borderRadius: ds.component.inlineStatus.radius,
+    backgroundColor: ds.color.semantic.status.attentionSubtle,
     borderWidth: 1,
-    borderColor: '#E4CE9C',
-    ...Shadow.one,
+    borderColor: ds.color.semantic.border.default,
+    ...dsShadow.one,
   },
   confirmBannerIcon: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#EBD9AF',
+    backgroundColor: ds.color.semantic.surface.floating,
     alignItems: 'center',
     justifyContent: 'center',
   },
   confirmBannerText: { flex: 1, gap: 2 },
-  confirmBannerTitle: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: '#3A2E17', letterSpacing: 0.2 },
-  confirmBannerSub: { fontFamily: Fonts.body, fontSize: 11, color: '#7A6A47' },
+  confirmBannerTitle: { fontFamily: Fonts.uiSemiBold, ...ds.typography.label, color: ds.color.semantic.text.primary },
+  confirmBannerSub: { fontFamily: Fonts.body, ...ds.typography.micro, color: ds.color.semantic.text.secondary },
   confirmBannerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
     paddingLeft: 10,
     paddingRight: 6,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#E4CE9C',
+    minHeight: ds.size.control.minimumTouch,
+    paddingVertical: ds.space[2],
+    borderRadius: ds.radius.full,
+    backgroundColor: ds.color.semantic.surface.floating,
   },
-  confirmBannerBtnText: { fontFamily: Fonts.uiSemiBold, fontSize: 12.5, color: '#3A2E17', letterSpacing: 0.3 },
+  confirmBannerBtnText: { fontFamily: Fonts.uiSemiBold, ...ds.typography.caption, color: ds.color.semantic.text.accent },
 
-  categoryList: { paddingHorizontal: Spacing.four, gap: Spacing.one, paddingBottom: Spacing.two },
+  categoryList: { paddingHorizontal: ds.layout.screenPaddingCompact, gap: ds.space[2], paddingBottom: ds.space[2] },
   catPill: {
     position: 'relative',
-    height: 32,
-    paddingHorizontal: 10,
-    borderRadius: 10,
+    minHeight: ds.size.control.minimumTouch,
+    paddingHorizontal: ds.space[3],
+    borderRadius: ds.radius.lg,
     borderWidth: 1,
-    borderColor: Colors.lineStrong,
-    backgroundColor: '#fff',
+    borderColor: ds.color.semantic.border.strong,
+    backgroundColor: ds.color.semantic.surface.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  catPillActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  catPillText: { fontSize: 12, fontFamily: Fonts.ui, color: Colors.ink },
-  catPillTextActive: { color: '#fff' },
+  catPillActive: { backgroundColor: ds.color.semantic.action.primary, borderColor: ds.color.semantic.action.primary },
+  catPillText: { ...ds.typography.caption, fontFamily: Fonts.ui, color: ds.color.semantic.text.primary },
+  catPillTextActive: { color: ds.color.semantic.text.inverse },
   catCount: {
     position: 'absolute',
     top: -5,
@@ -475,45 +487,51 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: Colors.line,
+    backgroundColor: ds.color.semantic.status.neutralSubtle,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  catCountActive: { backgroundColor: Colors.line },
-  catCountText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: Colors.gray1 },
-  catCountTextActive: { color: Colors.gray1 },
+  catCountActive: { backgroundColor: ds.color.semantic.surface.floating },
+  catCountText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: ds.color.semantic.text.secondary },
+  catCountTextActive: { color: ds.color.semantic.text.primary },
   scrollContent: { flex: 1 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: Spacing.four, rowGap: Spacing.two },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: ds.layout.screenPaddingCompact,
+    rowGap: ds.layout.gridGap,
+  },
   gridItem: { width: '47.5%' },
   card: {
     width: '100%',
-    backgroundColor: Colors.paperCard,
-    borderRadius: Radius.lg,
+    backgroundColor: ds.color.semantic.surface.card,
+    borderRadius: ds.radius.xl,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.06)',
-    ...Shadow.one,
+    borderWidth: 1,
+    borderColor: ds.color.semantic.border.subtle,
+    ...dsShadow.one,
   },
-  cardImage: { width: '100%', aspectRatio: 1, backgroundColor: Colors.paperCard },
+  cardImage: { width: '100%', aspectRatio: 1, backgroundColor: ds.color.semantic.surface.card },
   image: { width: '100%', height: '100%' },
-  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
-  cardInfo: { minHeight: 54, padding: Spacing.two, justifyContent: 'center' },
+  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: ds.color.semantic.surface.card },
+  cardInfo: { minHeight: ds.size.control.hero, padding: ds.space[2], justifyContent: 'center' },
   cardName: { ...T.itemName },
   cardMeta: { ...T.micro, marginTop: 2 },
-  emptyState: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.six, marginTop: Spacing.six },
+  emptyState: { alignItems: 'center', justifyContent: 'center', gap: ds.space[2], padding: ds.space[6], marginTop: ds.space[6] },
   emptyTitle: { ...T.emptyTitle },
   emptySub: { ...T.itemDesc, textAlign: 'center' },
   fab: {
     position: 'absolute',
-    bottom: Spacing.four + 60,
-    right: Spacing.four,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.ink,
+    bottom: ds.space[4] + 60,
+    right: ds.layout.screenPaddingCompact,
+    width: ds.size.control.hero,
+    height: ds.size.control.hero,
+    borderRadius: ds.radius.full,
+    backgroundColor: ds.color.semantic.action.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadow.two,
+    ...dsShadow.two,
   },
 });
