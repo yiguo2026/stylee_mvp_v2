@@ -20,6 +20,14 @@ import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { Toast } from '@/components/Toast';
 import { AILoading } from '@/components/AILoading';
 import { AIResultBanner } from '@/components/AIResultBanner';
+import {
+  ds,
+  StyleeButton,
+  StyleeInlineStatus,
+  StyleeNavigationBar,
+  StyleeOutfitItemCard,
+  StyleeStickyDecisionBar,
+} from '@/design-system';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
 
@@ -520,21 +528,13 @@ export default function OutfitResultScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>← 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>推荐方案</Text>
-        <TouchableOpacity style={styles.favBtn} onPress={handleFavorite}>
-          <Text style={[styles.favIcon, isFavorited && styles.favIconActive]}>
-            {isFavorited ? '♥' : '♡'}
-          </Text>
-          <Text style={[styles.favLabel, isFavorited && styles.favLabelActive]}>
-            {isFavorited ? '已收藏' : '收藏此搭配'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <StyleeNavigationBar
+        title="推荐方案"
+        onBack={() => router.back()}
+        trailingLabel="收藏此搭配"
+        trailingSelected={isFavorited}
+        onTrailingPress={handleFavorite}
+      />
 
       {aiMeta && <AIResultBanner {...aiMeta} />}
       <ScrollView contentContainerStyle={styles.content}>
@@ -609,60 +609,64 @@ export default function OutfitResultScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>搭配单品</Text>
             <Text style={styles.comboSub}>
-              已用你的 {ownedItems.length} 件单品 · 智能补齐 {recommendedItems.length} 件
+              {recommendedItems.length === 0
+                ? `${ownedItems.length} 件全部来自你的衣橱`
+                : `${ownedItems.length} 件来自你的衣橱 · ${recommendedItems.length} 件推荐补齐`}
             </Text>
             <View style={styles.grid}>
               {ownedItems.map((oi) => (
-                <TouchableOpacity key={oi.item_id}
-                  style={[styles.gridCard, adjustMode && styles.itemCardAdjust]}
-                  onPress={() => handleItemTap(oi)} activeOpacity={adjustMode ? 0.6 : 1}
-                >
-                  <Text style={styles.badgeOwned}>已拥有</Text>
-                  <View style={styles.gridThumb}>
-                    {oi.item?.image_url ? (
+                <StyleeOutfitItemCard
+                  key={oi.item_id}
+                  name={oi.item?.name ?? oi.item?.category ?? '衣橱单品'}
+                  ownership="owned"
+                  showOwnership={recommendedItems.length > 0}
+                  adjustMode={adjustMode}
+                  onPress={() => handleItemTap(oi)}
+                  media={
+                    oi.item?.image_url ? (
                       <Image source={{ uri: oi.item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
                     ) : (
                       <CategoryIcon category={oi.item?.category ?? ''} size={26} color={Colors.walnut2} />
-                    )}
-                  </View>
-                  <Text style={styles.gridName} numberOfLines={1}>{oi.item?.name ?? oi.item?.category}</Text>
-                  {adjustMode ? (
-                    <View style={styles.swapBadge}><Feather name="refresh-cw" size={10} color={Colors.paper} /></View>
-                  ) : null}
-                </TouchableOpacity>
+                    )
+                  }
+                />
               ))}
               {recommendedItems.map((rec, idx) => {
                 const isWishlisted = wishlistedRecs.has(idx);
                 const recKey = `${rec.name}-${rec.category}-${rec.color}-${rec.image_url ?? ''}`;
                 return (
-                  <View key={recKey} style={[styles.gridCard, styles.gridCardRec]}>
-                    <Text style={styles.badgeRec}>你还没有</Text>
-                    <View style={[styles.gridThumb, { backgroundColor: Colors.signalSoft }]}>
-                      {rec.image_url ? (
+                  <StyleeOutfitItemCard
+                    key={recKey}
+                    name={rec.name}
+                    ownership="missing"
+                    loading={addingRecIdx === idx}
+                    media={
+                      rec.image_url ? (
                         <Image source={{ uri: rec.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
                       ) : (
                         <CategoryIcon category={rec.category} size={26} color={Colors.walnut2} />
-                      )}
-                    </View>
-                    <Text style={styles.gridName} numberOfLines={1}>{rec.name}</Text>
-                    <View style={styles.recBtnCol}>
-                      <TouchableOpacity style={styles.recAddBtn} activeOpacity={0.7}
-                        disabled={addingRecIdx !== null}
-                        onPress={() => addRecommendedToWardrobe(rec, idx)}>
-                        <Text style={styles.recAddBtnText}>{addingRecIdx === idx ? '添加中…' : '+衣橱'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.recWishBtn, isWishlisted && styles.recWishBtnDone]}
-                        activeOpacity={0.7}
-                        onPress={() => !isWishlisted && addRecommendedToWishlist(rec, idx)}
-                        disabled={isWishlisted}
-                      >
-                        <Text style={[styles.recWishBtnText, isWishlisted && styles.recWishBtnTextDone]}>
-                          {isWishlisted ? '已加入' : '+心愿单'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                      )
+                    }
+                    actions={
+                      <>
+                        <TouchableOpacity style={styles.recAddBtn} activeOpacity={0.7}
+                          disabled={addingRecIdx !== null}
+                          onPress={() => addRecommendedToWardrobe(rec, idx)}>
+                          <Text style={styles.recAddBtnText}>{addingRecIdx === idx ? '添加中…' : '+衣橱'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.recWishBtn, isWishlisted && styles.recWishBtnDone]}
+                          activeOpacity={0.7}
+                          onPress={() => !isWishlisted && addRecommendedToWishlist(rec, idx)}
+                          disabled={isWishlisted}
+                        >
+                          <Text style={[styles.recWishBtnText, isWishlisted && styles.recWishBtnTextDone]}>
+                            {isWishlisted ? '已加入' : '+心愿单'}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    }
+                  />
                 );
               })}
             </View>
@@ -671,41 +675,32 @@ export default function OutfitResultScreen() {
 
         {/* All owned hint */}
         {recommendedItems.length === 0 && ownedItems.length > 0 ? (
-          <View style={styles.allOwnedHint}>
-            <Text style={styles.allOwnedText}>这套搭配所需单品你都已拥有</Text>
-          </View>
+          <StyleeInlineStatus tone="positive">
+            单品已齐，可以直接试穿
+          </StyleeInlineStatus>
         ) : null}
 
         {/* ── Try-on Button ── */}
-        <TouchableOpacity
-          style={styles.tryOnEntry}
+        <StyleeButton
+          label="AI 试穿看看"
+          hierarchy="secondary"
+          size="medium"
           onPress={handleGoTryOn}
-        >
-          <Ionicons name="person-outline" size={18} color={Colors.ink} />
-          <Text style={styles.tryOnEntryText}>AI 试穿看看</Text>
-          <Feather name="chevron-right" size={14} color={Colors.ink} />
-        </TouchableOpacity>
+          leadingIcon={<Ionicons name="person-outline" size={18} color={ds.color.semantic.text.primary} />}
+          trailingIcon={<Feather name="chevron-right" size={16} color={ds.color.semantic.text.primary} />}
+        />
       </ScrollView>
 
       {/* ── 5. Decision Bar ── */}
-      <View style={styles.decisionBar}>
-        <TouchableOpacity
-          style={[styles.decisionBtnConfirm, !!confirmedWear && styles.decisionBtnSaved]}
-          onPress={() => handleWear()} disabled={saving || confirmedWear}
-        >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.decisionBtnConfirmText}>{confirmedWear ? '已保存' : '就这么穿'}</Text>}
-        </TouchableOpacity>
-        <View style={styles.decisionBtnRow}>
-          <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleSwap}>
-            <Text style={styles.decisionBtnSwapText}>换一套看看</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.decisionBtnSecondary} onPress={handleAdjustToggle}>
-            <Text style={[styles.decisionBtnAdjustText, adjustMode && { color: Colors.terracotta }]}>
-              {adjustMode ? '完成调整' : '稍作调整'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <StyleeStickyDecisionBar
+        primaryLabel={confirmedWear ? '已保存' : '就这么穿'}
+        onPrimaryPress={() => { void handleWear(); }}
+        state={saving ? 'saving' : confirmedWear ? 'saved' : 'default'}
+        secondaryActions={[
+          { label: '换一套看看', onPress: handleSwap },
+          { label: adjustMode ? '完成调整' : '稍作调整', onPress: handleAdjustToggle },
+        ]}
+      />
 
       {/* Swap Modal */}
       {isWeb ? (
@@ -813,7 +808,11 @@ const styles = StyleSheet.create({
   favLabel: { fontSize: 12, color: Colors.walnut2, fontFamily: Fonts.ui },
   favLabelActive: { color: Colors.accent },
 
-  content: { padding: Spacing.three, gap: Spacing.two, paddingBottom: 100 },
+  content: {
+    padding: ds.layout.screenPaddingCompact,
+    gap: ds.space[3],
+    paddingBottom: ds.space[6],
+  },
   contextRow: { gap: 2 },
   contextText: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   queryText: { ...T.itemDesc, color: Colors.walnut },
@@ -848,7 +847,7 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.line },
   dotActive: { width: 20, borderRadius: 4, backgroundColor: Colors.terracotta },
 
-  section: { gap: Spacing.two },
+  section: { gap: ds.space[2], marginTop: ds.space[3] },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink },
   sectionSubOwned: { ...T.micro, color: Colors.sage },
@@ -876,7 +875,12 @@ const styles = StyleSheet.create({
 
   // 合并后的搭配单品网格
   comboSub: { ...T.micro, color: Colors.walnut, marginBottom: Spacing.one },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'stretch',
+    gap: ds.component.outfitItemCard.gap,
+  },
   gridCard: {
     width: '31.5%', backgroundColor: Colors.paperCard, borderRadius: Radius.md,
     padding: Spacing.two, position: 'relative', ...Shadow.one,

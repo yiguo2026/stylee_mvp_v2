@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabInset, Colors, Fonts } from '@/constants/theme';
+import { BottomTabInset, Fonts } from '@/constants/theme';
+import { ds, dsShadow } from '@/design-system/tokens';
 
 /**
  * Global Toast — 手机屏幕内定位、支持 success / error / info 三态。
@@ -141,10 +142,6 @@ export function ToastHost() {
     current.variant === 'success' ? 'check-circle' :
     current.variant === 'error' ? 'alert-circle' : 'info';
 
-  const iconColor =
-    current.variant === 'success' ? '#555F50' :
-    current.variant === 'error' ? '#B85450' : Colors.ink;
-
   const bubble = (
     <Animated.View
       style={[
@@ -156,7 +153,12 @@ export function ToastHost() {
         },
       ]}
     >
-      <Feather name={iconName as any} size={14} color={iconColor} style={styles.icon} />
+      <Feather
+        name={iconName as any}
+        size={16}
+        color={ds.color.semantic.text.inverse}
+        style={styles.icon}
+      />
       <Text style={styles.text} numberOfLines={2}>{current.message}</Text>
     </Animated.View>
   );
@@ -203,25 +205,17 @@ const styles = StyleSheet.create({
     maxWidth: '82%',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.11,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
+    borderRadius: 14,
+    ...dsShadow.two,
   },
-  bubbleInfo: { backgroundColor: 'rgba(255,255,255,0.96)' },
-  bubbleSuccess: { backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(85,95,80,0.22)' },
-  bubbleError: { backgroundColor: 'rgba(255,255,255,0.96)', borderColor: 'rgba(184,84,80,0.24)' },
-  icon: { marginRight: 7 },
+  bubbleInfo:    { backgroundColor: ds.color.semantic.surface.inverse },
+  bubbleSuccess: { backgroundColor: ds.color.semantic.surface.inverse },
+  bubbleError:   { backgroundColor: ds.color.semantic.surface.inverse },
+  icon: { marginRight: 8 },
   text: {
-    fontSize: 12,
-    color: Colors.ink,
-    fontFamily: Fonts.ui,
-    letterSpacing: 0.36,
+    fontSize: 13,
+    color: ds.color.semantic.text.inverse,
+    fontFamily: Fonts.uiSemiBold,
     textAlign: 'left',
     flexShrink: 1,
     lineHeight: 17,

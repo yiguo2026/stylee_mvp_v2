@@ -1,0 +1,190 @@
+/**
+ * Stylee Design System v3.7
+ *
+ * Implementation tokens mirror `stylee-design-tokens-v3.7.json`.
+ * Product components should consume semantic tokens instead of primitive colors.
+ */
+export const ds = {
+  meta: {
+    name: 'Stylee Design System',
+    version: '3.7.0',
+  },
+  color: {
+    primitive: {
+      neutral0: '#FFFFFF',
+      neutral25: '#FAFAFA',
+      neutral50: '#F4F4F5',
+      neutral100: '#ECECEE',
+      neutral200: '#DEDEE1',
+      neutral500: '#9A9AA0',
+      neutral700: '#6B6B6E',
+      neutral900: '#1C1C1E',
+      neutral950: '#0A0A0A',
+      oxblood100: '#F2EDEA',
+      oxblood700: '#7F3A34',
+      moss100: '#EFF1EC',
+      moss700: '#555F50',
+    },
+    semantic: {
+      surface: {
+        base: '#FFFFFF',
+        card: '#FAFAFA',
+        input: '#F4F4F5',
+        floating: '#FFFFFF',
+        inverse: '#0A0A0A',
+      },
+      text: {
+        primary: '#0A0A0A',
+        secondary: '#6B6B6E',
+        tertiary: '#9A9AA0',
+        inverse: '#FFFFFF',
+        accent: '#7F3A34',
+        positive: '#555F50',
+      },
+      border: {
+        subtle: '#F4F4F5',
+        default: '#ECECEE',
+        strong: '#DEDEE1',
+        focus: '#0A0A0A',
+      },
+      action: {
+        primary: '#0A0A0A',
+        primaryPressed: '#1C1C1E',
+        secondary: '#FFFFFF',
+        disabled: '#ECECEE',
+        destructive: '#7F3A34',
+      },
+      status: {
+        positive: '#555F50',
+        positiveSubtle: '#EFF1EC',
+        attention: '#7F3A34',
+        attentionSubtle: '#F2EDEA',
+        neutral: '#6B6B6E',
+        neutralSubtle: '#F4F4F5',
+      },
+      overlay: {
+        scrim: 'rgba(10,10,10,0.40)',
+        scrimStrong: 'rgba(10,10,10,0.60)',
+      },
+    },
+  },
+  space: {
+    0: 0,
+    0.5: 2,
+    1: 4,
+    2: 8,
+    3: 12,
+    4: 16,
+    5: 20,
+    6: 24,
+    8: 32,
+    10: 40,
+    12: 48,
+    16: 64,
+  },
+  size: {
+    control: {
+      compact: 32,
+      small: 36,
+      minimumTouch: 44,
+      medium: 48,
+      large: 52,
+      hero: 56,
+    },
+    icon: {
+      xs: 12,
+      sm: 16,
+      md: 20,
+      lg: 24,
+      xl: 28,
+      xxl: 32,
+    },
+  },
+  radius: {
+    xs: 4,
+    sm: 6,
+    md: 8,
+    lg: 10,
+    xl: 12,
+    xxl: 16,
+    xxxl: 20,
+    full: 999,
+  },
+  typography: {
+    body: { fontSize: 15, lineHeight: 24, letterSpacing: 0.3 },
+    bodySmall: { fontSize: 13, lineHeight: 20, letterSpacing: 0.26 },
+    button: { fontSize: 15, lineHeight: 20, letterSpacing: 0.3 },
+    label: { fontSize: 13, lineHeight: 18, letterSpacing: 0.26 },
+    caption: { fontSize: 12, lineHeight: 16, letterSpacing: 0.48 },
+    micro: { fontSize: 11, lineHeight: 14, letterSpacing: 0.44 },
+  },
+  layout: {
+    screenPaddingCompact: 16,
+    screenPaddingRegular: 24,
+    contentMaxMobile: 428,
+    contentMaxReading: 720,
+    breakpointTablet: 600,
+    gridGap: 12,
+    sectionGap: 24,
+  },
+  component: {
+    button: {
+      largeHeight: 52,
+      mediumHeight: 48,
+      smallHeight: 44,
+      radius: 12,
+      horizontalPadding: 16,
+    },
+    outfitItemCard: {
+      columnsMobile: 2,
+      columnsTablet: 3,
+      gap: 12,
+      padding: 8,
+      radius: 12,
+      mediaRadius: 10,
+      mediaAspectRatio: 1,
+    },
+    statusBadge: {
+      height: 20,
+      radius: 6,
+      horizontalPadding: 6,
+      mediaInset: 8,
+    },
+    inlineStatus: {
+      minimumHeight: 44,
+      radius: 12,
+      horizontalPadding: 16,
+      verticalPadding: 12,
+    },
+    stickyDecisionBar: {
+      horizontalPadding: 16,
+      topPadding: 12,
+      bottomPadding: 12,
+      actionGap: 8,
+    },
+  },
+} as const;
+
+export const dsShadow = {
+  one: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  two: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  three: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 32,
+    elevation: 8,
+  },
+} as const;

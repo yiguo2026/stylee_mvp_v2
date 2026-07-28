@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
 
 // ─────────────────────────────────────────────────────────
-// Colors — v3.6 Editorial Mark: 冷调中性黑白体系
+// Colors — v3.7 compatibility aliases.
+// New reusable components consume `src/design-system/tokens.ts` directly.
 // ─────────────────────────────────────────────────────────
 export const Colors = {
   // 三层中性表面

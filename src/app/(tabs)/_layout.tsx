@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Colors, Spacing, Fonts } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
+import { ds, dsShadow } from '@/design-system/tokens';
 
 // ── Tab icon wrapper ──────────────────────────────────────
 function TabIcon({
@@ -23,7 +24,9 @@ function TabIcon({
 }
 
 const ICON_SIZE = 22;
-const color = (focused: boolean) => (focused ? Colors.ink : Colors.walnut2);
+const color = (focused: boolean) => (
+  focused ? ds.color.semantic.text.primary : ds.color.semantic.text.tertiary
+);
 
 function renderTabLabel(title: string) {
   return ({ focused }: { focused: boolean }) => (
@@ -36,8 +39,8 @@ function renderTabLabel(title: string) {
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
 
-  const paddingBottom = Math.max(Spacing.three + 2, insets.bottom + 2);
-  const height = 70 + paddingBottom;
+  const paddingBottom = Math.max(ds.space[3], insets.bottom);
+  const height = 56 + paddingBottom;
   const tabBarStyle = [{ ...styles.tabBar, paddingBottom, height }];
 
   return (
@@ -45,8 +48,8 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle,
-        tabBarActiveTintColor: Colors.ink,
-        tabBarInactiveTintColor: Colors.walnut2,
+        tabBarActiveTintColor: ds.color.semantic.text.primary,
+        tabBarInactiveTintColor: ds.color.semantic.text.tertiary,
         tabBarItemStyle: styles.tabItem,
       }}
     >
@@ -104,10 +107,11 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.paper,
-    borderTopColor: Colors.line,
+    backgroundColor: ds.color.semantic.surface.floating,
+    borderTopColor: ds.color.semantic.border.subtle,
     borderTopWidth: 1,
-    paddingTop: Spacing.one + 1,
+    paddingTop: ds.space[1],
+    ...dsShadow.two,
   },
   tabItem: {
     paddingTop: 4,
@@ -133,6 +137,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapActive: {
-    backgroundColor: Colors.paperRaised,
+    backgroundColor: ds.color.semantic.status.neutralSubtle,
   },
 });
