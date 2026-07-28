@@ -1,0 +1,60 @@
+name: Design System Guard
+
+on:
+  pull_request:
+    paths:
+      - "design-tokens/**"
+      - "scripts/generate-design-tokens.mjs"
+      - "scripts/check-design-system.mjs"
+      - "src/design-system/**"
+      - "src/app/**"
+      - "src/components/**"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches: [main, tokens-sync]
+    paths:
+      - "design-tokens/**"
+      - "scripts/generate-design-tokens.mjs"
+      - "scripts/check-design-system.mjs"
+      - "src/design-system/**"
+      - "src/app/**"
+      - "src/components/**"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify generated tokens
+        run: npm run tokens:check
+
+      - name: Enforce Design System usage
+        run: npm run design-system:check
+        env:
+          DESIGN_SYSTEM_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build web
+        run: npm run build:web
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: public-anon-placeholder
+          EXPO_PUBLIC_STYLEE_API: https://example.com

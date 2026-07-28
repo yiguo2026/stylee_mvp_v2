@@ -5,6 +5,10 @@
   "scripts": {
     "start": "expo start",
     "build:web": "node node_modules/expo/bin/cli export --platform web && node ./scripts/patch-html.js",
+    "tokens:build": "node ./scripts/generate-design-tokens.mjs",
+    "tokens:check": "node ./scripts/generate-design-tokens.mjs --check",
+    "design-system:check": "node ./scripts/check-design-system.mjs",
+    "check": "npm run tokens:check && npm run design-system:check && tsc --noEmit",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
