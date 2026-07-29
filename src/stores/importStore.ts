@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ClothingCategory, DetectedItem, normalizeColor, normalizeMaterial } from '@/types';
+import { DetectedItem, normalizeColor, normalizeMaterial } from '@/types';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
@@ -50,14 +50,6 @@ interface ImportState {
   clearCompleted: () => void;
   removeTask: (taskId: string) => void;
 }
-
-const MOCK_CLOTHING_NAMES = [
-  '白色T恤', '蓝色牛仔裤', '黑色西装外套', '米色针织毛衣', '格纹围巾', 
-  '棕色单肩包', '白色运动鞋', '黑色休闲裤', '浅蓝衬衫', '灰色卫衣'
-];
-
-const MOCK_CATEGORIES: ClothingCategory[] = ['上装', '下装', '外套', '连体装', '鞋履', '包袋', '帽巾', '配饰'];
-const MOCK_COLORS = ['白色', '黑色', '蓝色', '米色', '灰色', '棕色', '红色'];
 
 let taskIdCounter = 0;
 
@@ -147,7 +139,7 @@ export const useImportStore = create<ImportState>((set) => ({
 
 async function processQueue() {
   const store = useImportStore;
-  const { isProcessing, _userId } = store.getState();
+  const { _userId } = store.getState();
   
   if (!_userId) return;
 
@@ -183,23 +175,20 @@ async function handleDetection(taskId: string) {
   }));
 
   let items: DetectedItem[] = [];
-  let detectionOk = false;
   try {
     const result = await aiDetectMultiItems(task.sourceUri);
-    detectionOk = result.meta.ok; // true 仅当真实模型服务返回了结果
     items = result.items.map((item, index) => ({
       ...item,
       index: typeof item.index === 'number' ? item.index : index,
       sourceImageUri: item.sourceImageUri || task.sourceUri,
     }));
   } catch (err) {
-    console.warn('[importStore] aiDetectMultiItems failed, using local fallback:', err);
+    console.warn('[importStore] aiDetectMultiItems failed:', err);
   }
 
   // 单品数量完全由真实模型服务（serviceRecognizeMulti）识别结果决定，不再用假数据造多件。
   // 真实服务不可用时，aiDetectMultiItems 已在内部兜底为「单件识别」（1 件），
   // 因此不会误弹多单品选择；只有模型真的识别到 >1 件，才进入多选流程。
-  void detectionOk;
 
   // 极端情况（图片无法编码 / 服务完全无响应且单件兜底也为空）：标记失败让用户重试，
   // 而不是伪造数据。
@@ -335,50 +324,4 @@ async function handleFinalize(taskId: string, userId: string) {
       failedCount: state.failedCount + 1
     }));
   }
-}
-
-/**
- * 离线兜底识别（仅在模型服务不可用时使用）。
- * 关键：结果对同一张图片是**稳定可复现**的——从图片引用派生一个稳定哈希，
- * 由哈希决定「这张图识别出几件单品」以及各单品的品类/颜色。
- * 这样单品数量完全由图片本身决定（模拟真实识别），而不是随机数或人工开关：
- *   • 同一张图片每次都得到相同的识别结果与相同的流程路由；
- *   • 大约一半图片会识别出多件（触发选择流程），另一半单件（直接导入）。
- */
-function hashString(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function buildMockDetectedItems(sourceUri: string): DetectedItem[] {
-  const seed = hashString(sourceUri || String(Date.now()));
-  // 用哈希的不同位段派生稳定的数量与属性，保证同图同结果。
-  // 数量分布：约 45% 单件，其余 2~3 件，贴近真人拍摄的穿搭图。
-  const bucket = seed % 100;
-  const itemCount = bucket < 45 ? 1 : bucket < 80 ? 2 : 3;
-  const usedCategories = new Set<ClothingCategory>();
-  return Array.from({ length: itemCount }).map((_, i) => {
-    const s = hashString(`${seed}#${i}`);
-    let category = MOCK_CATEGORIES[s % MOCK_CATEGORIES.length];
-    // 多件时尽量错开品类，让选择弹窗里的单品更真实（不至于三件都是「上装」）
-    if (itemCount > 1) {
-      let guard = 0;
-      while (usedCategories.has(category) && guard < MOCK_CATEGORIES.length) {
-        category = MOCK_CATEGORIES[(s + ++guard) % MOCK_CATEGORIES.length];
-      }
-      usedCategories.add(category);
-    }
-    return {
-      index: i,
-      category,
-      color: MOCK_COLORS[hashString(`${seed}c${i}`) % MOCK_COLORS.length],
-      description: MOCK_CLOTHING_NAMES[hashString(`${seed}n${i}`) % MOCK_CLOTHING_NAMES.length].slice(0, 10),
-      sourceImageUri: sourceUri,
-      photo_type: 'on_body',
-    };
-  });
 }
