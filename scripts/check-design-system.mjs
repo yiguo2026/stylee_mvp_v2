@@ -64,6 +64,11 @@ const rules = [
     message: 'Use ds.space.*, ds.layout.*, or a component token instead of numeric spacing.',
     pattern: /\b(?:padding|paddingHorizontal|paddingVertical|gap|rowGap|columnGap)\s*:\s*-?\d/,
   },
+  {
+    id: 'raw-typography',
+    message: 'Use one of the four semantic typography roles instead of a local font value.',
+    pattern: /\b(?:fontSize|lineHeight|letterSpacing|fontFamily)\s*:/,
+  },
 ];
 
 const violations = [];

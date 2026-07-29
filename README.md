@@ -14,7 +14,7 @@
 - **AI**：App 只调用 model service；服务端使用 DashScope（Qwen VL / Qwen Image）与 DeepSeek，密钥不会进入 App 或 Web bundle
 - **部署**：GitHub Pages（yiguo2026.github.io 仓库 gh-pages 分支）+ EAS Build（iOS）
 - **状态管理**：Zustand
-- **样式**：Editorial Mark v3.6（冷调中性黑白体系 / 统一字体体系 / 过程态规范）
+- **样式**：Stylee Design System v3.8（语义 Token / 四级字体 / 紧凑选择组件 / 衣橱密度规范）
 
 ## 功能
 

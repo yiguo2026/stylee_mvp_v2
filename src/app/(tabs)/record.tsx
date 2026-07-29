@@ -7,9 +7,10 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { ds } from '@/design-system';
 import { supabase } from '@/lib/supabase';
 
 // ── Types ────────────────────────────────────────────────
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  monthLabel: { ...T.subTitle, fontSize: 17 },
+  monthLabel: { ...T.heading },
 
   // Tabs
   tabRow: {
@@ -439,14 +440,14 @@ const styles = StyleSheet.create({
     padding: Spacing.two, borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   weekRow: { flexDirection: 'row', marginBottom: Spacing.one },
-  weekDay: { ...T.micro, flex: 1, textAlign: 'center', fontFamily: Fonts.uiSemiBold, paddingVertical: 4 },
+  weekDay: { ...T.support, flex: 1, textAlign: 'center', paddingVertical: ds.space[1] },
   daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: `${100 / 7}%`, height: CELL_SIZE, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 6, borderRadius: Radius.sm },
   dayCellToday: {},
   dayCellSelected: { backgroundColor: Colors.ink, borderRadius: Radius.md },
-  dayNum: { fontFamily: T.tag.fontFamily, fontSize: 14, color: Colors.ink },
-  dayNumToday: { color: Colors.terracotta, fontFamily: Fonts.uiSemiBold },
-  dayNumSelected: { color: Colors.paper, fontFamily: Fonts.uiSemiBold },
+  dayNum: { ...T.content },
+  dayNumToday: { color: ds.color.semantic.text.accent },
+  dayNumSelected: { color: ds.color.semantic.text.inverse },
   dotRow: { flexDirection: 'row', gap: 2, marginTop: 2 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.sage },
   dotSelected: { backgroundColor: Colors.paper },
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     padding: Spacing.four, alignItems: 'center', gap: Spacing.one,
     borderWidth: 1, borderColor: Colors.line,
   },
-  emptyDayText: { ...T.emptyTitle, fontSize: 14 },
+  emptyDayText: { ...T.content },
 
   outfitCard: {
     backgroundColor: Colors.paperCard, borderRadius: Radius.lg,
@@ -485,14 +486,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.paperCard,
   },
   outfitCardInfo: { flex: 1, gap: 2 },
-  outfitName: { ...T.itemName, fontSize: 15 },
-  outfitComment: { ...T.itemDesc, fontSize: 12, lineHeight: 18 },
+  outfitName: { ...T.content },
+  outfitComment: { ...T.support },
   outfitTime: { ...T.micro },
 
   // Empty sections
   emptySection: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.six, marginTop: Spacing.three },
   emptyTitle: { ...T.emptyTitle },
-  emptySub: { ...T.itemDesc, textAlign: 'center', lineHeight: 22 },
+  emptySub: { ...T.support, textAlign: 'center' },
 
   // Modal
   modalSafe: { flex: 1, backgroundColor: Colors.paper },
@@ -514,14 +515,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
     alignItems: 'center', justifyContent: 'center',
   },
-  flatlayName: { ...T.itemDesc, fontSize: 13, color: Colors.walnut2, textAlign: 'center' },
-  modalDate: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
+  flatlayName: { ...T.support, color: ds.color.semantic.text.tertiary, textAlign: 'center' },
+  modalDate: { ...T.support, color: ds.color.semantic.text.tertiary },
   commentCard: {
     backgroundColor: Colors.signalSoft, borderRadius: Radius.lg,
     padding: Spacing.three, gap: Spacing.one, borderWidth: 1, borderColor: Colors.line,
   },
   commentLabel: { ...T.formLabel },
-  commentText: { ...T.bodyText, fontSize: 14 },
+  commentText: { ...T.content },
   itemsTitle: { ...T.subTitle },
   itemRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -537,5 +538,5 @@ const styles = StyleSheet.create({
   itemName: { ...T.itemName },
   itemMeta: { ...T.micro },
   itemRole: { ...T.micro, backgroundColor: Colors.paper, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm },
-  noItems: { ...T.emptyTitle, fontSize: 14, textAlign: 'center', marginTop: 8 },
+  noItems: { ...T.content, textAlign: 'center', marginTop: 8 },
 });

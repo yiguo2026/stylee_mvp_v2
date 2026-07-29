@@ -44,6 +44,14 @@ const fontFaceStyle = fontFaceCSS
 
 // ── 2. Web shell: iPhone 14 Pro frame on desktop ──
 const shellStyle = `<style>
+.desktop-phone-stage,
+.desktop-phone-frame,
+.desktop-phone-screen {
+  display: contents;
+}
+.desktop-phone-statusbar {
+  display: none;
+}
 @media (min-width: 960px) {
   body {
     background: linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%) !important;
@@ -57,12 +65,14 @@ const shellStyle = `<style>
     overflow: auto !important;
   }
   .desktop-phone-stage {
+    display: block;
     --phone-scale: min(1, calc((100vw - 96px) / 425), calc((100vh - 64px) / 884));
     width: calc(425px * var(--phone-scale));
     height: calc(884px * var(--phone-scale));
     flex: none;
   }
   .desktop-phone-frame {
+    display: block;
     position: relative;
     width: 425px;
     height: 884px;
@@ -75,6 +85,7 @@ const shellStyle = `<style>
     box-shadow: 0 32px 80px rgba(15, 23, 42, 0.22), 0 10px 24px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
   }
   .desktop-phone-screen {
+    display: block;
     position: relative;
     width: 100%;
     height: 100%;
@@ -94,6 +105,7 @@ const shellStyle = `<style>
     z-index: 3;
   }
   .desktop-phone-statusbar {
+    display: block;
     position: absolute;
     top: 0;
     left: 0;
@@ -221,9 +233,21 @@ fs.writeFileSync(htmlPath, html);
 const html404Path = path.join(__dirname, '..', 'dist', '404.html');
 fs.writeFileSync(html404Path, html);
 
+// ── 5. Optional account-independent Design System preview route ──
+// Static servers do not provide SPA fallback. Generate a physical route only
+// when the explicit preview flag is enabled; production builds omit it.
+if (process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1') {
+  const previewDir = path.join(__dirname, '..', 'dist', 'wardrobe-preview');
+  fs.mkdirSync(previewDir, { recursive: true });
+  fs.writeFileSync(path.join(previewDir, 'index.html'), html);
+}
+
 const fontCount = fontMap.filter(({ dir }) => {
   const fullDir = path.join(fontsBase, dir);
   return fs.existsSync(fullDir) && fs.readdirSync(fullDir).some(f => f.endsWith('.ttf'));
 }).length;
 
-console.log(`Patched dist/index.html: lang=zh + ${fontCount} @font-face + web shell + 404.html`);
+const previewOutput = process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1'
+  ? ' + wardrobe preview'
+  : '';
+console.log(`Patched dist/index.html: lang=zh + ${fontCount} @font-face + web shell + 404.html${previewOutput}`);

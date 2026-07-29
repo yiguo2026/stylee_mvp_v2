@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Fonts } from '@/constants/theme';
+import { T } from '@/constants/theme';
 import { ds, dsShadow } from '@/design-system/tokens';
 
 // ── Tab icon wrapper ──────────────────────────────────────
@@ -101,6 +101,12 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="wardrobe-preview"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
@@ -124,9 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: Fonts.ui,
+    ...T.support,
     textAlign: 'center',
   },
   iconWrap: {

@@ -1,26 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Fonts, T } from '@/constants/theme';
+import { T } from '@/constants/theme';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import ItemSelectionSheet from '@/components/ItemSelectionSheet';
-import { ds, dsShadow } from '@/design-system';
+import {
+  ds,
+  dsShadow,
+  StyleeChoiceChip,
+  StyleePageHeader,
+  StyleeSearchField,
+  StyleeWardrobeCard,
+  StyleeWardrobeGrid,
+} from '@/design-system';
 import { useImportStore, type ImportTaskStatus } from '@/stores/importStore';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
@@ -30,6 +36,9 @@ import { CLOTHING_CATEGORIES_WITH_ALL, ClothingCategory, WardrobeItem } from '@/
 function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?: boolean }) {
   const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
   const scale = useRef(new Animated.Value(animateIn ? 1.02 : 1)).current;
+  const metadata = `${item.color} · ${item.category}${
+    item.wear_count ? ` · 穿过${item.wear_count}次` : ''
+  }`;
 
   useEffect(() => {
     if (!animateIn) {
@@ -55,30 +64,23 @@ function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?:
   }, [animateIn, item.item_id, opacity, scale]);
 
   return (
-    <Animated.View style={[styles.gridItem, { opacity, transform: [{ scale }] }]}>
-      <TouchableOpacity
-        accessibilityRole="button"
+    <Animated.View style={{ opacity, transform: [{ scale }] }}>
+      <StyleeWardrobeCard
         accessibilityLabel={`${item.name}，${item.color}，${item.category}`}
-        style={styles.card}
+        imageUri={item.image_url}
+        metadata={metadata}
+        name={item.name}
         onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: item.item_id } })}
-      >
-        <View style={styles.cardImage}>
-          {item.image_url ? (
-            <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <CategoryIcon category={item.category} size={44} color={ds.color.semantic.text.tertiary} />
-            </View>
-          )}
-        </View>
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.cardMeta}>
-            {item.color} · {item.category}
-            {item.wear_count ? ` · 穿过${item.wear_count}次` : ''}
-          </Text>
-        </View>
-      </TouchableOpacity>
+        placeholder={(
+          <View style={styles.imagePlaceholder}>
+            <CategoryIcon
+              category={item.category}
+              size={ds.size.control.minimumTouch}
+              color={ds.color.semantic.text.tertiary}
+            />
+          </View>
+        )}
+      />
     </Animated.View>
   );
 }
@@ -247,23 +249,21 @@ export default function WardrobeTab() {
   const showEmptyState = gridEntries.length === 0;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.title}>衣橱</Text>
-      </View>
-
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+      <StyleePageHeader
+        title="衣橱"
+        actionLabel="添加衣物"
+        actionIcon="plus"
+        onActionPress={() => setShowAddModal(true)}
+      />
       <View style={styles.searchRow}>
-        <View style={styles.searchBar}>
-          <Feather name="search" size={16} color={ds.color.semantic.text.tertiary} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="搜索单品..."
-            placeholderTextColor={ds.color.semantic.text.tertiary}
-            value={searchText}
-            onChangeText={setSearchText}
-            clearButtonMode="while-editing"
-          />
-        </View>
+        <StyleeSearchField
+          accessibilityLabel="搜索衣橱单品"
+          onChangeText={setSearchText}
+          placeholder="搜索单品..."
+          testID="wardrobe-search"
+          value={searchText}
+        />
       </View>
 
       {pendingSelectionTasks.length > 0 && (
@@ -305,24 +305,20 @@ export default function WardrobeTab() {
           {CLOTHING_CATEGORIES_WITH_ALL.map((category) => {
             const count = counts[category] ?? 0;
             return (
-              <TouchableOpacity
+              <StyleeChoiceChip
                 key={category}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selectedCategory === category }}
-                style={[styles.catPill, selectedCategory === category && styles.catPillActive]}
+                label={category}
+                selected={selectedCategory === category}
+                selectionMode="single"
                 onPress={() => setSelectedCategory(category)}
-              >
-                <Text style={[styles.catPillText, selectedCategory === category && styles.catPillTextActive]}>
-                  {category}
-                </Text>
-                {count > 0 ? (
+                trailingContent={count > 0 ? (
                   <View style={[styles.catCount, selectedCategory === category && styles.catCountActive]}>
                     <Text style={[styles.catCountText, selectedCategory === category && styles.catCountTextActive]}>
                       {count}
                     </Text>
                   </View>
-                ) : null}
-              </TouchableOpacity>
+                ) : undefined}
+              />
             );
           })}
         </ScrollView>
@@ -342,7 +338,7 @@ export default function WardrobeTab() {
             )}
           </View>
         ) : (
-          <View style={styles.grid}>
+          <StyleeWardrobeGrid>
             {gridEntries.map((entry) => (
               entry.type === 'task' ? (
                 <ImportSkeletonCard
@@ -362,21 +358,9 @@ export default function WardrobeTab() {
                 />
               )
             ))}
-          </View>
+          </StyleeWardrobeGrid>
         )}
-
-        <View style={{ height: 100 }} />
       </ScrollView>
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="添加衣物"
-        style={styles.fab}
-        onPress={() => setShowAddModal(true)}
-        activeOpacity={0.8}
-      >
-        <Feather name="plus" size={24} color={ds.color.semantic.text.inverse} />
-      </TouchableOpacity>
 
       <AddClothingSheet
         visible={showAddModal}
@@ -395,35 +379,14 @@ export default function WardrobeTab() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ds.color.semantic.surface.base, position: 'relative' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: ds.layout.screenPaddingCompact,
-    paddingTop: ds.space[2],
-    paddingBottom: ds.space[2],
-    minHeight: ds.size.control.minimumTouch,
-  },
-  title: { ...T.pageTitle },
   searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: '100%',
+    maxWidth: ds.layout.contentMaxReading,
+    alignSelf: 'center',
     paddingHorizontal: ds.layout.screenPaddingCompact,
-    marginBottom: ds.space[2],
+    marginTop: ds.component.wardrobeGrid.controlsGap,
+    marginBottom: ds.component.wardrobeGrid.controlsGap,
   },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: ds.size.control.minimumTouch,
-    backgroundColor: ds.color.semantic.surface.input,
-    borderRadius: ds.radius.xl,
-    paddingHorizontal: ds.space[3],
-    borderWidth: 1,
-    borderColor: ds.color.semantic.border.default,
-  },
-  searchIcon: { marginRight: ds.space[2] },
-  searchInput: { ...T.inputText, flex: 1, paddingVertical: ds.space[2], color: ds.color.semantic.text.primary },
 
   // 待确认横幅 —— 识别到多件单品时置顶提示，明显且常驻
   confirmBanner: {
@@ -442,96 +405,48 @@ const styles = StyleSheet.create({
     ...dsShadow.one,
   },
   confirmBannerIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: ds.size.icon.xxl,
+    height: ds.size.icon.xxl,
+    borderRadius: ds.radius.full,
     backgroundColor: ds.color.semantic.surface.floating,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmBannerText: { flex: 1, gap: 2 },
-  confirmBannerTitle: { fontFamily: Fonts.uiSemiBold, ...ds.typography.label, color: ds.color.semantic.text.primary },
-  confirmBannerSub: { fontFamily: Fonts.body, ...ds.typography.micro, color: ds.color.semantic.text.secondary },
+  confirmBannerText: { flex: 1, gap: ds.space[0.5] },
+  confirmBannerTitle: { ...T.content, color: ds.color.semantic.text.primary },
+  confirmBannerSub: { ...T.support, color: ds.color.semantic.text.secondary },
   confirmBannerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingLeft: 10,
-    paddingRight: 6,
+    gap: ds.space[0.5],
+    paddingHorizontal: ds.space[2],
     minHeight: ds.size.control.minimumTouch,
     paddingVertical: ds.space[2],
     borderRadius: ds.radius.full,
     backgroundColor: ds.color.semantic.surface.floating,
   },
-  confirmBannerBtnText: { fontFamily: Fonts.uiSemiBold, ...ds.typography.caption, color: ds.color.semantic.text.accent },
+  confirmBannerBtnText: { ...T.content, color: ds.color.semantic.text.accent },
 
-  categoryList: { paddingHorizontal: ds.layout.screenPaddingCompact, gap: ds.space[2], paddingBottom: ds.space[2] },
-  catPill: {
-    position: 'relative',
-    minHeight: ds.size.control.minimumTouch,
-    paddingHorizontal: ds.space[3],
-    borderRadius: ds.radius.lg,
-    borderWidth: 1,
-    borderColor: ds.color.semantic.border.strong,
-    backgroundColor: ds.color.semantic.surface.card,
-    alignItems: 'center',
-    justifyContent: 'center',
+  categoryList: {
+    paddingHorizontal: ds.component.wardrobeGrid.screenPadding,
+    gap: ds.component.choiceChip.groupGap,
+    paddingBottom: ds.component.wardrobeGrid.controlsGap,
   },
-  catPillActive: { backgroundColor: ds.color.semantic.action.primary, borderColor: ds.color.semantic.action.primary },
-  catPillText: { ...ds.typography.caption, fontFamily: Fonts.ui, color: ds.color.semantic.text.primary },
-  catPillTextActive: { color: ds.color.semantic.text.inverse },
   catCount: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: ds.typography.support.lineHeight,
+    height: ds.typography.support.lineHeight,
+    borderRadius: ds.radius.full,
     backgroundColor: ds.color.semantic.status.neutralSubtle,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: ds.space[0.5],
   },
   catCountActive: { backgroundColor: ds.color.semantic.surface.floating },
-  catCountText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: ds.color.semantic.text.secondary },
+  catCountText: { ...T.support, color: ds.color.semantic.text.secondary },
   catCountTextActive: { color: ds.color.semantic.text.primary },
   scrollContent: { flex: 1 },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: ds.layout.screenPaddingCompact,
-    rowGap: ds.layout.gridGap,
-  },
-  gridItem: { width: '47.5%' },
-  card: {
-    width: '100%',
-    backgroundColor: ds.color.semantic.surface.card,
-    borderRadius: ds.radius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: ds.color.semantic.border.subtle,
-    ...dsShadow.one,
-  },
-  cardImage: { width: '100%', aspectRatio: 1, backgroundColor: ds.color.semantic.surface.card },
-  image: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: ds.color.semantic.surface.card },
-  cardInfo: { minHeight: ds.size.control.hero, padding: ds.space[2], justifyContent: 'center' },
-  cardName: { ...T.itemName },
-  cardMeta: { ...T.micro, marginTop: 2 },
   emptyState: { alignItems: 'center', justifyContent: 'center', gap: ds.space[2], padding: ds.space[6], marginTop: ds.space[6] },
   emptyTitle: { ...T.emptyTitle },
   emptySub: { ...T.itemDesc, textAlign: 'center' },
-  fab: {
-    position: 'absolute',
-    bottom: ds.space[4] + 60,
-    right: ds.layout.screenPaddingCompact,
-    width: ds.size.control.hero,
-    height: ds.size.control.hero,
-    borderRadius: ds.radius.full,
-    backgroundColor: ds.color.semantic.action.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...dsShadow.two,
-  },
 });

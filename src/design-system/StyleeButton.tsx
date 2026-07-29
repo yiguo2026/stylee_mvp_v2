@@ -150,8 +150,8 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   label: {
-    ...ds.typography.button,
-    fontFamily: Fonts.uiSemiBold,
+    ...ds.typography.content,
+    fontFamily: Fonts.ui,
     textAlign: 'center',
   },
   labelPrimary: {

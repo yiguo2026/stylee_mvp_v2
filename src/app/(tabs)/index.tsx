@@ -20,7 +20,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import { showToast } from '@/components/Toast';
-import { ds, StyleeButton } from '@/design-system';
+import { ds, StyleeButton, StyleeChoiceChip } from '@/design-system';
 import { useImportStore } from '@/stores/importStore';
 import {
   WeatherData, FilterTag, InspirationCard,
@@ -363,17 +363,12 @@ export default function OutfitTab() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.tagRow}>
                       {section.tags.map(tag => (
-                        <TouchableOpacity
+                        <StyleeChoiceChip
                           key={tag.id}
-                          accessibilityRole="checkbox"
-                          accessibilityState={{ checked: tag.selected }}
-                          style={[styles.tag, tag.selected && styles.tagSelected]}
+                          label={tag.label}
+                          selected={tag.selected}
                           onPress={() => toggleTag(tag.id)}
-                        >
-                          <Text style={[styles.tagText, tag.selected && styles.tagTextSelected]}>
-                            {tag.label}
-                          </Text>
-                        </TouchableOpacity>
+                        />
                       ))}
                     </View>
                   </ScrollView>
@@ -539,6 +534,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   brandText: {
+    // ds-exception: Stylee wordmark is a brand asset, not product typography.
     fontFamily: Fonts.displayItalic,
     fontSize: 26,
     letterSpacing: 0,
@@ -584,24 +580,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
   tagSection: { gap: ds.space[1] },
-  tagSectionTitle: { ...T.formLabel, letterSpacing: 1.56 },
-  tagRow: { flexDirection: 'row', gap: ds.space[2] },
-  tag: {
-    minHeight: ds.size.control.minimumTouch,
-    paddingHorizontal: ds.space[3],
-    borderRadius: ds.radius.lg, borderWidth: 1,
-    borderColor: ds.color.semantic.border.strong, backgroundColor: ds.color.semantic.surface.base,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  tagSelected: { backgroundColor: ds.color.semantic.action.primary, borderColor: ds.color.semantic.action.primary },
-  tagText: { ...T.tag, color: ds.color.semantic.text.primary },
-  tagTextSelected: { ...T.tag, color: ds.color.semantic.text.inverse },
+  tagSectionTitle: { ...T.support },
+  tagRow: { flexDirection: 'row', gap: ds.component.choiceChip.groupGap },
   quotaHint: {
     ...T.micro,
     textAlign: 'center',
     color: ds.color.semantic.text.tertiary,
     marginTop: 2,
-    lineHeight: 14,
   },
 
   // ── Wardrobe Preview ──
@@ -618,7 +603,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', gap: ds.space[2],
     borderWidth: 1, borderColor: ds.color.semantic.border.default, borderStyle: 'dashed',
   },
-  wardrobeEmptyText: { ...T.emptyTitle, fontSize: 14 },
+  wardrobeEmptyText: { ...T.content },
   wardrobeRow: { flexDirection: 'row', gap: ds.layout.gridGap, alignItems: 'flex-start' },
   wardrobeAddBox: {
     width: 80, height: 80, borderRadius: ds.radius.xl,
@@ -626,14 +611,14 @@ const styles = StyleSheet.create({
     backgroundColor: ds.color.semantic.surface.card,
     alignItems: 'center', justifyContent: 'center',
   },
-  wardrobeAddText: { ...T.micro, fontSize: 10, textAlign: 'center', color: ds.color.semantic.text.accent },
+  wardrobeAddText: { ...T.support, textAlign: 'center', color: ds.color.semantic.text.accent },
   wardrobeThumb: { width: 80, gap: 4 },
   wardrobeThumbImg: { width: 80, height: 80, borderRadius: ds.radius.xl, backgroundColor: ds.color.semantic.surface.card },
   wardrobeThumbPlaceholder: {
     width: 80, height: 80, borderRadius: ds.radius.xl,
     backgroundColor: ds.color.semantic.surface.card, alignItems: 'center', justifyContent: 'center',
   },
-  wardrobeThumbName: { ...T.micro, fontSize: 10, textAlign: 'center' },
+  wardrobeThumbName: { ...T.support, textAlign: 'center' },
 
   // ── Inspiration ──
   inspirationSection: { gap: ds.space[3] },
@@ -657,11 +642,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7, paddingVertical: 2,
   },
   inspirationTagText: {
-    ...T.micro, color: ds.color.semantic.text.primary, fontSize: 10,
+    ...T.support, color: ds.color.semantic.text.primary,
     textTransform: 'uppercase',
   },
   inspirationComment: {
-    ...T.bodyText, fontSize: 12, lineHeight: 18,
+    ...T.support,
     color: ds.color.semantic.text.secondary,
   },
 
@@ -677,17 +662,10 @@ const styles = StyleSheet.create({
     borderColor: ds.color.semantic.border.default,
   },
   tryOnTitle: {
-    fontFamily: Fonts.titleSerif,
-    fontSize: 16,
-    letterSpacing: 0,
-    lineHeight: 20,
-    color: ds.color.semantic.text.primary,
+    ...T.heading,
   },
   tryOnSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    letterSpacing: 0,
-    lineHeight: 18,
+    ...T.support,
     color: ds.color.semantic.text.secondary,
   },
 
@@ -704,7 +682,7 @@ const styles = StyleSheet.create({
     minHeight: ds.size.control.minimumTouch,
     backgroundColor: ds.color.semantic.surface.input, borderWidth: 1, borderColor: ds.color.semantic.border.default,
     borderRadius: ds.radius.lg, paddingHorizontal: ds.space[3], paddingVertical: ds.space[2],
-    fontSize: 13, color: ds.color.semantic.text.primary, marginBottom: ds.space[2],
+    color: ds.color.semantic.text.primary, marginBottom: ds.space[2],
   },
   cityList: { maxHeight: 200 },
   cityRow: {
@@ -713,9 +691,9 @@ const styles = StyleSheet.create({
     borderRadius: ds.radius.sm,
   },
   cityRowActive: { backgroundColor: ds.color.semantic.status.neutralSubtle },
-  cityRowText: { ...T.bodyText, color: ds.color.semantic.text.secondary, fontSize: 14 },
-  cityRowTextActive: { color: ds.color.semantic.text.primary, fontFamily: Fonts.ui },
-  cityNoResult: { ...T.bodyText, color: ds.color.semantic.text.tertiary, fontSize: 14, textAlign: 'center', paddingVertical: ds.space[4] },
+  cityRowText: { ...T.content, color: ds.color.semantic.text.secondary },
+  cityRowTextActive: { color: ds.color.semantic.text.primary },
+  cityNoResult: { ...T.content, color: ds.color.semantic.text.tertiary, textAlign: 'center', paddingVertical: ds.space[4] },
   modalCloseBtn: { minHeight: ds.size.control.minimumTouch, marginTop: ds.space[3], alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: ds.space[2], paddingVertical: ds.space[2] },
   modalCloseText: { ...T.buttonSecondary, color: ds.color.semantic.text.secondary },
 });

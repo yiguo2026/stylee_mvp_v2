@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
+import { ds } from '@/design-system/tokens';
 
 // ─────────────────────────────────────────────────────────
-// Colors — v3.7 compatibility aliases.
+// Colors — v3.8 compatibility aliases.
 // New reusable components consume `src/design-system/tokens.ts` directly.
 // ─────────────────────────────────────────────────────────
 export const Colors = {
@@ -83,136 +84,64 @@ export const Fonts = {
 };
 
 // ─────────────────────────────────────────────────────────
-// Typography tokens (T)
+// Typography — four semantic levels only.
+// Color and alignment may change with context; family, size, line height,
+// weight, and tracking must come from one of these four roles.
 // ─────────────────────────────────────────────────────────
+export const TypeRole = {
+  display: {
+    ...ds.typography.display,
+    fontFamily: Fonts.pageTitleSerif,
+    color: Colors.ink,
+  },
+  heading: {
+    ...ds.typography.heading,
+    fontFamily: Fonts.titleSerif,
+    color: Colors.ink,
+  },
+  content: {
+    ...ds.typography.content,
+    fontFamily: Fonts.ui,
+    color: Colors.ink,
+  },
+  support: {
+    ...ds.typography.support,
+    fontFamily: Fonts.body,
+    color: Colors.gray1,
+  },
+} as const;
+
+// Compatibility aliases keep existing screens on the four-level system while
+// they migrate to the canonical role names.
 export const T = {
+  display: TypeRole.display,
+  heading: TypeRole.heading,
+  content: TypeRole.content,
+  support: TypeRole.support,
 
-  // ── Display · Playfair Display 600 — 英文大标题 / 品牌字标 ──
-  emptyTitle: {
-    fontFamily: Fonts.pageTitleSerif,
-    fontSize: 30,
-    letterSpacing: 0,
-    lineHeight: 36,
-    color: Colors.ink,
-  },
-  storyTitle: {
-    fontFamily: Fonts.pageTitleSerif,
-    fontSize: 34,
-    letterSpacing: 0,
-    lineHeight: 40,
-    color: Colors.ink,
-  },
+  emptyTitle: TypeRole.display,
+  storyTitle: TypeRole.display,
+  pageTitle: TypeRole.display,
 
-  // ── Title · 中文用 Inter 500/600；英文用 Playfair Display 500 ──
-  pageTitle: {
-    fontFamily: Fonts.pageTitleSerif,
-    fontSize: 24,
-    letterSpacing: 0,
-    lineHeight: 30,
-    color: Colors.ink,
-  },
-  sectionTitle: {
-    fontFamily: Fonts.titleSerif,
-    fontSize: 18,
-    letterSpacing: 0,
-    lineHeight: 24,
-    color: Colors.ink,
-  },
-  subTitle: {
-    fontFamily: Fonts.titleSerif,
-    fontSize: 15,
-    letterSpacing: 0,
-    lineHeight: 20,
-    color: Colors.ink,
-  },
+  sectionTitle: TypeRole.heading,
+  subTitle: TypeRole.heading,
 
-  // ── Body · Inter 400/500 — 列表/描述/说明 ──
-  bodyText: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    letterSpacing: 0.3,
-    lineHeight: 24,
-    color: Colors.inkSoft,
-  },
-  itemName: {
-    fontFamily: Fonts.bodyMedium,
-    fontSize: 14,
-    letterSpacing: 0.28,
-    color: Colors.ink,
-  },
-  itemDesc: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    letterSpacing: 0.26,
-    lineHeight: 22,
-    color: Colors.gray1,
-  },
+  bodyText: TypeRole.content,
+  itemName: TypeRole.content,
+  buttonPrimary: TypeRole.content,
+  buttonSecondary: TypeRole.content,
+  inputText: TypeRole.content,
+  tag: TypeRole.content,
 
-  // ── UI · Inter 500/600 — 按钮/标签/用户名/日期 ──
-  buttonPrimary: {
-    fontFamily: Fonts.uiSemiBold,
-    fontSize: 16,
-    letterSpacing: 0.32,
-  },
-  buttonSecondary: {
-    fontFamily: Fonts.ui,
-    fontSize: 14,
-    letterSpacing: 0.28,
-  },
-  inputText: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    letterSpacing: 0.32,
-  },
-  formLabel: {
-    fontFamily: Fonts.ui,
-    fontSize: 13,
-    letterSpacing: 0.26,
-    color: Colors.gray1,
-  },
-  tag: {
-    fontFamily: Fonts.ui,
-    fontSize: 13,
-    letterSpacing: 0.26,
-    color: Colors.ink,
-  },
-  tabLabel: {
-    fontFamily: Fonts.ui,
-    fontSize: 11,
-    letterSpacing: 0.88,
-  },
-  caption: {
-    fontFamily: Fonts.uiLight,
-    fontSize: 12,
-    letterSpacing: 0.96,
-    color: Colors.gray2,
-  },
-  micro: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    letterSpacing: 0.88,
-    color: Colors.gray2,
-  },
+  itemDesc: TypeRole.support,
+  formLabel: TypeRole.support,
+  tabLabel: TypeRole.support,
+  caption: { ...TypeRole.support, color: Colors.gray2 },
+  micro: { ...TypeRole.support, color: Colors.gray2 },
 
-  // ── Numeric · Playfair Display 正体 — 等宽数字 ──
-  tempLarge: {
-    fontFamily: Fonts.numericSerif,
-    fontSize: 26,
-    letterSpacing: 0,
-    color: Colors.ink,
-  },
-  statNum: {
-    fontFamily: Fonts.numericSerif,
-    fontSize: 22,
-    letterSpacing: 0,
-    color: Colors.ink,
-  },
-  numInline: {
-    fontFamily: Fonts.numericSerif,
-    fontSize: 15,
-    letterSpacing: 0,
-    color: Colors.ink,
-  },
+  tempLarge: TypeRole.display,
+  statNum: TypeRole.heading,
+  numInline: TypeRole.content,
 } as const;
 
 // ─────────────────────────────────────────────────────────

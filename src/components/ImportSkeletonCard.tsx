@@ -7,7 +7,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Colors, Fonts, Radius, Shadow, Spacing } from '@/constants/theme';
+import { T } from '@/constants/theme';
+import { ds, dsShadow } from '@/design-system';
 import { ImportTask, useImportStore } from '@/stores/importStore';
 
 export interface ImportSkeletonCardProps {
@@ -19,13 +20,9 @@ export interface ImportSkeletonCardProps {
 type StatusMeta = {
   label: string;
   detail: string;
-  accent: string;
+  tone: 'attention' | 'neutral' | 'positive';
   progressDuration: number;
 };
-
-const GOLD = '#C8A76A';
-const TAUPE = '#8B7355';
-const MUTED_RED = '#B85450';
 
 function getStatusMeta(task: ImportTask): StatusMeta {
   switch (task.status) {
@@ -33,49 +30,49 @@ function getStatusMeta(task: ImportTask): StatusMeta {
       return {
         label: `去确认 · ${task.allDetectedItems?.length ?? 0} 件`,
         detail: '识别到多件，点此选择导入',
-        accent: GOLD,
+        tone: 'attention',
         progressDuration: 1800,
       };
     case 'selected':
       return {
         label: '准备扣背景',
         detail: '排队生成衣物标准图',
-        accent: TAUPE,
+        tone: 'neutral',
         progressDuration: 1600,
       };
     case 'standardizing':
       return {
         label: '扣除背景中',
         detail: '正在生成干净标准图',
-        accent: TAUPE,
+        tone: 'neutral',
         progressDuration: 2200,
       };
     case 'uploading':
       return {
         label: '保存中',
         detail: '即将加入衣橱',
-        accent: TAUPE,
+        tone: 'neutral',
         progressDuration: 1200,
       };
     case 'failed':
       return {
         label: '识别失败 · 点击重试',
         detail: task.error || '轻触后重新加入队列',
-        accent: MUTED_RED,
+        tone: 'attention',
         progressDuration: 1800,
       };
     case 'done':
       return {
         label: '已导入',
         detail: '已保存到衣橱',
-        accent: '#555F50',
+        tone: 'positive',
         progressDuration: 1200,
       };
     case 'pending':
       return {
         label: '排队中',
         detail: '等待 AI 识别',
-        accent: '#9A9AA0',
+        tone: 'neutral',
         progressDuration: 1600,
       };
     case 'detecting':
@@ -83,7 +80,7 @@ function getStatusMeta(task: ImportTask): StatusMeta {
       return {
         label: 'AI 识别中',
         detail: '识别分类、颜色与材质',
-        accent: '#9A9AA0',
+        tone: 'neutral',
         progressDuration: 1600,
       };
   }
@@ -106,6 +103,11 @@ export default function ImportSkeletonCard({
   const pressScale = useRef(new Animated.Value(1)).current;
 
   const meta = getStatusMeta(liveTask);
+  const accentColor = meta.tone === 'positive'
+    ? ds.color.semantic.status.positive
+    : meta.tone === 'attention'
+      ? ds.color.semantic.status.attention
+      : ds.color.semantic.status.neutral;
 
   useEffect(() => {
     shimmer.setValue(0);
@@ -145,9 +147,9 @@ export default function ImportSkeletonCard({
 
   const isInteractive = liveTask.status === 'needs_selection' || liveTask.status === 'failed' || !!onPress;
   const cardAccentStyle = liveTask.status === 'needs_selection'
-    ? { borderColor: 'rgba(200,167,106,0.62)' }
+    ? { borderColor: ds.color.semantic.status.attention }
     : liveTask.status === 'failed'
-      ? { borderColor: 'rgba(184,84,80,0.42)' }
+      ? { borderColor: ds.color.semantic.action.destructive }
       : null;
 
   const shimmerTranslate = shimmer.interpolate({
@@ -171,6 +173,9 @@ export default function ImportSkeletonCard({
   if (variant === 'preview') {
     return (
       <Pressable
+        accessibilityRole={isInteractive ? 'button' : undefined}
+        accessibilityLabel={`${meta.label}，${meta.detail}`}
+        accessibilityState={{ disabled: !isInteractive }}
         disabled={!isInteractive}
         onPress={handlePress}
         onPressIn={() => animatePress(0.98)}
@@ -179,7 +184,7 @@ export default function ImportSkeletonCard({
         <Animated.View style={[styles.previewWrap, { transform: [{ scale: pressScale }] }]}> 
           <View style={[styles.previewCard, cardAccentStyle]}>
             <View style={styles.previewPhotoWrap}>
-              <Image source={{ uri: liveTask.sourceUri }} style={styles.previewPhoto} resizeMode="cover" />
+              <Image source={{ uri: liveTask.sourceUri }} style={styles.previewPhoto} resizeMode="contain" />
             </View>
             <Animated.View
               pointerEvents="none"
@@ -189,10 +194,10 @@ export default function ImportSkeletonCard({
               ]}
             />
             <View style={styles.previewProgressTrack}>
-              <Animated.View style={[styles.progressLine, { width: progressWidth, backgroundColor: meta.accent }]} />
+              <Animated.View style={[styles.progressLine, { width: progressWidth, backgroundColor: accentColor }]} />
             </View>
           </View>
-          <Text style={[styles.previewCaption, { color: meta.accent }]} numberOfLines={1}>
+          <Text style={[styles.previewCaption, { color: accentColor }]} numberOfLines={1}>
             {meta.label}
           </Text>
         </Animated.View>
@@ -202,6 +207,9 @@ export default function ImportSkeletonCard({
 
   return (
     <Pressable
+      accessibilityRole={isInteractive ? 'button' : undefined}
+      accessibilityLabel={`${meta.label}，${meta.detail}`}
+      accessibilityState={{ disabled: !isInteractive }}
       disabled={!isInteractive}
       onPress={handlePress}
       onPressIn={() => animatePress(0.98)}
@@ -211,7 +219,7 @@ export default function ImportSkeletonCard({
       <Animated.View style={[styles.card, cardAccentStyle, { transform: [{ scale: pressScale }] }]}> 
         <View style={styles.visualArea}>
           <View style={styles.photoHalo}>
-            <Image source={{ uri: liveTask.sourceUri }} style={styles.sourcePhoto} resizeMode="cover" />
+            <Image source={{ uri: liveTask.sourceUri }} style={styles.sourcePhoto} resizeMode="contain" />
           </View>
           <Animated.View
             pointerEvents="none"
@@ -222,11 +230,11 @@ export default function ImportSkeletonCard({
           />
         </View>
         <View style={styles.infoArea}>
-          <Text style={[styles.statusLabel, { color: meta.accent }]} numberOfLines={1}>{meta.label}</Text>
+          <Text style={[styles.statusLabel, { color: accentColor }]} numberOfLines={1}>{meta.label}</Text>
           <Text style={styles.statusDetail} numberOfLines={1}>{meta.detail}</Text>
         </View>
         <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressLine, { width: progressWidth, backgroundColor: meta.accent }]} />
+          <Animated.View style={[styles.progressLine, { width: progressWidth, backgroundColor: accentColor }]} />
         </View>
       </Animated.View>
     </Pressable>
@@ -235,32 +243,32 @@ export default function ImportSkeletonCard({
 
 const styles = StyleSheet.create({
   gridPressable: {
-    width: '47.5%',
+    width: '100%',
   },
   card: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
+    backgroundColor: ds.color.semantic.surface.card,
+    borderRadius: ds.component.wardrobeCard.radius,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.06)',
-    ...Shadow.one,
+    borderColor: ds.color.semantic.border.subtle,
+    ...dsShadow.one,
   },
   visualArea: {
     width: '100%',
-    aspectRatio: 1,
+    aspectRatio: ds.component.wardrobeCard.mediaAspectRatio,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ds.color.semantic.surface.card,
   },
   photoHalo: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    width: ds.space[16],
+    height: ds.space[16],
+    borderRadius: ds.radius.xxl,
     overflow: 'hidden',
-    backgroundColor: Colors.paperRaised,
+    backgroundColor: ds.color.semantic.surface.input,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: ds.color.semantic.border.subtle,
   },
   sourcePhoto: {
     width: '100%',
@@ -272,41 +280,32 @@ const styles = StyleSheet.create({
     top: -24,
     bottom: -24,
     width: 54,
-    backgroundColor: 'rgba(245,245,245,0.72)',
+    backgroundColor: ds.color.semantic.surface.input,
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.72)',
+    borderColor: ds.color.semantic.surface.floating,
+    opacity: 0.72,
   },
   infoArea: {
-    minHeight: 54,
-    paddingHorizontal: Spacing.two,
-    paddingBottom: 10,
-    alignItems: 'center',
+    minHeight: ds.component.wardrobeCard.infoMinimumHeight,
+    paddingHorizontal: ds.component.wardrobeCard.infoHorizontalPadding,
+    paddingVertical: ds.component.wardrobeCard.infoVerticalPadding,
     justifyContent: 'center',
-    gap: 3,
   },
   statusLabel: {
-    fontFamily: Fonts.uiLight,
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: 0.8,
-    textAlign: 'center',
+    ...T.content,
   },
   statusDetail: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    lineHeight: 13,
-    letterSpacing: 0.5,
-    color: '#8A8A8D',
-    textAlign: 'center',
+    ...T.support,
+    color: ds.color.semantic.text.secondary,
   },
   progressTrack: {
     position: 'absolute',
-    left: 10,
-    right: 10,
-    bottom: 9,
+    left: ds.component.wardrobeCard.infoHorizontalPadding,
+    right: ds.component.wardrobeCard.infoHorizontalPadding,
+    bottom: ds.space[0.5],
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: ds.color.semantic.border.subtle,
     overflow: 'hidden',
   },
   progressLine: {
@@ -315,28 +314,28 @@ const styles = StyleSheet.create({
   },
   previewWrap: {
     width: 80,
-    gap: 5,
+    gap: ds.space[1],
   },
   previewCard: {
     width: 80,
     height: 80,
-    borderRadius: Radius.md,
+    borderRadius: ds.radius.xl,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ds.color.semantic.surface.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderColor: ds.color.semantic.border.subtle,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadow.one,
+    ...dsShadow.one,
   },
   previewPhotoWrap: {
     width: 38,
     height: 38,
-    borderRadius: 11,
+    borderRadius: ds.radius.lg,
     overflow: 'hidden',
-    backgroundColor: Colors.paperRaised,
+    backgroundColor: ds.color.semantic.surface.input,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: ds.color.semantic.border.subtle,
   },
   previewPhoto: {
     width: '100%',
@@ -348,7 +347,8 @@ const styles = StyleSheet.create({
     top: -14,
     bottom: -14,
     width: 30,
-    backgroundColor: 'rgba(245,245,245,0.72)',
+    backgroundColor: ds.color.semantic.surface.input,
+    opacity: 0.72,
   },
   previewProgressTrack: {
     position: 'absolute',
@@ -356,14 +356,11 @@ const styles = StyleSheet.create({
     right: 8,
     bottom: 7,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: ds.color.semantic.border.subtle,
     overflow: 'hidden',
   },
   previewCaption: {
-    fontFamily: Fonts.uiLight,
-    fontSize: 10,
-    lineHeight: 12,
-    letterSpacing: 0.5,
+    ...T.support,
     textAlign: 'center',
   },
 });

@@ -4,13 +4,14 @@ import {
   ScrollView, SafeAreaView, Image,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { useOutfitStore } from '@/stores/outfitStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
+import { ds } from '@/design-system';
 import { STYLE_TAGS } from '@/types';
 
 function getTagName(tagId: string, fallback?: string): string {
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  avatarText: { fontSize: 32, color: '#fff', fontFamily: Fonts.pageTitleSerif },
+  avatarText: { ...T.display, color: ds.color.semantic.text.inverse },
   avatarEmoji: { fontSize: 32, color: '#fff' },
   avatarImage: { width: 72, height: 72, borderRadius: 36 },
   editBadge: {
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   },
   editBadgeIcon: { fontSize: 12 },
   profileInfo: { flex: 1, gap: 4 },
-  profileNick: { ...T.sectionTitle, fontSize: 20 },
+  profileNick: { ...T.heading },
   profileId: { ...T.micro, color: Colors.walnut2 },
   editBtn: {
     ...T.tag, color: Colors.ink,
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line, ...Shadow.one,
   },
   menuCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  menuCardTitle: { ...T.bodyText, fontFamily: Fonts.titleSerif, fontSize: 16, color: Colors.ink },
+  menuCardTitle: { ...T.content },
   menuCardArrow: { color: Colors.walnut2, fontSize: 16 },
 
   // Style tags
@@ -250,10 +251,10 @@ const styles = StyleSheet.create({
   stylePillEmpty: { ...T.tag, color: Colors.walnut2, fontStyle: 'italic' },
 
   // Try-on
-  tryOnLabel: { ...T.tag, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
+  tryOnLabel: { ...T.content },
   tryOnEmpty: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
-  tryOnEmptyTitle: { ...T.bodyText, fontSize: 13, color: Colors.walnut },
-  tryOnEmptySub: { ...T.micro, color: Colors.walnut2, textAlign: 'center', lineHeight: 18 },
+  tryOnEmptyTitle: { ...T.support },
+  tryOnEmptySub: { ...T.support, color: ds.color.semantic.text.tertiary, textAlign: 'center' },
 
   // Try-on photo scroll
   tryOnScroll: { gap: Spacing.two, paddingRight: Spacing.four },
@@ -262,8 +263,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
   },
   tryOnPhoto: { width: 100, height: 100 },
-  tryOnPhotoScene: { ...T.micro, fontSize: 10, color: Colors.ink, fontFamily: Fonts.uiSemiBold, paddingHorizontal: Spacing.one, paddingTop: 2 },
-  tryOnPhotoDate: { ...T.micro, fontSize: 9, color: Colors.walnut2, paddingHorizontal: Spacing.one, paddingBottom: Spacing.one },
+  tryOnPhotoScene: { ...T.support, color: ds.color.semantic.text.primary, paddingHorizontal: ds.space[1], paddingTop: ds.space[0.5] },
+  tryOnPhotoDate: { ...T.support, color: ds.color.semantic.text.tertiary, paddingHorizontal: ds.space[1], paddingBottom: ds.space[1] },
 
   // Settings entry
   settingsEntry: {

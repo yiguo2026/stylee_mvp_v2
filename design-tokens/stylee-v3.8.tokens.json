@@ -161,44 +161,20 @@
   },
   "Typography": {
     "type": {
-      "displayLarge": {
-        "value": { "fontFamily": "{font.family.display}", "fontWeight": "{font.weight.semibold}", "fontSize": "34", "lineHeight": "40", "letterSpacing": "0" },
-        "type": "typography"
-      },
       "display": {
-        "value": { "fontFamily": "{font.family.display}", "fontWeight": "{font.weight.semibold}", "fontSize": "30", "lineHeight": "36", "letterSpacing": "0" },
-        "type": "typography"
-      },
-      "pageTitle": {
         "value": { "fontFamily": "{font.family.display}", "fontWeight": "{font.weight.semibold}", "fontSize": "24", "lineHeight": "30", "letterSpacing": "0" },
         "type": "typography"
       },
-      "sectionTitle": {
+      "heading": {
         "value": { "fontFamily": "{font.family.display}", "fontWeight": "{font.weight.medium}", "fontSize": "18", "lineHeight": "24", "letterSpacing": "0" },
         "type": "typography"
       },
-      "body": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.regular}", "fontSize": "15", "lineHeight": "24", "letterSpacing": "0.3" },
+      "content": {
+        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.medium}", "fontSize": "15", "lineHeight": "22", "letterSpacing": "0.3" },
         "type": "typography"
       },
-      "bodySmall": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.regular}", "fontSize": "13", "lineHeight": "20", "letterSpacing": "0.26" },
-        "type": "typography"
-      },
-      "button": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.semibold}", "fontSize": "15", "lineHeight": "20", "letterSpacing": "0.3" },
-        "type": "typography"
-      },
-      "label": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.medium}", "fontSize": "13", "lineHeight": "18", "letterSpacing": "0.26" },
-        "type": "typography"
-      },
-      "caption": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.regular}", "fontSize": "12", "lineHeight": "16", "letterSpacing": "0.48" },
-        "type": "typography"
-      },
-      "micro": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.regular}", "fontSize": "11", "lineHeight": "14", "letterSpacing": "0.44" },
+      "support": {
+        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.regular}", "fontSize": "12", "lineHeight": "18", "letterSpacing": "0.24" },
         "type": "typography"
       }
     }
@@ -211,6 +187,46 @@
       },
       "radius": { "value": "{radius.xl}", "type": "borderRadius" },
       "paddingX": { "value": "{space.4}", "type": "spacing" }
+    },
+    "choiceChip": {
+      "visualMinHeight": { "value": "{size.control.compact}", "type": "sizing" },
+      "minimumTouch": { "value": "{size.control.minimumTouch}", "type": "sizing" },
+      "radius": { "value": "{radius.md}", "type": "borderRadius" },
+      "paddingX": { "value": "{space.3}", "type": "spacing" },
+      "paddingY": { "value": "{space.1}", "type": "spacing" },
+      "contentGap": { "value": "{space.1}", "type": "spacing" },
+      "groupGap": { "value": "{space.2}", "type": "spacing" }
+    },
+    "pageHeader": {
+      "minHeight": { "value": "{size.control.minimumTouch}", "type": "sizing" },
+      "paddingX": { "value": "{space.4}", "type": "spacing" },
+      "actionSize": { "value": "{size.control.minimumTouch}", "type": "sizing" }
+    },
+    "searchField": {
+      "height": { "value": "{size.control.minimumTouch}", "type": "sizing" },
+      "radius": { "value": "{radius.xl}", "type": "borderRadius" },
+      "paddingX": { "value": "{space.3}", "type": "spacing" },
+      "contentGap": { "value": "{space.2}", "type": "spacing" },
+      "iconSize": { "value": "{size.icon.sm}", "type": "sizing" }
+    },
+    "wardrobeCard": {
+      "radius": { "value": "{radius.xl}", "type": "borderRadius" },
+      "mediaRatio": { "value": "1.333333", "type": "number" },
+      "infoMinHeight": { "value": "{size.control.medium}", "type": "sizing" },
+      "infoPaddingX": { "value": "{space.2}", "type": "spacing" },
+      "infoPaddingY": { "value": "{space.1}", "type": "spacing" }
+    },
+    "wardrobeGrid": {
+      "referenceViewportWidth": { "value": "393", "type": "sizing" },
+      "referenceViewportHeight": { "value": "852", "type": "sizing" },
+      "columnsMobile": { "value": "2", "type": "number" },
+      "columnsTablet": { "value": "3", "type": "number" },
+      "visibleRowsReference": { "value": "3", "type": "number" },
+      "screenPadding": { "value": "{space.4}", "type": "spacing" },
+      "screenPaddingTablet": { "value": "{space.6}", "type": "spacing" },
+      "columnGap": { "value": "{space.2}", "type": "spacing" },
+      "rowGap": { "value": "{space.2}", "type": "spacing" },
+      "controlsGap": { "value": "{space.2}", "type": "spacing" }
     },
     "outfitItemCard": {
       "columnsMobile": { "value": "2", "type": "number" },
@@ -242,8 +258,8 @@
   },
   "$themes": [
     {
-      "id": "stylee-light-v3-7",
-      "name": "Stylee Light 3.7",
+      "id": "stylee-light-v3-8",
+      "name": "Stylee Light 3.8",
       "selectedTokenSets": {
         "Primitives": "source",
         "Semantic Light": "enabled",
@@ -254,7 +270,7 @@
     }
   ],
   "$metadata": {
-    "styleeVersion": "3.7.0",
+    "styleeVersion": "3.8.0",
     "tokenSetOrder": ["Primitives", "Semantic Light", "Typography", "Components"]
   }
 }

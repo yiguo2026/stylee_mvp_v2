@@ -4,10 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { router, usePathname } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
+import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { PRESET_BASIC_ITEMS } from '@/types';
 import { showToast } from '@/components/Toast';
+import { ds } from '@/design-system';
 
 import { useImportStore } from '@/stores/importStore';
 import { useUserStore } from '@/stores/userStore';
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.line, marginBottom: Spacing.two,
   },
   sheetTitle: {
-    ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.walnut,
+    ...T.heading,
     marginBottom: Spacing.one,
   },
 
@@ -196,10 +197,10 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
   },
-  primaryText: { ...T.bodyText, fontFamily: Fonts.uiSemiBold, fontSize: 16, color: Colors.ink },
-  primarySub: { ...T.micro, color: Colors.walnut2, marginTop: 2 },
+  primaryText: { ...T.content },
+  primarySub: { ...T.support, color: ds.color.semantic.text.tertiary, marginTop: ds.space[0.5] },
 
-  groupLabel: { ...T.micro, color: Colors.walnut2, marginTop: Spacing.one },
+  groupLabel: { ...T.heading, marginTop: ds.space[1] },
 
   // 次级方式行
   option: {
@@ -210,9 +211,9 @@ const styles = StyleSheet.create({
   },
   optionIcon: { width: 22, textAlign: 'center' },
   optionTextWrap: { flex: 1, gap: 2 },
-  optionText: { ...T.bodyText, fontSize: 15, color: Colors.ink },
+  optionText: { ...T.content },
   optionTextDisabled: { color: Colors.walnut2 },
-  optionSub: { ...T.micro, color: Colors.walnut2 },
+  optionSub: { ...T.support, color: ds.color.semantic.text.tertiary },
   optionDisabled: { opacity: 0.6, backgroundColor: Colors.paper },
 
   badge: {
@@ -220,11 +221,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  badgeText: { fontSize: 10, fontFamily: Fonts.uiSemiBold, color: Colors.paper },
+  badgeText: { ...T.support, color: ds.color.semantic.text.inverse },
 
   modalCancel: {
     alignItems: 'center', justifyContent: 'center',
     paddingVertical: Spacing.three, marginTop: Spacing.one,
   },
-  modalCancelText: { ...T.bodyText, fontSize: 16, color: Colors.walnut },
+  modalCancelText: { ...T.content, color: ds.color.semantic.text.secondary },
 });
