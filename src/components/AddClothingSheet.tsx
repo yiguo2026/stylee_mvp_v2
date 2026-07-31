@@ -99,7 +99,7 @@ function SheetContent({
         {/* 相册导入 — 主入口，最醒目 */}
         <TouchableOpacity style={styles.primary} onPress={handlePickImages} activeOpacity={0.85} disabled={picking}>
           <View style={styles.primaryIcon}>
-            <Feather name="image" size={20} color={Colors.paper} />
+            <Feather name="image" size={20} color={ds.color.semantic.text.primary} />
           </View>
           <View style={styles.optionTextWrap}>
             <Text style={styles.primaryText}>相册导入</Text>
@@ -117,7 +117,7 @@ function SheetContent({
           activeOpacity={allPresetAdded ? 1 : 0.7}
         >
           <View style={styles.optionIconBadge}>
-            <Feather name="zap" size={20} color={ds.color.semantic.text.inverse} />
+            <Feather name="zap" size={20} color={ds.color.semantic.text.primary} />
           </View>
           <View style={styles.optionTextWrap}>
             <Text style={[styles.optionText, allPresetAdded && styles.optionTextDisabled]}>快速添加推荐单品</Text>
@@ -133,7 +133,7 @@ function SheetContent({
         {/* 心愿单 — 查看想要的单品 */}
         <TouchableOpacity style={styles.option} onPress={handleOpenWishlist} activeOpacity={0.7}>
           <View style={styles.optionIconBadge}>
-            <Feather name="heart" size={20} color={ds.color.semantic.text.inverse} />
+            <Feather name="heart" size={20} color={ds.color.semantic.text.primary} />
           </View>
           <View style={styles.optionTextWrap}>
             <Text style={styles.optionText}>心愿单</Text>
@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentSoft, borderWidth: 1, borderColor: Colors.accentSoft,
   },
   primaryIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: ds.radius.xl,
+    backgroundColor: ds.color.semantic.surface.input, alignItems: 'center', justifyContent: 'center',
   },
   primaryText: { ...T.content },
   primarySub: { ...T.support, color: ds.color.semantic.text.tertiary, marginTop: ds.space[0.5] },
@@ -207,14 +207,14 @@ const styles = StyleSheet.create({
   // 次级方式行
   option: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
-    paddingVertical: Spacing.three, paddingHorizontal: Spacing.two,
+    paddingVertical: ds.space[3], paddingHorizontal: ds.space[3],
     borderRadius: Radius.md, backgroundColor: Colors.paperCard,
     borderWidth: 1, borderColor: Colors.line,
   },
   optionIcon: { width: 22, textAlign: 'center' },
   optionIconBadge: {
     width: 40, height: 40, borderRadius: ds.radius.xl,
-    backgroundColor: ds.color.primitive.oxblood700, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ds.color.semantic.surface.input, alignItems: 'center', justifyContent: 'center',
   },
   optionTextWrap: { flex: 1, gap: 2 },
   optionText: { ...T.content },

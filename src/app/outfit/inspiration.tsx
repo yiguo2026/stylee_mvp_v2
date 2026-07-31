@@ -8,7 +8,11 @@ import { Toast } from '@/components/Toast';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { useUserStore } from '@/stores/userStore';
-import { InspirationItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
+import { InspirationItem, ClothingCategory, CLOTHING_CATEGORIES, STYLE_TAGS } from '@/types';
+
+const STYLE_LABEL: Record<string, string> = Object.fromEntries(
+  STYLE_TAGS.map(t => [t.id, t.label]),
+);
 
 const normalizeCategory = (raw: string): string => {
   const s = raw.trim();
@@ -179,7 +183,7 @@ export default function InspirationDetailScreen() {
             <View style={styles.tagRow}>
               {styleTags.map(t => (
                 <View key={t} style={styles.tagPill}>
-                  <Text style={styles.tagPillText}>{t}</Text>
+                  <Text style={styles.tagPillText}>{STYLE_LABEL[t] ?? t}</Text>
                 </View>
               ))}
               {occasionTags.map(t => (

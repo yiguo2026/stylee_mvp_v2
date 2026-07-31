@@ -33,41 +33,44 @@ const isWeb = Platform.OS === 'web';
 const MOCK_INSPIRATIONS: InspirationCard[] = [
   {
     card_id: 'insp-1',
-    title: '法式温柔风',
+    title: '法式复古街头',
     image_url: '/inspirations/insp-1.png',
-    style_tags: ['french', 'romantic'],
-    comment: '巴黎街头的慵懒与精致',
-    occasion: '约会',
+    style_tags: ['french', 'vintage'],
+    comment: '皮衣配做旧牛仔，巴黎街头的慵懒松弛',
+    occasion: '休闲',
     items: [
-      { name: '针织开衫', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1583744946564-b53ac1efb997?w=300&h=300&fit=crop' },
-      { name: '白色T恤', category: '上装', color: '白色', image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop' },
-      { name: '蓝色牛仔裤', category: '下装', color: '蓝色', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop' },
-      { name: '帆布鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
+      { name: '红色针织帽', category: '帽巾', color: '红色', image_url: '/inspirations/items/insp-1-hat.png' },
+      { name: 'oversize黑色皮衣', category: '外套', color: '黑色', image_url: '/inspirations/items/insp-1-jacket.png' },
+      { name: '做旧阔腿牛仔裤', category: '下装', color: '蓝色', image_url: '/inspirations/items/insp-1-pants.png' },
+      { name: '黑色尖头鞋', category: '鞋履', color: '黑色', image_url: '/inspirations/items/insp-1-shoes.png' },
+      { name: '黑色托特包', category: '包袋', color: '黑色', image_url: '/inspirations/items/insp-1-bag.png' },
     ],
   },
   {
     card_id: 'insp-2',
-    title: '通勤简约风',
+    title: '撞色街头风',
     image_url: '/inspirations/insp-2.png',
-    style_tags: ['commute_style', 'minimalist'],
-    comment: '用基本款穿出高级感',
-    occasion: '职场',
+    style_tags: ['street', 'urban_cool'],
+    comment: '一条红围巾，点亮蓝调基础款',
+    occasion: '休闲',
     items: [
-      { name: '白衬衫', category: '上装', color: '白色', image_url: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=300&h=300&fit=crop' },
-      { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
-      { name: '小白鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=300&fit=crop' },
+      { name: 'oversize蓝色衬衫', category: '上装', color: '蓝色', image_url: '/inspirations/items/insp-2-shirt.png' },
+      { name: '红色毛绒围巾', category: '帽巾', color: '红色', image_url: '/inspirations/items/insp-2-scarf.png' },
+      { name: '浅色直筒牛仔裤', category: '下装', color: '蓝色', image_url: '/inspirations/items/insp-2-jeans.png' },
     ],
   },
   {
     card_id: 'insp-3',
-    title: '甜美少女风',
+    title: '海边度假甜风',
     image_url: '/inspirations/insp-3.png',
-    style_tags: ['sweet', 'romantic'],
-    comment: '清新温柔的日常穿搭',
-    occasion: '休闲',
+    style_tags: ['sweet', 'bohemian'],
+    comment: '蓝白条纹套装，清爽的海边假日',
+    occasion: '度假',
     items: [
-      { name: '白色连衣裙', category: '连体装', color: '白色', image_url: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=300&h=300&fit=crop' },
-      { name: '帆布鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=300&h=300&fit=crop' },
+      { name: '蓝白条纹抹胸', category: '上装', color: '蓝色', image_url: '/inspirations/items/insp-3-top.png' },
+      { name: '蓝白条纹短裙', category: '下装', color: '蓝色', image_url: '/inspirations/items/insp-3-skirt.png' },
+      { name: '猫眼墨镜', category: '配饰', color: '黑色', image_url: '/inspirations/items/insp-3-sunglass.png' },
+      { name: '白色手提包', category: '包袋', color: '白色', image_url: '/inspirations/items/insp-3-bag.png' },
     ],
   },
   {
@@ -75,31 +78,38 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
     title: '静奢老钱风',
     image_url: '/inspirations/insp-4.png',
     style_tags: ['quiet_luxury', 'minimalist'],
-    comment: '低调质感的从容优雅',
-    occasion: '职场',
+    comment: '灰白配色，低调而从容的格调',
+    occasion: '休闲',
     items: [
-      { name: '针织衫', category: '上装', color: '米色', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cda3a7a?w=300&h=300&fit=crop' },
-      { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
-      { name: '米色风衣', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=300&h=300&fit=crop' },
-      { name: '双肩包', category: '包袋', color: '黑色', image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=300&h=300&fit=crop' },
+      { name: '深灰古巴领短袖', category: '上装', color: '灰色', image_url: '/inspirations/items/insp-4-top.png' },
+      { name: '白色阔腿裤', category: '下装', color: '白色', image_url: '/inspirations/items/insp-4-pants.png' },
+      { name: '棕色棒球帽', category: '帽巾', color: '棕色', image_url: '/inspirations/items/insp-4-cap.png' },
+      { name: '棕色麂皮乐福鞋', category: '鞋履', color: '棕色', image_url: '/inspirations/items/insp-4-shoes.png' },
     ],
   },
   {
     card_id: 'insp-5',
-    title: '街头休闲风',
+    title: '夏日全白风',
     image_url: '/inspirations/insp-5.png',
-    style_tags: ['street', 'urban_cool'],
-    comment: '随性有型的日常态度',
-    occasion: '休闲',
+    style_tags: ['quiet_luxury', 'bohemian'],
+    comment: '通身白系，松弛又优雅的度假姿态',
+    occasion: '度假',
     items: [
-      { name: '连帽卫衣', category: '上装', color: '灰色', image_url: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=300&h=300&fit=crop' },
-      { name: '直筒牛仔裤', category: '下装', color: '蓝色', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop' },
-      { name: '运动鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=300&h=300&fit=crop' },
+      { name: '白色亚麻衬衫', category: '上装', color: '白色', image_url: '/inspirations/items/insp-5-shirt.png' },
+      { name: '白色长裤', category: '下装', color: '白色', image_url: '/inspirations/items/insp-5-pants.png' },
+      { name: '草编帽', category: '帽巾', color: '米色', image_url: '/inspirations/items/insp-5-hat.png' },
+      { name: '米色编织包', category: '包袋', color: '米色', image_url: '/inspirations/items/insp-5-bag.png' },
+      { name: '白色乐福鞋', category: '鞋履', color: '白色', image_url: '/inspirations/items/insp-5-shoes.png' },
     ],
   },
 ];
 
 type InputMode = 'description' | 'tags';
+
+// style_tag id → 中文展示标签（灵感卡与详情页统一使用）
+const STYLE_LABEL: Record<string, string> = Object.fromEntries(
+  STYLE_TAGS.map(t => [t.id, t.label]),
+);
 
 export default function OutfitTab() {
   const { profile, user } = useUserStore();
@@ -200,7 +210,8 @@ export default function OutfitTab() {
   };
 
   const handleInspire = (card: InspirationCard) => {
-    const tagStr = card.occasion ? `${card.style_tags[0] ?? ''} · ${card.occasion}` : card.style_tags.join(' · ');
+    const primaryStyle = STYLE_LABEL[card.style_tags[0]] ?? card.style_tags[0] ?? '';
+    const tagStr = card.occasion ? `${primaryStyle} · ${card.occasion}` : card.style_tags.map(t => STYLE_LABEL[t] ?? t).join(' · ');
     const itemsStr = card.items ? encodeURIComponent(JSON.stringify(card.items)) : '';
     router.push({
       pathname: '/outfit/inspiration',
@@ -490,7 +501,7 @@ export default function OutfitTab() {
                     <View style={styles.inspirationTags}>
                       {card.style_tags.slice(0, 2).map((tag) => (
                         <View key={`${card.card_id}:${tag}`} style={styles.inspirationTag}>
-                          <Text style={styles.inspirationTagText}>{tag}</Text>
+                          <Text style={styles.inspirationTagText}>{STYLE_LABEL[tag] ?? tag}</Text>
                         </View>
                       ))}
                     </View>
@@ -644,7 +655,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
   inspirationImage: {
-    width: '100%', aspectRatio: 4 / 3, backgroundColor: ds.color.semantic.surface.card,
+    width: '100%', aspectRatio: 3 / 4, backgroundColor: ds.color.semantic.surface.card,
     alignItems: 'center', justifyContent: 'center',
   },
   inspirationInfo: { paddingHorizontal: ds.space[2], paddingTop: ds.space[2], paddingBottom: ds.space[2], gap: ds.space[1] },
@@ -656,7 +667,6 @@ const styles = StyleSheet.create({
   },
   inspirationTagText: {
     ...T.support, color: ds.color.semantic.text.primary,
-    textTransform: 'uppercase',
   },
   inspirationComment: {
     ...T.support,
