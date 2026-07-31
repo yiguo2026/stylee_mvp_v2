@@ -34,7 +34,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
   {
     card_id: 'insp-1',
     title: '法式温柔风',
-    image_url: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=600&h=800&fit=crop',
+    image_url: '/inspirations/insp-1.png',
     style_tags: ['french', 'romantic'],
     comment: '巴黎街头的慵懒与精致',
     occasion: '约会',
@@ -48,7 +48,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
   {
     card_id: 'insp-2',
     title: '通勤简约风',
-    image_url: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=600&h=800&fit=crop',
+    image_url: '/inspirations/insp-2.png',
     style_tags: ['commute_style', 'minimalist'],
     comment: '用基本款穿出高级感',
     occasion: '职场',
@@ -61,7 +61,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
   {
     card_id: 'insp-3',
     title: '甜美少女风',
-    image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&h=800&fit=crop',
+    image_url: '/inspirations/insp-3.png',
     style_tags: ['sweet', 'romantic'],
     comment: '清新温柔的日常穿搭',
     occasion: '休闲',
@@ -73,7 +73,7 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
   {
     card_id: 'insp-4',
     title: '静奢老钱风',
-    image_url: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&h=800&fit=crop',
+    image_url: '/inspirations/insp-4.png',
     style_tags: ['quiet_luxury', 'minimalist'],
     comment: '低调质感的从容优雅',
     occasion: '职场',
@@ -82,6 +82,19 @@ const MOCK_INSPIRATIONS: InspirationCard[] = [
       { name: '黑色长裤', category: '下装', color: '黑色', image_url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&h=300&fit=crop' },
       { name: '米色风衣', category: '外套', color: '米色', image_url: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=300&h=300&fit=crop' },
       { name: '双肩包', category: '包袋', color: '黑色', image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=300&h=300&fit=crop' },
+    ],
+  },
+  {
+    card_id: 'insp-5',
+    title: '街头休闲风',
+    image_url: '/inspirations/insp-5.png',
+    style_tags: ['street', 'urban_cool'],
+    comment: '随性有型的日常态度',
+    occasion: '休闲',
+    items: [
+      { name: '连帽卫衣', category: '上装', color: '灰色', image_url: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=300&h=300&fit=crop' },
+      { name: '直筒牛仔裤', category: '下装', color: '蓝色', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop' },
+      { name: '运动鞋', category: '鞋履', color: '白色', image_url: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=300&h=300&fit=crop' },
     ],
   },
 ];

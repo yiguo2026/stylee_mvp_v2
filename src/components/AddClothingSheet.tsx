@@ -110,15 +110,15 @@ function SheetContent({
             : <Feather name="chevron-right" size={18} color={Colors.accent} />}
         </TouchableOpacity>
 
-        <Text style={styles.groupLabel}>更多方式</Text>
-
         {/* 快速添加推荐单品 — 从热门基础款补充 */}
         <TouchableOpacity
           style={[styles.option, allPresetAdded && styles.optionDisabled]}
           onPress={handleQuickAdd}
           activeOpacity={allPresetAdded ? 1 : 0.7}
         >
-          <Feather name="zap" size={18} color={allPresetAdded ? Colors.walnut2 : Colors.ink} style={styles.optionIcon} />
+          <View style={styles.optionIconBadge}>
+            <Feather name="zap" size={20} color={Colors.paper} />
+          </View>
           <View style={styles.optionTextWrap}>
             <Text style={[styles.optionText, allPresetAdded && styles.optionTextDisabled]}>快速添加推荐单品</Text>
             <Text style={styles.optionSub}>
@@ -132,7 +132,9 @@ function SheetContent({
 
         {/* 心愿单 — 查看想要的单品 */}
         <TouchableOpacity style={styles.option} onPress={handleOpenWishlist} activeOpacity={0.7}>
-          <Feather name="heart" size={18} color={Colors.accent} style={styles.optionIcon} />
+          <View style={styles.optionIconBadge}>
+            <Feather name="heart" size={20} color={Colors.paper} />
+          </View>
           <View style={styles.optionTextWrap}>
             <Text style={styles.optionText}>心愿单</Text>
             <Text style={styles.optionSub}>查看想要的单品，随时转入衣橱</Text>
@@ -210,6 +212,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.line,
   },
   optionIcon: { width: 22, textAlign: 'center' },
+  optionIconBadge: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+  },
   optionTextWrap: { flex: 1, gap: 2 },
   optionText: { ...T.content },
   optionTextDisabled: { color: Colors.walnut2 },
