@@ -1,8 +1,8 @@
 # Stylee Design System — Current Context and Handoff
 
 Last verified: 2026-07-29  
-Current released baseline: Stylee Design System v3.7  
-Active implementation candidate: Stylee Design System v3.8  
+Current released baseline: Stylee Design System v3.8  
+Active patch candidate: Stylee Design System v3.8.1  
 Repository: `https://github.com/yiguo2026/stylee_mvp_v2`
 
 This is the continuity document for new Codex conversations and future team
@@ -35,13 +35,13 @@ Important:
 ## 2. Verified Git and GitHub state
 
 - Default branch: `main`
-- Verified `origin/main`: `58559ba`
-- `58559ba`: merge of PR #12, Design Token governance
-- PR #12: `chore(design-system): automate token governance`
-- PR URL: `https://github.com/yiguo2026/stylee_mvp_v2/pull/12`
-- Both `Design System Guard` checks passed before merge.
+- Verified `origin/main`: `ee7f55d`
+- `ee7f55d`: merge of PR #13, Stylee v3.8 wardrobe density.
+- PR #13: `feat(design-system): Stylee v3.8 wardrobe density`
+- PR URL: `https://github.com/yiguo2026/stylee_mvp_v2/pull/13`
+- Design System Guard passed before merge.
 - Token working branch: `tokens-sync`
-- Verified remote `tokens-sync`: `70a48bf`
+- v3.8.1 correction commit on `tokens-sync`: `91b548e`
 - UI migration commits:
   - `3e8e7a1` — apply Stylee Design System v3.7 P0
   - `490c7a1` — migrate home and wardrobe to DS v3.7
