@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.72)',
   },
   name: {
-    ...ds.typography.label,
+    ...ds.typography.content,
     fontFamily: Fonts.ui,
     color: ds.color.semantic.text.primary,
     textAlign: 'center',

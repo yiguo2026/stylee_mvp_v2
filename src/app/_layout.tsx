@@ -31,6 +31,8 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const pathname = usePathname();
+  const designPreviewEnabled = process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1';
+  const isDesignPreview = designPreviewEnabled && pathname.startsWith('/wardrobe-preview');
   const pendingSelectionCount = useImportStore((state) => state.pendingSelectionCount);
   const tasks = useImportStore((state) => state.tasks);
   const pendingToastCountRef = useRef(0);
@@ -83,19 +85,23 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setSession(null);
-        router.replace('/(auth)/login');
+        if (!isDesignPreview) {
+          router.replace('/(auth)/login');
+        }
       } else if (event === 'INITIAL_SESSION') {
         if (session) {
           handleSignIn(session);
         } else {
           setSession(null);
-          router.replace('/(auth)/login');
+          if (!isDesignPreview) {
+            router.replace('/(auth)/login');
+          }
         }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [fontsReady]);
+  }, [fontsReady, isDesignPreview]);
 
   useEffect(() => {
     const shouldNotify = pendingSelectionCount > pendingToastCountRef.current && pathname !== '/wardrobe';

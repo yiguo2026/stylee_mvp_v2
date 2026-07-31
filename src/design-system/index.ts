@@ -1,9 +1,15 @@
 export { ds, dsShadow } from './tokens';
 export { StyleeButton } from './StyleeButton';
 export type { StyleeButtonHierarchy, StyleeButtonSize } from './StyleeButton';
+export { StyleeChoiceChip } from './StyleeChoiceChip';
+export type { StyleeChoiceChipSelectionMode } from './StyleeChoiceChip';
 export { StyleeIconButton } from './StyleeIconButton';
+export { StyleePageHeader } from './StyleePageHeader';
+export { StyleeSearchField } from './StyleeSearchField';
 export { StyleeStatusBadge, StyleeInlineStatus } from './StyleeStatus';
 export type { StyleeStatusTone } from './StyleeStatus';
 export { StyleeOutfitItemCard } from './StyleeOutfitItemCard';
+export { StyleeWardrobeCard } from './StyleeWardrobeCard';
+export { StyleeWardrobeGrid } from './StyleeWardrobeGrid';
 export { StyleeNavigationBar } from './StyleeNavigationBar';
 export { StyleeStickyDecisionBar } from './StyleeStickyDecisionBar';

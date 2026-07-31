@@ -94,20 +94,19 @@ const styles = StyleSheet.create({
     backgroundColor: ds.color.semantic.status.neutralSubtle,
   },
   backLabel: {
-    ...ds.typography.label,
+    ...ds.typography.content,
     fontFamily: Fonts.ui,
     color: ds.color.semantic.text.primary,
   },
   title: {
+    ...ds.typography.heading,
     fontFamily: Fonts.titleSerif,
-    fontSize: 18,
-    lineHeight: 24,
     color: ds.color.semantic.text.primary,
     textAlign: 'center',
     maxWidth: '42%',
   },
   trailingLabel: {
-    ...ds.typography.caption,
+    ...ds.typography.support,
     fontFamily: Fonts.body,
     color: ds.color.semantic.text.tertiary,
   },

@@ -6,6 +6,7 @@ on:
       - "design-tokens/**"
       - "scripts/generate-design-tokens.mjs"
       - "scripts/check-design-system.mjs"
+      - "scripts/check-wardrobe-density.mjs"
       - "src/design-system/**"
       - "src/app/**"
       - "src/components/**"
@@ -17,6 +18,7 @@ on:
       - "design-tokens/**"
       - "scripts/generate-design-tokens.mjs"
       - "scripts/check-design-system.mjs"
+      - "scripts/check-wardrobe-density.mjs"
       - "src/design-system/**"
       - "src/app/**"
       - "src/components/**"
@@ -48,6 +50,9 @@ jobs:
         run: npm run design-system:check
         env:
           DESIGN_SYSTEM_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+      - name: Verify wardrobe density contract
+        run: npm run wardrobe-density:check
 
       - name: Type check
         run: npx tsc --noEmit

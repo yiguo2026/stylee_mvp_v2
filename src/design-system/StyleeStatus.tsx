@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     gap: ds.space[1],
   },
   badgeText: {
-    ...ds.typography.micro,
+    ...ds.typography.support,
     fontFamily: Fonts.body,
   },
   inline: {
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     gap: ds.space[2],
   },
   inlineText: {
-    ...ds.typography.bodySmall,
+    ...ds.typography.support,
     fontFamily: Fonts.body,
     flexShrink: 1,
     textAlign: 'center',
