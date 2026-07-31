@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   primary: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.two,
     padding: Spacing.three, borderRadius: Radius.md,
-    backgroundColor: Colors.accentSoft, borderWidth: 1, borderColor: Colors.accentSoft,
+    backgroundColor: ds.color.semantic.surface.card, borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
   primaryIcon: {
     width: 40, height: 40, borderRadius: ds.radius.xl,
