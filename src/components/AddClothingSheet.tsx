@@ -117,7 +117,7 @@ function SheetContent({
           activeOpacity={allPresetAdded ? 1 : 0.7}
         >
           <View style={styles.optionIconBadge}>
-            <Feather name="zap" size={20} color={Colors.paper} />
+            <Feather name="zap" size={20} color={ds.color.semantic.text.inverse} />
           </View>
           <View style={styles.optionTextWrap}>
             <Text style={[styles.optionText, allPresetAdded && styles.optionTextDisabled]}>快速添加推荐单品</Text>
@@ -133,7 +133,7 @@ function SheetContent({
         {/* 心愿单 — 查看想要的单品 */}
         <TouchableOpacity style={styles.option} onPress={handleOpenWishlist} activeOpacity={0.7}>
           <View style={styles.optionIconBadge}>
-            <Feather name="heart" size={20} color={Colors.paper} />
+            <Feather name="heart" size={20} color={ds.color.semantic.text.inverse} />
           </View>
           <View style={styles.optionTextWrap}>
             <Text style={styles.optionText}>心愿单</Text>
@@ -213,8 +213,8 @@ const styles = StyleSheet.create({
   },
   optionIcon: { width: 22, textAlign: 'center' },
   optionIconBadge: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: ds.radius.xl,
+    backgroundColor: ds.color.primitive.oxblood700, alignItems: 'center', justifyContent: 'center',
   },
   optionTextWrap: { flex: 1, gap: 2 },
   optionText: { ...T.content },
