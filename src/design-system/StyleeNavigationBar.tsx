@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   backLabel: {
     ...ds.typography.content,
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     color: ds.color.semantic.text.primary,
   },
   title: {

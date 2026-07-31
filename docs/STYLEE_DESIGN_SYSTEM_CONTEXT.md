@@ -322,7 +322,7 @@ body, button, label, caption, and micro sizes is consolidated into four roles:
 |---|---|---|
 | Display | Display Semibold · 24/30 | Page title, major empty-state title |
 | Heading | Display Medium · 18/24 | Sheet title, section title, grouped-context heading |
-| Content | UI Medium · 15/22 | Card title, button, tab, chip, input, primary value |
+| Content | UI Regular · 15/22 | Card title, button, tab, chip, input, primary value |
 | Support | Body Regular · 12/18 | Description, metadata, label, help and status text |
 
 Rules:
@@ -337,6 +337,14 @@ Rules:
 - In `AddClothingSheet`, “补充衣橱” and “更多方式” are both Heading;
   “相册导入”, “快速添加推荐单品”, and “心愿单” are all Content; their
   descriptions are all Support.
+
+### v3.8.1 regression correction — 2026-07-31
+
+- Content uses Regular rather than Medium so functional UI stays light and
+  editorial instead of reading as a wall of bold labels.
+- `StyleeWardrobeGrid` measures its rendered container with `onLayout`.
+  Browser window width must never be used for card geometry because the web
+  build may render inside a narrower desktop phone stage.
 
 ### Wardrobe six-card density — 2026-07-29
 

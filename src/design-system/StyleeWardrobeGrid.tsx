@@ -1,8 +1,8 @@
-import React, { Children, ReactNode } from 'react';
+import React, { Children, ReactNode, useCallback, useState } from 'react';
 import {
+  LayoutChangeEvent,
   StyleProp,
   StyleSheet,
-  useWindowDimensions,
   View,
   ViewStyle,
 } from 'react-native';
@@ -19,27 +19,32 @@ export function StyleeWardrobeGrid({
   style,
   testID = 'wardrobe-grid',
 }: StyleeWardrobeGridProps) {
-  const { width } = useWindowDimensions();
-  const tablet = width >= ds.layout.breakpointTablet;
+  const [containerWidth, setContainerWidth] = useState(0);
+  const tablet = containerWidth >= ds.layout.breakpointTablet;
   const columns = tablet
     ? ds.component.wardrobeGrid.columnsTablet
     : ds.component.wardrobeGrid.columnsMobile;
   const horizontalPadding = tablet
     ? ds.component.wardrobeGrid.screenPaddingTablet
     : ds.component.wardrobeGrid.screenPadding;
-  const maximumWidth = tablet ? ds.layout.contentMaxReading : ds.layout.contentMaxMobile;
-  const contentWidth = Math.min(width, maximumWidth);
-  const usableWidth = contentWidth
+  const usableWidth = containerWidth
     - horizontalPadding * 2
     - ds.component.wardrobeGrid.columnGap * (columns - 1);
-  const itemWidth = usableWidth / columns;
+  const itemWidth = containerWidth > 0 ? Math.max(0, usableWidth / columns) : undefined;
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    setContainerWidth((currentWidth) => (
+      Math.abs(currentWidth - nextWidth) > 0.5 ? nextWidth : currentWidth
+    ));
+  }, []);
 
   return (
     <View
+      onLayout={handleLayout}
       style={[
         styles.grid,
         {
-          width: contentWidth,
           paddingHorizontal: horizontalPadding,
           columnGap: ds.component.wardrobeGrid.columnGap,
           rowGap: ds.component.wardrobeGrid.rowGap,
@@ -49,7 +54,10 @@ export function StyleeWardrobeGrid({
       testID={testID}
     >
       {Children.toArray(children).map((child, index) => (
-        <View key={(child as React.ReactElement).key ?? index} style={{ width: itemWidth }}>
+        <View
+          key={(child as React.ReactElement).key ?? index}
+          style={{ width: itemWidth ?? '100%' }}
+        >
           {child}
         </View>
       ))}
@@ -59,6 +67,8 @@ export function StyleeWardrobeGrid({
 
 const styles = StyleSheet.create({
   grid: {
+    width: '100%',
+    maxWidth: ds.layout.contentMaxReading,
     alignSelf: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',

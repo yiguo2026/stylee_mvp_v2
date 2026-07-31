@@ -96,6 +96,10 @@ const wardrobeCard = readFileSync(
   resolve(projectRoot, 'src/design-system/StyleeWardrobeCard.tsx'),
   'utf8',
 );
+const wardrobeGrid = readFileSync(
+  resolve(projectRoot, 'src/design-system/StyleeWardrobeGrid.tsx'),
+  'utf8',
+);
 const importSkeleton = readFileSync(
   resolve(projectRoot, 'src/components/ImportSkeletonCard.tsx'),
   'utf8',
@@ -124,6 +128,18 @@ for (const forbiddenPattern of [
 
 if (!/resizeMode=["']contain["']/.test(wardrobeCard)) {
   throw new Error('StyleeWardrobeCard must render garment images with contain.');
+}
+
+if (wardrobeGrid.includes('useWindowDimensions')) {
+  throw new Error('StyleeWardrobeGrid must not size cards from the browser window.');
+}
+
+for (const requiredContainerMeasurement of ['onLayout', 'containerWidth']) {
+  if (!wardrobeGrid.includes(requiredContainerMeasurement)) {
+    throw new Error(
+      `StyleeWardrobeGrid must measure its rendered container via ${requiredContainerMeasurement}.`,
+    );
+  }
 }
 
 if (!importSkeleton.includes('ds.component.wardrobeCard.mediaAspectRatio')) {

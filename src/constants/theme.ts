@@ -101,7 +101,7 @@ export const TypeRole = {
   },
   content: {
     ...ds.typography.content,
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     color: Colors.ink,
   },
   support: {

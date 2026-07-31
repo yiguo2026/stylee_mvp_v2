@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   name: {
     ...ds.typography.content,
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     color: ds.color.semantic.text.primary,
     textAlign: 'center',
     marginTop: ds.space[2],

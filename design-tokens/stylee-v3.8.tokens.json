@@ -170,7 +170,7 @@
         "type": "typography"
       },
       "content": {
-        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.medium}", "fontSize": "15", "lineHeight": "22", "letterSpacing": "0.3" },
+        "value": { "fontFamily": "{font.family.body}", "fontWeight": "{font.weight.regular}", "fontSize": "15", "lineHeight": "22", "letterSpacing": "0.3" },
         "type": "typography"
       },
       "support": {
@@ -270,7 +270,7 @@
     }
   ],
   "$metadata": {
-    "styleeVersion": "3.8.0",
+    "styleeVersion": "3.8.1",
     "tokenSetOrder": ["Primitives", "Semantic Light", "Typography", "Components"]
   }
 }

@@ -1,5 +1,13 @@
 # Stylee Design System v3.8 Verification
 
+## v3.8.1 regression correction
+
+- Content weight: Regular (400), including buttons, chips, search, navigation,
+  and wardrobe-card titles.
+- Wardrobe card width: calculated from the rendered grid container, not the
+  browser window, so the desktop phone stage still renders two complete
+  columns.
+
 Date: 2026-07-29  
 Target: wardrobe home v3.8 vertical slice
 
