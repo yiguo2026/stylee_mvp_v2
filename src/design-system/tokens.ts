@@ -8,7 +8,7 @@
 export const ds = {
   "meta": {
     "name": "Stylee Design System",
-    "version": "3.8.0"
+    "version": "3.8.1"
   },
   "color": {
     "primitive": {
@@ -123,21 +123,25 @@ export const ds = {
   },
   "typography": {
     "display": {
+      "fontWeight": "600",
       "fontSize": 24,
       "lineHeight": 30,
       "letterSpacing": 0
     },
     "heading": {
+      "fontWeight": "500",
       "fontSize": 18,
       "lineHeight": 24,
       "letterSpacing": 0
     },
     "content": {
+      "fontWeight": "400",
       "fontSize": 15,
       "lineHeight": 22,
       "letterSpacing": 0.3
     },
     "support": {
+      "fontWeight": "400",
       "fontSize": 12,
       "lineHeight": 18,
       "letterSpacing": 0.24

@@ -75,6 +75,7 @@ function numberToken(setName, path) {
 function typographyToken(name) {
   const value = token('Typography', `type.${name}`);
   return {
+    fontWeight: String(value.fontWeight),
     fontSize: Number(value.fontSize),
     lineHeight: Number(value.lineHeight),
     letterSpacing: Number(value.letterSpacing),

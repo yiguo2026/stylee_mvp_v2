@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     paddingVertical: ds.space[2],
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     color: ds.color.semantic.text.primary,
   },
   disabled: {

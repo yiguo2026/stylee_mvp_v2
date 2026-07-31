@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...ds.typography.content,
-    fontFamily: Fonts.ui,
+    fontFamily: Fonts.body,
     textAlign: 'center',
   },
   labelPrimary: {

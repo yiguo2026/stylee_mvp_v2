@@ -1,8 +1,8 @@
 # Stylee Design System — Current Context and Handoff
 
 Last verified: 2026-07-29  
-Current released baseline: Stylee Design System v3.7  
-Active implementation candidate: Stylee Design System v3.8  
+Current released baseline: Stylee Design System v3.8  
+Active patch candidate: Stylee Design System v3.8.1  
 Repository: `https://github.com/yiguo2026/stylee_mvp_v2`
 
 This is the continuity document for new Codex conversations and future team
@@ -35,13 +35,13 @@ Important:
 ## 2. Verified Git and GitHub state
 
 - Default branch: `main`
-- Verified `origin/main`: `58559ba`
-- `58559ba`: merge of PR #12, Design Token governance
-- PR #12: `chore(design-system): automate token governance`
-- PR URL: `https://github.com/yiguo2026/stylee_mvp_v2/pull/12`
-- Both `Design System Guard` checks passed before merge.
+- Verified `origin/main`: `ee7f55d`
+- `ee7f55d`: merge of PR #13, Stylee v3.8 wardrobe density.
+- PR #13: `feat(design-system): Stylee v3.8 wardrobe density`
+- PR URL: `https://github.com/yiguo2026/stylee_mvp_v2/pull/13`
+- Design System Guard passed before merge.
 - Token working branch: `tokens-sync`
-- Verified remote `tokens-sync`: `70a48bf`
+- v3.8.1 correction commit on `tokens-sync`: `91b548e`
 - UI migration commits:
   - `3e8e7a1` — apply Stylee Design System v3.7 P0
   - `490c7a1` — migrate home and wardrobe to DS v3.7
@@ -322,7 +322,7 @@ body, button, label, caption, and micro sizes is consolidated into four roles:
 |---|---|---|
 | Display | Display Semibold · 24/30 | Page title, major empty-state title |
 | Heading | Display Medium · 18/24 | Sheet title, section title, grouped-context heading |
-| Content | UI Medium · 15/22 | Card title, button, tab, chip, input, primary value |
+| Content | UI Regular · 15/22 | Card title, button, tab, chip, input, primary value |
 | Support | Body Regular · 12/18 | Description, metadata, label, help and status text |
 
 Rules:
@@ -337,6 +337,14 @@ Rules:
 - In `AddClothingSheet`, “补充衣橱” and “更多方式” are both Heading;
   “相册导入”, “快速添加推荐单品”, and “心愿单” are all Content; their
   descriptions are all Support.
+
+### v3.8.1 regression correction — 2026-07-31
+
+- Content uses Regular rather than Medium so functional UI stays light and
+  editorial instead of reading as a wall of bold labels.
+- `StyleeWardrobeGrid` measures its rendered container with `onLayout`.
+  Browser window width must never be used for card geometry because the web
+  build may render inside a narrower desktop phone stage.
 
 ### Wardrobe six-card density — 2026-07-29
 
