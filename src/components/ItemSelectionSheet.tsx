@@ -147,7 +147,10 @@ const ItemSelectionSheet: React.FC<Props> = ({ visible, onClose, taskId }) => {
                     onPress={() => toggleItem(item.index)}
                     activeOpacity={0.82}
                   >
-                    <View style={[styles.colorBadge, { backgroundColor: getColorHex(item.color) }]} />
+                    <Image
+                      source={{ uri: item.sourceImageUri || taskToSelect.sourceUri }}
+                      style={styles.itemThumb}
+                    />
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.description}</Text>
                       <Text style={styles.itemMeta}>{item.category} · {item.color}</Text>
@@ -181,21 +184,6 @@ const ItemSelectionSheet: React.FC<Props> = ({ visible, onClose, taskId }) => {
       </View>
     </View>
   );
-};
-
-const getColorHex = (colorName: string) => {
-  const map: Record<string, string> = {
-    白色: '#FFFFFF',
-    黑色: '#151515',
-    蓝色: '#4F7DFF',
-    米色: '#F1E6CF',
-    灰色: '#9AA0A6',
-    棕色: '#9A684E',
-    红色: '#D14343',
-    粉色: '#E9AFC0',
-    绿色: '#658062',
-  };
-  return map[colorName] || '#D9D9DD';
 };
 
 const styles = StyleSheet.create({
@@ -304,12 +292,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(15,15,15,0.42)',
     backgroundColor: Colors.paper,
   },
-  colorBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: Colors.lineStrong,
+  itemThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.paperRaised,
   },
   itemInfo: {
     flex: 1,
