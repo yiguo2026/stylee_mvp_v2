@@ -58,8 +58,14 @@ export default function LoginScreen() {
       );
 
       if (primary.error) {
+        const emsg = (primary.error.message || '').toLowerCase();
+        // 限流/网络类错误：不要再打第二次请求，否则会加重服务端限流、把账号“锁”得更久
+        const isRateLimited = emsg.includes('too many') || emsg.includes('rate limit');
+        const isNetworkErr = emsg.includes('network') || emsg.includes('fetch') || emsg.includes('timeout');
+        // 仅在“账号/密码不匹配”时，才为老账号回退旧版邮箱格式（保证老用户仍能登录）
+        const isCredErr = emsg.includes('invalid') || emsg.includes('credentials') || emsg.includes('password');
         const legacyEmail = legacyUsernameToEmail(username);
-        if (legacyEmail !== encodedEmail) {
+        if (isCredErr && !isRateLimited && !isNetworkErr && legacyEmail !== encodedEmail) {
           const legacy = await withTimeout(
             supabase.auth.signInWithPassword({ email: legacyEmail, password }),
             12000, 'login',
