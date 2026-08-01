@@ -7,6 +7,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
+import { useCooldown } from '@/lib/useCooldown';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 
 const isWeb = Platform.OS === 'web';
@@ -41,6 +42,7 @@ export default function RegisterScreen() {
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [showTerms, setShowTerms] = useState(false);
+  const cooldown = useCooldown();
 
   const canSubmit =
     username.trim().length > 0 &&
@@ -83,6 +85,7 @@ export default function RegisterScreen() {
     if (password.length < 6) { setError('密码至少需要6位'); return; }
     if (password !== confirmPassword) { setPasswordError('两次密码不一致'); return; }
 
+    if (cooldown.active) return;
     setLoading(true);
     try {
       const normalizedUsername = username.trim();
@@ -98,6 +101,8 @@ export default function RegisterScreen() {
         15000, 'register',
       );
       if (authError || !data.user) {
+        const raw = (authError?.message || '').toLowerCase();
+        if (raw.includes('rate limit') || raw.includes('too many')) cooldown.start(30);
         const translated = translateRegisterError(authError?.message || 'registration failed');
         if (translated === '该用户名已注册') setUsernameError(translated);
         else setError(translated);
@@ -129,6 +134,9 @@ export default function RegisterScreen() {
       const emsg = (e?.message || '').toLowerCase();
       if (emsg.includes('timeout') || emsg.includes('network') || emsg.includes('fetch')) {
         setError('网络较慢或连接失败，请稍后重试');
+      } else if (emsg.includes('rate limit') || emsg.includes('too many')) {
+        cooldown.start(30);
+        setError('请求过于频繁，请稍后再试');
       } else {
         setError(translateRegisterError(e?.message ?? ''));
       }
@@ -231,13 +239,15 @@ AI穿搭方案仅为参考建议，不构成穿搭、服饰选购的决定性依
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.button, (!canSubmit || loading) && styles.buttonDisabled]}
+            style={[styles.button, (!canSubmit || loading || cooldown.active) && styles.buttonDisabled]}
             onPress={handleRegister}
-            disabled={!canSubmit || loading}
+            disabled={!canSubmit || loading || cooldown.active}
           >
             {loading
               ? <ActivityIndicator color={Colors.paper} />
-              : <Text style={styles.buttonText}>注册</Text>
+              : <Text style={styles.buttonText}>
+                  {cooldown.active ? `请 ${cooldown.remaining}s 后重试` : '注册'}
+                </Text>
             }
           </TouchableOpacity>
 

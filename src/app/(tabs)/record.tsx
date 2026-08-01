@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, ActivityIndicator,
+  SafeAreaView, ScrollView,
   Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -12,6 +12,7 @@ import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useOutfitStore } from '@/stores/outfitStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { OutfitListSkeleton } from '@/components/Skeleton';
 import { ds } from '@/design-system';
 import { supabase } from '@/lib/supabase';
 
@@ -378,11 +379,15 @@ export default function RecordTab() {
               </Text>
               {monthOutfits.map(outfit => renderOutfitCard(outfit, true))}
             </View>
-          ) : !loading ? (
+          ) : loading ? (
+            <View style={styles.dayDetail}>
+              <OutfitListSkeleton />
+            </View>
+          ) : (
             <View style={styles.emptySection}>
               <Text style={styles.emptySub}>每次确认穿搭后，都会自动保存到这里</Text>
             </View>
-          ) : null}
+          )}
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -396,8 +401,6 @@ export default function RecordTab() {
           )}
         </ScrollView>
       )}
-
-      {loading ? <ActivityIndicator size="small" color={Colors.walnut2} style={{ marginTop: Spacing.two }} /> : null}
     </SafeAreaView>
   );
 }

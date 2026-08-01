@@ -7,6 +7,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
+import { useCooldown } from '@/lib/useCooldown';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
@@ -36,11 +37,13 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const cooldown = useCooldown();
 
   const canSubmit = username.trim().length > 0 && password.length > 0;
 
   const handleLogin = async () => {
     setError('');
+    if (cooldown.active) return;
     if (!username.trim()) { setError('请输入用户名'); return; }
     if (!password) { setError('请输入密码'); return; }
 
@@ -73,6 +76,8 @@ export default function LoginScreen() {
           if (!legacy.error && legacy.data.session) session = legacy.data.session;
         }
         if (!session) {
+          // 触发限流：启动 30s 冷却，避免用户狂点把账号越锁越久
+          if (isRateLimited) cooldown.start(30);
           setError(translateLoginError(primary.error.message));
           return;
         }
@@ -127,13 +132,15 @@ export default function LoginScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.button, (!canSubmit || loading) && styles.buttonDisabled]}
+            style={[styles.button, (!canSubmit || loading || cooldown.active) && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={!canSubmit || loading}
+            disabled={!canSubmit || loading || cooldown.active}
           >
             {loading
               ? <ActivityIndicator color={Colors.paper} />
-              : <Text style={styles.buttonText}>登录</Text>
+              : <Text style={styles.buttonText}>
+                  {cooldown.active ? `请 ${cooldown.remaining}s 后重试` : '登录'}
+                </Text>
             }
           </TouchableOpacity>
 

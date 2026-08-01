@@ -17,6 +17,7 @@ import { T } from '@/constants/theme';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
+import { WardrobeSkeletonGrid } from '@/components/Skeleton';
 import ItemSelectionSheet from '@/components/ItemSelectionSheet';
 import {
   ds,
@@ -88,6 +89,7 @@ function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?:
 export default function WardrobeTab() {
   const { user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
+  const wardrobeLoading = useWardrobeStore((state) => state.isLoading);
   const { items: wishlistItems, fetchItems: fetchWishlist } = useWishlistStore();
   const tasks = useImportStore((state) => state.tasks);
   const retryFailed = useImportStore((state) => state.retryFailed);
@@ -246,7 +248,9 @@ export default function WardrobeTab() {
     }
   }, [retryFailed]);
 
-  const showEmptyState = gridEntries.length === 0;
+  // 首次进入衣橱、数据还没回来时先展示骨架网格，避免「还没有衣物」空态闪现
+  const showSkeleton = wardrobeLoading && gridEntries.length === 0;
+  const showEmptyState = !showSkeleton && gridEntries.length === 0;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
@@ -323,7 +327,9 @@ export default function WardrobeTab() {
           })}
         </ScrollView>
 
-        {showEmptyState ? (
+        {showSkeleton ? (
+          <WardrobeSkeletonGrid />
+        ) : showEmptyState ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="hanger" size={56} color={ds.color.semantic.text.tertiary} />
             {selectedCategory === '全部' ? (
