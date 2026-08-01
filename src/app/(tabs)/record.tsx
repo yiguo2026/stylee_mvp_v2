@@ -7,8 +7,10 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
+import { useOutfitStore } from '@/stores/outfitStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ds } from '@/design-system';
 import { supabase } from '@/lib/supabase';
@@ -79,6 +81,7 @@ type RecordTab = 'worn' | 'favorite';
 // ── Main Component ────────────────────────────────────────
 export default function RecordTab() {
   const { user } = useUserStore();
+  const { toggleFavorite } = useOutfitStore();
   const params = useLocalSearchParams<{ tab?: string }>();
 
   const today = new Date();
@@ -174,6 +177,35 @@ export default function RecordTab() {
     router.push({ pathname: '/outfit/[id]', params: { id: outfit.outfit_id } });
   };
 
+  // 已收藏搭配的 outfit_id 集合 —— 派生自 favorites，用于决定收藏按钮的实心/空心状态。
+  const favoritedIds = new Set(favorites.map(f => f.outfit_id));
+
+  // 收藏 / 取消收藏（乐观更新，失败自动回滚重拉）。
+  const handleToggleFavorite = async (outfit: SavedOutfit) => {
+    if (!user?.id) return;
+    const currentlyFavorited = favoritedIds.has(outfit.outfit_id);
+
+    // 乐观更新：立即反映到收藏列表与计数
+    if (currentlyFavorited) {
+      setFavorites(prev => prev.filter(f => f.outfit_id !== outfit.outfit_id));
+      setTotalFavorites(n => Math.max(0, n - 1));
+    } else {
+      setFavorites(prev =>
+        prev.some(f => f.outfit_id === outfit.outfit_id)
+          ? prev
+          : [{ ...outfit, is_favorited: true }, ...prev],
+      );
+      setTotalFavorites(n => n + 1);
+    }
+
+    const newState = await toggleFavorite(user.id, outfit.outfit_id, currentlyFavorited);
+    // 写入失败：状态未变 → 从服务端重新同步，纠正乐观更新
+    if (newState === currentlyFavorited) {
+      fetchFavorites();
+      fetchTotalOutfits();
+    }
+  };
+
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
     else setViewMonth(m => m - 1);
@@ -201,31 +233,45 @@ export default function RecordTab() {
     .flat()
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const renderOutfitCard = (outfit: SavedOutfit, showDate = false) => (
-    <TouchableOpacity
-      key={outfit.outfit_id}
-      style={styles.outfitCard}
-      onPress={() => openDetail(outfit)}
-      activeOpacity={0.8}
-    >
-      {outfit.cover_image ? (
-        <Image source={{ uri: outfit.cover_image }} style={styles.outfitCardThumb} resizeMode="cover" />
-      ) : (
-        <View style={styles.outfitCardThumbPlaceholder}>
-          <CategoryIcon category={outfit.items?.[0]?.category ?? ''} size={22} color={Colors.walnut2} />
+  const renderOutfitCard = (outfit: SavedOutfit, showDate = false) => {
+    const isFavorited = favoritedIds.has(outfit.outfit_id);
+    return (
+      <TouchableOpacity
+        key={outfit.outfit_id}
+        style={styles.outfitCard}
+        onPress={() => openDetail(outfit)}
+        activeOpacity={0.8}
+      >
+        {outfit.cover_image ? (
+          <Image source={{ uri: outfit.cover_image }} style={styles.outfitCardThumb} resizeMode="cover" />
+        ) : (
+          <View style={styles.outfitCardThumbPlaceholder}>
+            <CategoryIcon category={outfit.items?.[0]?.category ?? ''} size={22} color={ds.color.semantic.text.tertiary} />
+          </View>
+        )}
+        <View style={styles.outfitCardInfo}>
+          <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
+          <Text style={styles.outfitTime}>
+            {showDate
+              ? `${new Date(outfit.created_at).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} ${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`
+              : `${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`}
+          </Text>
         </View>
-      )}
-      <View style={styles.outfitCardInfo}>
-        <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
-        <Text style={styles.outfitTime}>
-          {showDate
-            ? `${new Date(outfit.created_at).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} ${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`
-            : `${new Date(outfit.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 保存`}
-        </Text>
-      </View>
-      <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-    </TouchableOpacity>
-  );
+        <TouchableOpacity
+          style={styles.favToggleBtn}
+          onPress={() => handleToggleFavorite(outfit)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={isFavorited ? 'heart' : 'heart-outline'}
+            size={20}
+            color={isFavorited ? ds.color.semantic.text.accent : ds.color.semantic.text.tertiary}
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -343,38 +389,10 @@ export default function RecordTab() {
           {favorites.length === 0 ? (
             <View style={styles.emptySection}>
               <Text style={styles.emptyTitle}>还没有收藏搭配</Text>
-              <Text style={styles.emptySub}>在推荐结果页点击「收藏此搭配」即可保存灵感</Text>
+              <Text style={styles.emptySub}>在推荐结果页或记录里点击 ♥ 即可收藏灵感</Text>
             </View>
           ) : (
-            favorites.map(outfit => (
-              <TouchableOpacity
-                key={outfit.outfit_id}
-                style={styles.outfitCard}
-                onPress={() => openDetail(outfit)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.outfitCardThumbWrap}>
-                  {outfit.cover_image ? (
-                    <Image source={{ uri: outfit.cover_image }} style={styles.outfitCardThumb} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.outfitCardThumbPlaceholder}>
-                      <CategoryIcon category={outfit.items?.[0]?.category ?? ''} size={22} color={Colors.walnut2} />
-                    </View>
-                  )}
-                  <View style={styles.favBadge}>
-                    <Feather name="heart" size={10} color={Colors.paper} />
-                  </View>
-                </View>
-                <View style={styles.outfitCardInfo}>
-                  <Text style={styles.outfitName}>{outfit.name ?? '搭配'}</Text>
-
-                  <Text style={styles.outfitTime}>
-                    {new Date(outfit.created_at).toLocaleDateString('zh-CN')} 收藏
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={16} color={Colors.walnut2} />
-              </TouchableOpacity>
-            ))
+            favorites.map(outfit => renderOutfitCard(outfit, true))
           )}
         </ScrollView>
       )}
@@ -489,6 +507,13 @@ const styles = StyleSheet.create({
   outfitName: { ...T.content },
   outfitComment: { ...T.support },
   outfitTime: { ...T.micro },
+  favToggleBtn: {
+    width: ds.size.control.small,
+    height: ds.size.control.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: ds.radius.full,
+  },
 
   // Empty sections
   emptySection: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.six, marginTop: Spacing.three },

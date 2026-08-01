@@ -5,9 +5,13 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
+import { ds } from '@/design-system';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { useUserStore } from '@/stores/userStore';
+import { useOutfitStore } from '@/stores/outfitStore';
 
 interface OutfitItemDetail {
   item_id: string;
@@ -45,6 +49,9 @@ export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [outfit, setOutfit] = useState<OutfitDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [favBusy, setFavBusy] = useState(false);
+  const { user } = useUserStore();
+  const { toggleFavorite } = useOutfitStore();
 
   const fetchOutfit = useCallback(async () => {
     if (!id) return;
@@ -86,6 +93,20 @@ export default function OutfitDetailScreen() {
     router.push({ pathname: '/wardrobe/[id]', params: { id: itemId } });
   };
 
+  const handleToggleFavorite = async () => {
+    if (!outfit || !user?.id || favBusy) return;
+    const currentlyFavorited = !!outfit.is_favorited;
+    setFavBusy(true);
+    // 乐观更新
+    setOutfit(prev => (prev ? { ...prev, is_favorited: !currentlyFavorited } : prev));
+    const newState = await toggleFavorite(user.id, outfit.outfit_id, currentlyFavorited);
+    // 写入失败：回滚
+    if (newState === currentlyFavorited) {
+      setOutfit(prev => (prev ? { ...prev, is_favorited: currentlyFavorited } : prev));
+    }
+    setFavBusy(false);
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -94,7 +115,20 @@ export default function OutfitDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{outfit?.name ?? '搭配详情'}</Text>
         <View style={styles.headerRight}>
-          {outfit?.is_favorited ? <Feather name="heart" size={18} color={Colors.terracotta} /> : null}
+          {outfit ? (
+            <TouchableOpacity
+              onPress={handleToggleFavorite}
+              disabled={favBusy}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={outfit.is_favorited ? 'heart' : 'heart-outline'}
+                size={22}
+                color={outfit.is_favorited ? ds.color.semantic.text.accent : ds.color.semantic.text.tertiary}
+              />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
