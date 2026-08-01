@@ -36,6 +36,7 @@ export default function RootLayout() {
   const pendingSelectionCount = useImportStore((state) => state.pendingSelectionCount);
   const tasks = useImportStore((state) => state.tasks);
   const pendingToastCountRef = useRef(0);
+  const authRestoredRef = useRef(false);
   const { setSession, fetchProfile } = useUserStore();
 
   const [fontsLoaded, fontError] = useFonts({
@@ -70,6 +71,9 @@ export default function RootLayout() {
     if (!fontsReady) return;
 
     const handleSignIn = async (session: Session) => {
+      // 幂等：INITIAL_SESSION 事件与 getSession() 兜底可能同时触发，只处理一次
+      if (authRestoredRef.current) { setSession(session); return; }
+      authRestoredRef.current = true;
       setSession(session);
       await fetchProfile();
       const { profile } = useUserStore.getState();
@@ -82,22 +86,25 @@ export default function RootLayout() {
       }
     };
 
+    const goToLogin = () => {
+      setSession(null);
+      if (!isDesignPreview) router.replace('/(auth)/login');
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        setSession(null);
-        if (!isDesignPreview) {
-          router.replace('/(auth)/login');
-        }
+        authRestoredRef.current = false;
+        goToLogin();
       } else if (event === 'INITIAL_SESSION') {
-        if (session) {
-          handleSignIn(session);
-        } else {
-          setSession(null);
-          if (!isDesignPreview) {
-            router.replace('/(auth)/login');
-          }
-        }
+        if (session) handleSignIn(session);
+        else if (!authRestoredRef.current) goToLogin();
       }
+    });
+
+    // 兜底：直接从持久化存储读取会话，确保“记住登录状态”不会因错过 INITIAL_SESSION 事件而被弹回登录页
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) handleSignIn(data.session);
+      else if (!authRestoredRef.current) goToLogin();
     });
 
     return () => subscription.unsubscribe();
