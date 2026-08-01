@@ -78,6 +78,8 @@ export default function OnboardingStep1() {
         updated_at: new Date().toISOString(),
       });
       if (error) throw error;
+      // 同步 gender 到 auth metadata → 下次登录/冷启动路由零 DB 查询
+      void useUserStore.getState().syncGenderToAuth(gender);
       await fetchProfile();
       router.push('/onboarding/step2-style');
     } catch (e: any) {
@@ -95,6 +97,8 @@ export default function OnboardingStep1() {
         gender: 'other',
         updated_at: new Date().toISOString(),
       }).eq('user_id', user.id);
+      // 同步 gender 到 auth metadata → 下次登录/冷启动路由零 DB 查询
+      void useUserStore.getState().syncGenderToAuth('other');
       await fetchProfile();
     }
     router.replace('/(tabs)');

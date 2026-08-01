@@ -19,6 +19,8 @@ interface UserState {
   resolveRouteGender: () => Promise<string | null>;
   // 从本地缓存把 profile 直接灌进 store，先渲染再刷新（offline-first）
   hydrateFromCache: (userId: string) => UserProfile | null;
+  // 把 gender 写进 auth user_metadata（服务端持久化），下次登录/冷启动路由可零 DB 查询
+  syncGenderToAuth: (gender: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -107,13 +109,16 @@ export const useUserStore = create<UserState>((set, get) => ({
   resolveRouteGender: async () => {
     const { user } = get();
     if (!user) return null;
-    // 1) 本地缓存优先：老设备/回访用户瞬时拿到 gender，跳转零等待
+    // 0) auth user_metadata 优先：登录返回的 session 自带 gender → 零 DB 查询、最快
+    const metaGender = (user.user_metadata as any)?.gender;
+    if (typeof metaGender === 'string' && metaGender) return metaGender;
+    // 1) 本地缓存：老设备/回访用户瞬时拿到 gender，跳转零等待
     const cached = readProfileCache(user.id);
     if (cached?.gender) {
       set({ profile: cached });
       return cached.gender;
     }
-    // 2) 无缓存时只查 gender 单列（比 select(*)+style_preferences join 快很多）
+    // 2) 兜底：只查 gender 单列（比 select(*)+style_preferences join 快很多）
     try {
       const res: any = await withTimeout(
         supabase.from('users').select('gender').eq('user_id', user.id).single(),
@@ -123,6 +128,20 @@ export const useUserStore = create<UserState>((set, get) => ({
     } catch (e: any) {
       console.warn('[UserStore] resolveRouteGender failed:', e?.message);
       return null;
+    }
+  },
+
+  syncGenderToAuth: async (gender) => {
+    try {
+      const res: any = await withTimeout(
+        supabase.auth.updateUser({ data: { gender } }),
+        6000, 'sync-gender',
+      );
+      // 同步刷新内存里的 session.user，让本次会话也能零查询命中
+      if (res?.data?.user) set({ user: res.data.user });
+    } catch (e: any) {
+      // 失败不影响主流程：下次仍可回退到缓存 / 单列查询
+      console.warn('[UserStore] syncGenderToAuth failed:', e?.message);
     }
   },
 
@@ -136,6 +155,11 @@ export const useUserStore = create<UserState>((set, get) => ({
         .eq('user_id', user.id);
       if (error) throw error;
       set({ profile: { ...profile!, ...updates } });
+      // gender 变化时同步到 auth metadata + 本地缓存，保证下次登录路由零查询
+      if (typeof updates.gender === 'string' && updates.gender) {
+        writeProfileCache(user.id, { ...profile!, ...updates } as UserProfile);
+        void get().syncGenderToAuth(updates.gender);
+      }
     } catch (e: any) {
       console.warn('[UserStore] updateProfile failed:', e.message);
     }
