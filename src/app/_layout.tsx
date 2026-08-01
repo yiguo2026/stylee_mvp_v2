@@ -37,7 +37,7 @@ export default function RootLayout() {
   const tasks = useImportStore((state) => state.tasks);
   const pendingToastCountRef = useRef(0);
   const authRestoredRef = useRef(false);
-  const { setSession, fetchProfile } = useUserStore();
+  const { setSession } = useUserStore();
 
   const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
@@ -75,11 +75,15 @@ export default function RootLayout() {
       if (authRestoredRef.current) { setSession(session); return; }
       authRestoredRef.current = true;
       setSession(session);
-      await fetchProfile();
-      const { profile } = useUserStore.getState();
+      // 冷启动/记住登录：先用本地缓存的 profile 立即渲染，再解析路由 gender 立刻跳转，
+      // 完整 profile + 风格偏好后台刷新，避免开屏对着转圈等 DB。
+      const store = useUserStore.getState();
+      store.hydrateFromCache(session.user.id);
+      const gender = await store.resolveRouteGender();
+      void store.fetchProfile();
       // DB trigger auto-creates users with gender='private'; onboarding sets it to female/male/other.
       // Only go to onboarding if we positively know gender is 'private' (never completed).
-      if (profile?.gender === 'private') {
+      if (gender === 'private') {
         router.replace('/onboarding/step1-info');
       } else {
         router.replace('/(tabs)');

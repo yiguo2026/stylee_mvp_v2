@@ -83,11 +83,12 @@ export default function LoginScreen() {
       if (!session) { setError('登录失败，请重试'); return; }
 
       useUserStore.getState().setSession(session);
-      // 拉取 profile（内部已并行 + 超时保护），失败也不阻塞跳转
-      await useUserStore.getState().fetchProfile();
-      const { profile } = useUserStore.getState();
+      // 关键提速：只解析路由所需的 gender（缓存优先/单列查询），拿到就立刻跳转；
+      // 完整 profile + 风格偏好放到后台刷新，不再让用户对着转圈等 select(*)+join。
+      const gender = await useUserStore.getState().resolveRouteGender();
+      void useUserStore.getState().fetchProfile();
       // DB trigger auto-creates users with gender='private'; onboarding sets it to female/male/other.
-      router.replace(profile?.gender === 'private' ? '/onboarding/step1-info' : '/(tabs)');
+      router.replace(gender === 'private' ? '/onboarding/step1-info' : '/(tabs)');
     } catch (e: any) {
       setError(translateLoginError(e?.message ?? ''));
     } finally {
