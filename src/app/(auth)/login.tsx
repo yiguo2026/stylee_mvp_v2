@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 import { useUserStore } from '@/stores/userStore';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
@@ -44,41 +45,48 @@ export default function LoginScreen() {
     if (!password) { setError('请输入密码'); return; }
 
     setLoading(true);
+    try {
+      // 不再前置查 users 表（大小写敏感 + 可能与 auth 不同步会误杀已注册账号）。
+      // 直接交给 Supabase Auth 判定账号/密码。
+      // Try new encoded email first, fall back to legacy lowercase for old accounts.
+      const encodedEmail = usernameToEmail(username);
+      let session = null;
 
-    // 不再前置查 users 表（大小写敏感 + 可能与 auth 不同步会误杀已注册账号）。
-    // 直接交给 Supabase Auth 判定账号/密码。
-    // Try new encoded email first, fall back to legacy lowercase for old accounts
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: usernameToEmail(username),
-      password,
-    });
-    if (authError) {
-      const legacyEmail = legacyUsernameToEmail(username);
-      if (legacyEmail !== usernameToEmail(username)) {
-        const { data: data2, error: authError2 } = await supabase.auth.signInWithPassword({
-          email: legacyEmail,
-          password,
-        });
-        if (!authError2 && data2.session) {
-          useUserStore.getState().setSession(data2.session);
-          await useUserStore.getState().fetchProfile();
-          setLoading(false);
-          const { profile } = useUserStore.getState();
-          router.replace(profile?.gender === 'private' ? '/onboarding/step1-info' : '/(tabs)');
+      const primary = await withTimeout(
+        supabase.auth.signInWithPassword({ email: encodedEmail, password }),
+        12000, 'login',
+      );
+
+      if (primary.error) {
+        const legacyEmail = legacyUsernameToEmail(username);
+        if (legacyEmail !== encodedEmail) {
+          const legacy = await withTimeout(
+            supabase.auth.signInWithPassword({ email: legacyEmail, password }),
+            12000, 'login',
+          );
+          if (!legacy.error && legacy.data.session) session = legacy.data.session;
+        }
+        if (!session) {
+          setError(translateLoginError(primary.error.message));
           return;
         }
+      } else {
+        session = primary.data.session;
       }
-      setLoading(false);
-      setError(translateLoginError(authError.message));
-      return;
-    }
-    if (data.session) {
-      useUserStore.getState().setSession(data.session);
+
+      if (!session) { setError('登录失败，请重试'); return; }
+
+      useUserStore.getState().setSession(session);
+      // 拉取 profile（内部已并行 + 超时保护），失败也不阻塞跳转
       await useUserStore.getState().fetchProfile();
-      setLoading(false);
       const { profile } = useUserStore.getState();
       // DB trigger auto-creates users with gender='private'; onboarding sets it to female/male/other.
       router.replace(profile?.gender === 'private' ? '/onboarding/step1-info' : '/(tabs)');
+    } catch (e: any) {
+      setError(translateLoginError(e?.message ?? ''));
+    } finally {
+      // 保证任何路径（成功 / 失败 / 超时 / 异常）都会停止转圈
+      setLoading(false);
     }
   };
 
