@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { DetectedItem, normalizeColor, normalizeMaterial } from '@/types';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
+import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 
 // ─── Types ────────────────────────────────────────────────
@@ -232,6 +233,13 @@ async function handleFinalize(taskId: string, userId: string) {
   if (!task || !task.confirmedItems) return;
 
   try {
+    // 用于本次导入内 + 衣橱已有单品的同名去重（保证标题唯一且 ≤10 字）
+    const existingNames = new Set(
+      useWardrobeStore.getState().items
+        .map(i => (i.name || '').trim())
+        .filter(Boolean),
+    );
+
     for (let i = 0; i < task.confirmedItems.length; i++) {
       const item = task.confirmedItems[i];
       const sourceUri = item.sourceImageUri || task.sourceUri;
@@ -288,11 +296,27 @@ async function handleFinalize(taskId: string, userId: string) {
         tasks: state.tasks.map(t => t.id === taskId ? { ...t, standardizedImageUri: finalImageUrl } : t)
       }));
 
+      // 统一命名规则：[记忆点]+[颜色]+[细分品类]，≤10 字，衣橱内去重
+      const itemName = ensureUniqueName(
+        buildItemName({
+          category: item.category,
+          color: item.color,
+          material: item.material,
+          style: item.style,
+          fit_type: item.fit_type,
+          sleeve_length: item.sleeve_length,
+          description: item.description,
+          brand: item.brand,
+        }),
+        existingNames,
+      );
+      existingNames.add(itemName);
+
       // Save to wardrobe. The primary image is the standardized/bg-removed image when available.
       const { addItem } = useWardrobeStore.getState();
       await addItem({
         user_id: userId,
-        name: (item.description || `${item.color}${item.category}`).slice(0, 10),
+        name: itemName,
         category: item.category,
         color: normalizeColor(item.color),
         material: item.material ? normalizeMaterial(item.material) : undefined,
