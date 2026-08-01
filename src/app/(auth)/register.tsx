@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 
 const isWeb = Platform.OS === 'web';
@@ -85,50 +86,55 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const normalizedUsername = username.trim();
-      const { data: existing } = await supabase
-        .from('users')
-        .select('user_id')
-        .eq('username', normalizedUsername)
-        .maybeSingle();
-      if (existing) {
-        setLoading(false);
-        setUsernameError('该用户名已注册');
-        return;
-      }
 
-      const { data, error: authError } = await supabase.auth.signUp({
-        email: usernameToEmail(normalizedUsername),
-        password,
-        options: { data: { username: normalizedUsername } },
-      });
+      // 直接 signUp（去掉冗余的前置 users 查询，少一次串行往返 → 更快）；
+      // 重复用户名交给 signUp 的 already-registered 错误来判定。
+      const { data, error: authError } = await withTimeout(
+        supabase.auth.signUp({
+          email: usernameToEmail(normalizedUsername),
+          password,
+          options: { data: { username: normalizedUsername } },
+        }),
+        15000, 'register',
+      );
       if (authError || !data.user) {
-        setLoading(false);
         const translated = translateRegisterError(authError?.message || 'registration failed');
         if (translated === '该用户名已注册') setUsernameError(translated);
         else setError(translated);
         return;
       }
-      // Ensure username is saved in users table (trigger may miss it)
-      const { error: profileError } = await supabase
-        .from('users')
-        .upsert({
+
+      // 确保 username 落到 users 表（trigger 可能漏）——带超时，失败不阻塞注册
+      const upsertRes = await withTimeout(
+        supabase.from('users').upsert({
           user_id: data.user.id,
           username: normalizedUsername,
           nickname: normalizedUsername,
           gender: 'private',
-        }, { onConflict: 'user_id' });
-      if (profileError) {
-        console.warn('[Register] profile upsert failed:', profileError.message);
+        }, { onConflict: 'user_id' }),
+        8000, 'profile',
+      ).catch((e: any) => ({ error: e }));
+      if (upsertRes?.error) {
+        console.warn('[Register] profile upsert failed:', upsertRes.error.message);
       }
 
-      if (data.session) await supabase.auth.signOut();
+      // 注册后不自动登录：清掉会话（带超时，避免卡住跳转）
+      if (data.session) {
+        await withTimeout(supabase.auth.signOut(), 8000, 'signout').catch(() => {});
+      }
 
-      setLoading(false);
       // 注册成功，跳转登录页（不自动登录）
       router.replace('/(auth)/login');
-    } catch {
+    } catch (e: any) {
+      const emsg = (e?.message || '').toLowerCase();
+      if (emsg.includes('timeout') || emsg.includes('network') || emsg.includes('fetch')) {
+        setError('网络较慢或连接失败，请稍后重试');
+      } else {
+        setError(translateRegisterError(e?.message ?? ''));
+      }
+    } finally {
+      // 保证任何路径都停止转圈
       setLoading(false);
-      setError('网络连接失败，请检查网络后重试');
     }
   };
 
