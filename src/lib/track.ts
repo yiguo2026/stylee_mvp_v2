@@ -25,7 +25,8 @@ export type EventName =
   | 'record_view'
   | 'feedback_submit'
   | 'filter_conflict_shown'
-  | 'filter_conflict_confirmed';
+  | 'filter_conflict_confirmed'
+  | 'account_deletion_requested';
 
 export interface AuthViewParams {
   page: 'login' | 'register';
@@ -111,6 +112,7 @@ export type EventParamsMap = {
   feedback_submit: FeedbackSubmitParams;
   filter_conflict_shown: FilterConflictShownParams;
   filter_conflict_confirmed: FilterConflictConfirmedParams;
+  account_deletion_requested: {};
 };
 
 // ─── Session & Anonymous ID ──────────────────────────────────
