@@ -117,7 +117,7 @@ export type EventParamsMap = {
 
 const SESSION_ID = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-function getAnonymousId(): string {
+export function getAnonymousId(): string {
   const STORAGE_KEY = 'stylee.anonymous_id';
   try {
     if (typeof localStorage !== 'undefined') {

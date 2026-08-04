@@ -3,10 +3,13 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { showToast } from '@/components/Toast';
-import { track } from '@/lib/track';
+import { track, getAnonymousId } from '@/lib/track';
+import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 
 const CATEGORIES: { key: string; label: string }[] = [
   { key: 'bug',      label: '功能异常 / Bug' },
@@ -32,15 +35,53 @@ export default function FeedbackPage() {
       return;
     }
     setSubmitting(true);
-    // TODO: 接后端反馈表 / 或转 Supabase feedback 表
-    try { track('feedback_submit', { category, has_screenshot: false }); } catch {}
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      // 获取当前用户（可能未登录）
+      let userId: string | null = null;
+      try {
+        const { data } = await supabase.auth.getUser();
+        userId = data?.user?.id ?? null;
+      } catch {
+        userId = null;
+      }
+      const anonymousId = getAnonymousId();
+      const appVersion = Constants.expoConfig?.version ?? 'unknown';
+
+      const payload = {
+        user_id: userId,
+        anonymous_id: userId ? null : anonymousId,
+        category,
+        content: content.trim(),
+        contact: contact.trim() ? contact.trim() : null,
+        screenshot_url: null,
+        app_version: appVersion,
+        platform: Platform.OS,
+      };
+
+      // 用 withTimeout 包裹，避免弱网卡死
+      const { error } = await withTimeout(
+        supabase.from('user_feedback').insert(payload),
+        10000,
+        'user_feedback.insert',
+      );
+
+      if (error) throw error;
+
+      // 只在成功入库后才上报埋点，避免污染数据
+      try { track('feedback_submit', { category, has_screenshot: false }); } catch {}
+
       showToast('已收到您的反馈，谢谢 💛', 'success');
+      // 清空表单
       setContent('');
       setContact('');
       if (router.canGoBack()) router.back();
-    }, 400);
+    } catch (e: any) {
+      console.error('[feedback] submit failed', e?.message ?? e);
+      showToast('提交失败，请稍后重试', 'error');
+      // 失败保留表单内容，方便重试
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
