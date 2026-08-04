@@ -11,13 +11,14 @@ Supabase Dashboard → **SQL Editor** 手动跑一次。执行时请按下方**�
 |---|------|------|------|
 | 1 | `supabase/migrations/20260804175519_analytics_events.sql` | P0 埋点表 `analytics_events`，承接 `track.ts` 上报 | ⚠️ 未确认执行 |
 | 2 | `supabase/migrations/20260804191827_user_feedback.sql` | 意见反馈表 `user_feedback`，承接反馈页 handleSubmit | ⚠️ 未确认执行 |
+| 3 | `supabase/migrations/20260804201158_account_deletion_requests.sql` | P2 账号注销表 `account_deletion_requests`，承接设置页「注销账号」入口登记的待处理请求 | ⚠️ 未确认执行 |
 
 ### 执行方法
 
 1. 打开 Supabase Dashboard，选择本项目
 2. 进入 **SQL Editor** → New query
 3. 复制对应 SQL 文件全文，粘贴执行
-4. 到 **Table Editor** 验证：`analytics_events` / `user_feedback` 两张表已创建，且 RLS 开启
+4. 到 **Table Editor** 验证：`analytics_events` / `user_feedback` / `account_deletion_requests` 三张表已创建，且 RLS 开启
 
 ### 未执行时的降级行为
 
@@ -25,6 +26,11 @@ Supabase Dashboard → **SQL Editor** 手动跑一次。执行时请按下方**�
 - **`user_feedback` 未建**：反馈页提交时 `supabase.from('user_feedback').insert()` 会返回 error，
   toast 展示"提交失败，请稍后重试"，表单内容保留。**这是符合预期的失败态**，不会崩溃或误伤埋点
   （埋点 `feedback_submit` 只在成功入库后才上报）。
+- **`account_deletion_requests` 未建**：设置页点「确认注销」时 `insert()` 会返回 error，
+  toast 展示"提交失败，请稍后重试"，**用户停留在设置页且不会被登出**（signOut 只在入库成功后才执行），
+  可稍后重试。**这是符合预期的失败态**。
+  > 注意：MVP 阶段该表只做「注销请求登记」（`status=pending`），**不做真实数据联删**。
+  > 真正删除 `users` / `wardrobe` / `outfits` / 收藏等关联数据由后端定时任务或人工按 `pending` 队列处理。
 
 ## 二、前端部署
 
