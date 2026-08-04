@@ -79,10 +79,26 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
         log_usage(provider, model, feature, call_type, None, int((time.time() - t0) * 1000), False)
         raise ProviderTimeoutError(f"上游模型调用超时({timeout}s): {url}") from None
     try:
-        content = body["choices"][0]["message"]["content"]
+        choice = body["choices"][0]
+        message = choice["message"]
+        content = message["content"]
     except (KeyError, IndexError):
         log_usage(provider, model, feature, call_type, body.get("usage"), int((time.time() - t0) * 1000), False, body.get("id"))
         raise ProviderError(f"返回结构异常: {str(body)[:300]}") from None
+    usage = body.get("usage") or {}
+    print(json.dumps({
+        "event": "stylee_upstream_response",
+        "provider": provider,
+        "feature": feature,
+        "model": model,
+        "response_id": body.get("id"),
+        "finish_reason": choice.get("finish_reason"),
+        "content_chars": len(content or ""),
+        "reasoning_chars": len(message.get("reasoning_content") or ""),
+        "prompt_tokens": usage.get("prompt_tokens"),
+        "completion_tokens": usage.get("completion_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }, ensure_ascii=False, separators=(",", ":")), flush=True)
     log_usage(provider, model, feature, call_type, body.get("usage"), int((time.time() - t0) * 1000), True, body.get("id"))
     return content
 

@@ -14,7 +14,9 @@ import os
 os.environ["STYLEE_SUPABASE_URL"] = "http://127.0.0.1:9"
 
 import json
+import io
 import urllib.request
+from contextlib import redirect_stdout
 
 import stylee.providers.openai_compat as oc
 from stylee.providers import ProviderError, ProviderTimeoutError, deepseek
@@ -102,6 +104,33 @@ def main() -> None:
         except ProviderTimeoutError:
             _check(True, "超时抛 ProviderTimeoutError")
         _check(len(usage_calls) == 1, "超时写入一次失败埋点")
+
+        print("\n[6] 上游响应只记录安全元数据")
+        truncated_body = {
+            "id": "req-truncated",
+            "choices": [{
+                "finish_reason": "length",
+                "message": {"content": "", "reasoning_content": "internal reasoning"},
+            }],
+            "usage": {"prompt_tokens": 2571, "completion_tokens": 2048, "total_tokens": 4619},
+        }
+        urllib.request.urlopen = _patched_urlopen({}, truncated_body)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            oc._chat_completion(
+                "https://api.deepseek.com/v1", "k", "deepseek-v4-flash",
+                [{"role": "user", "content": "hi"}], 0.7, 30, True,
+            )
+        metadata_lines = [
+            json.loads(line) for line in output.getvalue().splitlines()
+            if line.startswith("{") and '"event":"stylee_upstream_response"' in line
+        ]
+        _check(len(metadata_lines) == 1, "每次响应输出一条上游元数据")
+        metadata = metadata_lines[0]
+        _check(metadata["finish_reason"] == "length", "记录 finish_reason")
+        _check(metadata["content_chars"] == 0, "记录空正文长度")
+        _check(metadata["reasoning_chars"] == 18, "只记录推理长度，不记录推理内容")
+        _check(metadata["completion_tokens"] == 2048, "记录 completion token")
     finally:
         urllib.request.urlopen = orig
         oc.log_usage = orig_log_usage
