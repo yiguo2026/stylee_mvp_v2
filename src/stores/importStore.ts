@@ -4,6 +4,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
 import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
+import { track } from '@/lib/track';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -71,6 +72,8 @@ export const useImportStore = create<ImportState>((set) => ({
       sourceUri: uri,
       status: 'pending',
     }));
+
+    try { track('wardrobe_import_start', { source: 'album' }); } catch {}
 
     set(state => {
       const allTasks = [...state.tasks, ...newTasks];
@@ -216,6 +219,7 @@ async function handleDetection(taskId: string) {
       } : t),
       pendingSelectionCount: state.pendingSelectionCount + 1
     }));
+    try { track('wardrobe_import_result', { status: 'multi_selection', item_count: items.length, duration_ms: 0 }); } catch {}
   } else {
     store.setState(state => ({
       tasks: state.tasks.map(t => t.id === taskId ? { 
@@ -231,6 +235,7 @@ async function handleFinalize(taskId: string, userId: string) {
   const store = useImportStore;
   const task = store.getState().tasks.find(t => t.id === taskId);
   if (!task || !task.confirmedItems) return;
+  const finalizeStart = Date.now();
 
   try {
     // 用于本次导入内 + 衣橱已有单品的同名去重（保证标题唯一且 ≤10 字）
@@ -342,10 +347,12 @@ async function handleFinalize(taskId: string, userId: string) {
       tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'done' } : t),
       completedCount: state.completedCount + 1
     }));
+    try { track('wardrobe_import_result', { status: 'success', item_count: task.confirmedItems?.length ?? 1, duration_ms: Date.now() - finalizeStart }); } catch {}
   } catch (err: any) {
     store.setState(state => ({
       tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'failed', error: err.message || '导入失败' } : t),
       failedCount: state.failedCount + 1
     }));
+    try { track('wardrobe_import_result', { status: 'failed', item_count: 0, duration_ms: Date.now() - finalizeStart, error_code: err.message }); } catch {}
   }
 }

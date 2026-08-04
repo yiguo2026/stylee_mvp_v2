@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
 import { useCooldown } from '@/lib/useCooldown';
+import { track } from '@/lib/track';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 
 const isWeb = Platform.OS === 'web';
@@ -50,6 +51,10 @@ export default function RegisterScreen() {
     password === confirmPassword &&
     !usernameError &&
     !passwordError;
+
+  useEffect(() => {
+    try { track('auth_view', { page: 'register' }); } catch {}
+  }, []);
 
   const handleUsernameChange = (t: string) => {
     setUsername(t);
@@ -129,6 +134,7 @@ export default function RegisterScreen() {
       }
 
       // 注册成功，跳转登录页（不自动登录）
+      try { track('auth_success', { mode: 'register', is_new_user: true }); } catch {}
       router.replace('/(auth)/login');
     } catch (e: any) {
       const emsg = (e?.message || '').toLowerCase();

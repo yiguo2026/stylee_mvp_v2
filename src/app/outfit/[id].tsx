@@ -9,6 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
 import { ds } from '@/design-system';
 import { supabase } from '@/lib/supabase';
+import { track } from '@/lib/track';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useUserStore } from '@/stores/userStore';
 import { useOutfitStore } from '@/stores/outfitStore';
@@ -88,6 +89,12 @@ export default function OutfitDetailScreen() {
   }, [id]);
 
   useEffect(() => { fetchOutfit(); }, [fetchOutfit]);
+
+  useEffect(() => {
+    if (id) {
+      try { track('outfit_detail_view', { outfit_id: id, source: 'record' }); } catch {}
+    }
+  }, [id]);
 
   const openItem = (itemId: string) => {
     router.push({ pathname: '/wardrobe/[id]', params: { id: itemId } });

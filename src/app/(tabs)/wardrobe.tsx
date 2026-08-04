@@ -32,6 +32,7 @@ import { useImportStore, type ImportTaskStatus } from '@/stores/importStore';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
+import { track } from '@/lib/track';
 import { CLOTHING_CATEGORIES_WITH_ALL, ClothingCategory, WardrobeItem } from '@/types';
 
 function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?: boolean }) {
@@ -115,6 +116,7 @@ export default function WardrobeTab() {
     if (user) {
       fetchItems(user.id);
       fetchWishlist(user.id);
+      try { track('wardrobe_view', { item_count: items.length }); } catch {}
     }
   }, [fetchItems, fetchWishlist, user]));
 

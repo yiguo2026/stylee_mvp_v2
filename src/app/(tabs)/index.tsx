@@ -15,6 +15,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { fetchWeather, getMockWeather, searchCitiesOnline, getTempTag, CityResult } from '@/lib/weather';
 import { supabase } from '@/lib/supabase';
 import { getQuota } from '@/lib/dailyQuota';
+import { track } from '@/lib/track';
 import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
@@ -196,6 +197,14 @@ export default function OutfitTab() {
 
     const mode = modeOverride ?? inputMode;
     const selectedTagIds = allTags.filter(t => t.selected).map(t => t.id);
+
+    try {
+      track('outfit_generate_click', {
+        query_type: mode === 'description' ? 'scene' : 'style',
+        query_text: mode === 'description' ? query : selectedTagIds.join(','),
+      });
+    } catch {}
+
     router.push({
       pathname: '/outfit/result',
       params: {

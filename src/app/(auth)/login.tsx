@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
 import { useCooldown } from '@/lib/useCooldown';
 import { useUserStore } from '@/stores/userStore';
+import { track } from '@/lib/track';
 import { Colors, Spacing, Radius, Fonts, T } from '@/constants/theme';
 
 function usernameToEmail(username: string) {
@@ -40,6 +41,10 @@ export default function LoginScreen() {
   const cooldown = useCooldown();
 
   const canSubmit = username.trim().length > 0 && password.length > 0;
+
+  useEffect(() => {
+    try { track('auth_view', { page: 'login' }); } catch {}
+  }, []);
 
   const handleLogin = async () => {
     setError('');
@@ -88,6 +93,7 @@ export default function LoginScreen() {
       if (!session) { setError('登录失败，请重试'); return; }
 
       useUserStore.getState().setSession(session);
+      try { track('auth_success', { mode: 'login', is_new_user: false }); } catch {}
       // 关键提速：只解析路由所需的 gender（缓存优先/单列查询），拿到就立刻跳转；
       // 完整 profile + 风格偏好放到后台刷新，不再让用户对着转圈等 select(*)+join。
       const gender = await useUserStore.getState().resolveRouteGender();

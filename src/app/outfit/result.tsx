@@ -15,6 +15,7 @@ import { useWishlistStore } from '@/stores/wishlistStore';
 import { useOutfitStore } from '@/stores/outfitStore';
 import { aiRecommendOutfits, AIMeta } from '@/lib/ai';
 import { supabase } from '@/lib/supabase';
+import { track } from '@/lib/track';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import { Toast } from '@/components/Toast';
@@ -86,6 +87,8 @@ export default function OutfitResultScreen() {
   const [addingRecIdx, setAddingRecIdx] = useState<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quotaConsumedRef = useRef(false);
+  const previewStartRef = useRef<number>(Date.now());
+  const exitReasonRef = useRef<'back' | 'save' | 'regenerate' | 'change_item'>('back');
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -192,6 +195,15 @@ export default function OutfitResultScreen() {
     setAiMeta(aiResult.meta);
     if (aiResult.error) setErrorMessage(aiResult.error);
     setLoading(false);
+
+    try {
+      track('outfit_generate_result', {
+        status: aiResult.error ? 'failed' : 'success',
+        duration_ms: Date.now() - startTime,
+        item_count: aiResult.outfits[0]?.items?.length ?? 0,
+        error_code: aiResult.error ?? undefined,
+      });
+    } catch {}
   }, [params.city, params.query, params.tags, params.temp, params.weather, showToast]);
 
   useEffect(() => {
@@ -219,12 +231,24 @@ export default function OutfitResultScreen() {
   // 卸载时清理定时器，避免 setState after unmount
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
+    // outfit_preview_duration: 离开时上报预览停留时长
+    try {
+      track('outfit_preview_duration', {
+        outfit_id: savedId ?? `temp_${currentIndex}`,
+        duration_ms: Date.now() - previewStartRef.current,
+        exited_by: exitReasonRef.current,
+      });
+    } catch {}
   }, []);
 
   const currentOutfit = outfits[currentIndex];
 
   const handleWear = async (silent = false): Promise<string | null> => {
     if (!currentOutfit || !user) return null;
+    if (!silent) {
+      exitReasonRef.current = 'save';
+      try { track('outfit_action', { outfit_id: savedId ?? `temp_${currentIndex}`, action: 'save' }); } catch {}
+    }
     // 如果已经保存过（如收藏时静默保存），直接复用 savedId
     if (savedId && !silent) {
       setConfirmedWear(true);
@@ -278,6 +302,7 @@ export default function OutfitResultScreen() {
 
   const handleFavorite = async () => {
     if (!currentOutfit || !user) return;
+    try { track('outfit_action', { outfit_id: savedId ?? `temp_${currentIndex}`, action: 'like' }); } catch {}
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       showToast('登录已过期，请重新登录后再操作');
@@ -311,6 +336,7 @@ export default function OutfitResultScreen() {
   // 这里把已有单品 + 推荐补位单品一起传过去，试穿看完整 look。
   const handleGoTryOn = () => {
     if (!currentOutfit) return;
+    try { track('outfit_action', { outfit_id: savedId ?? `temp_${currentIndex}`, action: 'try_on' }); } catch {}
     const tryOnItems = [
       ...(currentOutfit.items ?? []).map(i => ({
         item_id: i.item_id,
@@ -331,6 +357,8 @@ export default function OutfitResultScreen() {
   };
 
   const handleSwap = () => {
+    exitReasonRef.current = 'regenerate';
+    try { track('outfit_action', { outfit_id: savedId ?? `temp_${currentIndex}`, action: 'regenerate' }); } catch {}
     if (outfits.length <= 1) {
       void generateOutfits({ keepCurrentOnFallback: true });
       return;
@@ -342,6 +370,10 @@ export default function OutfitResultScreen() {
   };
 
   const handleAdjustToggle = () => {
+    if (!adjustMode) {
+      exitReasonRef.current = 'change_item';
+      try { track('outfit_action', { outfit_id: savedId ?? `temp_${currentIndex}`, action: 'change_item' }); } catch {}
+    }
     setAdjustMode(prev => !prev);
     setSwapTarget(null);
   };

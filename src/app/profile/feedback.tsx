@@ -6,6 +6,7 @@ import {
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { showToast } from '@/components/Toast';
+import { track } from '@/lib/track';
 
 const CATEGORIES: { key: string; label: string }[] = [
   { key: 'bug',      label: '功能异常 / Bug' },
@@ -32,6 +33,7 @@ export default function FeedbackPage() {
     }
     setSubmitting(true);
     // TODO: 接后端反馈表 / 或转 Supabase feedback 表
+    try { track('feedback_submit', { category, has_screenshot: false }); } catch {}
     setTimeout(() => {
       setSubmitting(false);
       showToast('已收到您的反馈，谢谢 💛', 'success');

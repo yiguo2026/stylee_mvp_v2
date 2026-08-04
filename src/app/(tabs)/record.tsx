@@ -13,6 +13,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useOutfitStore } from '@/stores/outfitStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { OutfitListSkeleton } from '@/components/Skeleton';
+import { track } from '@/lib/track';
 import { ds } from '@/design-system';
 import { supabase } from '@/lib/supabase';
 
@@ -171,6 +172,12 @@ export default function RecordTab() {
       fetchMonthOutfits();
       fetchTotalOutfits();
       fetchFavorites();
+      try {
+        track('record_view', {
+          tab: (params.tab === 'favorite' ? 'collection' : 'record') as 'record' | 'collection',
+          item_count: totalOutfits,
+        });
+      } catch {}
     }, [fetchMonthOutfits, fetchTotalOutfits, fetchFavorites, params.tab])
   );
 
