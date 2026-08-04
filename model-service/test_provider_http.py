@@ -66,6 +66,8 @@ def main() -> None:
         _check(out == '{"outfits":[]}', "返回 content 正确")
         _check(cap["payload"].get("max_tokens") == 2048, "payload 默认带 max_tokens=2048")
         _check(cap["payload"]["model"] == "deepseek-v4-flash", "payload 用传入的 model")
+        _check(cap["payload"].get("thinking") == {"type": "disabled"},
+               "DeepSeek 结构化请求默认关闭思考模式")
 
         print("\n[2] LLM_MAX_TOKENS=0 可关闭封顶")
         os.environ["LLM_MAX_TOKENS"] = "0"

@@ -45,9 +45,13 @@ class ProviderTimeoutError(ProviderError):
 def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dict],
                      temperature: float, timeout: int, json_mode: bool) -> str:
     url = base_url.rstrip("/") + "/chat/completions"
+    provider = "deepseek" if "deepseek" in url else "qwen"
     payload: dict = {"model": model, "messages": messages, "temperature": temperature}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
+    if provider == "deepseek":
+        thinking = os.environ.get("DEEPSEEK_THINKING", "disabled").strip().lower()
+        payload["thinking"] = {"type": thinking if thinking in {"enabled", "disabled"} else "disabled"}
     # 成本护栏：所有文本/视觉 chat 输出 token 封顶。可用 LLM_MAX_TOKENS 调整，0=不封顶。
     max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
     if max_tokens > 0:
@@ -59,7 +63,6 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
                  "Authorization": f"Bearer {api_key}"},
     )
     # 用量埋点上下文
-    provider = "deepseek" if "deepseek" in url else "qwen"
     feature = detect_feature(messages)
     call_type = "vision" if any(isinstance(m.get("content"), list) for m in messages) else "chat"
     t0 = time.time()
