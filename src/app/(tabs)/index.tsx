@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal,
-  Image, Platform,
+  Image, Platform, Animated,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -23,6 +23,7 @@ import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
+import { SkeletonBlock } from '@/components/Skeleton';
 import { showToast } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ds, StyleeButton, StyleeChoiceChip } from '@/design-system';
@@ -34,80 +35,68 @@ import {
 
 const isWeb = Platform.OS === 'web';
 
-// Mock inspiration data (will be replaced by DB content)
-const MOCK_INSPIRATIONS: InspirationCard[] = [
-  {
-    card_id: 'insp-1',
-    title: '法式复古街头',
-    image_url: '/inspirations/insp-1.png',
-    style_tags: ['french', 'vintage'],
-    comment: '皮衣配做旧牛仔，巴黎街头的慵懒松弛',
-    occasion: '休闲',
-    items: [
-      { name: '红色针织帽', category: '帽巾', color: '红色', image_url: '/inspirations/items/insp-1-hat.png' },
-      { name: 'oversize黑色皮衣', category: '外套', color: '黑色', image_url: '/inspirations/items/insp-1-jacket.png' },
-      { name: '做旧阔腿牛仔裤', category: '下装', color: '蓝色', image_url: '/inspirations/items/insp-1-pants.png' },
-      { name: '黑色尖头鞋', category: '鞋履', color: '黑色', image_url: '/inspirations/items/insp-1-shoes.png' },
-      { name: '黑色托特包', category: '包袋', color: '黑色', image_url: '/inspirations/items/insp-1-bag.png' },
-    ],
-  },
-  {
-    card_id: 'insp-2',
-    title: '撞色街头风',
-    image_url: '/inspirations/insp-2.png',
-    style_tags: ['street', 'urban_cool'],
-    comment: '一条红围巾，点亮蓝调基础款',
-    occasion: '休闲',
-    items: [
-      { name: 'oversize蓝色衬衫', category: '上装', color: '蓝色', image_url: '/inspirations/items/insp-2-shirt.png' },
-      { name: '红色毛绒围巾', category: '帽巾', color: '红色', image_url: '/inspirations/items/insp-2-scarf.png' },
-      { name: '浅色直筒牛仔裤', category: '下装', color: '蓝色', image_url: '/inspirations/items/insp-2-jeans.png' },
-    ],
-  },
-  {
-    card_id: 'insp-3',
-    title: '海边度假甜风',
-    image_url: '/inspirations/insp-3.png',
-    style_tags: ['sweet', 'bohemian'],
-    comment: '蓝白条纹套装，清爽的海边假日',
-    occasion: '度假',
-    items: [
-      { name: '蓝白条纹抹胸', category: '上装', color: '蓝色', image_url: '/inspirations/items/insp-3-top.png' },
-      { name: '蓝白条纹短裙', category: '下装', color: '蓝色', image_url: '/inspirations/items/insp-3-skirt.png' },
-      { name: '猫眼墨镜', category: '配饰', color: '黑色', image_url: '/inspirations/items/insp-3-sunglass.png' },
-      { name: '白色手提包', category: '包袋', color: '白色', image_url: '/inspirations/items/insp-3-bag.png' },
-    ],
-  },
-  {
-    card_id: 'insp-4',
-    title: '静奢老钱风',
-    image_url: '/inspirations/insp-4.png',
-    style_tags: ['quiet_luxury', 'minimalist'],
-    comment: '灰白配色，低调而从容的格调',
-    occasion: '休闲',
-    items: [
-      { name: '深灰古巴领短袖', category: '上装', color: '灰色', image_url: '/inspirations/items/insp-4-top.png' },
-      { name: '白色阔腿裤', category: '下装', color: '白色', image_url: '/inspirations/items/insp-4-pants.png' },
-      { name: '棕色棒球帽', category: '帽巾', color: '棕色', image_url: '/inspirations/items/insp-4-cap.png' },
-      { name: '棕色麂皮乐福鞋', category: '鞋履', color: '棕色', image_url: '/inspirations/items/insp-4-shoes.png' },
-    ],
-  },
-  {
-    card_id: 'insp-5',
-    title: '夏日全白风',
-    image_url: '/inspirations/insp-5.png',
-    style_tags: ['quiet_luxury', 'bohemian'],
-    comment: '通身白系，松弛又优雅的度假姿态',
-    occasion: '度假',
-    items: [
-      { name: '白色亚麻衬衫', category: '上装', color: '白色', image_url: '/inspirations/items/insp-5-shirt.png' },
-      { name: '白色长裤', category: '下装', color: '白色', image_url: '/inspirations/items/insp-5-pants.png' },
-      { name: '草编帽', category: '帽巾', color: '米色', image_url: '/inspirations/items/insp-5-hat.png' },
-      { name: '米色编织包', category: '包袋', color: '米色', image_url: '/inspirations/items/insp-5-bag.png' },
-      { name: '白色乐福鞋', category: '鞋履', color: '白色', image_url: '/inspirations/items/insp-5-shoes.png' },
-    ],
-  },
-];
+// ─── 首页 cache-first 存储（缓解冷启动闪烁）────────────────────
+// 首帧优先读本地 cache 直接渲染真数据，无 cache 时渲染骨架；后台静默刷新。
+// 仅在 web（localStorage 同步可读）上做首帧命中；native 首帧走骨架，随后淡入。
+const INSP_CACHE_KEY = 'stylee.home.inspirations';
+const WEATHER_CACHE_PREFIX = 'stylee.home.weather.';
+
+function readInspCache(): InspirationCard[] | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(INSP_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as InspirationCard[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeInspCache(cards: InspirationCard[]) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(INSP_CACHE_KEY, JSON.stringify(cards));
+    }
+  } catch { /* ignore quota / serialize errors */ }
+}
+
+function readWeatherCache(city: string): WeatherData | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(WEATHER_CACHE_PREFIX + city);
+    return raw ? (JSON.parse(raw) as WeatherData) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeWeatherCache(city: string, data: WeatherData) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(WEATHER_CACHE_PREFIX + city, JSON.stringify(data));
+    }
+  } catch { /* ignore */ }
+}
+
+/** 数据到达后 opacity 0→1 淡入，避免从骨架/空白硬切换的 pop-in */
+function FadeInView({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: any;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity]);
+  return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
+}
 
 type InputMode = 'description' | 'tags';
 
@@ -126,7 +115,9 @@ export default function OutfitTab() {
   const { items, fetchItems } = useWardrobeStore();
 
   const defaultCity = profile?.permanent_city ?? '北京';
-  const [weather, setWeather] = useState<WeatherData>(getMockWeather(defaultCity));
+  // 天气：cache-first。首帧命中本地 cache 直接渲染（无骨架）；无 cache 时为 null → 渲染骨架，
+  // 真数据到达后只 setState 一次（不再先塞一份 mock 假值造成闪烁）。
+  const [weather, setWeather] = useState<WeatherData | null>(() => readWeatherCache(defaultCity));
   const [cityModalVisible, setCityModalVisible] = useState(false);
   const [citySearch, setCitySearch] = useState('');
   const [cityResults, setCityResults] = useState<CityResult[]>([]);
@@ -143,8 +134,12 @@ export default function OutfitTab() {
     ...OCCASION_TAGS, ...STYLE_TAGS, ...COLOR_TAGS,
   ]);
 
-  // Inspiration
-  const [inspirations, setInspirations] = useState<InspirationCard[]>(MOCK_INSPIRATIONS);
+  // 灵感卡：cache-first。
+  // - null                → 加载中（渲染骨架）
+  // - []                  → DB 空（渲染"暂无灵感"引导，不再回退到写死的 5 张 mock）
+  // - InspirationCard[]   → 真数据（淡入渲染）
+  const [inspirations, setInspirations] = useState<InspirationCard[] | null>(() => readInspCache());
+  const [inspError, setInspError] = useState(false);
 
   useFocusEffect(useCallback(() => {
     if (user?.id) fetchItems(user.id);
@@ -163,27 +158,50 @@ export default function OutfitTab() {
   }, [user?.id]));
 
   useEffect(() => {
-    fetchWeather(defaultCity).then(setWeather);
+    let cancelled = false;
+    fetchWeather(defaultCity).then(data => {
+      if (cancelled) return;
+      setWeather(data);            // 只在真数据到达后 setState 一次
+      writeWeatherCache(defaultCity, data);
+    });
+    return () => { cancelled = true; };
   }, [defaultCity]);
 
   useEffect(() => {
+    if (!weather) return;
     const tempTagId = getTempTag(weather.temp);
     setAllTags(prev => prev.map(t =>
       t.type === 'temperature' ? { ...t, selected: t.id === tempTagId } : t
     ));
   }, [weather]);
 
-  // Load inspirations from DB if available
-  useEffect(() => {
-    supabase
+  // Load inspirations from DB（后台静默刷新：有 cache 时保持展示，成功后 diff 更新 + 回写 cache）
+  const fetchInspirations = useCallback(async () => {
+    const { data, error } = await supabase
       .from('inspiration_cards')
       .select('*')
       .order('sort_order')
-      .limit(10)
-      .then(({ data }) => {
-        if (data && data.length > 0) setInspirations(data as InspirationCard[]);
-      });
+      .limit(10);
+    if (error) {
+      // 仅在没有任何可展示内容时暴露错误态；已有 cache 则静默保留
+      setInspError(true);
+      return;
+    }
+    const cards = (data ?? []) as InspirationCard[];
+    setInspError(false);
+    setInspirations(cards);
+    if (cards.length > 0) writeInspCache(cards);
   }, []);
+
+  useEffect(() => {
+    void fetchInspirations();
+  }, [fetchInspirations]);
+
+  const retryInspirations = useCallback(() => {
+    setInspError(false);
+    setInspirations(null); // 回到骨架态
+    void fetchInspirations();
+  }, [fetchInspirations]);
 
   const toggleTag = (tagId: string) => {
     setAllTags(prev => prev.map(t =>
@@ -317,12 +335,14 @@ export default function OutfitTab() {
       });
     } catch {}
 
+    // 天气尚未加载完成时，用 mock 兜底，保证生成链路可用（不阻塞）
+    const w = weather ?? getMockWeather(defaultCity);
     router.push({
       pathname: '/outfit/result',
       params: {
-        city: weather.city,
-        temp: weather.temp,
-        weather: weather.condition,
+        city: w.city,
+        temp: w.temp,
+        weather: w.condition,
         query: mode === 'description' ? query : '',
         tags: mode === 'tags' ? selectedTagIds.join(',') : '',
         inputMode: mode,
@@ -351,7 +371,10 @@ export default function OutfitTab() {
   const selectCity = (city: string) => {
     setCityModalVisible(false);
     setCitySearch('');
-    fetchWeather(city).then(setWeather);
+    fetchWeather(city).then(data => {
+      setWeather(data);
+      writeWeatherCache(city, data);
+    });
   };
 
   const handleCitySearch = (text: string) => {
@@ -382,7 +405,7 @@ export default function OutfitTab() {
             <Text style={styles.cityNoResult}>无搜索结果</Text>
           ) : (
             cityResults.map(cr => {
-              const isActive = weather.city === cr.name;
+              const isActive = weather?.city === cr.name;
               return (
                 <TouchableOpacity
                   key={cr.id || cr.name}
@@ -434,17 +457,24 @@ export default function OutfitTab() {
         {/* ── Section 0: Weather Bar ── */}
         <View style={styles.weatherBar}>
           <Text style={styles.brandText}>Stylee</Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={`当前城市 ${weather.city}，${weather.temp} 度`}
-            accessibilityHint="选择其他城市"
-            style={styles.weatherBtn}
-            onPress={openCityModal}
-          >
-            <WeatherIcon condition={weather.condition} size={16} color={ds.color.semantic.text.primary} />
-            <Text style={styles.weatherBtnText}>{weather.temp}°C · {weather.city}</Text>
-            <Feather name="chevron-down" size={12} color={ds.color.semantic.text.tertiary} />
-          </TouchableOpacity>
+          {weather ? (
+            <FadeInView>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`当前城市 ${weather.city}，${weather.temp} 度`}
+                accessibilityHint="选择其他城市"
+                style={styles.weatherBtn}
+                onPress={openCityModal}
+              >
+                <WeatherIcon condition={weather.condition} size={16} color={ds.color.semantic.text.primary} />
+                <Text style={styles.weatherBtnText}>{weather.temp}°C · {weather.city}</Text>
+                <Feather name="chevron-down" size={12} color={ds.color.semantic.text.tertiary} />
+              </TouchableOpacity>
+            </FadeInView>
+          ) : (
+            // 天气加载中：骨架占位，避免先渲染 mock 假天气再刷成真值的闪烁
+            <SkeletonBlock style={styles.weatherSkeleton} />
+          )}
         </View>
 
         {/* ── Section 1: AI Input Area ── */}
@@ -615,33 +645,70 @@ export default function OutfitTab() {
           <View style={styles.inspirationHeader}>
             <Text style={styles.inspirationTitle}>穿搭灵感</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.inspirationRow}>
-              {inspirations.map(card => (
-                <TouchableOpacity key={card.card_id} style={styles.inspirationCard}
-                  onPress={() => handleInspire(card)} activeOpacity={0.8}
-                >
-                  {card.image_url ? (
-                    <Image source={{ uri: card.image_url }} style={styles.inspirationImage} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.inspirationImage}>
-                      <MaterialCommunityIcons name="hanger" size={32} color={ds.color.semantic.text.tertiary} />
+
+          {inspirations === null ? (
+            // 加载中：优先骨架屏；若首拉失败且无 cache，显示可点击重试
+            inspError ? (
+              <TouchableOpacity style={styles.inspStateBox} onPress={retryInspirations} activeOpacity={0.8}>
+                <Feather name="wifi-off" size={22} color={ds.color.semantic.text.tertiary} />
+                <Text style={styles.inspStateText}>网络异常，点击重试</Text>
+              </TouchableOpacity>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.inspirationRow}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <View key={`insp-skeleton-${i}`} style={styles.inspirationCard}>
+                      <SkeletonBlock style={styles.inspirationImage} />
+                      <View style={styles.inspirationInfo}>
+                        <SkeletonBlock style={styles.inspSkeletonTag} />
+                        <SkeletonBlock style={styles.inspSkeletonLine} />
+                      </View>
                     </View>
-                  )}
-                  <View style={styles.inspirationInfo}>
-                    <View style={styles.inspirationTags}>
-                      {card.style_tags.slice(0, 2).map((tag) => (
-                        <View key={`${card.card_id}:${tag}`} style={styles.inspirationTag}>
-                          <Text style={styles.inspirationTagText}>{STYLE_LABEL[tag] ?? tag}</Text>
+                  ))}
+                </View>
+              </ScrollView>
+            )
+          ) : inspirations.length === 0 ? (
+            // DB 空：引导去导入衣橱，不再回退到写死的 5 张 mock（对新用户会误导）
+            <TouchableOpacity
+              style={styles.inspStateBox}
+              onPress={() => router.push('/(tabs)/wardrobe?scrollTop=1')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="hanger" size={24} color={ds.color.semantic.text.tertiary} />
+              <Text style={styles.inspStateText}>暂无灵感，去导入衣橱试试</Text>
+            </TouchableOpacity>
+          ) : (
+            <FadeInView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.inspirationRow}>
+                  {inspirations.map(card => (
+                    <TouchableOpacity key={card.card_id} style={styles.inspirationCard}
+                      onPress={() => handleInspire(card)} activeOpacity={0.8}
+                    >
+                      {card.image_url ? (
+                        <Image source={{ uri: card.image_url }} style={styles.inspirationImage} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.inspirationImage}>
+                          <MaterialCommunityIcons name="hanger" size={32} color={ds.color.semantic.text.tertiary} />
                         </View>
-                      ))}
-                    </View>
-                    <Text style={styles.inspirationComment} numberOfLines={2}>{card.comment}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+                      )}
+                      <View style={styles.inspirationInfo}>
+                        <View style={styles.inspirationTags}>
+                          {card.style_tags.slice(0, 2).map((tag) => (
+                            <View key={`${card.card_id}:${tag}`} style={styles.inspirationTag}>
+                              <Text style={styles.inspirationTagText}>{STYLE_LABEL[tag] ?? tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                        <Text style={styles.inspirationComment} numberOfLines={2}>{card.comment}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </FadeInView>
+          )}
         </View>
 
         {/* ── Section P2: AI Try-on ── */}
@@ -722,6 +789,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: ds.color.semantic.border.default,
   },
   weatherBtnText: { ...T.tag, color: ds.color.semantic.text.primary },
+  weatherSkeleton: {
+    width: 108,
+    height: ds.size.control.minimumTouch,
+    borderRadius: ds.radius.xl,
+  },
 
   // ── Input Section ──
   inputSection: { gap: ds.space[2] },
@@ -825,6 +897,22 @@ const styles = StyleSheet.create({
     ...T.support,
     color: ds.color.semantic.text.secondary,
   },
+  // 灵感卡骨架内文字占位
+  inspSkeletonTag: { width: '55%', height: ds.space[3], borderRadius: ds.radius.sm },
+  inspSkeletonLine: { width: '82%', height: ds.space[2], borderRadius: ds.radius.sm },
+  // 灵感区空态 / 错误态占位框（复用 dashed 卡片风格，与衣橱空态一致）
+  inspStateBox: {
+    backgroundColor: ds.color.semantic.surface.card,
+    borderRadius: ds.radius.xxl,
+    paddingVertical: ds.space[6],
+    paddingHorizontal: ds.space[4],
+    alignItems: 'center',
+    gap: ds.space[2],
+    borderWidth: 1,
+    borderColor: ds.color.semantic.border.default,
+    borderStyle: 'dashed',
+  },
+  inspStateText: { ...T.content, color: ds.color.semantic.text.secondary },
 
   // ── AI Try-on (P2) ──
   tryOnSection: {
