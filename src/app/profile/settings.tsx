@@ -5,12 +5,14 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
+import { ds } from '@/design-system';
 import { useUserStore } from '@/stores/userStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { NicknameEditModal } from '@/components/NicknameEditModal';
 import Constants from 'expo-constants';
 import { showToast } from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
+import { track } from '@/lib/track';
 
 const isWeb = Platform.OS === 'web';
 const STORAGE_PREFIX = 'stylee_settings_';
@@ -42,6 +44,8 @@ export default function SettingsPage() {
   const { user, profile, signOut, setProfile } = useUserStore();
   const [showSignOut, setShowSignOut] = useState(false);
   const [showNicknameEdit, setShowNicknameEdit] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [locationAccess, setLocationAccess] = useState(true);
   const [cacheSize, setCacheSize] = useState('128 MB');
 
@@ -80,6 +84,31 @@ export default function SettingsPage() {
       showToast('用户名已更新', 'success');
     } catch (e: any) {
       showToast('保存失败：' + (e?.message || '请稍后重试'), 'error');
+    }
+  };
+
+  // P2 账号注销：登记一条 pending 请求 → signOut → 跳登录页
+  // 顺序不可反：先入库成功再登出；失败保留在原页面可重试
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error('未登录');
+      const { error } = await supabase.from('account_deletion_requests').insert({
+        user_id: authUser.id,
+        email: authUser.email,
+      });
+      if (error) throw error;
+      try { track('account_deletion_requested', {}); } catch { /* 埋点失败静默 */ }
+      await supabase.auth.signOut();
+      setShowDeleteAccount(false);
+      showToast('账户注销请求已提交，24 小时内完成清理', 'success');
+      router.replace('/(auth)/login');
+    } catch (e) {
+      console.error('[deletion] failed', e);
+      showToast('提交失败，请稍后重试', 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -197,6 +226,16 @@ export default function SettingsPage() {
             <Text style={styles.signOutText}>退出登录</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 注销账号（合规入口，次要降级呈现，避免误点） */}
+        <TouchableOpacity
+          style={styles.deleteAccountBtn}
+          onPress={() => setShowDeleteAccount(true)}
+          accessibilityRole="button"
+          accessibilityLabel="注销账号"
+        >
+          <Text style={styles.deleteAccountText}>注销账号</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <ConfirmModal
@@ -207,6 +246,21 @@ export default function SettingsPage() {
         confirmStyle="destructive"
         onConfirm={() => { setShowSignOut(false); signOut(); }}
         onCancel={() => setShowSignOut(false)}
+      />
+
+      <ConfirmModal
+        visible={showDeleteAccount}
+        title="注销账号"
+        message={
+          '注销后，你的账户信息、衣橱单品、生成记录、收藏将 24 小时内删除，且无法恢复。\n\n如你只是暂时不想使用，建议使用「退出登录」保留账户数据。'
+        }
+        confirmText="确认注销"
+        cancelText="取消"
+        confirmStyle="destructive"
+        confirmVerificationText="注销"
+        loading={deleting}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => setShowDeleteAccount(false)}
       />
 
       <NicknameEditModal
@@ -256,4 +310,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.line,
   },
   signOutText: { ...T.bodyText, color: Colors.accent, fontFamily: Fonts.uiSemiBold, fontSize: 15 },
+  deleteAccountBtn: {
+    marginTop: ds.space[4],
+    paddingVertical: ds.space[2],
+    alignItems: 'center',
+  },
+  deleteAccountText: {
+    ...T.support,
+    color: ds.color.semantic.text.accent,
+    textDecorationLine: 'underline',
+  },
 });

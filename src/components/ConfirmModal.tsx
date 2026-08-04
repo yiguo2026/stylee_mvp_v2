@@ -1,9 +1,10 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Modal, ActivityIndicator, Platform,
+  Modal, ActivityIndicator, Platform, TextInput,
 } from 'react-native';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { ds } from '@/design-system';
 
 const isWeb = Platform.OS === 'web';
 
@@ -18,6 +19,8 @@ interface ConfirmModalProps {
   onCancel: () => void;
   loading?: boolean;
   singleButton?: boolean;
+  /** 可选：要求用户输入特定文字才能点击确认 */
+  confirmVerificationText?: string;
 }
 
 export function ConfirmModal({
@@ -31,12 +34,41 @@ export function ConfirmModal({
   onCancel,
   loading,
   singleButton,
+  confirmVerificationText,
 }: ConfirmModalProps) {
+  const [verificationInput, setVerificationInput] = React.useState('');
+
+  // Reset input when modal becomes visible
+  React.useEffect(() => {
+    if (visible) {
+      setVerificationInput('');
+    }
+  }, [visible]);
+
+  const isVerified = !confirmVerificationText || verificationInput === confirmVerificationText;
+
   const content = (
     <View style={styles.overlay}>
       <View style={styles.dialog}>
         <Text style={styles.title}>{title}</Text>
         {message ? <Text style={styles.message}>{message}</Text> : null}
+
+        {confirmVerificationText ? (
+          <View style={styles.verificationContainer}>
+            <Text style={styles.verificationHint}>
+              请输入「{confirmVerificationText}」以确认：
+            </Text>
+            <TextInput
+              style={styles.verificationInput}
+              value={verificationInput}
+              onChangeText={setVerificationInput}
+              placeholder={`输入 ${confirmVerificationText}`}
+              placeholderTextColor={ds.color.semantic.text.tertiary}
+              autoFocus
+            />
+          </View>
+        ) : null}
+
         <View style={styles.buttons}>
           {!singleButton && (
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
@@ -47,12 +79,13 @@ export function ConfirmModal({
             style={[
               singleButton ? styles.singleConfirmBtn : styles.confirmBtn,
               confirmStyle === 'destructive' && styles.destructiveBtn,
+              (!isVerified || loading) && styles.disabledBtn,
             ]}
             onPress={onConfirm}
-            disabled={loading}
+            disabled={!isVerified || loading}
           >
             {loading
-              ? <ActivityIndicator color={Colors.paper} size="small" />
+              ? <ActivityIndicator color={ds.color.semantic.text.inverse} size="small" />
               : <Text style={styles.confirmText}>{confirmText}</Text>
             }
           </TouchableOpacity>
@@ -138,8 +171,28 @@ const styles = StyleSheet.create({
   destructiveBtn: {
     backgroundColor: Colors.accent,
   },
+  disabledBtn: {
+    opacity: 0.4,
+  },
   confirmText: {
     ...T.buttonPrimary,
     color: Colors.paper,
+  },
+  verificationContainer: {
+    gap: ds.space[1],
+  },
+  verificationHint: {
+    ...T.support,
+    color: ds.color.semantic.text.secondary,
+  },
+  verificationInput: {
+    ...T.bodyText,
+    borderWidth: 1,
+    borderColor: ds.color.semantic.border.default,
+    borderRadius: ds.radius.md,
+    paddingHorizontal: ds.space[3],
+    paddingVertical: ds.space[2],
+    backgroundColor: ds.color.semantic.surface.input,
+    color: ds.color.semantic.text.primary,
   },
 });
