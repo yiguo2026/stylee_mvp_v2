@@ -23,7 +23,9 @@ export type EventName =
   | 'outfit_action'
   | 'outfit_detail_view'
   | 'record_view'
-  | 'feedback_submit';
+  | 'feedback_submit'
+  | 'filter_conflict_shown'
+  | 'filter_conflict_confirmed';
 
 export interface AuthViewParams {
   page: 'login' | 'register';
@@ -76,6 +78,24 @@ export interface FeedbackSubmitParams {
   has_screenshot: boolean;
 }
 
+/**
+ * 生成穿搭 filter — 用户看到"降饱和 tag"时（每次 render 中同 tag 去重曝光一次）。
+ * 用于评估软引导互斥的曝光量与后续转化。
+ */
+export interface FilterConflictShownParams {
+  tag: string;                  // tag id（英文 key）
+  tag_kind: 'style' | 'occasion';
+}
+
+/**
+ * 生成穿搭 filter — 用户在 confirm 弹窗中点"仍然选择"（跨过软引导）。
+ */
+export interface FilterConflictConfirmedParams {
+  tag: string;                    // tag id
+  tag_kind: 'style' | 'occasion';
+  selected_others: string[];      // 已选的另一维度 tag id 列表
+}
+
 export type EventParamsMap = {
   auth_view: AuthViewParams;
   auth_success: AuthSuccessParams;
@@ -89,6 +109,8 @@ export type EventParamsMap = {
   outfit_detail_view: OutfitDetailViewParams;
   record_view: RecordViewParams;
   feedback_submit: FeedbackSubmitParams;
+  filter_conflict_shown: FilterConflictShownParams;
+  filter_conflict_confirmed: FilterConflictConfirmedParams;
 };
 
 // ─── Session & Anonymous ID ──────────────────────────────────
