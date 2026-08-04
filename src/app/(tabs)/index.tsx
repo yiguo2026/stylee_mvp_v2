@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal,
@@ -16,11 +16,15 @@ import { fetchWeather, getMockWeather, searchCitiesOnline, getTempTag, CityResul
 import { supabase } from '@/lib/supabase';
 import { getQuota } from '@/lib/dailyQuota';
 import { track } from '@/lib/track';
+import {
+  isStyleCompatible, isOccasionCompatible, buildConflictMessage,
+} from '@/lib/tagCompat';
 import { WeatherIcon } from '@/components/WeatherIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AddClothingSheet } from '@/components/AddClothingSheet';
 import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import { showToast } from '@/components/Toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { ds, StyleeButton, StyleeChoiceChip } from '@/design-system';
 import { useImportStore } from '@/stores/importStore';
 import {
@@ -112,6 +116,11 @@ const STYLE_LABEL: Record<string, string> = Object.fromEntries(
   STYLE_TAGS.map(t => [t.id, t.label]),
 );
 
+// occasion_tag id → 中文展示标签（confirm 文案用）
+const OCCASION_LABEL: Record<string, string> = Object.fromEntries(
+  OCCASION_TAGS.map(t => [t.id, t.label]),
+);
+
 export default function OutfitTab() {
   const { profile, user } = useUserStore();
   const { items, fetchItems } = useWardrobeStore();
@@ -181,6 +190,109 @@ export default function OutfitTab() {
       t.id === tagId ? { ...t, selected: !t.selected } : t
     ));
   };
+
+  // ─── 场合 × 风格 软引导互斥（只作用于 inputMode === 'tags' 生成 filter） ───
+
+  // 当前已选（并集判定所需）
+  const selectedOccasionIds = useMemo(
+    () => allTags.filter(t => t.type === 'occasion' && t.selected).map(t => t.id),
+    [allTags],
+  );
+  const selectedStyleIds = useMemo(
+    () => allTags.filter(t => t.type === 'style' && t.selected).map(t => t.id),
+    [allTags],
+  );
+
+  // 当前 render 下"不兼容且未选"的 tag id 集合（用于降饱和 + 曝光埋点）
+  const incompatibleTagIds = useMemo(() => {
+    const set = new Set<string>();
+    allTags.forEach(t => {
+      if (t.selected) return;
+      if (t.type === 'style' && !isStyleCompatible(t.id, selectedOccasionIds)) {
+        set.add(t.id);
+      } else if (t.type === 'occasion' && !isOccasionCompatible(t.id, selectedStyleIds)) {
+        set.add(t.id);
+      }
+    });
+    return set;
+  }, [allTags, selectedOccasionIds, selectedStyleIds]);
+
+  // 曝光去重：同一个 tag 短时间内只上报一次 filter_conflict_shown
+  const shownRef = useRef<Set<string>>(new Set());
+
+  // 依赖变化时，diff 出"新增不兼容"上报（避免每次滚动/render 都炸库）
+  useEffect(() => {
+    if (inputMode !== 'tags') return;
+    incompatibleTagIds.forEach(id => {
+      if (shownRef.current.has(id)) return;
+      shownRef.current.add(id);
+      const tag = allTags.find(t => t.id === id);
+      if (!tag) return;
+      try {
+        track('filter_conflict_shown', {
+          tag: id,
+          tag_kind: tag.type === 'style' ? 'style' : 'occasion',
+        });
+      } catch { /* 埋点失败静默 */ }
+    });
+    // 已回归兼容的 tag 从 shownRef 中移除，便于下次再变为不兼容时重新曝光
+    Array.from(shownRef.current).forEach(id => {
+      if (!incompatibleTagIds.has(id)) shownRef.current.delete(id);
+    });
+  }, [incompatibleTagIds, inputMode, allTags]);
+
+  // Confirm 弹窗状态
+  const [conflictConfirm, setConflictConfirm] = useState<{
+    tagId: string;
+    tagLabel: string;
+    tagKind: 'style' | 'occasion';
+    selectedOtherIds: string[];
+    selectedOtherLabels: string[];
+  } | null>(null);
+
+  // 生成穿搭 filter 中的 tag 点击处理（内部路由：兼容→直接切换；不兼容→confirm）
+  const handleFilterTagPress = (tag: FilterTag) => {
+    // 已选中或色系/温度 tag：走原来的直接切换
+    if (tag.selected || (tag.type !== 'style' && tag.type !== 'occasion')) {
+      toggleTag(tag.id);
+      return;
+    }
+
+    const isIncompatible =
+      (tag.type === 'style' && !isStyleCompatible(tag.id, selectedOccasionIds)) ||
+      (tag.type === 'occasion' && !isOccasionCompatible(tag.id, selectedStyleIds));
+
+    if (!isIncompatible) {
+      toggleTag(tag.id);
+      return;
+    }
+
+    const otherIds = tag.type === 'style' ? selectedOccasionIds : selectedStyleIds;
+    const otherLabelMap = tag.type === 'style' ? OCCASION_LABEL : STYLE_LABEL;
+    setConflictConfirm({
+      tagId: tag.id,
+      tagLabel: tag.label,
+      tagKind: tag.type === 'style' ? 'style' : 'occasion',
+      selectedOtherIds: otherIds,
+      selectedOtherLabels: otherIds.map(i => otherLabelMap[i] ?? i),
+    });
+  };
+
+  const handleConflictConfirm = () => {
+    if (!conflictConfirm) return;
+    const { tagId, tagKind, selectedOtherIds } = conflictConfirm;
+    try {
+      track('filter_conflict_confirmed', {
+        tag: tagId,
+        tag_kind: tagKind,
+        selected_others: selectedOtherIds,
+      });
+    } catch { /* 埋点失败静默 */ }
+    toggleTag(tagId);
+    setConflictConfirm(null);
+  };
+
+  const handleConflictCancel = () => setConflictConfirm(null);
 
   const handleGenerate = async (modeOverride?: InputMode) => {
     if (!user?.id) {
@@ -395,14 +507,24 @@ export default function OutfitTab() {
                   <Text style={styles.tagSectionTitle}>{section.title}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.tagRow}>
-                      {section.tags.map(tag => (
-                        <StyleeChoiceChip
-                          key={tag.id}
-                          label={tag.label}
-                          selected={tag.selected}
-                          onPress={() => toggleTag(tag.id)}
-                        />
-                      ))}
+                      {section.tags.map(tag => {
+                        const dim = incompatibleTagIds.has(tag.id);
+                        return (
+                          <StyleeChoiceChip
+                            key={tag.id}
+                            label={tag.label}
+                            selected={tag.selected}
+                            onPress={() => handleFilterTagPress(tag)}
+                            // 软引导：不兼容 tag 降饱和显示（仍可点击）
+                            style={dim ? styles.tagChipIncompatible : undefined}
+                            accessibilityLabel={
+                              dim
+                                ? `${tag.label}（与已选不太协调，点击可确认使用）`
+                                : tag.label
+                            }
+                          />
+                        );
+                      })}
                     </View>
                   </ScrollView>
                 </View>
@@ -544,6 +666,25 @@ export default function OutfitTab() {
       )}
 
       <AddClothingSheet visible={showAddSheet} onClose={() => setShowAddSheet(false)} />
+
+      {/* 场合 × 风格 软引导互斥 —— 不兼容 tag 点击时弹 confirm 询问 */}
+      <ConfirmModal
+        visible={!!conflictConfirm}
+        title={
+          conflictConfirm
+            ? `「${conflictConfirm.tagLabel}」和已选${
+                conflictConfirm.tagKind === 'style' ? '场合' : '风格'
+              }「${conflictConfirm.selectedOtherLabels.slice(0, 3).join('、')}${
+                conflictConfirm.selectedOtherLabels.length > 3 ? '…' : ''
+              }」搭配可能不太协调`
+            : ''
+        }
+        message={conflictConfirm ? '仍要使用吗？' : undefined}
+        confirmText="仍然选择"
+        cancelText="取消"
+        onConfirm={handleConflictConfirm}
+        onCancel={handleConflictCancel}
+      />
     </SafeAreaView>
   );
 }
@@ -615,6 +756,9 @@ const styles = StyleSheet.create({
   tagSection: { gap: ds.space[1] },
   tagSectionTitle: { ...T.support },
   tagRow: { flexDirection: 'row', gap: ds.component.choiceChip.groupGap },
+  // 场合 × 风格 软引导：不兼容 tag 降饱和显示（仍可点击）
+  // 不新增 DS token，直接用 opacity 让底层 chip 视觉减弱到 45%
+  tagChipIncompatible: { opacity: 0.45 },
   quotaHint: {
     ...T.micro,
     textAlign: 'center',
