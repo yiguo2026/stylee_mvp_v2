@@ -30,7 +30,14 @@ export interface RecommendRespOutfit {
   recommended_items: { name: string; category: string; color: string; description?: string }[];
   comment: string;
 }
-export interface RecommendResp { outfits: RecommendRespOutfit[]; trace?: { rag_mode?: string; pool?: number; provider?: string }; }
+export interface RecommendResp {
+  outfits: RecommendRespOutfit[];
+  trace?: {
+    rag_mode?: string; pool?: number; provider?: string;
+    request_id?: string; duration_ms?: number; stage_ms?: Record<string, number>;
+    degraded?: boolean;
+  };
+}
 
 export type RecommendContext = {
   weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string;

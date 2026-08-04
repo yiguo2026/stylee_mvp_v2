@@ -1,9 +1,9 @@
 from .base import LLMProvider
 from .mock import MockProvider
-from .openai_compat import OpenAICompatProvider, ProviderError, deepseek, qwen
+from .openai_compat import OpenAICompatProvider, ProviderError, ProviderTimeoutError, deepseek, qwen
 
 __all__ = [
-    "LLMProvider", "MockProvider", "OpenAICompatProvider", "ProviderError",
+    "LLMProvider", "MockProvider", "OpenAICompatProvider", "ProviderError", "ProviderTimeoutError",
     "deepseek", "qwen", "build_provider",
 ]
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -34,6 +35,10 @@ from .base import LLMProvider
 # HTTP(stdlib urllib;urlopen 默认读 HTTP(S)_PROXY 环境变量 → 自动走代理)
 # ---------------------------------------------------------------------------
 class ProviderError(RuntimeError):
+    pass
+
+
+class ProviderTimeoutError(ProviderError):
     pass
 
 
@@ -67,7 +72,12 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
         raise ProviderError(f"HTTP {e.code} from {url}: {detail}") from None
     except urllib.error.URLError as e:
         log_usage(provider, model, feature, call_type, None, int((time.time() - t0) * 1000), False)
+        if isinstance(e.reason, (TimeoutError, socket.timeout)):
+            raise ProviderTimeoutError(f"上游模型调用超时({timeout}s): {url}") from None
         raise ProviderError(f"网络错误 {url}: {e.reason}") from None
+    except (TimeoutError, socket.timeout):
+        log_usage(provider, model, feature, call_type, None, int((time.time() - t0) * 1000), False)
+        raise ProviderTimeoutError(f"上游模型调用超时({timeout}s): {url}") from None
     try:
         content = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError):

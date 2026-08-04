@@ -9,6 +9,9 @@
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
+from typing import Callable, ContextManager
+
 from .constraints import build_candidate_pool, validate_outfit
 from .contracts import (
     Outfit,
@@ -73,57 +76,66 @@ def recommend(
     provider: LLMProvider,
     retriever: ExemplarRetriever | None = None,
     overgen: int = 2,
+    stage_timer: Callable[[str], ContextManager[None]] | None = None,
 ) -> RecommendationResult:
     retriever = retriever or default_retriever()
     idx = _item_index(ctx.wardrobe)
     k = max(ctx.n * overgen, ctx.n + 2)   # 预生成 K 套
 
+    def timed(name: str) -> ContextManager[None]:
+        return stage_timer(name) if stage_timer else nullcontext()
+
     # B0 意图 → 场景规格(NL 走模型;标签走 code,均封装在 provider 内)
-    scene = provider.parse_intent(ctx)
+    with timed("B0.parse_intent"):
+        scene = provider.parse_intent(ctx)
 
     # B1 约束过滤 → 可行候选池(纯 code)
-    pool = build_candidate_pool(ctx, scene)
+    with timed("B1.build_candidate_pool"):
+        pool = build_candidate_pool(ctx, scene)
 
     # B2 取审美范例(检索)
-    exemplars = retriever.retrieve(scene, k=3, season=pool.season)
+    with timed("B2.retrieve_exemplars"):
+        exemplars = retriever.retrieve(scene, k=3, season=pool.season)
 
     # B3 生成 K 套(模型,受约束于 pool 的真实 id)
-    drafts = provider.generate_outfits(ctx, scene, pool, exemplars, k)
+    with timed("B3.generate_outfits"):
+        drafts = provider.generate_outfits(ctx, scene, pool, exemplars, k)
 
     # B4 硬校验 + 四维打分(纯 code,挡掉非法)
-    valid: list[Outfit] = []
-    n_rejected = 0
-    n_clash = 0
-    n_gap = 0
-    for o in drafts:
-        errs = validate_outfit(o, ctx, scene, idx)
-        if errs:
-            n_rejected += 1
-            continue
-        o.scores = score_outfit(o, ctx, scene, idx)
-        # B6 信心分:code 四维加权为主,缺口略降(真模型时再叠品味自评)
-        conf = o.scores.weighted(PRIORITY_WEIGHTS)
-        if o.has_gap():
-            conf *= 0.85
-            n_gap += 1
-        o.confidence = round(conf, 3)
-        if has_style_clash(o, idx):
-            n_clash += 1
-        valid.append(o)
+    with timed("B4.validate_and_score"):
+        valid: list[Outfit] = []
+        n_rejected = 0
+        n_clash = 0
+        n_gap = 0
+        for o in drafts:
+            errs = validate_outfit(o, ctx, scene, idx)
+            if errs:
+                n_rejected += 1
+                continue
+            o.scores = score_outfit(o, ctx, scene, idx)
+            # B6 信心分:code 四维加权为主,缺口略降(真模型时再叠品味自评)
+            conf = o.scores.weighted(PRIORITY_WEIGHTS)
+            if o.has_gap():
+                conf *= 0.85
+                n_gap += 1
+            o.confidence = round(conf, 3)
+            if has_style_clash(o, idx):
+                n_clash += 1
+            valid.append(o)
 
-    # 去重:同一组真实/推荐单品只留信心最高的一份,备用池才有意义
-    best_by_sig: dict[frozenset[str], Outfit] = {}
-    for o in valid:
-        sig = _signature(o)
-        if sig not in best_by_sig or o.confidence > best_by_sig[sig].confidence:
-            best_by_sig[sig] = o
-    deduped = list(best_by_sig.values())
+    with timed("B5.rank_and_diversify"):
+        # 去重:同一组真实/推荐单品只留信心最高的一份,备用池才有意义
+        best_by_sig: dict[frozenset[str], Outfit] = {}
+        for o in valid:
+            sig = _signature(o)
+            if sig not in best_by_sig or o.confidence > best_by_sig[sig].confidence:
+                best_by_sig[sig] = o
+        deduped = list(best_by_sig.values())
 
-    # B5 排序 + 多样性
-    ranked = sorted(deduped, key=lambda x: x.confidence, reverse=True)
-    top = _select_diverse(ranked, ctx.n)
-    top_sigs = {_signature(o) for o in top}
-    rest = [o for o in ranked if _signature(o) not in top_sigs]
+        ranked = sorted(deduped, key=lambda x: x.confidence, reverse=True)
+        top = _select_diverse(ranked, ctx.n)
+        top_sigs = {_signature(o) for o in top}
+        rest = [o for o in ranked if _signature(o) not in top_sigs]
 
     return RecommendationResult(
         outfits=top,
@@ -135,7 +147,8 @@ def recommend(
                 "formality": scene.formality.value,
                 "style": scene.style_keywords,
             },
-            "rag_mode": getattr(retriever, "mode", "keyword"),
+            "rag_mode": getattr(retriever, "last_mode", getattr(retriever, "mode", "keyword")),
+            "rag_fallback": getattr(retriever, "last_fallback", None),
             "candidate_pool_size": pool.total(),
             "gap_slots": [s.value for s in pool.gap_slots],
             "drafts": len(drafts),

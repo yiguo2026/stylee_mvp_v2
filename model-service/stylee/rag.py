@@ -60,16 +60,28 @@ class Garments2LookRetriever:
         self._index = None
         self._embedder = None
         self.mode = "fallback"
+        self.last_fallback = None
         try:
             idx = load_index(index_dir)
             emb = embedder or build_embedder()
             if idx.signature != emb.signature():
                 print(f"[rag] 签名不匹配 {idx.signature} != {emb.signature()}"
                       f" → 回退关键词 stub")
+                self.last_fallback = {
+                    "stage": "B2.retrieve_exemplars",
+                    "error_type": "IndexSignatureMismatch",
+                    "message": f"{idx.signature} != {emb.signature()}",
+                }
             else:
                 self._index, self._embedder, self.mode = idx, emb, "vector"
         except (FileNotFoundError, ValueError, OSError, KeyError) as e:
             print(f"[rag] 索引不可用({e}) → 回退关键词 stub")
+            self.last_fallback = {
+                "stage": "B2.retrieve_exemplars",
+                "error_type": type(e).__name__,
+                "message": str(e)[:300],
+            }
+        self.last_mode = self.mode
 
     @staticmethod
     def _query_text(scene: SceneSpec, season) -> str:
@@ -83,14 +95,23 @@ class Garments2LookRetriever:
 
     def retrieve(self, scene: SceneSpec, k: int = 3, season=None) -> list[dict]:
         if self.mode != "vector":
+            self.last_mode = "fallback"
             return self._fallback.retrieve(scene, k, season)
         try:
             qvec = self._embedder.embed([self._query_text(scene, season)])[0]
-        except EmbeddingError as e:
+        except (EmbeddingError, TimeoutError) as e:
             # 设计稿 §6.2 设想此处可先做 lexical-over-loaded-metadata 再回退;
             # as-built 简化为直接回退关键词 stub(在线 embed 失败是稀有窗口,stub 安全)。
             print(f"[rag] 在线 embed 失败({e}) → 本次回退 stub")
+            self.last_mode = "fallback"
+            self.last_fallback = {
+                "stage": "B2.retrieve_exemplars",
+                "error_type": type(e).__name__,
+                "message": str(e)[:300],
+            }
             return self._fallback.retrieve(scene, k, season)
+        self.last_mode = "vector"
+        self.last_fallback = None
         return [m for _, m in self._index.search(qvec, k)]
 
 

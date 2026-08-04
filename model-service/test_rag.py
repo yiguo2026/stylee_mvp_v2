@@ -130,6 +130,14 @@ class _Scene:        # 仿 SceneSpec 的鸭子类型(只用到这几个字段)
     vibe: str = ""
 
 
+class _TimeoutEmbedder:
+    def signature(self):
+        return "hashing:64"
+
+    def embed(self, texts):
+        raise TimeoutError("embedding timed out")
+
+
 def _build_fixture_index(d):
     exemplars = [
         {"id": "a", "text": "风格:法式 场合:约会", "recipe": "针织+半裙",
@@ -161,6 +169,18 @@ def test_g2l_vector_mode_hits():
         assert out[0]["id"] == "a"
 
 
+def test_g2l_embedding_timeout_falls_back_with_reason():
+    with tempfile.TemporaryDirectory() as d:
+        _build_fixture_index(d)
+        r = Garments2LookRetriever(index_dir=d, embedder=_TimeoutEmbedder())
+        out = r.retrieve(_Scene(occasions=["约会"], style_keywords=["法式"]),
+                         k=1, season="春")
+        assert out
+        assert r.last_mode == "fallback"
+        assert r.last_fallback["stage"] == "B2.retrieve_exemplars"
+        assert r.last_fallback["error_type"] == "TimeoutError"
+
+
 def test_g2l_missing_index_falls_back():
     with tempfile.TemporaryDirectory() as d:
         r = Garments2LookRetriever(index_dir=d, embedder=HashingEmbedder(dim=64))
@@ -174,6 +194,7 @@ def test_g2l_signature_mismatch_falls_back():
         _build_fixture_index(d)               # 用 hashing:64 建
         r = Garments2LookRetriever(index_dir=d, embedder=HashingEmbedder(dim=128))
         assert r.mode == "fallback"           # 查询 embedder hashing:128,签名不符
+        assert r.last_fallback["error_type"] == "IndexSignatureMismatch"
 
 
 def test_pipeline_has_rag_mode_and_runs():
@@ -203,6 +224,7 @@ def main():
     test_write_then_load_roundtrip()
     test_keyword_retriever_accepts_season()
     test_g2l_vector_mode_hits()
+    test_g2l_embedding_timeout_falls_back_with_reason()
     test_g2l_missing_index_falls_back()
     test_g2l_signature_mismatch_falls_back()
     test_pipeline_has_rag_mode_and_runs()

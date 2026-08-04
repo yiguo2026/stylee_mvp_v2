@@ -114,8 +114,13 @@ class _BoomStd:
 
 
 def test_recognize_item_provider_exception_safe():
-    res = recognize_item("u", _RaisingVP(), item_id="e1")
+    fallbacks = []
+    res = recognize_item(
+        "u", _RaisingVP(), item_id="e1",
+        on_fallback=lambda stage, error: fallbacks.append((stage, type(error).__name__)),
+    )
     assert res.item.id == "e1" and res.needs_review is True   # provider 抛异常仍产出可用 item
+    assert fallbacks == [("A1.vision_recognize", "RuntimeError")]
 
 
 def test_mock_recognize_and_standardize():
@@ -155,8 +160,13 @@ def test_standardize_drift_falls_back():
 def test_standardize_api_error_falls_back():
     from stylee.vision.mock import MockVisionProvider
     item = WardrobeItem(id="i", category=Category.TOP)
-    si = standardize_item("orig://x", item, PhotoType.WEB, MockVisionProvider(), _BoomStd())
+    fallbacks = []
+    si = standardize_item(
+        "orig://x", item, PhotoType.WEB, MockVisionProvider(), _BoomStd(),
+        on_fallback=lambda stage, error: fallbacks.append((stage, type(error).__name__)),
+    )
     assert si.method == "cropped_fallback" and si.image_ref == "orig://x"
+    assert fallbacks == [("A2.image_edit", "RuntimeError")]
 
 
 import os

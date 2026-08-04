@@ -33,9 +33,35 @@ def test_tryon_prompt_is_built_server_side():
         ai_features.edit_image = original
 
 
+def test_multi_recognition_uses_server_deadline_env():
+    saved_key = os.environ.get("DASHSCOPE_API_KEY")
+    saved_timeout = os.environ.get("VL_MULTI_TIMEOUT_SECONDS")
+    original = ai_features._chat_completion
+    seen = {}
+    os.environ["DASHSCOPE_API_KEY"] = "test-key"
+    os.environ["VL_MULTI_TIMEOUT_SECONDS"] = "17"
+    ai_features._chat_completion = lambda base_url, key, model, messages, temperature, timeout, json_mode: (
+        seen.update(timeout=timeout) or '{"items":[]}'
+    )
+    try:
+        assert ai_features.recognize_many("data:image/png;base64,AA==")["items"] == []
+        assert seen["timeout"] == 17
+    finally:
+        ai_features._chat_completion = original
+        if saved_key is None:
+            os.environ.pop("DASHSCOPE_API_KEY", None)
+        else:
+            os.environ["DASHSCOPE_API_KEY"] = saved_key
+        if saved_timeout is None:
+            os.environ.pop("VL_MULTI_TIMEOUT_SECONDS", None)
+        else:
+            os.environ["VL_MULTI_TIMEOUT_SECONDS"] = saved_timeout
+
+
 def main():
     test_no_keys_do_not_call_external_models()
     test_tryon_prompt_is_built_server_side()
+    test_multi_recognition_uses_server_deadline_env()
     print("ok")
 
 

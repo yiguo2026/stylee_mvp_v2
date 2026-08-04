@@ -2,7 +2,8 @@ import { WardrobeItem, Outfit, ClothingCategory, RecognitionResult, DetectedItem
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 import { buildFallbackLook } from '@/lib/fallbackLook';
-import { serviceFeature, serviceRecognize, serviceRecognizeMulti, serviceRecommend, serviceStandardize, uriToBase64 } from '@/lib/styleeService';
+import { serviceFeature, serviceRecognize, serviceRecognizeMulti, serviceRecommendDetailed, serviceStandardize, uriToBase64 } from '@/lib/styleeService';
+import type { ServiceErrorInfo } from '@/lib/styleeService';
 import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
 
 // ─── AI 元信息 ───────────────────────────────────────────
@@ -11,6 +12,18 @@ export interface AIMeta {
   source: string;     // 模型名 或 'mock'
   durationMs: number; // 耗时毫秒
   ok: boolean;        // 是否成功拿到可用结果
+  requestId?: string;
+  failedStage?: string;
+  errorType?: string;
+  serverDurationMs?: number;
+  degraded?: boolean;
+}
+
+function recommendationFailure(error?: ServiceErrorInfo): string | undefined {
+  if (!error) return undefined;
+  const stage = error.stage ? `，阶段 ${error.stage}` : '';
+  const type = error.errorType ? `，${error.errorType}` : '';
+  return `模型服务失败（request_id: ${error.requestId}${stage}${type}）：${error.message}`;
 }
 
 // ─── 衣服识别 ───────────────────────────────────────────
@@ -97,13 +110,28 @@ export async function aiRecommendOutfits(
   context?: { weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string },
 ): Promise<{ outfits: Outfit[]; error?: string; meta: AIMeta }> {
   const t0 = Date.now();
-  const serviceResult = await serviceRecommend(toRecommendRequest(wardrobeItems, context));
+  const detailed = await serviceRecommendDetailed(toRecommendRequest(wardrobeItems, context));
+  const serviceResult = detailed.data;
+  const serviceError = recommendationFailure(detailed.error);
+  const errorMeta = detailed.error ? {
+    requestId: detailed.error.requestId,
+    failedStage: detailed.error.stage,
+    errorType: detailed.error.errorType,
+    serverDurationMs: detailed.error.serverDurationMs,
+  } : {};
   if (Array.isArray(serviceResult?.outfits)) {
     const serviceOutfits = outfitsRespToApp(serviceResult.outfits, wardrobeItems, userId, sessionId);
     if (serviceOutfits.length > 0) {
       return {
         outfits: serviceOutfits,
-        meta: { source: `model-service/${serviceResult.trace?.provider || 'model'}`, durationMs: Date.now() - t0, ok: serviceResult.trace?.provider !== 'mock' },
+        meta: {
+          source: `model-service/${serviceResult.trace?.provider || 'model'}`,
+          durationMs: Date.now() - t0,
+          ok: serviceResult.trace?.provider !== 'mock',
+          requestId: serviceResult.trace?.request_id,
+          serverDurationMs: serviceResult.trace?.duration_ms,
+          degraded: serviceResult.trace?.degraded,
+        },
       };
     }
   }
@@ -117,12 +145,17 @@ export async function aiRecommendOutfits(
   if (activeItems.length === 0 || (!hasTop && !hasDress) || (!hasBottom && !hasDress)) {
     return {
       outfits: [buildFallbackLook(activeItems, userId, sessionId)],
-      meta: { source: 'fallback', durationMs: Date.now() - t0, ok: true },
+      error: serviceError,
+      meta: { source: 'fallback', durationMs: Date.now() - t0, ok: true, ...errorMeta },
     };
   }
 
   const outfits = await mockGetOutfitRecommendations(wardrobeItems, userId, sessionId, undefined);
-  return { outfits, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
+  return {
+    outfits,
+    error: serviceError,
+    meta: { source: 'mock', durationMs: Date.now() - t0, ok: false, ...errorMeta },
+  };
 }
 
 // ─── 穿搭理由（独立生成）─────────────────────────────────

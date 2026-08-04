@@ -88,7 +88,8 @@ def recognize_many(image_url: str) -> dict:
                 ]}]
     content = _chat_completion(
         os.environ.get("VL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-        key, os.environ.get("VL_MODEL", "qwen3-vl-plus"), messages, 0.2, 60, True,
+        key, os.environ.get("VL_MODEL", "qwen3-vl-plus"), messages, 0.2,
+        int(os.environ.get("VL_MULTI_TIMEOUT_SECONDS", "50")), True,
     )
     data = _extract_json(content)
     raw_items = data.get("items") if isinstance(data.get("items"), list) else []

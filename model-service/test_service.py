@@ -101,9 +101,12 @@ from stylee.service.server import run_server
 from stylee.service import gamma as gamma_service
 
 
-def _post(url, payload):
+def _post(url, payload, request_id=None):
+    headers = {"Content-Type": "application/json"}
+    if request_id:
+        headers["X-Request-ID"] = request_id
     req = urllib.request.Request(url, data=_json.dumps(payload).encode(), method="POST",
-                                 headers={"Content-Type": "application/json"})
+                                 headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, _json.loads(r.read().decode())
@@ -158,8 +161,26 @@ def test_server_smoke():
                 {"item_id": "t1", "category": "上装", "color": "白色", "material": "棉"},
                 {"item_id": "b1", "category": "下装", "color": "黑色", "material": "牛仔"},
                 {"item_id": "s1", "category": "鞋", "color": "白色", "material": "皮"},
-            ]})
+            ]}, request_id="req-smoke-recommend")
         assert st == 200 and isinstance(b["outfits"], list) and len(b["outfits"]) >= 1
+        assert b["trace"]["request_id"] == "req-smoke-recommend"
+        assert b["trace"]["stage_ms"]["B0.parse_intent"] >= 0
+        assert b["trace"]["stage_ms"]["B3.generate_outfits"] >= 0
+
+        import stylee.service.server as server_service
+        original_recommend = server_service.recommend
+        server_service.recommend = lambda *args, **kwargs: (_ for _ in ()).throw(
+            TimeoutError("provider deadline exceeded"))
+        try:
+            st, b = _post(base + "/recommend", {
+                "input_mode": "nl", "query": "周末约会", "n": 2, "wardrobe": [],
+            }, request_id="req-smoke-timeout")
+            assert st == 504
+            assert b["request_id"] == "req-smoke-timeout"
+            assert b["stage"] == "recommend_pipeline"
+            assert b["error_type"] == "TimeoutError"
+        finally:
+            server_service.recommend = original_recommend
 
         st, b = _post(base + "/gamma/import", {"image_url": "mock://x"})
         assert st == 200 and b["standardized"] is True

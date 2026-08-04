@@ -17,7 +17,7 @@ import json
 import urllib.request
 
 import stylee.providers.openai_compat as oc
-from stylee.providers import ProviderError, deepseek
+from stylee.providers import ProviderError, ProviderTimeoutError, deepseek
 
 
 def _check(cond: bool, msg: str) -> None:
@@ -54,6 +54,7 @@ def main() -> None:
                "choices": [{"message": {"content": '{"outfits":[]}'}}],
                "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
     orig = urllib.request.urlopen
+    orig_log_usage = oc.log_usage
     try:
         print("[1] max_tokens 护栏默认封顶")
         cap: dict = {}
@@ -88,8 +89,22 @@ def main() -> None:
             _check(False, "应抛 ProviderError")
         except ProviderError:
             _check(True, "网络失败抛 ProviderError(埋点已在其间调用,未额外报错)")
+
+        print("\n[5] socket 超时被分类并记录失败埋点")
+        usage_calls = []
+        oc.log_usage = lambda *args, **kwargs: usage_calls.append((args, kwargs))
+        urllib.request.urlopen = lambda req, timeout=0: (_ for _ in ()).throw(
+            TimeoutError("socket timed out"))
+        try:
+            oc._chat_completion("https://api.deepseek.com/v1", "k", "deepseek-v4-flash",
+                                [{"role": "user", "content": "hi"}], 0.7, 12, True)
+            _check(False, "应抛 ProviderTimeoutError")
+        except ProviderTimeoutError:
+            _check(True, "超时抛 ProviderTimeoutError")
+        _check(len(usage_calls) == 1, "超时写入一次失败埋点")
     finally:
         urllib.request.urlopen = orig
+        oc.log_usage = orig_log_usage
 
     print("\n全部通过 ✅")
 

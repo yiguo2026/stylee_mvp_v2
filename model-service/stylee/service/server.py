@@ -17,11 +17,13 @@ from ..vision import build_image_standardizer, build_vision_provider
 from . import adapter
 from . import ai_features
 from . import gamma
+from .request_trace import RequestTrace, error_status, normalize_request_id
 from .security import RateLimiter, TokenVerifier, allowed_origins, env_bool
 
 _CORS = {
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+    "Access-Control-Expose-Headers": "X-Request-ID",
 }
 
 
@@ -56,15 +58,25 @@ class Handler(BaseHTTPRequestHandler):
             headers["Vary"] = "Origin"
         return headers
 
-    def _send(self, status: int, payload: dict) -> None:
+    def _send(self, status: int, payload: dict, request_id: str | None = None) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        for k, v in self._cors().items():
-            self.send_header(k, v)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            if request_id:
+                self.send_header("X-Request-ID", request_id)
+            for k, v in self._cors().items():
+                self.send_header(k, v)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            print(json.dumps({
+                "event": "stylee_client_disconnected",
+                "path": self.path,
+                "request_id": request_id,
+                "status": status,
+            }, ensure_ascii=False, separators=(",", ":")), flush=True)
 
     def do_OPTIONS(self) -> None:
         self.send_response(204)
@@ -79,90 +91,169 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self) -> None:
+        request_id = normalize_request_id(self.headers.get("X-Request-ID"))
+        trace = RequestTrace(
+            feature=self.path.strip("/").replace("/", "_") or "unknown",
+            request_id=request_id,
+            path=self.path,
+        )
         origin = (self.headers.get("Origin") or "").rstrip("/")
         if origin and origin not in self.origins:
-            self._send(403, {"error": "origin not allowed"})
+            trace.emit(403)
+            self._send(403, {"error": "origin not allowed", "request_id": request_id}, request_id)
             return
         user_id = "local"
         if self.require_auth:
             user_id = self.verifier.verify(self.headers.get("Authorization") or "") or ""
             if not user_id:
-                self._send(401, {"error": "valid user access token required"})
+                trace.emit(401)
+                self._send(401, {"error": "valid user access token required", "request_id": request_id}, request_id)
                 return
         subject = user_id or self.client_address[0]
         if not self.limiter.allow(subject):
-            self._send(429, {"error": "rate limit exceeded"})
+            trace.emit(429)
+            self._send(429, {"error": "rate limit exceeded", "request_id": request_id}, request_id)
             return
         try:
-            n = int(self.headers.get("Content-Length") or 0)
-            if n > int(os.environ.get("STYLEE_MAX_BODY_BYTES", "15728640")):
-                self._send(413, {"error": "request too large"})
-                return
-            payload = json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
+            with trace.stage("request.parse_json"):
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > int(os.environ.get("STYLEE_MAX_BODY_BYTES", "15728640")):
+                    trace.emit(413)
+                    self._send(413, {"error": "request too large", "request_id": request_id}, request_id)
+                    return
+                payload = json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
         except Exception as e:  # noqa: BLE001
-            self._send(400, {"error": f"bad json: {e}"})
+            trace.emit(400, e)
+            self._send(400, {"error": f"bad json: {e}", "request_id": request_id}, request_id)
             return
+
+        error = None
         try:
             if self.path == "/recommend":
-                self._send(200, self._recommend(payload))
+                response = self._recommend(payload, trace)
             elif self.path == "/recognize":
-                self._send(200, self._recognize(payload))
+                response = self._recognize(payload, trace)
             elif self.path == "/standardize":
-                self._send(200, self._standardize(payload))
+                response = self._standardize(payload, trace)
             elif self.path == "/recognize-multi":
-                self._send(200, ai_features.recognize_many(_image_url(payload)))
+                multi_timeout = int(os.environ.get("VL_MULTI_TIMEOUT_SECONDS", "50"))
+                trace.annotate(upstream_timeout_seconds=multi_timeout)
+                with trace.stage("A1.multi_vision_recognize"):
+                    response = ai_features.recognize_many(_image_url(payload))
+                trace.annotate(provider=response.get("provider"))
             elif self.path == "/intent":
-                self._send(200, ai_features.intent(str(payload.get("query") or "")))
+                with trace.stage("intent.model_call"):
+                    response = ai_features.intent(str(payload.get("query") or ""))
             elif self.path == "/reason":
-                self._send(200, ai_features.reason(payload))
+                with trace.stage("reason.model_call"):
+                    response = ai_features.reason(payload)
             elif self.path == "/product-extract":
-                self._send(200, ai_features.product(payload))
+                with trace.stage("product_extract.model_call"):
+                    response = ai_features.product(payload)
             elif self.path == "/tryon-suggestion":
-                self._send(200, ai_features.tryon_suggestion(payload))
+                with trace.stage("tryon_suggestion.model_call"):
+                    response = ai_features.tryon_suggestion(payload)
             elif self.path == "/tryon-image":
                 payload["image_url"] = _image_url(payload)
-                self._send(200, {"image_ref": ai_features.tryon_image(payload)})
+                with trace.stage("tryon_image.model_call"):
+                    response = {"image_ref": ai_features.tryon_image(payload)}
             elif self.path == "/gamma/import":
-                self._send(200, gamma.import_garment(payload))
+                with trace.stage("gamma.import"):
+                    response = gamma.import_garment(payload)
             elif self.path == "/gamma/outfit":
-                self._send(200, gamma.outfit(payload))
+                with trace.stage("gamma.outfit"):
+                    response = gamma.outfit(payload)
             elif self.path == "/gamma/tryon":
-                self._send(200, gamma.tryon(payload))
+                with trace.stage("gamma.tryon"):
+                    response = gamma.tryon(payload)
             else:
-                self._send(404, {"error": "not found"})
+                trace.emit(404)
+                self._send(404, {"error": "not found", "request_id": request_id}, request_id)
+                return
         except Exception as e:  # noqa: BLE001
-            self._send(500, {"error": str(e)})
+            error = e
+            status = error_status(e)
+            response = trace.error_summary(e)
+        else:
+            status = 200
+            if isinstance(response, dict):
+                existing_trace = response.get("trace")
+                if not isinstance(existing_trace, dict):
+                    existing_trace = {}
+                    response["trace"] = existing_trace
+                existing_trace.update(trace.response_summary())
 
-    def _recommend(self, payload: dict) -> dict:
-        ctx = adapter.to_request_context(payload)
-        provider = build_provider(self.provider_name)
-        result = recommend(ctx, provider, default_retriever())
-        response = adapter.outfits_to_app(result, ctx)
+        trace.emit(status, error)
+        self._send(status, response, request_id)
+
+    def _recommend(self, payload: dict, trace: RequestTrace) -> dict:
+        with trace.stage("request_adapter"):
+            ctx = adapter.to_request_context(payload)
+        with trace.stage("provider_init"):
+            provider = build_provider(self.provider_name)
+        trace.annotate(
+            provider=provider.name,
+            model_intent=getattr(provider, "model_intent", None),
+            model_generation=getattr(provider, "model_gen", None),
+            upstream_timeout_seconds=getattr(provider, "timeout", None),
+        )
+        with trace.stage("rag_init"):
+            retriever = default_retriever()
+        trace.annotate(rag_mode=getattr(retriever, "mode", "keyword"))
+        with trace.stage("recommend_pipeline"):
+            result = recommend(ctx, provider, retriever, stage_timer=trace.stage)
+        trace.annotate(
+            rag_mode=result.trace.get("rag_mode"),
+            rag_fallback=result.trace.get("rag_fallback"),
+        )
+        if isinstance(result.trace.get("rag_fallback"), dict):
+            trace.record_fallback_info(result.trace["rag_fallback"])
+        with trace.stage("response_adapter"):
+            response = adapter.outfits_to_app(result, ctx)
         response["trace"]["provider"] = provider.name
         return response
 
-    def _recognize(self, payload: dict) -> dict:
-        provider = build_vision_provider()
-        response = adapter.ingest_to_app(recognize_item(_image_url(payload), provider))
+    def _recognize(self, payload: dict, trace: RequestTrace) -> dict:
+        recognize_timeout = int(os.environ.get("VL_RECOGNIZE_TIMEOUT_SECONDS", "15"))
+        with trace.stage("vision_provider_init"):
+            provider = build_vision_provider(timeout=recognize_timeout)
+        trace.annotate(provider=provider.name, upstream_timeout_seconds=recognize_timeout)
+        result = recognize_item(
+            _image_url(payload), provider,
+            stage_timer=trace.stage,
+            on_fallback=trace.record_fallback,
+        )
+        with trace.stage("response_adapter"):
+            response = adapter.ingest_to_app(result)
         response["provider"] = provider.name
         return response
 
-    def _standardize(self, payload: dict) -> dict:
+    def _standardize(self, payload: dict, trace: RequestTrace) -> dict:
         d = payload.get("item") or {}
-        item = WardrobeItem(id=str(d.get("item_id", "")),
-                            category=adapter.model_category(d.get("category")),
-                            subcategory=str(d.get("description") or "")[:100],
-                            colors=[d["color"]] if d.get("color") else [],
-                            material=str(d.get("material") or "")[:100])
+        with trace.stage("request_adapter"):
+            item = WardrobeItem(id=str(d.get("item_id", "")),
+                                category=adapter.model_category(d.get("category")),
+                                subcategory=str(d.get("description") or "")[:100],
+                                colors=[d["color"]] if d.get("color") else [],
+                                material=str(d.get("material") or "")[:100])
         # Standardization is sequential: edit, then visual verification. Bound
         # verification separately so a slow verifier cannot double total time.
         verify_timeout = int(os.environ.get("VL_VERIFY_TIMEOUT_SECONDS", "20"))
         edit_timeout = int(os.environ.get("IMG_EDIT_TIMEOUT_SECONDS", "60"))
-        vision = build_vision_provider(timeout=verify_timeout)
-        standardizer = build_image_standardizer(timeout=edit_timeout)
+        with trace.stage("vision_provider_init"):
+            vision = build_vision_provider(timeout=verify_timeout)
+            standardizer = build_image_standardizer(timeout=edit_timeout)
+        trace.annotate(
+            provider=standardizer.name,
+            verifier=vision.name,
+            image_edit_timeout_seconds=edit_timeout,
+            visual_verify_timeout_seconds=verify_timeout,
+        )
         si = standardize_item(_image_url(payload), item, _photo_type(payload.get("photo_type")),
-                              vision, standardizer)
-        response = adapter.std_to_app(si)
+                              vision, standardizer, stage_timer=trace.stage,
+                              on_fallback=trace.record_fallback)
+        with trace.stage("response_adapter"):
+            response = adapter.std_to_app(si)
         response["provider"] = standardizer.name
         return response
 

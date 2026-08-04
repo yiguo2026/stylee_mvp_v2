@@ -15,6 +15,10 @@ services:
         value: "20"
       - key: LLM_MAX_TOKENS
         value: "2048"
+      - key: VL_RECOGNIZE_TIMEOUT_SECONDS
+        value: "15"
+      - key: VL_MULTI_TIMEOUT_SECONDS
+        value: "50"
       - key: STYLEE_ALLOWED_ORIGINS
         sync: false
       - key: DEEPSEEK_API_KEY

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from contextlib import nullcontext
+from typing import Callable, ContextManager
 
 from .contracts import (
     Category,
@@ -103,17 +105,27 @@ def _gen_id(raw: dict) -> str:
     return "a_" + hashlib.md5(seed.encode("utf-8")).hexdigest()[:8]
 
 
-def recognize_item(image_url: str, provider: VisionProvider, item_id: str = "") -> IngestResult:
+def recognize_item(
+    image_url: str,
+    provider: VisionProvider,
+    item_id: str = "",
+    stage_timer: Callable[[str], ContextManager[None]] | None = None,
+    on_fallback: Callable[[str, BaseException], None] | None = None,
+) -> IngestResult:
     """A1:看图 → WardrobeItem。模型/解析出错也产出可用 item(+needs_review)。"""
-    try:
-        raw = provider.recognize(image_url)
-        if not isinstance(raw, dict):
+    with stage_timer("A1.vision_recognize") if stage_timer else nullcontext():
+        try:
+            raw = provider.recognize(image_url)
+            if not isinstance(raw, dict):
+                raw = {}
+        except Exception as error:
+            if on_fallback:
+                on_fallback("A1.vision_recognize", error)
             raw = {}
-    except Exception:
-        raw = {}
     parse_failed = not raw
 
-    item, photo_type, needs_review = normalize_attrs(raw, item_id or _gen_id(raw))
+    with stage_timer("A1.normalize_attrs") if stage_timer else nullcontext():
+        item, photo_type, needs_review = normalize_attrs(raw, item_id or _gen_id(raw))
     needs_review = needs_review or parse_failed
     confidence = 0.3 if parse_failed else (0.7 if needs_review else 0.95)
     return IngestResult(item=item, photo_type=photo_type, confidence=confidence,
@@ -125,20 +137,34 @@ def mode_for(photo_type: PhotoType) -> str:
 
 
 def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
-                     provider: VisionProvider, standardizer: ImageStandardizer
+                     provider: VisionProvider, standardizer: ImageStandardizer,
+                     stage_timer: Callable[[str], ContextManager[None]] | None = None,
+                     on_fallback: Callable[[str, BaseException], None] | None = None,
                      ) -> StandardizedImage:
     """A2:按 photo_type 路由生成标准化图 → 回验漂移 → 失败/漂移回退原图。"""
     mode = mode_for(photo_type)
-    try:
-        result_url = standardizer.standardize(image_url, item, mode)
-    except Exception:
+    edit_error = None
+    with stage_timer("A2.image_edit") if stage_timer else nullcontext():
+        try:
+            result_url = standardizer.standardize(image_url, item, mode)
+        except Exception as error:
+            edit_error = error
+            result_url = ""
+    if edit_error is not None:
+        if on_fallback:
+            on_fallback("A2.image_edit", edit_error)
         return StandardizedImage(image_ref=image_url, method="cropped_fallback", verified=False)
 
     expected = {"category": item.category.value, "colors": item.colors}
-    try:
-        vres = provider.verify(result_url, expected)
-    except Exception:
-        vres = {"drift": True, "reason": "verify failed"}
+    verify_error = None
+    with stage_timer("A2.visual_verify") if stage_timer else nullcontext():
+        try:
+            vres = provider.verify(result_url, expected)
+        except Exception as error:
+            verify_error = error
+            vres = {"drift": True, "reason": "verify failed"}
+    if verify_error is not None and on_fallback:
+        on_fallback("A2.visual_verify", verify_error)
     if vres.get("drift"):
         return StandardizedImage(image_ref=image_url, method="cropped_fallback", verified=False)
     return StandardizedImage(image_ref=result_url, method=mode, verified=True)

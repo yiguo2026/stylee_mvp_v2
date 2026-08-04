@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import os
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -19,6 +20,10 @@ from .usage_log import log_usage
 
 
 class EmbeddingError(RuntimeError):
+    pass
+
+
+class EmbeddingTimeoutError(EmbeddingError):
     pass
 
 
@@ -118,7 +123,12 @@ class OpenAICompatEmbedder(EmbeddingClient):
             raise EmbeddingError(f"HTTP {e.code}: {detail}") from None
         except urllib.error.URLError as e:
             log_usage("qwen", self.model, "embedding", "embedding", None, int((time.time() - t0) * 1000), False)
+            if isinstance(e.reason, (TimeoutError, socket.timeout)):
+                raise EmbeddingTimeoutError(f"embedding 调用超时({self.timeout}s)") from None
             raise EmbeddingError(f"网络错误: {e.reason}") from None
+        except (TimeoutError, socket.timeout):
+            log_usage("qwen", self.model, "embedding", "embedding", None, int((time.time() - t0) * 1000), False)
+            raise EmbeddingTimeoutError(f"embedding 调用超时({self.timeout}s)") from None
         log_usage("qwen", self.model, "embedding", "embedding", body.get("usage"),
                   int((time.time() - t0) * 1000), True)
         return parse_embeddings_response(body)

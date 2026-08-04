@@ -60,7 +60,9 @@ Blueprint 默认关闭自动部署，首次使用免费实例完成 HTTPS 与真
 | `POST /gamma/outfit` | Gamma 直接搭配、换单件、换整套 | DeepSeek + Qwen Image |
 | `POST /gamma/tryon` | Gamma 身体照、搭配、场景直接生成试穿图 | Qwen 多图编辑 |
 
-注意：`/recommend` 真实生成耗时约 40~60s（App 侧超时 90s）。`/standardize` 顺序执行图片编辑和视觉回验，默认分别限时 60s/20s，App 侧整体限时 90s。可用 `IMG_EDIT_TIMEOUT_SECONDS` 和 `VL_VERIFY_TIMEOUT_SECONDS` 调整，三者必须保持整体限时大于服务端两段之和。
+注意：`/recommend` 真实生成耗时约 40~60s（App 侧超时 90s）。单品/多品识别的服务端默认限时分别为 15s/50s（`VL_RECOGNIZE_TIMEOUT_SECONDS` / `VL_MULTI_TIMEOUT_SECONDS`），必须短于 App 侧 20s/60s，确保服务端能先返回可追踪错误。`/standardize` 顺序执行图片编辑和视觉回验，默认分别限时 60s/20s，App 侧整体限时 90s。可用 `IMG_EDIT_TIMEOUT_SECONDS` 和 `VL_VERIFY_TIMEOUT_SECONDS` 调整，三者必须保持整体限时大于服务端两段之和。
+
+每个模型请求都由 App 生成 `X-Request-ID`，服务端用同一 ID 输出一行结构化日志。成功响应的 `trace.stage_ms` 会列出实际阶段耗时；失败响应会返回 `stage`、`error_type`、`duration_ms` 和 `retryable`。即使客户端先中止请求，也能用客户端日志里的 request ID 在 Render 日志中定位服务端最终停在哪个阶段。线上复测时分别跑一次推荐和识别，再按 request ID 对齐浏览器日志与 Render 的 `stylee_request` 日志即可。
 
 导入时，App 必须使用识别返回的 `photo_type`（`flatlay|on_body|web|angled`）选择标准化策略。为兼容旧客户端，服务端会把 `flat` 映射为 `flatlay`、`product` 映射为 `web`。标准图通过回验后，App 保存时必须将临时 OSS URL 复制到自有 Supabase Storage，不得直接入库。
 
