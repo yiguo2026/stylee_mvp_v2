@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
+import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -100,6 +101,10 @@ export default function EditItemScreen() {
     try {
       const { result, meta } = await aiRecognizeClothing(uri);
       if (reqTokenRef.current !== token) return; // 被更新的图片取代，丢弃旧结果
+      if (!shouldApplyRecognition(meta.ok, 1)) {
+        showToast('照片识别失败，已保留原有信息');
+        return;
+      }
       setCategory(result.category);
       setColor(result.color);
       if (result.material) setMaterial(result.material);
@@ -108,7 +113,7 @@ export default function EditItemScreen() {
       if (result.season?.length) setSeasons(result.season);
       if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
       setName((result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`).slice(0, 10));
-      showToast(meta.ok ? '已根据新照片更新商品信息' : '已更新照片，识别信息仅供参考');
+      showToast('已根据新照片更新商品信息');
     } catch (e) {
       // 兜底：保留原属性，仅提示，不阻断保存
       if (reqTokenRef.current === token) showToast('照片识别失败，已保留原有信息');

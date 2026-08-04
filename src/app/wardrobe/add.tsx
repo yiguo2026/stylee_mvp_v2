@@ -19,6 +19,7 @@ import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast } from '@/components/Toast';
+import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
 
 const isWeb = Platform.OS === 'web';
 
@@ -114,12 +115,15 @@ export default function AddWardrobeItem() {
           // Collect all items, tag each with its source image URI
           const allItems: DetectedItem[] = [];
           results.forEach((result, imgIdx) => {
+            if (!shouldApplyRecognition(result.meta.ok, result.items.length)) return;
             result.items.forEach((item) => {
               allItems.push({ ...item, sourceImageUri: uris[imgIdx] });
             });
           });
 
           if (allItems.length === 0) {
+            setRecognizeMeta(results[0]?.meta ?? null);
+            showToast('AI识别失败，请重试或手动填写', 'error');
             return;
           }
 
@@ -237,6 +241,10 @@ export default function AddWardrobeItem() {
       const { items, meta } = await aiDetectMultiItems(uri);
       if (reqTokenRef.current !== token) return;
       setRecognizeMeta(meta);
+      if (!shouldApplyRecognition(meta.ok, items.length)) {
+        showToast('AI识别失败，请重试或手动填写', 'error');
+        return;
+      }
 
       if (items.length === 1) {
         // Single item — skip picker, fill form directly
