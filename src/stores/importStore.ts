@@ -5,6 +5,7 @@ import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
 import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { track } from '@/lib/track';
+import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -181,7 +182,7 @@ async function handleDetection(taskId: string) {
   let items: DetectedItem[] = [];
   try {
     const result = await aiDetectMultiItems(task.sourceUri);
-    items = result.items.map((item, index) => ({
+    items = acceptedRecognitionItems(result.meta.ok, result.items).map((item, index) => ({
       ...item,
       index: typeof item.index === 'number' ? item.index : index,
       sourceImageUri: item.sourceImageUri || task.sourceUri,
@@ -190,12 +191,6 @@ async function handleDetection(taskId: string) {
     console.warn('[importStore] aiDetectMultiItems failed:', err);
   }
 
-  // 单品数量完全由真实模型服务（serviceRecognizeMulti）识别结果决定，不再用假数据造多件。
-  // 真实服务不可用时，aiDetectMultiItems 已在内部兜底为「单件识别」（1 件），
-  // 因此不会误弹多单品选择；只有模型真的识别到 >1 件，才进入多选流程。
-
-  // 极端情况（图片无法编码 / 服务完全无响应且单件兜底也为空）：标记失败让用户重试，
-  // 而不是伪造数据。
   if (items.length === 0) {
     store.setState(state => ({
       tasks: state.tasks.map(t => t.id === taskId

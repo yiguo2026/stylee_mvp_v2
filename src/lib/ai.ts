@@ -5,6 +5,7 @@ import { buildFallbackLook } from '@/lib/fallbackLook';
 import { serviceFeature, serviceRecognize, serviceRecognizeMulti, serviceRecommendDetailed, serviceStandardize, uriToBase64 } from '@/lib/styleeService';
 import type { ServiceErrorInfo } from '@/lib/styleeService';
 import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
+import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
 
 // ─── AI 元信息 ───────────────────────────────────────────
 
@@ -64,12 +65,13 @@ export const aiDetectMultiItems = async (
   }
   // Fallback: use single-item recognition, wrap as array
   const { result, meta: singleMeta } = await aiRecognizeClothing(imageUri);
+  const fallbackItems: DetectedItem[] = [{
+    index: 1,
+    ...result,
+    description: result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`,
+  }];
   return {
-    items: [{
-      index: 1,
-      ...result,
-      description: result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`,
-    }],
+    items: acceptedRecognitionItems(singleMeta.ok, fallbackItems),
     meta: singleMeta,
   };
 };
