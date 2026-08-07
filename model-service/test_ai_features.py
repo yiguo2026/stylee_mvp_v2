@@ -37,19 +37,25 @@ def test_multi_recognition_uses_server_deadline_env():
     saved_key = os.environ.get("DASHSCOPE_API_KEY")
     saved_timeout = os.environ.get("VL_MULTI_TIMEOUT_SECONDS")
     saved_model = os.environ.get("VL_MULTI_MODEL")
+    saved_max_pixels = os.environ.get("VL_MULTI_MAX_PIXELS")
     original = ai_features._chat_completion
     seen = {}
     os.environ["DASHSCOPE_API_KEY"] = "test-key"
     os.environ["VL_MULTI_TIMEOUT_SECONDS"] = "17"
     os.environ["VL_MULTI_MODEL"] = "qwen3-vl-flash"
+    os.environ["VL_MULTI_MAX_PIXELS"] = "1048576"
     ai_features._chat_completion = lambda base_url, key, model, messages, temperature, timeout, json_mode: (
-        seen.update(timeout=timeout, model=model) or '{"items":[]}'
+        seen.update(timeout=timeout, model=model, messages=messages) or '{"items":[]}'
     )
     try:
         result = ai_features.recognize_many("data:image/png;base64,AA==")
         assert result == {"items": [], "provider": "qwen3-vl-flash"}
         assert seen["timeout"] == 17
         assert seen["model"] == "qwen3-vl-flash"
+        assert seen["messages"][1]["content"][1]["max_pixels"] == 1048576
+        prompt = str(seen["messages"])
+        assert "白底商品图优先判为 web" in prompt
+        assert "有真实环境背景" in prompt
     finally:
         ai_features._chat_completion = original
         if saved_key is None:
@@ -64,12 +70,33 @@ def test_multi_recognition_uses_server_deadline_env():
             os.environ.pop("VL_MULTI_MODEL", None)
         else:
             os.environ["VL_MULTI_MODEL"] = saved_model
+        if saved_max_pixels is None:
+            os.environ.pop("VL_MULTI_MAX_PIXELS", None)
+        else:
+            os.environ["VL_MULTI_MAX_PIXELS"] = saved_max_pixels
+
+
+def test_multi_max_pixels_rejects_invalid_or_unsafe_values():
+    saved = os.environ.get("VL_MULTI_MAX_PIXELS")
+    try:
+        os.environ["VL_MULTI_MAX_PIXELS"] = "invalid"
+        assert ai_features.multi_max_pixels() == 1048576
+        os.environ["VL_MULTI_MAX_PIXELS"] = "1"
+        assert ai_features.multi_max_pixels() == 65536
+        os.environ["VL_MULTI_MAX_PIXELS"] = "99999999"
+        assert ai_features.multi_max_pixels() == 16777216
+    finally:
+        if saved is None:
+            os.environ.pop("VL_MULTI_MAX_PIXELS", None)
+        else:
+            os.environ["VL_MULTI_MAX_PIXELS"] = saved
 
 
 def main():
     test_no_keys_do_not_call_external_models()
     test_tryon_prompt_is_built_server_side()
     test_multi_recognition_uses_server_deadline_env()
+    test_multi_max_pixels_rejects_invalid_or_unsafe_values()
     print("ok")
 
 

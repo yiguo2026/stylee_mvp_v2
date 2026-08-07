@@ -30,6 +30,14 @@ _PHOTO_TYPE_ALIASES = {
 }
 
 
+def multi_max_pixels() -> int:
+    try:
+        configured = int(os.environ.get("VL_MULTI_MAX_PIXELS", "1048576"))
+    except ValueError:
+        configured = 1048576
+    return min(16777216, max(65536, configured))
+
+
 def normalize_multi_item(raw: dict, index: int) -> dict:
     """Keep /recognize-multi compatible with the typed App contract.
 
@@ -77,15 +85,21 @@ def recognize_many(image_url: str) -> dict:
     if not key:
         return {"items": [], "provider": "mock"}
     model = os.environ.get("VL_MULTI_MODEL", os.environ.get("VL_MODEL", "qwen3-vl-plus"))
+    max_pixels = multi_max_pixels()
     schema = ('{"items":[{"category":"上装|下装|连体装|外套|鞋履|包袋|帽巾|配饰",'
               '"color":"颜色","material":"材质","style":"风格","brand":"",'
               '"sleeve_length":"无袖|短袖|长袖|null","fit_type":"版型|null",'
               '"season":[],"occasion_tags":[],"description":"简洁客观名称",'
               '"photo_type":"flatlay|on_body|web|angled"}]}')
-    messages = [{"role": "system", "content": "识别图片中所有服饰单品，只输出JSON，schema:" + schema},
+    photo_type_rules = (
+        "photo_type判定：白底商品图优先判为 web，即使衣物是平铺状态；"
+        "flatlay 仅指有真实环境背景的俯拍平铺照，不含已抠净或棚拍商品图；"
+        "on_body 指真人或人台穿着；angled 指带场景的非正俯视角度照片。"
+    )
+    messages = [{"role": "system", "content": "识别图片中所有服饰单品，只输出JSON。" + photo_type_rules + "schema:" + schema},
                 {"role": "user", "content": [
                     {"type": "text", "text": "逐件识别所有可辨认的服饰。"},
-                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {"type": "image_url", "image_url": {"url": image_url}, "max_pixels": max_pixels},
                 ]}]
     content = _chat_completion(
         os.environ.get("VL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),

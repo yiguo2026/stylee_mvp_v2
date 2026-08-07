@@ -21,6 +21,8 @@ services:
         value: "50"
       - key: VL_MULTI_MODEL
         value: qwen3-vl-flash
+      - key: VL_MULTI_MAX_PIXELS
+        value: "1048576"
       - key: STYLEE_ALLOWED_ORIGINS
         sync: false
       - key: DEEPSEEK_API_KEY

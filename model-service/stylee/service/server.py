@@ -137,7 +137,10 @@ class Handler(BaseHTTPRequestHandler):
                 response = self._standardize(payload, trace)
             elif self.path == "/recognize-multi":
                 multi_timeout = int(os.environ.get("VL_MULTI_TIMEOUT_SECONDS", "50"))
-                trace.annotate(upstream_timeout_seconds=multi_timeout)
+                trace.annotate(
+                    upstream_timeout_seconds=multi_timeout,
+                    vision_max_pixels=ai_features.multi_max_pixels(),
+                )
                 with trace.stage("A1.multi_vision_recognize"):
                     response = ai_features.recognize_many(_image_url(payload))
                 items = response.get("items") if isinstance(response, dict) else None

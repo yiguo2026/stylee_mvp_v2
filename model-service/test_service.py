@@ -159,6 +159,7 @@ def test_server_smoke():
             assert st == 200
             assert b["trace"]["recognized_item_count"] == 2
             assert b["trace"]["recognized_photo_types"] == ["web", "flatlay"]
+            assert b["trace"]["vision_max_pixels"] == 1048576
         finally:
             server_service.ai_features.recognize_many = original_recognize_many
 
