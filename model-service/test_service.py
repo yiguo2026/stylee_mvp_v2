@@ -97,6 +97,7 @@ import json as _json
 import threading
 import urllib.error
 import urllib.request
+from stylee.providers import ProviderTimeoutError
 from stylee.service.server import run_server
 from stylee.service import gamma as gamma_service
 
@@ -181,6 +182,56 @@ def test_server_smoke():
             assert b["error_type"] == "TimeoutError"
         finally:
             server_service.recommend = original_recommend
+
+        original_build_vision_provider = server_service.build_vision_provider
+
+        class TimeoutVisionProvider:
+            name = "timeout-vlm"
+
+            def recognize(self, image_url):
+                raise ProviderTimeoutError("upstream recognition timed out")
+
+            def verify(self, image_url, expected):
+                return {"drift": False, "reason": ""}
+
+        server_service.build_vision_provider = lambda timeout: TimeoutVisionProvider()
+        try:
+            st, b = _post(
+                base + "/recognize",
+                {"image_url": "data:image/png;base64,AAAA"},
+                request_id="req-recognize-timeout",
+            )
+            assert st == 504
+            assert b["request_id"] == "req-recognize-timeout"
+            assert b["stage"] == "A1.vision_recognize"
+            assert b["error_type"] == "ProviderTimeoutError"
+            assert "category" not in b
+        finally:
+            server_service.build_vision_provider = original_build_vision_provider
+
+        class EmptyVisionProvider:
+            name = "empty-vlm"
+
+            def recognize(self, image_url):
+                return {}
+
+            def verify(self, image_url, expected):
+                return {"drift": False, "reason": ""}
+
+        server_service.build_vision_provider = lambda timeout: EmptyVisionProvider()
+        try:
+            st, b = _post(
+                base + "/recognize",
+                {"image_url": "data:image/png;base64,AAAA"},
+                request_id="req-recognize-empty",
+            )
+            assert st == 502
+            assert b["request_id"] == "req-recognize-empty"
+            assert b["stage"] == "A1.vision_recognize"
+            assert b["error_type"] == "VisionError"
+            assert "category" not in b
+        finally:
+            server_service.build_vision_provider = original_build_vision_provider
 
         st, b = _post(base + "/gamma/import", {"image_url": "mock://x"})
         assert st == 200 and b["standardized"] is True

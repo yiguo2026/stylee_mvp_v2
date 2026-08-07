@@ -5,6 +5,7 @@ export interface RecognizeResp {
   brand: string; photo_type: string; needs_review: boolean; confidence: number;
   fit_type?: string; sleeve_length?: string; season?: string[]; occasion_tags?: string[];
   provider?: string;
+  trace?: ModelServiceTrace;
 }
 export interface RecognizeManyItemResp {
   index?: number; category?: string; color?: string; material?: string; style?: string;
@@ -12,8 +13,18 @@ export interface RecognizeManyItemResp {
   fit_type?: string; sleeve_length?: string; season?: string[]; occasion_tags?: string[];
   description?: string;
 }
-export interface RecognizeManyResp { items: RecognizeManyItemResp[]; provider?: string; }
+export interface RecognizeManyResp {
+  items: RecognizeManyItemResp[];
+  provider?: string;
+  trace?: ModelServiceTrace;
+}
 export interface StandardizeResp { image_ref: string; method: string; verified: boolean; provider?: string; }
+export interface ModelServiceTrace {
+  request_id?: string;
+  duration_ms?: number;
+  stage_ms?: Record<string, number>;
+  degraded?: boolean;
+}
 export interface RecommendReqItem {
   item_id: string; name: string; category: string; color: string;
   material?: string; sleeve_length?: string; fit?: string; season?: string[]; occasion_tags?: string[];
@@ -32,10 +43,8 @@ export interface RecommendRespOutfit {
 }
 export interface RecommendResp {
   outfits: RecommendRespOutfit[];
-  trace?: {
+  trace?: ModelServiceTrace & {
     rag_mode?: string; pool?: number; provider?: string;
-    request_id?: string; duration_ms?: number; stage_ms?: Record<string, number>;
-    degraded?: boolean;
   };
 }
 

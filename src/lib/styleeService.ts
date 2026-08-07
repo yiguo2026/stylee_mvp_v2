@@ -121,11 +121,22 @@ export async function serviceHealth(): Promise<boolean> {
 }
 
 export async function serviceRecognize(b64: string, mime: string): Promise<RecognizeResp | null> {
-  return _postJson<RecognizeResp>('/recognize', { image_b64: b64, mime }, 20000);
+  return (await serviceRecognizeDetailed(b64, mime)).data;
+}
+
+export async function serviceRecognizeDetailed(b64: string, mime: string): Promise<ServiceResult<RecognizeResp>> {
+  return _postJsonDetailed<RecognizeResp>('/recognize', { image_b64: b64, mime }, 20000);
 }
 
 export async function serviceRecognizeMulti(b64: string, mime: string): Promise<RecognizeManyResp | null> {
-  return _postJson<RecognizeManyResp>('/recognize-multi', { image_b64: b64, mime }, 60000);
+  return (await serviceRecognizeMultiDetailed(b64, mime)).data;
+}
+
+export async function serviceRecognizeMultiDetailed(
+  b64: string,
+  mime: string,
+): Promise<ServiceResult<RecognizeManyResp>> {
+  return _postJsonDetailed<RecognizeManyResp>('/recognize-multi', { image_b64: b64, mime }, 60000);
 }
 
 export async function serviceStandardize(

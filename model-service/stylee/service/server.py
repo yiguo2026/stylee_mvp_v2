@@ -222,6 +222,7 @@ class Handler(BaseHTTPRequestHandler):
             _image_url(payload), provider,
             stage_timer=trace.stage,
             on_fallback=trace.record_fallback,
+            strict=True,
         )
         with trace.stage("response_adapter"):
             response = adapter.ingest_to_app(result)

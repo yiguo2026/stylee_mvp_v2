@@ -2,10 +2,21 @@ import { WardrobeItem, Outfit, ClothingCategory, RecognitionResult, DetectedItem
 import { mockGetOutfitRecommendations, extractTagsFromQuery } from '@/lib/mock/recommendation';
 import { mockRecognizeClothing } from '@/lib/mock/recognition';
 import { buildFallbackLook } from '@/lib/fallbackLook';
-import { serviceFeature, serviceRecognize, serviceRecognizeMulti, serviceRecommendDetailed, serviceStandardize, uriToBase64 } from '@/lib/styleeService';
+import {
+  serviceFeature,
+  serviceRecognizeDetailed,
+  serviceRecognizeMultiDetailed,
+  serviceRecommendDetailed,
+  serviceStandardize,
+  uriToBase64,
+} from '@/lib/styleeService';
 import type { ServiceErrorInfo } from '@/lib/styleeService';
 import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
-import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
+import {
+  acceptedRecognitionItems,
+  isTrustedRecognition,
+  shouldFallbackToSingleRecognition,
+} from '@/lib/recognitionPolicy';
 
 // ─── AI 元信息 ───────────────────────────────────────────
 
@@ -33,16 +44,38 @@ function recommendationFailure(error?: ServiceErrorInfo): string | undefined {
 export const aiRecognizeClothing = async (imageUri: string): Promise<{ result: RecognitionResult; meta: AIMeta }> => {
   const t0 = Date.now();
   const encoded = await uriToBase64(imageUri);
-  const response = encoded ? await serviceRecognize(encoded.b64, encoded.mime) : null;
+  const detailed = encoded ? await serviceRecognizeDetailed(encoded.b64, encoded.mime) : { data: null };
+  const response = detailed.data;
   if (response) {
     const result = recognizeRespToResult(response);
     result.color = normalizeColor(result.color);
     result.material = normalizeMaterial(result.material);
     const provider = response.provider || 'model';
-    return { result, meta: { source: `model-service/${provider}`, durationMs: Date.now() - t0, ok: provider !== 'mock' } };
+    return {
+      result,
+      meta: {
+        source: `model-service/${provider}`,
+        durationMs: Date.now() - t0,
+        ok: isTrustedRecognition(response.provider, response.trace?.degraded),
+        requestId: response.trace?.request_id,
+        serverDurationMs: response.trace?.duration_ms,
+        degraded: response.trace?.degraded,
+      },
+    };
   }
   const result = await mockRecognizeClothing(imageUri);
-  return { result, meta: { source: 'mock', durationMs: Date.now() - t0, ok: false } };
+  return {
+    result,
+    meta: {
+      source: detailed.error ? 'model-service/error' : 'mock',
+      durationMs: Date.now() - t0,
+      ok: false,
+      requestId: detailed.error?.requestId,
+      failedStage: detailed.error?.stage,
+      errorType: detailed.error?.errorType,
+      serverDurationMs: detailed.error?.serverDurationMs,
+    },
+  };
 };
 
 // ─── 多品识别 ────────────────────────────────────────────
@@ -52,7 +85,8 @@ export const aiDetectMultiItems = async (
 ): Promise<{ items: DetectedItem[]; meta: AIMeta }> => {
   const t0 = Date.now();
   const encoded = await uriToBase64(imageUri);
-  const parsed = encoded ? await serviceRecognizeMulti(encoded.b64, encoded.mime) : null;
+  const detailed = encoded ? await serviceRecognizeMultiDetailed(encoded.b64, encoded.mime) : { data: null };
+  const parsed = detailed.data;
   if (Array.isArray(parsed?.items) && parsed.items.length > 0) {
           const items: DetectedItem[] = parsed.items.map((p, i) => {
             const item = recognizeManyItemToDetected(p, i);
@@ -61,18 +95,42 @@ export const aiDetectMultiItems = async (
             return item;
           });
           const provider = parsed.provider || 'model';
-          return { items, meta: { source: `model-service/${provider}`, durationMs: Date.now() - t0, ok: provider !== 'mock' } };
+          return {
+            items,
+            meta: {
+              source: `model-service/${provider}`,
+              durationMs: Date.now() - t0,
+              ok: isTrustedRecognition(parsed.provider, parsed.trace?.degraded),
+              requestId: parsed.trace?.request_id,
+              serverDurationMs: parsed.trace?.duration_ms,
+              degraded: parsed.trace?.degraded,
+            },
+          };
   }
-  // Fallback: use single-item recognition, wrap as array
-  const { result, meta: singleMeta } = await aiRecognizeClothing(imageUri);
-  const fallbackItems: DetectedItem[] = [{
-    index: 1,
-    ...result,
-    description: result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`,
-  }];
+  if (shouldFallbackToSingleRecognition(detailed.error)) {
+    const { result, meta: singleMeta } = await aiRecognizeClothing(imageUri);
+    const fallbackItems: DetectedItem[] = [{
+      index: 1,
+      ...result,
+      description: result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`,
+    }];
+    return {
+      items: acceptedRecognitionItems(singleMeta.ok, fallbackItems),
+      meta: singleMeta,
+    };
+  }
   return {
-    items: acceptedRecognitionItems(singleMeta.ok, fallbackItems),
-    meta: singleMeta,
+    items: [],
+    meta: {
+      source: parsed?.provider ? `model-service/${parsed.provider}` : 'model-service/error',
+      durationMs: Date.now() - t0,
+      ok: false,
+      requestId: detailed.error?.requestId || parsed?.trace?.request_id,
+      failedStage: detailed.error?.stage,
+      errorType: detailed.error?.errorType,
+      serverDurationMs: detailed.error?.serverDurationMs || parsed?.trace?.duration_ms,
+      degraded: parsed?.trace?.degraded,
+    },
   };
 };
 

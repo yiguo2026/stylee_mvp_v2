@@ -22,6 +22,7 @@ from .contracts import (
     WardrobeItem,
 )
 from .vision.base import ImageStandardizer, VisionProvider
+from .vision.dashscope import VisionError
 
 
 def to_data_url(image_bytes: bytes, mime: str) -> str:
@@ -111,14 +112,19 @@ def recognize_item(
     item_id: str = "",
     stage_timer: Callable[[str], ContextManager[None]] | None = None,
     on_fallback: Callable[[str, BaseException], None] | None = None,
+    strict: bool = False,
 ) -> IngestResult:
-    """A1:看图 → WardrobeItem。模型/解析出错也产出可用 item(+needs_review)。"""
+    """A1:看图 → WardrobeItem。默认容错；严格模式让接口返回真实上游错误。"""
     with stage_timer("A1.vision_recognize") if stage_timer else nullcontext():
         try:
             raw = provider.recognize(image_url)
-            if not isinstance(raw, dict):
+            if not isinstance(raw, dict) or not raw:
+                if strict:
+                    raise VisionError("识别模型未返回有效单品属性")
                 raw = {}
         except Exception as error:
+            if strict:
+                raise
             if on_fallback:
                 on_fallback("A1.vision_recognize", error)
             raw = {}

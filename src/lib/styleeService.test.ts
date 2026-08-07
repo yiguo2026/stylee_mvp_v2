@@ -1,6 +1,12 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert';
-import { serviceRecognize, serviceRecommend, serviceRecommendDetailed, serviceHealth } from './styleeService.ts';
+import {
+  serviceHealth,
+  serviceRecognize,
+  serviceRecognizeMultiDetailed,
+  serviceRecommend,
+  serviceRecommendDetailed,
+} from './styleeService.ts';
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });
@@ -52,6 +58,36 @@ test('serviceRecommendDetailed 保留服务端阶段、错误类型和请求 ID'
   assert.equal(result.error?.stage, 'B3.generate_outfits');
   assert.equal(result.error?.errorType, 'TimeoutError');
   assert.equal(result.error?.serverDurationMs, 45012);
+});
+
+test('serviceRecognizeMultiDetailed 保留识别失败阶段和请求 ID', async () => {
+  let clientRequestId = '';
+  globalThis.fetch = (async (url: any, init: any) => {
+    assert.match(String(url), /\/recognize-multi$/);
+    clientRequestId = init.headers['X-Request-ID'];
+    return {
+      ok: false,
+      status: 504,
+      text: async () => JSON.stringify({
+        error: 'model_service_error',
+        message: 'upstream recognition timed out',
+        request_id: clientRequestId,
+        stage: 'A1.multi_vision_recognize',
+        error_type: 'ProviderTimeoutError',
+        duration_ms: 50748,
+        retryable: true,
+      }),
+    } as any;
+  }) as any;
+
+  const result = await serviceRecognizeMultiDetailed('QUJD', 'image/png');
+
+  assert.equal(result.data, null);
+  assert.equal(result.error?.requestId, clientRequestId);
+  assert.equal(result.error?.stage, 'A1.multi_vision_recognize');
+  assert.equal(result.error?.errorType, 'ProviderTimeoutError');
+  assert.equal(result.error?.serverDurationMs, 50748);
+  assert.equal(result.error?.retryable, true);
 });
 
 test('serviceHealth 抛异常返回 false（不冒泡）', async () => {
