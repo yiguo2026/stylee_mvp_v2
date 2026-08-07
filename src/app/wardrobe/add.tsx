@@ -224,10 +224,11 @@ export default function AddWardrobeItem() {
 
   const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string; description?: string }) => {
     setStdState('generating');
-    const { url, meta } = await aiStandardizeGarment(uri, cat, pt, extras);
+    const { url, meta, skipped } = await aiStandardizeGarment(uri, cat, pt, extras);
     if (reqTokenRef.current !== token) return;
     setStdMeta(meta);
-    if (url) { setStandardizedUri(url); setUseStandardized(true); setStdState('done'); }
+    if (skipped) { setStandardizedUri(null); setUseStandardized(false); setStdState('idle'); }
+    else if (url) { setStandardizedUri(url); setUseStandardized(true); setStdState('done'); }
     else { setStdState('failed'); }
   };
 

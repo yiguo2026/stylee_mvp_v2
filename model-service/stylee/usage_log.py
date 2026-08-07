@@ -43,6 +43,7 @@ _PRICING = {
     "qwen-image": {"per_image": 0.25},
     # Qwen 文本/VL/向量(百炼实价,元/百万tokens)
     "qwen3-vl-plus": {"in_miss": 1.0, "out": 10.0},   # 输出为思维链+回答
+    "qwen3-vl-flash": {"in_miss": 0.15, "out": 1.5},
     "text-embedding-v4": {"in_miss": 0.5, "out": 0.0},  # embedding 只输入计费
     "qwen-plus": {"in_miss": 0.8, "out": 2.0},         # 思考模式输出 8 元
     "qwen-flash": {"in_hit": 0.0, "in_miss": 0.0, "out": 0.0},   # TODO(若用 qwen provider)
@@ -52,6 +53,7 @@ _SIGNATURES = [
     ("你是穿搭意图解析器", "recommend-intent"),   # B0
     ("你是资深个人穿搭师", "recommend-gen"),       # B3
     ("你是服装属性识别器", "recognize"),           # 触点A 识别
+    ("识别图片中所有服饰单品", "recognize-multi"),
     ("回验", "verify"),
 ]
 

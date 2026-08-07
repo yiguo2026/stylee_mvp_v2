@@ -15,3 +15,8 @@ export function shouldFallbackToSingleRecognition(
 export function isTrustedRecognition(provider?: string, degraded?: boolean): boolean {
   return Boolean(provider && provider !== 'mock' && degraded !== true);
 }
+
+export function shouldStandardizePhotoType(photoType?: string): boolean {
+  const normalized = (photoType || '').trim().toLowerCase();
+  return normalized !== 'web' && normalized !== 'product';
+}

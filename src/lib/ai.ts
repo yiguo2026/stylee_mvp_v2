@@ -16,6 +16,7 @@ import {
   acceptedRecognitionItems,
   isTrustedRecognition,
   shouldFallbackToSingleRecognition,
+  shouldStandardizePhotoType,
 } from '@/lib/recognitionPolicy';
 
 // ─── AI 元信息 ───────────────────────────────────────────
@@ -137,15 +138,26 @@ export const aiDetectMultiItems = async (
 export const aiStandardizeGarment = async (
   imageUri: string, category: string, photoType: string,
   extras?: { color?: string; material?: string; description?: string },
-): Promise<{ url: string | null; meta: AIMeta }> => {
+): Promise<{ url: string | null; meta: AIMeta; skipped: boolean }> => {
   const t0 = Date.now();
+  if (!shouldStandardizePhotoType(photoType)) {
+    return {
+      url: null,
+      skipped: true,
+      meta: { source: 'original/web', durationMs: Date.now() - t0, ok: true },
+    };
+  }
   const encoded = await uriToBase64(imageUri);
   const response = encoded
     ? await serviceStandardize(encoded.b64, encoded.mime, photoType, category, extras)
     : null;
   const usable = response?.verified && response.image_ref?.startsWith('http')
     ? response.image_ref : null;
-  return { url: usable, meta: { source: usable ? 'model-service/qwen-image-edit' : 'mock', durationMs: Date.now() - t0, ok: !!usable } };
+  return {
+    url: usable,
+    skipped: false,
+    meta: { source: usable ? 'model-service/qwen-image-edit' : 'mock', durationMs: Date.now() - t0, ok: !!usable },
+  };
 };
 
 // Re-export static option lists used by pickers

@@ -19,6 +19,8 @@ services:
         value: "15"
       - key: VL_MULTI_TIMEOUT_SECONDS
         value: "50"
+      - key: VL_MULTI_MODEL
+        value: qwen3-vl-flash
       - key: STYLEE_ALLOWED_ORIGINS
         sync: false
       - key: DEEPSEEK_API_KEY

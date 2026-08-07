@@ -36,16 +36,20 @@ def test_tryon_prompt_is_built_server_side():
 def test_multi_recognition_uses_server_deadline_env():
     saved_key = os.environ.get("DASHSCOPE_API_KEY")
     saved_timeout = os.environ.get("VL_MULTI_TIMEOUT_SECONDS")
+    saved_model = os.environ.get("VL_MULTI_MODEL")
     original = ai_features._chat_completion
     seen = {}
     os.environ["DASHSCOPE_API_KEY"] = "test-key"
     os.environ["VL_MULTI_TIMEOUT_SECONDS"] = "17"
+    os.environ["VL_MULTI_MODEL"] = "qwen3-vl-flash"
     ai_features._chat_completion = lambda base_url, key, model, messages, temperature, timeout, json_mode: (
-        seen.update(timeout=timeout) or '{"items":[]}'
+        seen.update(timeout=timeout, model=model) or '{"items":[]}'
     )
     try:
-        assert ai_features.recognize_many("data:image/png;base64,AA==")["items"] == []
+        result = ai_features.recognize_many("data:image/png;base64,AA==")
+        assert result == {"items": [], "provider": "qwen3-vl-flash"}
         assert seen["timeout"] == 17
+        assert seen["model"] == "qwen3-vl-flash"
     finally:
         ai_features._chat_completion = original
         if saved_key is None:
@@ -56,6 +60,10 @@ def test_multi_recognition_uses_server_deadline_env():
             os.environ.pop("VL_MULTI_TIMEOUT_SECONDS", None)
         else:
             os.environ["VL_MULTI_TIMEOUT_SECONDS"] = saved_timeout
+        if saved_model is None:
+            os.environ.pop("VL_MULTI_MODEL", None)
+        else:
+            os.environ["VL_MULTI_MODEL"] = saved_model
 
 
 def main():

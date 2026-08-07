@@ -5,7 +5,7 @@ import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
 import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
 import { track } from '@/lib/track';
-import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
+import { acceptedRecognitionItems, shouldStandardizePhotoType } from '@/lib/recognitionPolicy';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -257,6 +257,7 @@ async function handleFinalize(taskId: string, userId: string) {
       // Real standardization/background-removal path used by /wardrobe/add.
       // Keep a minimum dwell time so the user can visibly see “扣除背景中”.
       const photoType = item.photo_type ?? 'on_body';
+      const shouldStandardize = shouldStandardizePhotoType(photoType);
       const [standardized] = await Promise.all([
         aiStandardizeGarment(sourceUri, item.category, photoType, {
           color: item.color,
@@ -264,19 +265,20 @@ async function handleFinalize(taskId: string, userId: string) {
           description: item.description,
         }).catch((err) => {
           console.warn('[importStore] aiStandardizeGarment failed:', err);
-          return { url: null, meta: { source: 'mock', durationMs: 0, ok: false } };
+          return { url: null, skipped: false, meta: { source: 'mock', durationMs: 0, ok: false } };
         }),
-        new Promise(resolve => setTimeout(resolve, 2200)),
+        shouldStandardize ? new Promise(resolve => setTimeout(resolve, 2200)) : Promise.resolve(),
       ]);
 
       const usingStandardized = Boolean(standardized.url);
+      const standardizationSkipped = standardized.skipped;
       const imageToPersist = standardized.url || sourceUri;
 
       store.setState(state => ({
         tasks: state.tasks.map(t => t.id === taskId ? {
           ...t,
           standardizedImageUri: imageToPersist,
-          standardizationFallback: !usingStandardized,
+          standardizationFallback: !usingStandardized && !standardizationSkipped,
           status: 'uploading',
         } : t)
       }));
@@ -323,8 +325,9 @@ async function handleFinalize(taskId: string, userId: string) {
         image_url: finalImageUrl,
         ai_recognized_attrs: {
           async_import: true,
-          standardization: usingStandardized ? 'qwen-image-edit' : 'fallback_original',
+          standardization: standardizationSkipped ? 'skipped_web' : usingStandardized ? 'qwen-image-edit' : 'fallback_original',
           standardization_ok: usingStandardized,
+          standardization_skipped: standardizationSkipped,
           original_image_url: sourceUri,
           standardized_image_url: usingStandardized ? imageToPersist : undefined,
           photo_type: photoType,

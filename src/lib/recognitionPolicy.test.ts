@@ -40,3 +40,15 @@ test('mock 或 degraded 响应不能标记为可信识别', async () => {
   assert.equal(policy.isTrustedRecognition('mock', false), false);
   assert.equal(policy.isTrustedRecognition(undefined, false), false);
 });
+
+test('网页商品图跳过标准化，其他照片继续标准化', async () => {
+  const policy = await import('./recognitionPolicy.ts').catch(() => null);
+  assert.ok(policy, '识别兜底策略模块应存在');
+
+  assert.equal(policy.shouldStandardizePhotoType('web'), false);
+  assert.equal(policy.shouldStandardizePhotoType('product'), false);
+  assert.equal(policy.shouldStandardizePhotoType('flatlay'), true);
+  assert.equal(policy.shouldStandardizePhotoType('on_body'), true);
+  assert.equal(policy.shouldStandardizePhotoType('angled'), true);
+  assert.equal(policy.shouldStandardizePhotoType(undefined), true);
+});

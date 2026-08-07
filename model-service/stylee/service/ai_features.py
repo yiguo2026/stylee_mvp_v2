@@ -76,6 +76,7 @@ def recognize_many(image_url: str) -> dict:
     key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not key:
         return {"items": [], "provider": "mock"}
+    model = os.environ.get("VL_MULTI_MODEL", os.environ.get("VL_MODEL", "qwen3-vl-plus"))
     schema = ('{"items":[{"category":"上装|下装|连体装|外套|鞋履|包袋|帽巾|配饰",'
               '"color":"颜色","material":"材质","style":"风格","brand":"",'
               '"sleeve_length":"无袖|短袖|长袖|null","fit_type":"版型|null",'
@@ -88,14 +89,13 @@ def recognize_many(image_url: str) -> dict:
                 ]}]
     content = _chat_completion(
         os.environ.get("VL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-        key, os.environ.get("VL_MODEL", "qwen3-vl-plus"), messages, 0.2,
+        key, model, messages, 0.2,
         int(os.environ.get("VL_MULTI_TIMEOUT_SECONDS", "50")), True,
     )
     data = _extract_json(content)
     raw_items = data.get("items") if isinstance(data.get("items"), list) else []
     items = [normalize_multi_item(item, i) for i, item in enumerate(raw_items) if isinstance(item, dict)]
-    return {"items": items,
-            "provider": os.environ.get("VL_MODEL", "qwen3-vl-plus")}
+    return {"items": items, "provider": model}
 
 
 def intent(query: str) -> dict:

@@ -148,6 +148,20 @@ def test_server_smoke():
         assert st == 200 and b["category"] in [c for c in ("上装", "下装", "连衣裙", "外套", "鞋", "包", "帽子", "围巾")]
         assert "needs_review" in b and "photo_type" in b
 
+        import stylee.service.server as server_service
+        original_recognize_many = server_service.ai_features.recognize_many
+        server_service.ai_features.recognize_many = lambda image_url: {
+            "items": [{"photo_type": "web"}, {"photo_type": "flatlay"}],
+            "provider": "trace-test-vlm",
+        }
+        try:
+            st, b = _post(base + "/recognize-multi", {"image_url": "data:image/png;base64,AAAA"})
+            assert st == 200
+            assert b["trace"]["recognized_item_count"] == 2
+            assert b["trace"]["recognized_photo_types"] == ["web", "flatlay"]
+        finally:
+            server_service.ai_features.recognize_many = original_recognize_many
+
         st, b = _post(base + "/standardize",
                       {"image_url": "mock://x", "photo_type": "flatlay", "item": {"category": "上装"}})
         assert st == 200 and b["method"] == "cutout"
@@ -168,7 +182,6 @@ def test_server_smoke():
         assert b["trace"]["stage_ms"]["B0.parse_intent"] >= 0
         assert b["trace"]["stage_ms"]["B3.generate_outfits"] >= 0
 
-        import stylee.service.server as server_service
         original_recommend = server_service.recommend
         server_service.recommend = lambda *args, **kwargs: (_ for _ in ()).throw(
             TimeoutError("provider deadline exceeded"))

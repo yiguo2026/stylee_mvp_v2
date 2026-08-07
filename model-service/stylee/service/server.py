@@ -140,7 +140,17 @@ class Handler(BaseHTTPRequestHandler):
                 trace.annotate(upstream_timeout_seconds=multi_timeout)
                 with trace.stage("A1.multi_vision_recognize"):
                     response = ai_features.recognize_many(_image_url(payload))
-                trace.annotate(provider=response.get("provider"))
+                items = response.get("items") if isinstance(response, dict) else None
+                photo_types = [
+                    str(item.get("photo_type"))
+                    for item in items or []
+                    if isinstance(item, dict) and item.get("photo_type")
+                ]
+                trace.annotate(
+                    provider=response.get("provider"),
+                    recognized_item_count=len(items) if isinstance(items, list) else 0,
+                    recognized_photo_types=photo_types,
+                )
             elif self.path == "/intent":
                 with trace.stage("intent.model_call"):
                     response = ai_features.intent(str(payload.get("query") or ""))
