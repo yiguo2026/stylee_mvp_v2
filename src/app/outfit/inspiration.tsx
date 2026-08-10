@@ -9,6 +9,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { useUserStore } from '@/stores/userStore';
 import { InspirationItem, ClothingCategory, CLOTHING_CATEGORIES, STYLE_TAGS } from '@/types';
+import { reconcileBreakdownItems } from '@/data/inspirations';
 
 const STYLE_LABEL: Record<string, string> = Object.fromEntries(
   STYLE_TAGS.map(t => [t.id, t.label]),
@@ -45,8 +46,25 @@ const WARDROBE_DB_CAT: Record<CatConcept, string> = {
   top: '上装', bottom: '下装', dress: '连体装', outer: '外套', shoes: '鞋履', bag: '包袋', hat: '帽巾', acc: '配饰',
 };
 
+// 单品缩略图：优先渲染真实图片；加载失败 (onError) 或无 uri 时回退到 category 图标占位，避免裂图。
+function ItemThumb({ uri, category, imgStyle }: { uri?: string | null; category: string; imgStyle: any }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={imgStyle}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return <CategoryIcon category={category} size={26} color={Colors.walnut2} />; // ds-exception: 沿用本文件既有 Colors token，图标占位色与原内联渲染保持一致
+}
+
 export default function InspirationDetailScreen() {
   const params = useLocalSearchParams<{
+    card_id: string;
     title: string; tag: string; desc: string;
     image_url: string; style_tags: string; occasion_tags: string;
     items: string;
@@ -64,6 +82,7 @@ export default function InspirationDetailScreen() {
   }, []);
 
   const title = decodeURIComponent(params.title ?? '');
+  const cardId = params.card_id ? decodeURIComponent(params.card_id) : '';
   const tag = decodeURIComponent(params.tag ?? '');
   const desc = decodeURIComponent(params.desc ?? '');
   const imageUrl = decodeURIComponent(params.image_url ?? '');
@@ -74,6 +93,8 @@ export default function InspirationDetailScreen() {
   try {
     if (params.items) breakdownItems = JSON.parse(decodeURIComponent(params.items));
   } catch {}
+  // 收敛到单一数据源：route params 缺 items/image_url 时，按 card_id 从编辑精选灵感回填真实单品图片。
+  breakdownItems = reconcileBreakdownItems(breakdownItems, cardId);
 
   // Match each inspiration item against user's wardrobe
   // Same category = owned (user has something that can serve the same role)
@@ -213,13 +234,11 @@ export default function InspirationDetailScreen() {
                     >
                       <Text style={styles.badgeOwned}>已拥有</Text>
                       <View style={styles.gridThumb}>
-                        {item.wardrobeImageUrl ? (
-                          <Image source={{ uri: item.wardrobeImageUrl }} style={styles.gridThumbImg} resizeMode="cover" />
-                        ) : item.image_url ? (
-                          <Image source={{ uri: item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
-                        ) : (
-                          <CategoryIcon category={item.normalizedCategory} size={26} color={Colors.walnut2} />
-                        )}
+                        <ItemThumb
+                          uri={item.wardrobeImageUrl || item.image_url}
+                          category={item.normalizedCategory}
+                          imgStyle={styles.gridThumbImg}
+                        />
                       </View>
                       <Text style={styles.gridName} numberOfLines={1}>{item.wardrobeName || item.name}</Text>
                       <Text style={styles.gridMeta} numberOfLines={1}>{item.normalizedCategory} · {item.color}</Text>
@@ -232,11 +251,11 @@ export default function InspirationDetailScreen() {
                     <Text style={styles.badgeRec}>你还没有</Text>
                     <TouchableOpacity onPress={() => handleItemPress(item)} activeOpacity={0.7}>
                       <View style={[styles.gridThumb, { backgroundColor: Colors.signalSoft }]}>
-                        {item.image_url ? (
-                          <Image source={{ uri: item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
-                        ) : (
-                          <CategoryIcon category={item.normalizedCategory} size={26} color={Colors.walnut2} />
-                        )}
+                        <ItemThumb
+                          uri={item.image_url}
+                          category={item.normalizedCategory}
+                          imgStyle={styles.gridThumbImg}
+                        />
                       </View>
                     </TouchableOpacity>
                     <Text style={styles.gridName} numberOfLines={1}>{item.name}</Text>
