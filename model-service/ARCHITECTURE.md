@@ -55,7 +55,7 @@ Production controls:
 | Capability | HTTP endpoint | Pipeline/model |
 |---|---|---|
 | Clothing recognition | `POST /recognize`, `/recognize-multi` | DashScope Qwen VL |
-| Image standardization | `POST /standardize` | DashScope Qwen Image Edit + visual verification |
+| Transparent garment master | `POST /standardize` | WEB direct alpha matte fast path, otherwise Qwen Image Edit preparation + Pillow alpha matte + visual verification |
 | Outfit recommendation | `POST /recommend` | B0-B6 constraints/RAG + DeepSeek |
 | Intent and reasons | `POST /intent`, `/reason` | DeepSeek |
 | Product extraction | `POST /product-extract` | DeepSeek |
@@ -109,8 +109,8 @@ The App imports a garment through one controlled path:
 
 ```text
 local image -> /recognize-multi -> normalized attributes + photo_type
-            -> /standardize -> Qwen image edit -> bounded VL verification
-            -> App copies the verified temporary URL to Supabase Storage
+            -> /standardize -> transparent PNG alpha validation -> bounded VL verification
+            -> App copies the verified transparent PNG to Supabase Storage
             -> wardrobe_items + ai_recognized_attrs
 ```
 
@@ -121,13 +121,40 @@ cutout path. Multi-item recognition returns a deterministic completeness
 confidence and review flag; the App persists these with style/photo metadata
 in `ai_recognized_attrs` and persists sleeve length in its typed column.
 
-Provider image URLs are temporary. The App must copy a verified standard image
-to its own Storage bucket before inserting the wardrobe row. If that copy
-fails, it uploads the original image; if the original upload also fails, the
+The canonical `/standardize` success contract is a transparent PNG data URI:
+`mime=image/png`, `background=transparent`, `alpha_verified=true`, and
+`verified=true`. The complete response fields are `image_ref`, `mime`, `method`,
+`verified`, `background`, `alpha_verified`, `matte_provider`, and
+`failure_stage`; `server.py` additionally assigns `provider` and `trace`.
+
+Routing is fixed. `web` first attempts alpha matte directly and only falls back
+to `img2img` preparation plus matte if direct processing fails. `flatlay` uses
+`cutout` preparation plus matte; `on_body`, `angled`, and unknown normalized
+types use `img2img` preparation plus matte. Visual verification always receives
+the transparent data URI, never the white preparation output. Only successful
+alpha validation with no visual drift sets `verified=true`. Terminal failure
+returns the original `image_ref`, `method=cropped_fallback`, both verification
+flags false, and the first failed stage; a white preparation image is never a
+successful response.
+
+Pillow 12.3.0 is installed from `requirements.txt`. Alpha processing accepts
+only base64 PNG/JPEG data URIs or HTTP(S) references. Encoded input is limited
+to 20 MiB, decoded input to 16,000,000 pixels, processing to a 1600-pixel longest
+edge, and encoded PNG output to 8 MiB. Alpha validation requires at least 5%
+pixels with alpha <=16, at least 5% with alpha >=32, at least 90% transparent
+border pixels, and a non-empty visible bounding box. The four processing trace
+stages are `A2.source_image_download`, `A2.alpha_matte`, `A2.png_encode`, and
+`A2.alpha_validate`; `A2.image_edit` and `A2.visual_verify` appear when those
+route steps run. Traces and logs include provider names and timings, never image
+references, secrets, image bytes, or data URIs.
+
+The App must copy the verified transparent PNG to its own Storage bucket before
+inserting the wardrobe row. If that copy fails, it uploads the original image;
+if the original upload also fails, the
 insert is stopped so a device-local or expiring URL is never stored.
 
-Standardization is sequential. Production defaults bound image edit to 60s
-(`IMG_EDIT_TIMEOUT_SECONDS`) and verification to 20s
+Routes that require preparation are sequential. Production defaults bound
+image edit to 60s (`IMG_EDIT_TIMEOUT_SECONDS`) and verification to 20s
 (`VL_VERIFY_TIMEOUT_SECONDS`); the App request deadline is 90s.
 
 The client receives only:

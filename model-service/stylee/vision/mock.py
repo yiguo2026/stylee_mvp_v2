@@ -5,8 +5,14 @@
 """
 from __future__ import annotations
 
+import base64
+import io
+
+from PIL import Image
+
 from ..contracts import WardrobeItem
-from .base import ImageStandardizer, VisionProvider
+from .alpha_matte import AlphaMatteError, AlphaMatteOutput, validate_alpha_png
+from .base import AlphaMatteProcessor, ImageStandardizer, VisionProvider
 
 _FIXED = {
     "category": "上装", "colors": ["白色"], "material": "棉",
@@ -31,3 +37,35 @@ class MockImageStandardizer(ImageStandardizer):
 
     def standardize(self, image_url: str, item: WardrobeItem, mode: str) -> str:
         return f"mock://std/{mode}"
+
+
+class MockAlphaMatteProcessor(AlphaMatteProcessor):
+    name = "mock-alpha-matte-v1"
+
+    def process(self, image_ref: str, stage_timer=None) -> AlphaMatteOutput:
+        if not image_ref:
+            raise AlphaMatteError("A2.source_image_download", "source image reference is required")
+
+        from .alpha_matte import _stage
+
+        with _stage(stage_timer, "A2.source_image_download"):
+            pass
+        with _stage(stage_timer, "A2.alpha_matte"):
+            image = Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+            pixels = image.load()
+            for y in (1, 2):
+                for x in (1, 2):
+                    pixels[x, y] = (64, 96, 160, 255)
+        with _stage(stage_timer, "A2.png_encode"):
+            output = io.BytesIO()
+            image.save(output, format="PNG", optimize=True)
+            png = output.getvalue()
+        with _stage(stage_timer, "A2.alpha_validate"):
+            stats = validate_alpha_png(png)
+        return AlphaMatteOutput(
+            data_uri="data:image/png;base64," + base64.b64encode(png).decode("ascii"),
+            mime="image/png",
+            alpha_verified=True,
+            provider=self.name,
+            stats=stats,
+        )

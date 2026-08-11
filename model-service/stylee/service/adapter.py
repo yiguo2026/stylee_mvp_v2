@@ -199,4 +199,13 @@ def ingest_to_app(res) -> dict:
 
 
 def std_to_app(si) -> dict:
-    return {"image_ref": si.image_ref, "method": si.method, "verified": si.verified}
+    return {
+        "image_ref": si.image_ref,
+        "mime": si.mime,
+        "method": si.method,
+        "verified": si.verified,
+        "background": si.background,
+        "alpha_verified": si.alpha_verified,
+        "matte_provider": si.matte_provider,
+        "failure_stage": si.failure_stage,
+    }

@@ -76,8 +76,25 @@ def test_ingest_to_app():
 
 
 def test_std_to_app():
-    assert std_to_app(StandardizedImage(image_ref="http://o/x.png", method="img2img", verified=True)) == {
-        "image_ref": "http://o/x.png", "method": "img2img", "verified": True}
+    assert std_to_app(StandardizedImage(
+        image_ref="data:image/png;base64,AAAA",
+        method="img2img_alpha",
+        verified=True,
+        mime="image/png",
+        background="transparent",
+        alpha_verified=True,
+        matte_provider="pillow-border-connected-v1",
+        failure_stage=None,
+    )) == {
+        "image_ref": "data:image/png;base64,AAAA",
+        "mime": "image/png",
+        "method": "img2img_alpha",
+        "verified": True,
+        "background": "transparent",
+        "alpha_verified": True,
+        "matte_provider": "pillow-border-connected-v1",
+        "failure_stage": None,
+    }
 
 
 def test_normalize_multi_item_contract():
@@ -165,11 +182,18 @@ def test_server_smoke():
 
         st, b = _post(base + "/standardize",
                       {"image_url": "mock://x", "photo_type": "flatlay", "item": {"category": "上装"}})
-        assert st == 200 and b["method"] == "cutout"
+        assert st == 200 and b["method"] == "cutout_alpha"
+        assert b["image_ref"].startswith("data:image/png;base64,")
+        assert b["mime"] == "image/png" and b["background"] == "transparent"
+        assert b["verified"] is True and b["alpha_verified"] is True
+        assert b["matte_provider"] == "mock-alpha-matte-v1" and b["failure_stage"] is None
 
         st, b = _post(base + "/standardize",
                       {"image_url": "mock://x", "photo_type": "flat", "item": {"category": "上装"}})
-        assert st == 200 and b["method"] == "cutout"
+        assert st == 200 and b["method"] == "cutout_alpha"
+        assert b["image_ref"].startswith("data:image/png;base64,")
+        assert b["mime"] == "image/png" and b["background"] == "transparent"
+        assert b["verified"] is True and b["alpha_verified"] is True
 
         st, b = _post(base + "/recommend", {
             "input_mode": "nl", "query": "周末约会", "n": 2,

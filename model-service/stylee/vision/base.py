@@ -31,3 +31,11 @@ class ImageStandardizer(ABC):
     def standardize(self, image_url: str, item: WardrobeItem, mode: str) -> str:
         """以原图为条件生成标准化展示图,返回结果图 url。mode ∈ {cutout, img2img}。"""
         raise NotImplementedError
+
+
+class AlphaMatteProcessor(ABC):
+    name: str
+
+    @abstractmethod
+    def process(self, image_ref: str, stage_timer=None):
+        raise NotImplementedError
