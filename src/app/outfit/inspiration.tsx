@@ -96,15 +96,16 @@ export default function InspirationDetailScreen() {
   // 收敛到单一数据源：route params 缺 items/image_url 时，按 card_id 从编辑精选灵感回填真实单品图片。
   breakdownItems = reconcileBreakdownItems(breakdownItems, cardId);
 
-  // Match each inspiration item against user's wardrobe.
-  // 「已拥有」必须是真实命中：同品类 + 同色（或同名），才算用户衣橱里确有这件。
-  // 仅「同品类」不算拥有（例如有件白T不代表拥有条纹抹胸），否则会大面积误报「已拥有」。
+  // Match each inspiration item against user's wardrobe by a REAL identity key.
+  // 灵感单品是编辑精选数据，本身没有衣橱 item_id；无法用「同品类/同色」这种模糊规则判断拥有
+  // （灰色卫衣≠灰色Polo、白色A字裙≠白色长裤，都会误报「已拥有」且点进去是另一件）。
+  // 稳定身份键：用户从灵感「+衣橱」加入时会把该单品的 image_url 与 name 原样落库，
+  // 因此按 image_url（唯一）→ 完全同名 精确匹配，命中才算「已拥有」，且点击跳转到这件真实单品。
   const matchedItems = breakdownItems.map((bi) => {
     const normalizedCat = normalizeCategory(bi.category);
-    const sameCatItems = wardrobeItems.filter(wi => normalizeCategory(wi.category) === normalizedCat);
     const realMatch =
-      sameCatItems.find(wi => wi.name === bi.name) ??
-      sameCatItems.find(wi => wi.color === bi.color);
+      (bi.image_url ? wardrobeItems.find(wi => wi.image_url === bi.image_url) : undefined) ??
+      wardrobeItems.find(wi => wi.name.trim() === bi.name.trim());
     return {
       ...bi,
       normalizedCategory: normalizedCat,
