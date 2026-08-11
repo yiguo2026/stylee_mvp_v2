@@ -2,7 +2,7 @@ from stylee.vision.prompts import (
     build_recognize_messages, parse_recognize_json,
     build_verify_messages, parse_verify_json,
 )
-from stylee.vision.base import VisionProvider, ImageStandardizer
+from stylee.vision.base import ImageRefSource, VisionProvider, ImageStandardizer
 from stylee.contracts import StandardizedImage, IngestResult, WardrobeItem, Category, PhotoType, Sleeve, Fit, Season
 from stylee.ingest import to_data_url, derive_warmth, normalize_attrs, recognize_item, mode_for, standardize_item
 
@@ -118,8 +118,8 @@ class _FakeMatte:
     def __init__(self, fail_first=False):
         self.refs = []
         self.fail_first = fail_first
-    def process(self, image_ref, stage_timer=None):
-        self.refs.append(image_ref)
+    def process(self, image_ref, stage_timer=None, source=ImageRefSource.CLIENT):
+        self.refs.append((source, image_ref))
         if self.fail_first and len(self.refs) == 1:
             from stylee.vision.alpha_matte import AlphaMatteError
             raise AlphaMatteError("A2.alpha_validate", "not transparent")
@@ -134,7 +134,7 @@ def test_web_uses_direct_matte_before_edit():
     matte = _FakeMatte()
     item = WardrobeItem(id="i", category=Category.TOP)
     si = standardize_item("orig://web", item, PhotoType.WEB, _FakeVP({}), _BoomStd(), matte)
-    assert matte.refs == ["orig://web"]
+    assert matte.refs == [(ImageRefSource.CLIENT, "orig://web")]
     assert si.method == "direct_matte" and si.alpha_verified is True
 
 
@@ -143,7 +143,10 @@ def test_web_direct_failure_falls_back_to_edit_then_matte():
     matte = _FakeMatte(fail_first=True)
     item = WardrobeItem(id="i", category=Category.TOP)
     si = standardize_item("orig://web", item, PhotoType.WEB, _FakeVP({}), MockImageStandardizer(), matte)
-    assert matte.refs == ["orig://web", "mock://std/img2img"]
+    assert matte.refs == [
+        (ImageRefSource.CLIENT, "orig://web"),
+        (ImageRefSource.PROVIDER_OUTPUT, "mock://std/img2img"),
+    ]
     assert si.method == "img2img_alpha" and si.verified is True
 
 

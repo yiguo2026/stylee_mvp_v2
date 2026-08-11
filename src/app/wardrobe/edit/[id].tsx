@@ -138,7 +138,7 @@ export default function EditItemScreen() {
     let finalUrl = item.image_url ?? '';
     let shouldRecognizeReplacement = false;
     try {
-      const standardizationResult = await aiStandardizeGarment(localUri, category, 'flat_lay', {
+      const standardizationResult = await aiStandardizeGarment(localUri, category, 'flatlay', {
         color,
         material,
         description: name || item.name,
@@ -148,15 +148,22 @@ export default function EditItemScreen() {
           url: null,
           skipped: false as const,
           acceptance: { ok: false as const, reason: 'missing' as const },
-          meta: { source: 'model-service/error', durationMs: 0, ok: false },
+          meta: {
+            source: 'model-service/error',
+            durationMs: 0,
+            ok: false,
+            requestId: undefined,
+            failedStage: undefined,
+          },
         };
       });
 
       const persistedImage = await persistGarmentMaster({
         sourceUri: localUri,
         userId: item.user_id,
-        photoType: 'flat_lay',
+        photoType: 'flatlay',
         acceptance: standardizationResult.acceptance,
+        diagnostics: standardizationResult.meta,
       });
       if (!persistedImage.ok) {
         setImageUri(finalUrl);

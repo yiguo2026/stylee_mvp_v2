@@ -195,6 +195,19 @@ test('serviceStandardizeDetailed requests web standardization and preserves resp
   assert.deepEqual(result.data?.trace?.stage_ms, { standardize: 3000, verify: 210 });
 });
 
+test('serviceStandardizeDetailed normalizes legacy flat_lay at the request boundary', async () => {
+  let requestBody: Record<string, unknown> | null = null;
+  globalThis.fetch = (async (_url: any, init: any) => {
+    requestBody = JSON.parse(init.body);
+    return { ok: true, json: async () => ({}) } as any;
+  }) as any;
+
+  await serviceStandardizeDetailed('QUJD', 'image/png', 'flat_lay', '上装');
+
+  const body = requestBody as Record<string, unknown> | null;
+  assert.equal(body?.photo_type, 'flatlay');
+});
+
 test('aiStandardizeGarment accepts a verified transparent result without skipping web images', async () => {
   const requestCount = installStandardizationFetch({
     ok: true,

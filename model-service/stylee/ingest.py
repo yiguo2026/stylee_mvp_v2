@@ -21,7 +21,7 @@ from .contracts import (
     StandardizedImage,
     WardrobeItem,
 )
-from .vision.base import AlphaMatteProcessor, ImageStandardizer, VisionProvider
+from .vision.base import AlphaMatteProcessor, ImageRefSource, ImageStandardizer, VisionProvider
 from .vision.alpha_matte import AlphaMatteError, AlphaMatteOutput
 from .vision.dashscope import VisionError
 
@@ -169,9 +169,13 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
             failure_stage=first_failed_stage,
         )
 
-    def apply_matte(image_ref: str, failure_stage: str | None = None) -> AlphaMatteOutput | None:
+    def apply_matte(
+        image_ref: str,
+        source: ImageRefSource,
+        failure_stage: str | None = None,
+    ) -> AlphaMatteOutput | None:
         try:
-            output = matte_processor.process(image_ref, stage_timer=stage_timer)
+            output = matte_processor.process(image_ref, stage_timer=stage_timer, source=source)
             if not output.alpha_verified:
                 raise AlphaMatteError("A2.alpha_validate", "matte output was not alpha verified")
             return output
@@ -183,7 +187,9 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
     method: str
     matte_output: AlphaMatteOutput | None = None
     if photo_type == PhotoType.WEB:
-        matte_output = apply_matte(image_url, "A2.direct_matte")
+        matte_output = apply_matte(
+            image_url, ImageRefSource.CLIENT, "A2.direct_matte",
+        )
         method = "direct_matte"
 
     if matte_output is None:
@@ -199,7 +205,7 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
             record_failure("A2.image_edit", edit_error)
             return terminal_failure()
 
-        matte_output = apply_matte(prepared_ref)
+        matte_output = apply_matte(prepared_ref, ImageRefSource.PROVIDER_OUTPUT)
         if matte_output is None:
             return terminal_failure()
         method = "cutout_alpha" if mode == "cutout" else "img2img_alpha"

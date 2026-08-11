@@ -1,7 +1,11 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 
-import { acceptTransparentStandardization, buildStandardizationMetadata } from './standardizationPolicy.ts';
+import {
+  MAX_STANDARDIZED_DATA_URI_LENGTH,
+  acceptTransparentStandardization,
+  buildStandardizationMetadata,
+} from './standardizationPolicy.ts';
 
 const png = 'data:image/png;base64,iVBORw0KGgo=';
 const valid = {
@@ -38,10 +42,38 @@ test('requires boolean verification flags from untyped service JSON', () => {
 test('rejects malformed and oversized PNG data URIs', () => {
   assert.equal(acceptTransparentStandardization({ ...valid, image_ref: 'data:image/png;base64,***' }).ok, false);
   const prefix = 'data:image/png;base64,';
-  const atLimit = prefix + 'A'.repeat(12 * 1024 * 1024 - prefix.length);
-  const oversized = `${atLimit}A`;
+  const signaturePrefix = 'iVBORw0KGgo';
+  const maximumPayloadLength = MAX_STANDARDIZED_DATA_URI_LENGTH - prefix.length;
+  const canonicalPayloadLength = maximumPayloadLength - (maximumPayloadLength % 4);
+  const atLimit = prefix + signaturePrefix + 'A'.repeat(canonicalPayloadLength - signaturePrefix.length);
+  const oversized = `${atLimit}AAAA`;
   assert.equal(acceptTransparentStandardization({ ...valid, image_ref: atLimit }).ok, true);
   assert.equal(acceptTransparentStandardization({ ...valid, image_ref: oversized }).ok, false);
+});
+
+test('rejects a canonical base64 payload without the PNG signature', () => {
+  const acceptance = acceptTransparentStandardization({
+    ...valid,
+    image_ref: 'data:image/png;base64,AAAA',
+  });
+
+  assert.equal(acceptance.ok, false);
+  assert.equal(acceptance.ok ? undefined : acceptance.reason, 'malformed');
+});
+
+test('rejects non-canonical base64 length and padding', () => {
+  const malformedRefs = [
+    'data:image/png;base64,iVBORw0KGgo',
+    'data:image/png;base64,iVBORw0KGgo===',
+    'data:image/png;base64,iVBORw0KGgoAAB==',
+    'data:image/png;base64,iVBORw0KGgoAAAB=',
+  ];
+
+  for (const image_ref of malformedRefs) {
+    const acceptance = acceptTransparentStandardization({ ...valid, image_ref });
+    assert.equal(acceptance.ok, false);
+    assert.equal(acceptance.ok ? undefined : acceptance.reason, 'malformed');
+  }
 });
 
 test('metadata never contains PNG bytes', () => {

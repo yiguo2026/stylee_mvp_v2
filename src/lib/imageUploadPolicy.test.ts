@@ -109,6 +109,29 @@ function uploaderHarness() {
   return { uploader, fetchUris, uploadCalls };
 }
 
+async function captureUploadWarnings(run: () => Promise<void>) {
+  const originalWarn = console.warn;
+  const warnings: unknown[][] = [];
+  console.warn = (...args: unknown[]) => { warnings.push(args); };
+  try {
+    await run();
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(console.warn, originalWarn);
+  return warnings;
+}
+
+function capturedWarningText(warnings: unknown[][]): string {
+  return warnings.flatMap((args) => args.map((value) => {
+    if (value instanceof Error) {
+      return [value.name, value.message, value.stack, String(value.cause ?? '')].join('|');
+    }
+    if (value && typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  })).join('\n');
+}
+
 test('remote HTTP image is passed through when persistence is not requested', async () => {
   const harness = uploaderHarness();
   const providerUrl = 'https://provider.test/temporary.png';
@@ -140,6 +163,87 @@ test('remote HTTP image is copied to Supabase with policy content type when pers
   }]);
 });
 
+test('fetch exceptions log only allowlisted diagnostics and restore console.warn', async () => {
+  const imageMarker = ['image', 'bytes', 'marker'].join('-');
+  const keyMarker = ['api', 'key', 'marker'].join('-');
+  const sensitiveUri = `data:image/png;base64,${imageMarker}`;
+  const uploader = createWardrobeImageUploader({
+    fetchImage: async () => {
+      throw {
+        name: 'FetchBoundaryError',
+        message: keyMarker,
+        stack: sensitiveUri,
+        cause: { providerPayload: sensitiveUri },
+      };
+    },
+    getBucket: async () => { throw new Error('unused'); },
+  });
+
+  const warnings = await captureUploadWarnings(async () => {
+    assert.equal(await uploader(sensitiveUri, 'user-1'), null);
+  });
+  const warningText = capturedWarningText(warnings);
+  assert.equal(warnings.length, 1);
+  assert.equal(warningText.includes(imageMarker), false);
+  assert.equal(warningText.includes(keyMarker), false);
+  assert.equal((warnings[0][1] as any)?.uriKind, 'data');
+  assert.equal((warnings[0][1] as any)?.uriChars, sensitiveUri.length);
+  assert.equal((warnings[0][1] as any)?.errorName, 'FetchBoundaryError');
+});
+
+test('storage failures never log response messages, image refs, or raw errors', async () => {
+  const imageMarker = ['upload', 'image', 'marker'].join('-');
+  const keyMarker = ['storage', 'key', 'marker'].join('-');
+  const sensitiveUri = `data:image/png;base64,${imageMarker}`;
+  const uploader = createWardrobeImageUploader({
+    fetchImage: async () => ({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(['png'], { type: 'image/png' }),
+    }),
+    getBucket: async () => ({
+      upload: async () => ({
+        data: null,
+        error: { message: keyMarker, stack: sensitiveUri },
+      } as any),
+      getPublicUrl: (path) => ({ data: { publicUrl: path } }),
+    }),
+  });
+
+  const warnings = await captureUploadWarnings(async () => {
+    assert.equal(await uploader(sensitiveUri, 'user-1'), null);
+  });
+  const warningText = capturedWarningText(warnings);
+  assert.equal(warnings.length, 1);
+  assert.equal(warningText.includes(imageMarker), false);
+  assert.equal(warningText.includes(keyMarker), false);
+  assert.equal((warnings[0][1] as any)?.uriKind, 'data');
+  assert.equal((warnings[0][1] as any)?.uriChars, sensitiveUri.length);
+  assert.equal((warnings[0][1] as any)?.errorKind, 'storage_response');
+});
+
+test('HTTP fetch rejection logs kind, length, and status without the URI', async () => {
+  const pathMarker = ['private', 'path', 'marker'].join('-');
+  const remoteUri = `https://provider.test/${pathMarker}`;
+  const uploader = createWardrobeImageUploader({
+    fetchImage: async () => ({
+      ok: false,
+      status: 502,
+      blob: async () => new Blob(),
+    }),
+    getBucket: async () => { throw new Error('unused'); },
+  });
+
+  const warnings = await captureUploadWarnings(async () => {
+    assert.equal(await uploader(remoteUri, 'user-1', undefined, { persistRemote: true }), null);
+  });
+  const warningText = capturedWarningText(warnings);
+  assert.equal(warningText.includes(pathMarker), false);
+  assert.equal((warnings[0][1] as any)?.uriKind, 'https');
+  assert.equal((warnings[0][1] as any)?.uriChars, remoteUri.length);
+  assert.equal((warnings[0][1] as any)?.httpStatus, 502);
+});
+
 const accepted = {
   ok: true as const,
   uri: 'data:image/png;base64,AAAA',
@@ -167,6 +271,19 @@ function recordingUploader(results: Array<string | null>) {
     return results.shift() ?? null;
   };
   return { upload, calls };
+}
+
+function assertMetadataHasNoDiagnosticPayload(
+  metadata: object,
+  sensitiveMarkers: string[],
+) {
+  const serialized = JSON.stringify(metadata);
+  for (const marker of sensitiveMarkers) {
+    assert.equal(serialized.includes(marker), false);
+  }
+  for (const forbiddenKey of ['image_ref', 'message', 'stack', 'cause', 'provider_payload', 'trace']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(metadata, forbiddenKey), false);
+  }
 }
 
 function deferred<T>() {
@@ -226,6 +343,7 @@ test('accepted master persists original then master and returns durable metadata
   assert.equal(result.imageUrl, 'https://storage.test/master.png');
   assert.equal(result.metadata.original_image_url, 'https://storage.test/original.jpg');
   assert.equal(result.metadata.standardized_image_url, 'https://storage.test/master.png');
+  assert.equal(result.metadata.photo_type, 'flatlay');
   assert.equal(JSON.stringify(result.metadata).includes('data:image/png'), false);
 });
 
@@ -248,6 +366,80 @@ test('processing rejection persists only the durable original', async () => {
   assert.equal(result.metadata.standardized_image_url, null);
 });
 
+test('service failures persist only sanitized request ID and accurate failed stage', async () => {
+  const harness = recordingUploader(['https://storage.test/original.jpg']);
+  const imageMarker = ['service', 'image', 'marker'].join('-');
+  const secretMarker = ['service', 'secret', 'marker'].join('-');
+
+  const result = await persistGarmentMaster({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: { ok: false, reason: 'missing' },
+    diagnostics: {
+      requestId: 'req-service-123',
+      failedStage: 'client_timeout',
+      image_ref: `data:image/png;base64,${imageMarker}`,
+      message: secretMarker,
+      stack: secretMarker,
+      provider_payload: { marker: secretMarker },
+    },
+  } as any, harness.upload);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.metadata.request_id, 'req-service-123');
+  assert.equal(result.metadata.failure_stage, 'client_timeout');
+  assertMetadataHasNoDiagnosticPayload(result.metadata, [imageMarker, secretMarker]);
+});
+
+test('contract rejection persists response stage and sanitized request ID only', async () => {
+  const harness = recordingUploader(['https://storage.test/original.jpg']);
+  const imageMarker = ['contract', 'image', 'marker'].join('-');
+  const response = {
+    ...accepted.response,
+    image_ref: `data:image/png;base64,${imageMarker}`,
+    alpha_verified: false,
+    failure_stage: 'A2.alpha_validate',
+    trace: { request_id: 'untrusted-trace-id', provider_payload: imageMarker },
+  };
+
+  const result = await persistGarmentMaster({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: { ok: false, reason: 'unverified', response },
+    diagnostics: { requestId: 'req-contract-456', failedStage: 'wrong_stage' },
+  } as any, harness.upload);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.metadata.request_id, 'req-contract-456');
+  assert.equal(result.metadata.failure_stage, 'A2.alpha_validate');
+  assertMetadataHasNoDiagnosticPayload(result.metadata, [imageMarker, 'untrusted-trace-id']);
+});
+
+test('diagnostic whitelist rejects unsafe request IDs and stages', async () => {
+  const harness = recordingUploader(['https://storage.test/original.jpg']);
+  const unsafeMarker = ['unsafe', 'diagnostic', 'marker'].join('-');
+  const result = await persistGarmentMaster({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: { ok: false, reason: 'missing' },
+    diagnostics: {
+      requestId: `bad request=${unsafeMarker}`,
+      failedStage: `bad stage;${unsafeMarker}`,
+    },
+  } as any, harness.upload);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal('request_id' in result.metadata, false);
+  assert.equal(result.metadata.failure_stage, 'missing');
+  assertMetadataHasNoDiagnosticPayload(result.metadata, [unsafeMarker]);
+});
+
 test('master upload failure falls back to durable original and clears old master pointer', async () => {
   const harness = recordingUploader(['https://storage.test/original.jpg', null]);
 
@@ -256,12 +448,14 @@ test('master upload failure falls back to durable original and clears old master
     userId: 'user-1',
     photoType: 'web',
     acceptance: accepted,
+    diagnostics: { requestId: 'req-upload-789', failedStage: 'A2.visual_verify' },
   }, harness.upload);
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.status, 'fallback_original');
   assert.equal(result.imageUrl, 'https://storage.test/original.jpg');
+  assert.equal(result.metadata.request_id, 'req-upload-789');
   assert.equal(result.metadata.failure_stage, 'transparent_upload');
   assert.equal(result.metadata.standardized_image_url, null);
 });
@@ -322,5 +516,23 @@ test('ordinary edit save cannot standardize or persist an untouched image', () =
   const ordinarySaveFlow = editSource.slice(saveStart, deleteStart);
   assert.match(replacementFlow, /shouldPersistReplacementImage\s*\(/);
   assert.match(replacementFlow, /persistGarmentMaster\s*\(/);
+  assert.doesNotMatch(replacementFlow, /flat_lay/);
+  assert.equal(replacementFlow.match(/'flatlay'/g)?.length, 2);
   assert.doesNotMatch(ordinarySaveFlow, /aiStandardizeGarment\s*\(|persistGarmentMaster\s*\(/);
+});
+
+test('add failure state keeps the fallback copy without a manual retry action', () => {
+  const testDirectory = dirname(fileURLToPath(import.meta.url));
+  const addSource = readFileSync(
+    resolve(testDirectory, '../app/wardrobe/add.tsx'),
+    'utf8',
+  );
+  const failureStart = addSource.indexOf("{stdState === 'failed' ?");
+  const actionsStart = addSource.indexOf('<View style={styles.imageActions}>', failureStart);
+  assert.ok(failureStart >= 0 && actionsStart > failureStart);
+
+  const failureState = addSource.slice(failureStart, actionsStart);
+  assert.match(failureState, /透明主图生成失败，已保留原图/);
+  assert.doesNotMatch(failureState, /TouchableOpacity|refresh-cw|>重试</);
+  assert.doesNotMatch(addSource, /stdRetryBtn|stdRetryBtnText/);
 });

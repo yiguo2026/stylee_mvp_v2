@@ -30,7 +30,7 @@ _CORS = {
 
 
 def _photo_type(value):
-    value = {"flat": "flatlay", "product": "web"}.get(value, value)
+    value = {"flat": "flatlay", "flat_lay": "flatlay", "product": "web"}.get(value, value)
     for p in PhotoType:
         if p.value == value:
             return p

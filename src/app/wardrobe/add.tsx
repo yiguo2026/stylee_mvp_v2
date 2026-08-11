@@ -333,6 +333,7 @@ export default function AddWardrobeItem() {
           photoType,
           acceptance: standardizationResult?.acceptance
             ?? { ok: false, reason: 'missing' },
+          diagnostics: standardizationResult?.meta,
         });
         if (!persistedImage.ok) {
           showToast('图片上传失败，请检查网络后重试', 'error');
@@ -524,17 +525,6 @@ export default function AddWardrobeItem() {
           {stdState === 'failed' ? (
             <View style={styles.stdFailedRow}>
               <Text style={styles.stdFailedCaption}>透明主图生成失败，已保留原图</Text>
-              <TouchableOpacity
-                style={styles.stdRetryBtn}
-                onPress={() => {
-                  if (!imageUri) return;
-                  const token = ++reqTokenRef.current;
-                  void runStandardize(imageUri, category, photoType, token, { color, material, description: name });
-                }}
-              >
-                <Feather name="refresh-cw" size={13} color={Colors.terracotta} />
-                <Text style={styles.stdRetryBtnText}>重试</Text>
-              </TouchableOpacity>
             </View>
           ) : null}
 
@@ -917,12 +907,6 @@ const styles = StyleSheet.create({
   stdDoneCaption: { ...T.itemDesc, color: Colors.walnut2, flex: 1, textAlign: 'right' },
   stdFailedRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   stdFailedCaption: { ...T.itemDesc, color: Colors.walnut2 },
-  stdRetryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: Spacing.two, paddingVertical: 4,
-    borderRadius: 10, borderWidth: 1, borderColor: Colors.terracotta, backgroundColor: Colors.paper,
-  },
-  stdRetryBtnText: { ...T.tag, color: Colors.terracotta },
   stdUseOriginalBtn: {
     paddingHorizontal: Spacing.two, paddingVertical: 4,
     borderRadius: 10, backgroundColor: Colors.ink,

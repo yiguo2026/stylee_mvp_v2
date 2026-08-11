@@ -115,7 +115,7 @@ import threading
 import urllib.error
 import urllib.request
 from stylee.providers import ProviderTimeoutError
-from stylee.service.server import run_server
+from stylee.service.server import _photo_type, run_server
 from stylee.service import gamma as gamma_service
 
 
@@ -135,6 +135,10 @@ def _post(url, payload, request_id=None):
 def _get(url):
     with urllib.request.urlopen(url, timeout=10) as r:
         return r.status, _json.loads(r.read().decode())
+
+
+def test_standardize_request_normalizes_legacy_flat_lay_to_flatlay():
+    assert _photo_type("flat_lay") == PhotoType.FLATLAY
 
 
 def test_server_smoke():
@@ -300,6 +304,7 @@ def main():
     test_ingest_to_app()
     test_std_to_app()
     test_normalize_multi_item_contract()
+    test_standardize_request_normalizes_legacy_flat_lay_to_flatlay()
     test_server_smoke()
     print("ok")
 

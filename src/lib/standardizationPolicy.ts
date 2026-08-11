@@ -1,8 +1,13 @@
 import type { StandardizeResp } from './styleeMapping.ts';
+import { normalizePhotoType } from './styleeMapping.ts';
 
 export const MAX_STANDARDIZED_DATA_URI_LENGTH = 12 * 1024 * 1024;
 
-const PNG_DATA_URI = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
+const PNG_DATA_URI_PREFIX = 'data:image/png;base64,';
+const BASE64_PAYLOAD = /^[A-Za-z0-9+/]+={0,2}$/;
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const PNG_SIGNATURE_BASE64_PREFIX = 'iVBORw0KGg';
+const PNG_SIGNATURE_FINAL_SEXTETS = 'opqr';
 
 export type TransparentAcceptance =
   | { ok: true; uri: string; response: StandardizeResp }
@@ -12,6 +17,11 @@ export type TransparentAcceptance =
       response?: StandardizeResp;
     };
 
+export interface StandardizationDiagnostics {
+  requestId?: unknown;
+  failedStage?: unknown;
+}
+
 export interface StandardizationMetadata {
   standardization_ok: boolean;
   standardization: string;
@@ -19,9 +29,37 @@ export interface StandardizationMetadata {
   alpha_verified: boolean;
   transparent_background: boolean;
   matte_provider: string | null;
+  request_id?: string;
   failure_stage?: string;
   original_uri: string;
   photo_type: string;
+}
+
+function sanitizedDiagnosticValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ? value : undefined;
+}
+
+function isCanonicalPngDataUri(value: string): boolean {
+  if (!value.startsWith(PNG_DATA_URI_PREFIX)) return false;
+
+  const payload = value.slice(PNG_DATA_URI_PREFIX.length);
+  if (payload.length % 4 !== 0 || !BASE64_PAYLOAD.test(payload)) return false;
+  if (
+    !payload.startsWith(PNG_SIGNATURE_BASE64_PREFIX)
+    || !PNG_SIGNATURE_FINAL_SEXTETS.includes(payload.charAt(PNG_SIGNATURE_BASE64_PREFIX.length))
+  ) {
+    return false;
+  }
+
+  const finalQuartet = payload.slice(-4);
+  if (payload.endsWith('==')) {
+    return (BASE64_ALPHABET.indexOf(finalQuartet.charAt(1)) & 0x0f) === 0;
+  }
+  if (payload.endsWith('=')) {
+    return (BASE64_ALPHABET.indexOf(finalQuartet.charAt(2)) & 0x03) === 0;
+  }
+  return true;
 }
 
 /**
@@ -50,7 +88,7 @@ export function acceptTransparentStandardization(response?: StandardizeResp): Tr
     return { ok: false, reason: 'oversize', response };
   }
 
-  if (!PNG_DATA_URI.test(response.image_ref)) {
+  if (!isCanonicalPngDataUri(response.image_ref)) {
     return { ok: false, reason: 'malformed', response };
   }
 
@@ -65,8 +103,13 @@ export function buildStandardizationMetadata(
   acceptance: TransparentAcceptance,
   originalUri: string,
   photoType: string,
+  diagnostics: StandardizationDiagnostics = {},
 ): StandardizationMetadata {
+  const requestId = sanitizedDiagnosticValue(diagnostics.requestId);
   if (!acceptance.ok) {
+    const failureStage = sanitizedDiagnosticValue(acceptance.response?.failure_stage)
+      ?? sanitizedDiagnosticValue(diagnostics.failedStage)
+      ?? acceptance.reason;
     return {
       standardization_ok: false,
       standardization: 'fallback_original',
@@ -74,9 +117,10 @@ export function buildStandardizationMetadata(
       alpha_verified: false,
       transparent_background: false,
       matte_provider: null,
-      failure_stage: acceptance.response?.failure_stage || acceptance.reason,
+      ...(requestId ? { request_id: requestId } : {}),
+      failure_stage: failureStage,
       original_uri: originalUri,
-      photo_type: photoType,
+      photo_type: normalizePhotoType(photoType),
     };
   }
 
@@ -87,7 +131,8 @@ export function buildStandardizationMetadata(
     alpha_verified: acceptance.response.alpha_verified === true,
     transparent_background: acceptance.response.background === 'transparent',
     matte_provider: acceptance.response.matte_provider ?? null,
+    ...(requestId ? { request_id: requestId } : {}),
     original_uri: originalUri,
-    photo_type: photoType,
+    photo_type: normalizePhotoType(photoType),
   };
 }

@@ -5,16 +5,18 @@ import binascii
 from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
+import http.client
 import io
-from typing import Callable, ContextManager
-from urllib.parse import urlparse
-import urllib.error
-import urllib.request
+import ipaddress
+import os
+import socket
+from typing import Callable, ContextManager, Mapping, Sequence
+from urllib.parse import urljoin, urlsplit
 import warnings
 
 from PIL import Image, UnidentifiedImageError
 
-from .base import AlphaMatteProcessor
+from .base import AlphaMatteProcessor, ImageRefSource
 
 
 MAX_INPUT_BYTES = 20 * 1024 * 1024
@@ -27,6 +29,16 @@ MIN_TRANSPARENT_RATIO = 0.05
 MIN_VISIBLE_RATIO = 0.05
 MIN_TRANSPARENT_BORDER_RATIO = 0.90
 MATTE_PROVIDER = "pillow-border-connected-v1"
+MAX_PROVIDER_REDIRECTS = 3
+
+_DASHSCOPE_RESULT_HOSTS = frozenset({
+    "dashscope-result-bj.oss-cn-beijing.aliyuncs.com",
+    "dashscope-result-hz.oss-cn-hangzhou.aliyuncs.com",
+    "dashscope-result-sg.oss-ap-southeast-1.aliyuncs.com",
+    "dashscope-result-sh.oss-cn-shanghai.aliyuncs.com",
+    "dashscope-result-sz.oss-cn-shenzhen.aliyuncs.com",
+})
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
 
 class AlphaMatteError(RuntimeError):
@@ -50,6 +62,13 @@ class AlphaMatteOutput:
     alpha_verified: bool
     provider: str
     stats: AlphaStats
+
+
+@dataclass(frozen=True)
+class ProviderHttpResponse:
+    status: int
+    headers: Mapping[str, str]
+    body: bytes
 
 
 StageTimer = Callable[[str], ContextManager[None]]
@@ -92,37 +111,205 @@ def _decode_data_uri(ref: str) -> bytes:
     return data
 
 
-def _read_http_image(ref: str, timeout_seconds: int | float) -> bytes:
-    request = urllib.request.Request(ref, headers={"Accept": "image/png,image/jpeg"})
+def read_image_ref(ref: str, timeout_seconds: int | float = 20) -> bytes:
+    """Read an untrusted client source without performing network I/O."""
+    if not isinstance(ref, str) or not ref:
+        raise _source_error("source image reference is required")
+    if ref.startswith("data:"):
+        return _decode_data_uri(ref)
+    raise _source_error("source image reference scheme is not supported")
+
+
+def _normalize_host(host: str) -> str:
+    if not host or host.endswith("."):
+        raise _source_error("provider image host is not allowed")
     try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            if urlparse(response.geturl()).scheme.lower() not in {"http", "https"}:
-                raise _source_error("source image redirect scheme is not supported")
-            content_length = response.headers.get("Content-Length")
+        return host.encode("idna").decode("ascii").lower()
+    except UnicodeError:
+        raise _source_error("provider image host is not allowed") from None
+
+
+def _configured_provider_hosts() -> tuple[str, ...]:
+    hosts: set[str] = set()
+    for value in os.environ.get("STYLEE_PROVIDER_IMAGE_HOSTS", "").split(","):
+        value = value.strip()
+        if value:
+            hosts.add(_normalize_host(value))
+    supabase_url = os.environ.get("STYLEE_SUPABASE_URL", "")
+    if supabase_url:
+        try:
+            supabase_host = urlsplit(supabase_url).hostname
+        except ValueError:
+            supabase_host = None
+        if supabase_host:
+            hosts.add(_normalize_host(supabase_host))
+    return tuple(sorted(hosts))
+
+
+def _provider_host_allowed(host: str, allowed_hosts: Sequence[str]) -> bool:
+    normalized_allowed = {_normalize_host(value) for value in allowed_hosts}
+    return host in normalized_allowed or host in _DASHSCOPE_RESULT_HOSTS
+
+
+def _default_resolver(host: str, port: int) -> Sequence[str]:
+    try:
+        answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError:
+        raise _source_error("provider image host could not be resolved") from None
+    return tuple(dict.fromkeys(str(answer[4][0]) for answer in answers))
+
+
+def _validated_connection_target(
+    ref: str,
+    allowed_hosts: Sequence[str],
+    resolver: Callable[[str, int], Sequence[str]],
+) -> str:
+    try:
+        parsed = urlsplit(ref)
+        port = parsed.port or 443
+        host_value = parsed.hostname or ""
+    except ValueError:
+        raise _source_error("provider image URL is malformed") from None
+    if parsed.scheme.lower() != "https":
+        raise _source_error("provider image URL must use HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        raise _source_error("provider image URL userinfo is not allowed")
+    if port != 443:
+        raise _source_error("provider image URL port is not allowed")
+
+    host = _normalize_host(host_value)
+    if not _provider_host_allowed(host, allowed_hosts):
+        raise _source_error("provider image host is not allowed")
+
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        try:
+            resolved = tuple(resolver(host, port))
+        except AlphaMatteError:
+            raise
+        except (OSError, ValueError, TypeError):
+            raise _source_error("provider image host could not be resolved") from None
+    else:
+        resolved = (str(literal),)
+
+    if not resolved:
+        raise _source_error("provider image host could not be resolved")
+    validated: list[str] = []
+    for value in resolved:
+        if not isinstance(value, str) or "%" in value:
+            raise _source_error("provider image host resolved to a disallowed address")
+        try:
+            address = ipaddress.ip_address(value)
+        except ValueError:
+            raise _source_error("provider image host resolved to a disallowed address") from None
+        if not address.is_global:
+            raise _source_error("provider image host resolved to a disallowed address")
+        validated.append(str(address))
+    return validated[0]
+
+
+def _header(headers: Mapping[str, str], name: str) -> str | None:
+    lowered = name.lower()
+    for key, value in headers.items():
+        if str(key).lower() == lowered:
+            return str(value)
+    return None
+
+
+def _https_transport(
+    ref: str,
+    connect_ip: str,
+    timeout_seconds: int | float,
+) -> ProviderHttpResponse:
+    parsed = urlsplit(ref)
+    host = _normalize_host(parsed.hostname or "")
+    port = parsed.port or 443
+    connection = http.client.HTTPSConnection(host, port, timeout=timeout_seconds)
+
+    def create_validated_connection(address, timeout=None, source_address=None):
+        return socket.create_connection(
+            (connect_ip, port), timeout=timeout, source_address=source_address,
+        )
+
+    connection._create_connection = create_validated_connection
+    target = parsed.path or "/"
+    if parsed.query:
+        target += "?" + parsed.query
+    response = None
+    try:
+        connection.request("GET", target, headers={"Accept": "image/png,image/jpeg"})
+        response = connection.getresponse()
+        headers = dict(response.getheaders())
+        if response.status in _REDIRECT_STATUSES:
+            body = b""
+        else:
+            content_length = _header(headers, "Content-Length")
             if content_length:
                 try:
                     if int(content_length) > MAX_INPUT_BYTES:
                         raise _source_error("source image exceeds the input size limit")
                 except ValueError:
                     raise _source_error("source image has an invalid content length") from None
-            data = response.read(MAX_INPUT_BYTES + 1)
-    except AlphaMatteError:
-        raise
-    except (OSError, urllib.error.URLError, ValueError):
-        raise _source_error("source image could not be downloaded") from None
-    _ensure_input_size(data)
-    return data
+            body = response.read(MAX_INPUT_BYTES + 1)
+        return ProviderHttpResponse(status=response.status, headers=headers, body=body)
+    finally:
+        if response is not None:
+            response.close()
+        connection.close()
 
 
-def read_image_ref(ref: str, timeout_seconds: int | float = 20) -> bytes:
+def read_provider_image_ref(
+    ref: str,
+    timeout_seconds: int | float = 20,
+    *,
+    allowed_hosts: Sequence[str] | None = None,
+    resolver: Callable[[str, int], Sequence[str]] = _default_resolver,
+    transport: Callable[[str, str, int | float], ProviderHttpResponse] = _https_transport,
+) -> bytes:
+    """Read a trusted provider output through a validated, pinned HTTPS target."""
     if not isinstance(ref, str) or not ref:
         raise _source_error("source image reference is required")
     if ref.startswith("data:"):
         return _decode_data_uri(ref)
-    scheme = urlparse(ref).scheme.lower()
-    if scheme in {"http", "https"}:
-        return _read_http_image(ref, timeout_seconds)
-    raise _source_error("source image reference scheme is not supported")
+
+    configured_hosts = _configured_provider_hosts() if allowed_hosts is None else allowed_hosts
+    current_ref = ref
+    for redirect_count in range(MAX_PROVIDER_REDIRECTS + 1):
+        connect_ip = _validated_connection_target(current_ref, configured_hosts, resolver)
+        try:
+            response = transport(current_ref, connect_ip, timeout_seconds)
+        except AlphaMatteError:
+            raise
+        except (OSError, http.client.HTTPException, ValueError):
+            raise _source_error("provider image could not be downloaded") from None
+        if not isinstance(response, ProviderHttpResponse):
+            raise _source_error("provider image transport returned an invalid response")
+
+        if response.status in _REDIRECT_STATUSES:
+            if redirect_count >= MAX_PROVIDER_REDIRECTS:
+                raise _source_error("provider image exceeded the redirect limit")
+            location = _header(response.headers, "Location")
+            if not location:
+                raise _source_error("provider image redirect is missing a location")
+            current_ref = urljoin(current_ref, location)
+            continue
+        if response.status != 200:
+            raise _source_error("provider image download returned a non-success status")
+
+        content_length = _header(response.headers, "Content-Length")
+        if content_length:
+            try:
+                if int(content_length) > MAX_INPUT_BYTES:
+                    raise _source_error("source image exceeds the input size limit")
+            except ValueError:
+                raise _source_error("source image has an invalid content length") from None
+        if not isinstance(response.body, bytes):
+            raise _source_error("provider image transport returned invalid bytes")
+        _ensure_input_size(response.body)
+        return response.body
+
+    raise _source_error("provider image exceeded the redirect limit")
 
 
 def _decode_image(data: bytes) -> Image.Image:
@@ -308,7 +495,17 @@ def matte_image_bytes(data: bytes, stage_timer: StageTimer | None = None) -> Alp
 class PillowAlphaMatteProcessor(AlphaMatteProcessor):
     name = MATTE_PROVIDER
 
-    def process(self, image_ref: str, stage_timer=None) -> AlphaMatteOutput:
+    def process(
+        self,
+        image_ref: str,
+        stage_timer=None,
+        source: ImageRefSource = ImageRefSource.CLIENT,
+    ) -> AlphaMatteOutput:
         with _stage(stage_timer, "A2.source_image_download"):
-            data = read_image_ref(image_ref)
+            if source == ImageRefSource.CLIENT:
+                data = read_image_ref(image_ref)
+            elif source == ImageRefSource.PROVIDER_OUTPUT:
+                data = read_provider_image_ref(image_ref)
+            else:
+                raise _source_error("source image trust classification is invalid")
         return matte_image_bytes(data, stage_timer=stage_timer)

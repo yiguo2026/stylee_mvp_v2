@@ -1,11 +1,52 @@
 import { storageFormatFor } from './imageUploadPolicy.ts';
 import { buildStandardizationMetadata } from './standardizationPolicy.ts';
 import type {
+  StandardizationDiagnostics,
   StandardizationMetadata,
   TransparentAcceptance,
 } from './standardizationPolicy.ts';
 
 const BUCKET = 'wardrobe-images';
+
+type UploadFailureKind =
+  | 'fetch_exception'
+  | 'fetch_response'
+  | 'fetch_timeout'
+  | 'blob_exception'
+  | 'storage_init_exception'
+  | 'storage_exception'
+  | 'storage_response'
+  | 'storage_timeout';
+
+function uriKindForLog(uri: string): 'http' | 'https' | 'data' | 'file' | 'blob' | 'unknown' {
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(uri)?.[1]?.toLowerCase();
+  if (scheme === 'http' || scheme === 'https' || scheme === 'data'
+      || scheme === 'file' || scheme === 'blob') {
+    return scheme;
+  }
+  return 'unknown';
+}
+
+function safeErrorName(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('name' in error)) return undefined;
+  const name = String((error as { name?: unknown }).name ?? '');
+  return /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(name) ? name : undefined;
+}
+
+function logUploadFailure(
+  uri: string,
+  errorKind: UploadFailureKind,
+  options: { httpStatus?: number; error?: unknown } = {},
+): void {
+  const errorName = safeErrorName(options.error);
+  console.warn('[uploadImage] operation failed', {
+    uriKind: uriKindForLog(uri),
+    uriChars: uri.length,
+    ...(typeof options.httpStatus === 'number' ? { httpStatus: options.httpStatus } : {}),
+    ...(errorName ? { errorName } : {}),
+    errorKind,
+  });
+}
 
 function isRemoteUrl(uri: string): boolean {
   return uri.startsWith('http://') || uri.startsWith('https://');
@@ -77,40 +118,48 @@ export function createWardrobeImageUploader(
       return localUri;
     }
 
+    let exceptionKind: UploadFailureKind = 'fetch_exception';
     try {
       const timeoutMs = options.timeoutMs ?? (options.persistRemote ? 30000 : 15000);
       const response = await withTimeout(dependencies.fetchImage(localUri), timeoutMs);
       // React Native file:// responses may use status 0 even when the blob is
       // readable. Enforce HTTP status only for remote provider downloads.
       if (!response || (isRemoteUrl(localUri) && !response.ok)) {
-        console.warn('[uploadImage] fetch failed for', localUri.slice(0, 60), response?.status);
+        logUploadFailure(
+          localUri,
+          response ? 'fetch_response' : 'fetch_timeout',
+          { httpStatus: response?.status },
+        );
         return null;
       }
+      exceptionKind = 'blob_exception';
       const blob = await response.blob();
       const { extension, contentType } = storageFormatFor(localUri, blob.type || '');
       const folder = subfolder ? `${userId}/${subfolder}` : userId;
       const fileName = `${folder}/${(dependencies.now ?? Date.now)()}.${extension}`;
+      exceptionKind = 'storage_init_exception';
       const bucket = await dependencies.getBucket();
 
+      exceptionKind = 'storage_exception';
       const uploadResult = await withTimeout(
         bucket.upload(fileName, blob, { contentType, upsert: false }),
         timeoutMs,
       );
 
       if (!uploadResult) {
-        console.warn('[uploadImage] Storage upload timed out');
+        logUploadFailure(localUri, 'storage_timeout');
         return null;
       }
 
       const { data, error } = uploadResult;
       if (error || !data) {
-        console.warn('[uploadImage] Storage upload failed:', error?.message);
+        logUploadFailure(localUri, 'storage_response', { error });
         return null;
       }
 
       return bucket.getPublicUrl(data.path).data.publicUrl;
     } catch (error) {
-      console.warn('[uploadImage] Unexpected error:', error);
+      logUploadFailure(localUri, exceptionKind, { error });
       return null;
     }
   };
@@ -139,6 +188,7 @@ export interface PersistGarmentMasterInput {
   userId: string;
   photoType: string;
   acceptance: TransparentAcceptance;
+  diagnostics?: StandardizationDiagnostics;
 }
 
 export type PersistedGarmentMetadata = StandardizationMetadata & {
@@ -194,7 +244,12 @@ export async function persistGarmentMaster(
   }
 
   const metadata: PersistedGarmentMetadata = {
-    ...buildStandardizationMetadata(persistedAcceptance, durableOriginalUrl, input.photoType),
+    ...buildStandardizationMetadata(
+      persistedAcceptance,
+      durableOriginalUrl,
+      input.photoType,
+      input.diagnostics,
+    ),
     original_image_url: durableOriginalUrl,
     standardized_image_url: transparentMasterUrl,
   };

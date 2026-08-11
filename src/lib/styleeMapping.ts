@@ -65,7 +65,7 @@ export type RecommendContext = {
 
 /** Normalize legacy/client aliases to the model-service PhotoType contract. */
 export function normalizePhotoType(value?: string | null): PhotoType {
-  if (value === 'flat' || value === 'flatlay') return 'flatlay';
+  if (value === 'flat' || value === 'flat_lay' || value === 'flatlay') return 'flatlay';
   if (value === 'product' || value === 'web') return 'web';
   if (value === 'angled') return 'angled';
   return 'on_body';

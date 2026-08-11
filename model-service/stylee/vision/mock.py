@@ -12,7 +12,7 @@ from PIL import Image
 
 from ..contracts import WardrobeItem
 from .alpha_matte import AlphaMatteError, AlphaMatteOutput, validate_alpha_png
-from .base import AlphaMatteProcessor, ImageStandardizer, VisionProvider
+from .base import AlphaMatteProcessor, ImageRefSource, ImageStandardizer, VisionProvider
 
 _FIXED = {
     "category": "上装", "colors": ["白色"], "material": "棉",
@@ -42,7 +42,12 @@ class MockImageStandardizer(ImageStandardizer):
 class MockAlphaMatteProcessor(AlphaMatteProcessor):
     name = "mock-alpha-matte-v1"
 
-    def process(self, image_ref: str, stage_timer=None) -> AlphaMatteOutput:
+    def process(
+        self,
+        image_ref: str,
+        stage_timer=None,
+        source: ImageRefSource = ImageRefSource.CLIENT,
+    ) -> AlphaMatteOutput:
         if not image_ref:
             raise AlphaMatteError("A2.source_image_download", "source image reference is required")
 

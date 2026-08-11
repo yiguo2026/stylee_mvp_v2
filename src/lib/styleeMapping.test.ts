@@ -21,6 +21,7 @@ test('recognizeRespToResult 映射并带出 photo_type/needs_review', () => {
 
 test('photo_type 旧值归一化，多品识别元数据不丢失', () => {
   assert.equal(normalizePhotoType('flat'), 'flatlay');
+  assert.equal(normalizePhotoType('flat_lay'), 'flatlay');
   assert.equal(normalizePhotoType('product'), 'web');
   assert.equal(normalizePhotoType('unknown'), 'on_body');
   const item = recognizeManyItemToDetected({

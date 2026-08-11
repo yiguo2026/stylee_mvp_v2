@@ -289,6 +289,7 @@ async function handleFinalize(taskId: string, userId: string) {
         userId,
         photoType,
         acceptance: standardized.acceptance,
+        diagnostics: standardized.meta,
       });
       if (!persistedImage.ok) throw new Error('原图上传失败');
       const finalImageUrl = persistedImage.imageUrl;
