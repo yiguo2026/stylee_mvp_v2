@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors, Spacing, Radius, T } from '@/constants/theme';
-import { ds } from '@/design-system';
+import { ds, StyleeGarmentMedia } from '@/design-system';
 import { supabase } from '@/lib/supabase';
 import { track } from '@/lib/track';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -155,7 +155,9 @@ export default function OutfitDetailScreen() {
                   onPress={() => openItem(item.item_id)}
                 >
                   {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.flatlayImg} resizeMode="cover" />
+                    <View style={styles.flatlayImg}>
+                      <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
+                    </View>
                   ) : (
                     <View style={styles.flatlayPlaceholder}>
                       <CategoryIcon category={item.category} size={40} color={Colors.walnut2} />
@@ -187,7 +189,7 @@ export default function OutfitDetailScreen() {
               >
                 <View style={styles.itemIconWrap}>
                   {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.itemThumb} resizeMode="cover" />
+                    <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
                   ) : (
                     <CategoryIcon category={item.category} size={20} color={Colors.walnut2} />
                   )}
@@ -230,6 +232,7 @@ const styles = StyleSheet.create({
   flatlayImg: {
     width: '78%', aspectRatio: 4 / 3, borderRadius: Radius.lg,
     backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
+    overflow: 'hidden',
   },
   flatlayPlaceholder: {
     width: '78%', aspectRatio: 4 / 3, borderRadius: Radius.lg,
@@ -257,7 +260,6 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: Radius.md, overflow: 'hidden',
     backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center',
   },
-  itemThumb: { width: '100%', height: '100%' },
   itemInfo: { flex: 1 },
   itemName: { ...T.itemName },
   itemMeta: { ...T.micro },

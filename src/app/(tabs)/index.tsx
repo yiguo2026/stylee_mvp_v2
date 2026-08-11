@@ -26,7 +26,7 @@ import ImportSkeletonCard from '@/components/ImportSkeletonCard';
 import { SkeletonBlock } from '@/components/Skeleton';
 import { showToast } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { ds, StyleeButton, StyleeChoiceChip } from '@/design-system';
+import { ds, StyleeButton, StyleeChoiceChip, StyleeGarmentMedia } from '@/design-system';
 import { useImportStore } from '@/stores/importStore';
 import {
   WeatherData, FilterTag, InspirationCard,
@@ -629,7 +629,9 @@ export default function OutfitTab() {
                       onPress={() => router.push({ pathname: '/wardrobe/[id]', params: { id: entry.item.item_id } })}
                     >
                       {entry.item.image_url ? (
-                        <Image source={{ uri: entry.item.image_url }} style={styles.wardrobeThumbImg} resizeMode="cover" />
+                        <View style={styles.wardrobeThumbImg}>
+                          <StyleeGarmentMedia imageUri={entry.item.image_url} tone="neutral" />
+                        </View>
                       ) : (
                         <View style={styles.wardrobeThumbPlaceholder}>
                           <CategoryIcon category={entry.item.category} size={20} color={ds.color.semantic.text.tertiary} />
@@ -856,7 +858,7 @@ const styles = StyleSheet.create({
   },
   wardrobeAddText: { ...T.support, textAlign: 'center', color: ds.color.semantic.text.accent },
   wardrobeThumb: { width: 80, gap: 4 },
-  wardrobeThumbImg: { width: 80, height: 80, borderRadius: ds.radius.xl, backgroundColor: ds.color.semantic.surface.card },
+  wardrobeThumbImg: { width: 80, height: 80, borderRadius: ds.radius.xl, overflow: 'hidden' },
   wardrobeThumbPlaceholder: {
     width: 80, height: 80, borderRadius: ds.radius.xl,
     backgroundColor: ds.color.semantic.surface.card, alignItems: 'center', justifyContent: 'center',
