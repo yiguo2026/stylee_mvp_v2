@@ -21,6 +21,8 @@ from stylee.outfit_fallback import build_safe_fallback
 from stylee.outfit_policy import ConstraintPolicy
 from stylee.pipeline import _item_index, recommend
 from stylee.providers.base import LLMProvider
+from stylee.providers.mock import MockProvider
+from stylee.sampledata import scenarios
 
 
 class FixedRetriever:
@@ -184,11 +186,19 @@ def test_empty_wardrobe_fallback_uses_only_required_gaps():
     assert result.trace["query_overridden_rules"] == []
 
 
+def test_mock_provider_stays_legal_under_the_production_policy():
+    for name, ctx in scenarios():
+        result = recommend(ctx, MockProvider(), retriever=FixedRetriever())
+        assert result.trace["rejected_illegal"] == 0, (name, result.trace["rejected_by_rule"])
+        assert result.trace["retry_triggered"] is False, name
+
+
 def main():
     test_zero_first_pass_retries_four_without_repeating_intent()
     test_one_valid_first_pass_returns_without_retry()
     test_repeated_invalid_output_uses_absolute_valid_fallback()
     test_empty_wardrobe_fallback_uses_only_required_gaps()
+    test_mock_provider_stays_legal_under_the_production_policy()
     print("ok")
 
 
