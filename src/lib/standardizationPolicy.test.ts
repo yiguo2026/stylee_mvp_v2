@@ -24,6 +24,17 @@ test('accepts only verified transparent PNG data URIs', () => {
   assert.equal(acceptTransparentStandardization({ ...valid, image_ref: 'https://provider/x.png' }).ok, false);
 });
 
+test('requires boolean verification flags from untyped service JSON', () => {
+  assert.equal(
+    acceptTransparentStandardization({ ...valid, verified: 'true' } as unknown as typeof valid).ok,
+    false,
+  );
+  assert.equal(
+    acceptTransparentStandardization({ ...valid, alpha_verified: 1 } as unknown as typeof valid).ok,
+    false,
+  );
+});
+
 test('rejects malformed and oversized PNG data URIs', () => {
   assert.equal(acceptTransparentStandardization({ ...valid, image_ref: 'data:image/png;base64,***' }).ok, false);
   const prefix = 'data:image/png;base64,';
@@ -45,6 +56,25 @@ test('metadata never contains PNG bytes', () => {
   assert.equal('image_ref' in metadata, false);
 });
 
+test('success metadata normalizes a missing matte provider to null', () => {
+  const metadata = buildStandardizationMetadata(
+    acceptTransparentStandardization({
+      image_ref: png,
+      method: 'cutout_alpha',
+      verified: true,
+      mime: 'image/png',
+      background: 'transparent',
+      alpha_verified: true,
+      failure_stage: null,
+    }),
+    'https://storage/original.jpg',
+    'flatlay',
+  );
+  assert.equal(metadata.standardization_ok, true);
+  assert.equal(metadata.matte_provider, null);
+  assert.equal(JSON.stringify(metadata).includes('"matte_provider":null'), true);
+});
+
 test('rejected responses produce JSONB-safe fallback metadata', () => {
   const metadata = buildStandardizationMetadata(
     acceptTransparentStandardization({ ...valid, alpha_verified: false }),
@@ -57,6 +87,7 @@ test('rejected responses produce JSONB-safe fallback metadata', () => {
     verified: false,
     alpha_verified: false,
     transparent_background: false,
+    matte_provider: null,
     failure_stage: 'unverified',
     original_uri: 'https://storage/original.jpg',
     photo_type: 'flatlay',

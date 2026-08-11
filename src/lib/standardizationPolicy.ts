@@ -18,7 +18,7 @@ export interface StandardizationMetadata {
   verified: boolean;
   alpha_verified: boolean;
   transparent_background: boolean;
-  matte_provider?: string;
+  matte_provider: string | null;
   failure_stage?: string;
   original_uri: string;
   photo_type: string;
@@ -34,7 +34,7 @@ export function acceptTransparentStandardization(response?: StandardizeResp): Tr
     return { ok: false, reason: 'missing', response };
   }
 
-  if (!response.verified || !response.alpha_verified) {
+  if (response.verified !== true || response.alpha_verified !== true) {
     return { ok: false, reason: 'unverified', response };
   }
 
@@ -73,6 +73,7 @@ export function buildStandardizationMetadata(
       verified: false,
       alpha_verified: false,
       transparent_background: false,
+      matte_provider: null,
       failure_stage: acceptance.response?.failure_stage || acceptance.reason,
       original_uri: originalUri,
       photo_type: photoType,
@@ -85,7 +86,7 @@ export function buildStandardizationMetadata(
     verified: acceptance.response.verified,
     alpha_verified: acceptance.response.alpha_verified === true,
     transparent_background: acceptance.response.background === 'transparent',
-    matte_provider: acceptance.response.matte_provider,
+    matte_provider: acceptance.response.matte_provider ?? null,
     original_uri: originalUri,
     photo_type: photoType,
   };
