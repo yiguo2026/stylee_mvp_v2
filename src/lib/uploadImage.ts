@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { storageFormatFor } from './imageUploadPolicy';
 
 const BUCKET = 'wardrobe-images';
 
@@ -17,19 +18,6 @@ export interface UploadImageOptions {
   /** Copy remote provider URLs into our own bucket instead of storing expiring URLs. */
   persistRemote?: boolean;
   timeoutMs?: number;
-}
-
-function extensionFor(uri: string, mime: string): string {
-  const mimeExt = mime.toLowerCase().split('/')[1]?.split(';')[0];
-  if (mimeExt && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(mimeExt)) {
-    return mimeExt === 'jpeg' ? 'jpg' : mimeExt;
-  }
-  const cleanUri = uri.split(/[?#]/, 1)[0];
-  const parsed = cleanUri.split('.').pop()?.toLowerCase();
-  if (parsed && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(parsed)) {
-    return parsed === 'jpeg' ? 'jpg' : parsed;
-  }
-  return 'jpg';
 }
 
 /**
@@ -61,10 +49,9 @@ export const uploadWardrobeImage = async (
       return null;
     }
     const blob = await response.blob();
-    const ext = extensionFor(localUri, blob.type || '');
-    const contentType = blob.type || (ext === 'png' ? 'image/png' : 'image/jpeg');
+    const { extension, contentType } = storageFormatFor(localUri, blob.type || '');
     const folder = subfolder ? `${userId}/${subfolder}` : userId;
-    const fileName = `${folder}/${Date.now()}.${ext}`;
+    const fileName = `${folder}/${Date.now()}.${extension}`;
 
     const uploadResult = await withTimeout(
       supabase.storage

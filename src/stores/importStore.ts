@@ -2,10 +2,12 @@ import { create } from 'zustand';
 import { DetectedItem, normalizeColor, normalizeMaterial } from '@/types';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
+import type { GarmentStandardizationResult } from '@/lib/ai';
 import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
 import { uploadWardrobeImage } from '@/lib/uploadImage';
+import { buildStandardizationMetadata } from '@/lib/standardizationPolicy';
 import { track } from '@/lib/track';
-import { acceptedRecognitionItems, shouldStandardizePhotoType } from '@/lib/recognitionPolicy';
+import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -257,45 +259,66 @@ async function handleFinalize(taskId: string, userId: string) {
       // Real standardization/background-removal path used by /wardrobe/add.
       // Keep a minimum dwell time so the user can visibly see “扣除背景中”.
       const photoType = item.photo_type ?? 'on_body';
-      const shouldStandardize = shouldStandardizePhotoType(photoType);
-      const [standardized] = await Promise.all([
+      const standardizationPromise: Promise<GarmentStandardizationResult> =
         aiStandardizeGarment(sourceUri, item.category, photoType, {
           color: item.color,
           material: item.material,
           description: item.description,
         }).catch((err) => {
           console.warn('[importStore] aiStandardizeGarment failed:', err);
-          return { url: null, skipped: false, meta: { source: 'mock', durationMs: 0, ok: false } };
-        }),
-        shouldStandardize ? new Promise(resolve => setTimeout(resolve, 2200)) : Promise.resolve(),
+          return {
+            url: null,
+            skipped: false,
+            acceptance: { ok: false, reason: 'missing' },
+            meta: { source: 'model-service/error', durationMs: 0, ok: false },
+          };
+        });
+      const [standardized] = await Promise.all([
+        standardizationPromise,
+        new Promise(resolve => setTimeout(resolve, 2200)),
       ]);
-
-      const usingStandardized = Boolean(standardized.url);
-      const standardizationSkipped = standardized.skipped;
-      const imageToPersist = standardized.url || sourceUri;
 
       store.setState(state => ({
         tasks: state.tasks.map(t => t.id === taskId ? {
           ...t,
-          standardizedImageUri: imageToPersist,
-          standardizationFallback: !usingStandardized && !standardizationSkipped,
           status: 'uploading',
         } : t)
       }));
 
-      let finalImageUrl = await uploadWardrobeImage(imageToPersist, userId, undefined, {
-        persistRemote: usingStandardized,
-        timeoutMs: usingStandardized ? 45000 : undefined,
+      const durableOriginalUrl = await uploadWardrobeImage(sourceUri, userId, 'originals', {
+        persistRemote: true,
+        timeoutMs: 45000,
       });
+      if (!durableOriginalUrl) throw new Error('原图上传失败');
 
-      if (!finalImageUrl && usingStandardized) {
-        console.warn('[importStore] standardized image persistence failed, falling back to original');
-        finalImageUrl = await uploadWardrobeImage(sourceUri, userId);
+      let transparentMasterUrl: string | null = null;
+      let persistedAcceptance = standardized.acceptance;
+      if (standardized.acceptance.ok) {
+        transparentMasterUrl = await uploadWardrobeImage(standardized.acceptance.uri, userId, undefined, {
+          timeoutMs: 45000,
+        });
+        if (!transparentMasterUrl) {
+          console.warn('[importStore] transparent master persistence failed, falling back to original');
+          persistedAcceptance = {
+            ok: false,
+            reason: 'missing',
+            response: { ...standardized.acceptance.response, failure_stage: 'transparent_upload' },
+          };
+        }
       }
-      if (!finalImageUrl) finalImageUrl = sourceUri;
+      const finalImageUrl = transparentMasterUrl ?? durableOriginalUrl;
+      const standardizationMetadata = buildStandardizationMetadata(
+        persistedAcceptance,
+        durableOriginalUrl,
+        photoType,
+      );
 
       store.setState(state => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, standardizedImageUri: finalImageUrl } : t)
+        tasks: state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          standardizedImageUri: finalImageUrl,
+          standardizationFallback: !transparentMasterUrl,
+        } : t)
       }));
 
       // 统一命名规则：[记忆点]+[颜色]+[细分品类]，≤10 字，衣橱内去重
@@ -325,13 +348,10 @@ async function handleFinalize(taskId: string, userId: string) {
         image_url: finalImageUrl,
         ai_recognized_attrs: {
           async_import: true,
-          standardization: standardizationSkipped ? 'skipped_web' : usingStandardized ? 'qwen-image-edit' : 'fallback_original',
-          standardization_ok: usingStandardized,
-          standardization_skipped: standardizationSkipped,
-          original_image_url: sourceUri,
-          standardized_image_url: usingStandardized ? imageToPersist : undefined,
-          photo_type: photoType,
           detection_index: item.index,
+          ...standardizationMetadata,
+          original_image_url: durableOriginalUrl,
+          ...(transparentMasterUrl ? { standardized_image_url: transparentMasterUrl } : {}),
         },
         source_type: 'album_ai',
         source_label: '相册导入',
