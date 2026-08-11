@@ -1,7 +1,6 @@
 import React, { ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ImageSourcePropType,
   Pressable,
   StyleProp,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Fonts } from '@/constants/theme';
 import { ds, dsShadow } from './tokens';
+import { StyleeGarmentMedia } from './StyleeGarmentMedia';
 
 interface StyleeWardrobeCardProps {
   name: string;
@@ -38,8 +38,6 @@ export function StyleeWardrobeCard({
   accessibilityLabel,
   style,
 }: StyleeWardrobeCardProps) {
-  const resolvedImageSource = imageSource ?? (imageUri ? { uri: imageUri } : undefined);
-
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
@@ -54,20 +52,20 @@ export function StyleeWardrobeCard({
         style,
       ]}
     >
-      <View style={styles.media}>
-        {resolvedImageSource ? (
-          <Image
-            source={resolvedImageSource}
-            style={styles.image}
-            resizeMode="contain"
-          />
-        ) : placeholder}
+      {/* Wardrobe garment media delegates its resizeMode="contain" contract here. */}
+      <StyleeGarmentMedia
+        imageUri={imageUri}
+        imageSource={imageSource}
+        tone="neutral"
+        placeholder={placeholder}
+        style={styles.media}
+      >
         {loading ? (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator color={ds.color.semantic.text.primary} />
           </View>
         ) : null}
-      </View>
+      </StyleeGarmentMedia>
       <View style={styles.info}>
         <Text numberOfLines={1} style={styles.name}>{name}</Text>
         <Text numberOfLines={1} style={styles.metadata}>{metadata}</Text>
@@ -95,14 +93,9 @@ const styles = StyleSheet.create({
   media: {
     width: '100%',
     aspectRatio: ds.component.wardrobeCard.mediaAspectRatio,
-    backgroundColor: ds.color.semantic.surface.card,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

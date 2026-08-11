@@ -33,6 +33,7 @@ Always pull after first connecting. For later design updates:
 - `StyleeIconButton`
 - `StyleeStatusBadge`
 - `StyleeInlineStatus`
+- `StyleeGarmentMedia`
 - `StyleeOutfitItemCard`
 - `StyleeNavigationBar`
 - `StyleeStickyDecisionBar`
@@ -43,6 +44,16 @@ Always pull after first connecting. For later design updates:
 - `StyleeWardrobeGrid`
 - Existing app Tab Bar and Toast retain the v3.7 semantic foundation.
 - Choice chips, four-level typography, and wardrobe density form the v3.8 release slice.
+
+## Garment media
+
+`StyleeGarmentMedia` is the shared semantic surface for garment imagery. It
+accepts a URI or React Native image source, always renders images with
+`resizeMode="contain"`, and supports overlays through `children`.
+
+Use `neutral`, `owned`, `recommended`, or `inverse` tones instead of assigning
+media background colors in consumers. The consumer continues to own aspect
+ratio, radius, clipping, and all other geometry.
 
 ## Engineering rules
 

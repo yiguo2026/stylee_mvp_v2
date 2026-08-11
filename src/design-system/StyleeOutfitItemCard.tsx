@@ -12,12 +12,16 @@ import {
 import Feather from '@expo/vector-icons/Feather';
 import { Fonts } from '@/constants/theme';
 import { ds } from './tokens';
+import { GarmentMediaTone } from './garmentMediaTone';
+import { StyleeGarmentMedia } from './StyleeGarmentMedia';
 import { StyleeStatusBadge } from './StyleeStatus';
 
 interface StyleeOutfitItemCardProps {
   name: string;
   ownership: 'owned' | 'missing';
-  media: ReactNode;
+  media?: ReactNode;
+  imageUri?: string | null;
+  mediaTone?: GarmentMediaTone;
   actions?: ReactNode;
   showOwnership?: boolean;
   adjustMode?: boolean;
@@ -32,6 +36,8 @@ export function StyleeOutfitItemCard({
   name,
   ownership,
   media,
+  imageUri,
+  mediaTone,
   actions,
   showOwnership = true,
   adjustMode = false,
@@ -48,14 +54,15 @@ export function StyleeOutfitItemCard({
     : styles.mobileCard;
   const content = (
     <>
-      <View
+      <StyleeGarmentMedia
+        imageUri={imageUri}
+        tone={mediaTone ?? (ownership === 'owned' ? 'owned' : 'recommended')}
+        placeholder={media}
         style={[
           styles.media,
-          ownership === 'missing' ? styles.mediaMissing : styles.mediaOwned,
           error && styles.mediaError,
         ]}
       >
-        {media}
         {showOwnership ? (
           <View style={styles.badgePosition}>
             <StyleeStatusBadge
@@ -74,7 +81,7 @@ export function StyleeOutfitItemCard({
             <ActivityIndicator color={ds.color.semantic.text.primary} />
           </View>
         ) : null}
-      </View>
+      </StyleeGarmentMedia>
       <Text numberOfLines={2} style={styles.name}>{name}</Text>
       {actions ? <View style={styles.actions}>{actions}</View> : null}
     </>
@@ -123,12 +130,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  mediaOwned: {
-    backgroundColor: ds.color.semantic.surface.input,
-  },
-  mediaMissing: {
-    backgroundColor: ds.color.semantic.status.attentionSubtle,
   },
   mediaError: {
     borderWidth: 1,
