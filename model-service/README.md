@@ -4,7 +4,7 @@ App 三个 AI 能力的本地推理服务：**服饰识别**（qwen3-vl-plus）�
 
 安全边界、模型路由、生产部署和双仓同步规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。用户模型权限与次数的权威设计见 [`QUOTA_ARCHITECTURE.md`](QUOTA_ARCHITECTURE.md)。第一次配置 key 可逐步照着 [`LOCAL_SETUP.md`](LOCAL_SETUP.md) 操作。
 
-- **纯 Python 标准库，零 pip 依赖**——系统有 `python3`（≥3.9）即可，无需 venv / pip install。
+- Python 3.9+；透明图处理固定使用 Pillow 12.3.0，启动或测试前必须安装 `requirements.txt`。
 - API key 只存在服务进程的环境变量里，App 端零 key。
 - 语义向量索引（3000 套穿搭 × 1024 维）已随仓提交，**clone 即完整功能**。
 
@@ -13,17 +13,18 @@ App 三个 AI 能力的本地推理服务：**服饰识别**（qwen3-vl-plus）�
 ```bash
 # 1. 起服务（key 找 fitzw 拿；必须在 model-service 目录下运行——索引按相对路径加载）
 cd model-service
+python3 -m pip install -r requirements.txt
 DEEPSEEK_API_KEY=<deepseek的key> DASHSCOPE_API_KEY=<qwen的key> \
   python3 serve.py --provider deepseek
 
-# 2. 另开终端，验证服务（应输出 health: true + 三个能力的真实结果，recommend trace 应为 rag_mode: 'vector'）
-node scripts/styleeSmoke.ts        # 在仓库根目录跑
+# 2. 另开终端，用批准样本验证服务；smoke 只输出安全标量，不输出图片字节或凭据
+node scripts/styleeSmoke.ts /path/to/approved-garment.png  # 在仓库根目录跑
 
 # 3. 起 App（.env 不用改，默认就是 http://127.0.0.1:8000）
 npm start
 ```
 
-App 侧行为：服务在 → AI 能力走真模型；服务不在/挂了 → 自动回落 mock / 预置结果 / 原图。App 绝不直连 DeepSeek 或 DashScope。
+App 侧行为：服务在 → AI 能力走真模型；透明主图失败 → 保留已持久化原图，并显示「透明主图生成失败，已保留原图」；成功保存后显示「已更新为透明主图」。其他能力继续使用各自既有的 mock / 预置结果降级。App 绝不直连 DeepSeek 或 DashScope。
 
 ## 生产安全配置
 
@@ -54,7 +55,7 @@ Blueprint 默认关闭自动部署，首次使用免费实例完成 HTTPS 与真
 | `GET /health` | 存活检查 | - |
 | `POST /recognize` | 识别衣物属性（类目/颜色/材质/照片类型） | qwen3-vl-plus |
 | `POST /recognize-multi` | 识别图片中的全部衣物，返回标准化属性和可复核元数据 | qwen3-vl-plus |
-| `POST /standardize` | 原图 → 白底标准商品图（临时 OSS URL，App 负责转存 Supabase） | qwen-image-edit |
+| `POST /standardize` | 原图 → 经 alpha 与视觉双重校验的透明 PNG 主图 data URI | qwen-image-edit + Pillow 12.3.0 |
 | `POST /recommend` | 衣橱+场景 → 3 套搭配+理由（B0-B6 链路，仅 2 次 LLM 调用） | DeepSeek flash/pro |
 | `POST /gamma/import` | Gamma 单次识别与标准化 | Qwen VL + Image Edit |
 | `POST /gamma/outfit` | Gamma 直接搭配、换单件、换整套 | DeepSeek + Qwen Image |
@@ -64,7 +65,13 @@ Blueprint 默认关闭自动部署，首次使用免费实例完成 HTTPS 与真
 
 每个模型请求都由 App 生成 `X-Request-ID`，服务端用同一 ID 输出一行结构化日志。成功响应的 `trace.stage_ms` 会列出实际阶段耗时；失败响应会返回 `stage`、`error_type`、`duration_ms` 和 `retryable`。即使客户端先中止请求，也能用客户端日志里的 request ID 在 Render 日志中定位服务端最终停在哪个阶段。线上复测时分别跑一次推荐和识别，再按 request ID 对齐浏览器日志与 Render 的 `stylee_request` 日志即可。
 
-导入时，App 必须使用识别返回的 `photo_type`（`flatlay|on_body|web|angled`）选择标准化策略。为兼容旧客户端，服务端会把 `flat` 映射为 `flatlay`、`product` 映射为 `web`。标准图通过回验后，App 保存时必须将临时 OSS URL 复制到自有 Supabase Storage，不得直接入库。
+导入时，App 必须使用识别返回的 `photo_type`（`flatlay|on_body|web|angled`）选择标准化策略。为兼容旧客户端，服务端会把 `flat` 映射为 `flatlay`、`product` 映射为 `web`。
+
+`/standardize` 的成功合同必须同时满足 `verified=true`、`alpha_verified=true`、`background=transparent`、`mime=image/png`，且 `image_ref` 为 PNG data URI。`web` 图优先直接抠图；其他路径可以先调用图片编辑做中间准备，但准备图本身绝不是成功结果。终态失败返回显式失败字段和原图引用，App 不得把它当成透明主图。
+
+透明处理的资源边界固定为：编码输入不超过 20 MiB，解码输入不超过 16,000,000 像素，处理时最长边缩至 1600 px，编码 PNG 输出不超过 8 MiB；App 另以 12 MiB data URI 字符长度上限做入站防护。App 必须先把通过校验的透明 PNG 转存到自有 Supabase Storage 再入库；data URI 不进入日志、分析事件或数据库元数据。该发布不迁移或重处理历史白底/不透明图片。
+
+`scripts/styleeSmoke.ts` 只记录 `verified`、`alpha_verified`、`background`、`mime`、处理方法、matte provider、失败阶段、data URI 类型和字符数等安全标量；禁止打印 `image_ref`、data URI/base64、Authorization、API key 或其他凭据。
 
 ## 跑测试（全离线，不需要 key）
 
@@ -72,6 +79,27 @@ Blueprint 默认关闭自动部署，首次使用免费实例完成 HTTPS 与真
 cd model-service
 for t in test_*.py; do python3 "$t"; done   # 每个都应打印 ok
 ```
+
+`style-model` 是规范仓，App 内的 `model-service/` 是受治理镜像。必须先在规范仓修改和测试，再同步到 App；不要从 vendored copy 反向覆盖 canonical。完整离线发布验证：
+
+```bash
+cd /Users/bytedance/Documents/style-model
+for t in test_*.py; do .venv/bin/python "$t"; done
+
+cd /path/to/stylee-app/model-service
+for t in test_*.py; do /Users/bytedance/Documents/style-model/.venv/bin/python "$t"; done
+
+cd /path/to/stylee-app
+./scripts/check-model-service-sync.sh /Users/bytedance/Documents/style-model
+node --test src/lib/*.test.ts src/design-system/*.test.ts
+npm run tokens:check
+npm run design-system:check
+npm run wardrobe-density:check
+npm run check
+npm run build:web
+```
+
+部署门槛：规范服务先部署并以批准的白色服装和图案服装完成 HTTPS smoke 与 `neutral` / `inverse` / `recommended` 背景质检，随后才能发布 App。未获得明确批准时，不 push、不部署、不修改 `EXPO_PUBLIC_STYLEE_API`。
 
 ## 不带 key 也能起服务（mock 模式）
 

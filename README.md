@@ -42,7 +42,7 @@
 - 单图多品识别：上传包含多件单品的照片时，AI 检测所有单品，用户多选后逐件确认（标准图+属性）批量导入
 - 多图导入：相册选择多张图片，AI 并行识别所有图片中的单品，汇总展示后逐件确认
 - 统一添加入口：所有页面（首页/衣橱/穿搭结果）添加衣物均走「相册导入」弹窗 → 拉起图片选择器 → 详情页
-- 标准图失败处理：生成失败时提供「重试」和「用原图保存」按钮，不再卡死
+- 透明主图失败处理：仅接受严格校验通过的透明 PNG；失败时保留原图并显示「透明主图生成失败，已保留原图」
 
 ### 穿搭推荐
 - 实时天气卡片（和风天气 API，180+ 城市本地 ID 映射，自动匹配温度标签）
@@ -226,10 +226,39 @@ App 不直连任何模型 API，全部能力通过 model service：
 | 能力 | 模型 | 端点 |
 |------|------|------|
 | 服饰识别（单品/多品） | qwen3-vl-plus | model service `/recognize` / `/recognize-multi` |
-| 标准图/试穿图生成 | qwen-image-edit | model service `/standardize` / `/tryon-image` |
+| 透明服装主图/试穿图生成 | qwen-image-edit + Pillow 12.3.0 / qwen-image-edit | model service `/standardize` / `/tryon-image` |
 | 意图识别 / 搭配推荐 / 试穿建议 | DeepSeek | model service 专用端点 |
 
-生产部署时 model service 会校验 Supabase 用户 JWT、限制来源域名与每分钟请求数。模型 API 不可用时自动回落到 mock 数据，不影响基础功能。
+生产部署时 model service 会校验 Supabase 用户 JWT、限制来源域名与每分钟请求数。透明主图失败不会伪装成成功或写入准备图：App 保留已持久化原图，并显示精确文案「透明主图生成失败，已保留原图」；成功保存后显示「已更新为透明主图」。其他 AI 能力按各自既有降级策略处理。
+
+### 透明服装主图合同
+
+- `/standardize` 的成功结果必须同时满足 `verified=true`、`alpha_verified=true`、`background=transparent`、`mime=image/png`，且 `image_ref` 是 PNG data URI。App 还会严格校验格式，并把 data URI 长度限制为 12 MiB。
+- 服务端透明处理使用固定版本 Pillow 12.3.0。编码输入上限为 20 MiB，解码输入上限为 16,000,000 像素，处理时最长边缩至 1600 px，编码 PNG 输出上限为 8 MiB。
+- 通过合同的透明 PNG 会先转存至 Stylee 自有 Supabase Storage，再写入衣橱；data URI 不进入日志、分析事件或持久化元数据。失败则保存原图和不含图片字节的失败元数据。
+- 新增或替换的服装图片采用透明主图。现存历史白底/不透明图片保持原样，不批量迁移、不重处理，也不新增数据库迁移。
+- 服装内容与背景解耦：衣橱、搭配、推荐和反色场景分别通过 Design System 的 `neutral`、`owned`、`recommended`、`inverse` 语义 surface 呈现，图片统一 `contain`；不要从图片像素猜背景色。
+
+规范仓优先：先在 canonical `style-model` 修改并验证，再同步其受治理文件到本仓 `model-service/`。发布前使用 canonical 路径核对镜像，并完成 App 的 Node、Token、Design System、密度、TypeScript 和 Web 构建验证：
+
+```bash
+cd /Users/bytedance/Documents/style-model
+for t in test_*.py; do .venv/bin/python "$t"; done
+
+cd /path/to/stylee-app/model-service
+for t in test_*.py; do /Users/bytedance/Documents/style-model/.venv/bin/python "$t"; done
+
+cd /path/to/stylee-app
+./scripts/check-model-service-sync.sh /Users/bytedance/Documents/style-model
+node --test src/lib/*.test.ts src/design-system/*.test.ts
+npm run tokens:check
+npm run design-system:check
+npm run wardrobe-density:check
+npm run check
+npm run build:web
+```
+
+真实服务发布门槛还包括：用批准的白色服装和图案服装各跑一次安全 smoke，在 `neutral`、`inverse`、`recommended` 背景检查透明边缘与品类/颜色保真，并在已登录账号的 320、375、393、430、768 pt 视口检查衣橱、详情、搭配结果、换款和试穿缩略图。服务先于 App 部署；未完成这些检查不得切换 `EXPO_PUBLIC_STYLEE_API` 或发布。
 
 ### Gamma 直接模型实验
 
