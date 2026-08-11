@@ -155,6 +155,12 @@ export type PersistGarmentMasterResult =
       metadata: PersistedGarmentMetadata;
     };
 
+export function shouldPersistReplacementImage(
+  selectedReplacementUri: string | null | undefined,
+): selectedReplacementUri is string {
+  return Boolean(selectedReplacementUri);
+}
+
 /**
  * Persists a source image before an accepted transparent master and returns
  * the JSONB-safe metadata that callers write with their wardrobe row.

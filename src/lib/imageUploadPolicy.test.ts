@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { storageFormatFor } from './imageUploadPolicy.ts';
 import {
   createWardrobeImageUploader,
   persistGarmentMaster,
+  shouldPersistReplacementImage,
   type UploadWardrobeImage,
 } from './uploadImage.ts';
 
@@ -165,6 +169,40 @@ function recordingUploader(results: Array<string | null>) {
   return { upload, calls };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+test('master upload waits until the durable original promise resolves', async () => {
+  const original = deferred<string | null>();
+  const calls: string[] = [];
+  const upload: UploadWardrobeImage = async (uri) => {
+    calls.push(uri);
+    if (calls.length === 1) return original.promise;
+    return 'https://storage.test/master.png';
+  };
+
+  const resultPromise = persistGarmentMaster({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flat_lay',
+    acceptance: accepted,
+  }, upload);
+
+  await Promise.resolve();
+  assert.deepEqual(calls, ['file:///source.jpg']);
+
+  original.resolve('https://storage.test/original.jpg');
+  const result = await resultPromise;
+
+  assert.deepEqual(calls, ['file:///source.jpg', accepted.uri]);
+  assert.equal(result.ok, true);
+});
+
 test('accepted master persists original then master and returns durable metadata', async () => {
   const harness = recordingUploader([
     'https://storage.test/original.jpg',
@@ -260,4 +298,29 @@ test('HTTP provider source and accepted master are both forced into durable stor
   if (!result.ok) return;
   assert.equal(result.metadata.original_uri, 'https://storage.test/original.jpg');
   assert.equal(result.metadata.standardized_image_url, 'https://storage.test/master.png');
+});
+
+test('replacement persistence decision requires a newly selected URI', () => {
+  assert.equal(shouldPersistReplacementImage(null), false);
+  assert.equal(shouldPersistReplacementImage(undefined), false);
+  assert.equal(shouldPersistReplacementImage(''), false);
+  assert.equal(shouldPersistReplacementImage('file:///replacement.jpg'), true);
+});
+
+test('ordinary edit save cannot standardize or persist an untouched image', () => {
+  const testDirectory = dirname(fileURLToPath(import.meta.url));
+  const editSource = readFileSync(
+    resolve(testDirectory, '../app/wardrobe/edit/[id].tsx'),
+    'utf8',
+  );
+  const pickerStart = editSource.indexOf('const pickMainImage =');
+  const saveStart = editSource.indexOf('const handleSave =');
+  const deleteStart = editSource.indexOf('const confirmDelete =');
+  assert.ok(pickerStart >= 0 && saveStart > pickerStart && deleteStart > saveStart);
+
+  const replacementFlow = editSource.slice(pickerStart, saveStart);
+  const ordinarySaveFlow = editSource.slice(saveStart, deleteStart);
+  assert.match(replacementFlow, /shouldPersistReplacementImage\s*\(/);
+  assert.match(replacementFlow, /persistGarmentMaster\s*\(/);
+  assert.doesNotMatch(ordinarySaveFlow, /aiStandardizeGarment\s*\(|persistGarmentMaster\s*\(/);
 });

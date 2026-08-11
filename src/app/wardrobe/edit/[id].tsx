@@ -10,7 +10,7 @@ import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
-import { persistGarmentMaster } from '@/lib/uploadImage';
+import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Toast } from '@/components/Toast';
@@ -131,6 +131,7 @@ export default function EditItemScreen() {
     if (result.canceled || !result.assets[0]) return;
 
     const localUri = result.assets[0].uri;
+    if (!shouldPersistReplacementImage(localUri)) return;
     setImageUri(localUri); // 立即预览
     setStandardizing(true);
 
