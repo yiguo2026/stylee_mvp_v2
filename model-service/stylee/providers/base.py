@@ -33,3 +33,15 @@ class LLMProvider(ABC):
         约束:owned 单品只能引用 pool 里存在的 id;凑不齐的必需槽位走缺口建议。
         """
         raise NotImplementedError
+
+    def regenerate_outfits(
+        self,
+        ctx: RequestContext,
+        scene: SceneSpec,
+        pool: "CandidatePool",          # noqa: F821 - 运行时由 pipeline 传入
+        exemplars: list[dict],
+        k: int,
+        violations: list[str],
+    ) -> list[Outfit]:
+        """B3 定向重生成；旧 provider 默认兼容为普通生成。"""
+        return self.generate_outfits(ctx, scene, pool, exemplars, k)

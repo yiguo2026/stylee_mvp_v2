@@ -22,12 +22,14 @@ from ..contracts import (
     Category,
     Formality,
     GapSuggestion,
+    LayerRole,
     Outfit,
     OutfitItemRef,
     RequestContext,
     SceneSpec,
     Slot,
 )
+from ..outfit_policy import allowed_styles_for_scene, build_constraint_policy
 from .base import LLMProvider
 
 
@@ -159,31 +161,54 @@ def _pool_table(pool: CandidatePool) -> dict:
 
 _GEN_SCHEMA = (
     '{"outfits":[{"items":['
-    '{"role":"torso|bottom|outer|feet|accessory","id":"候选池里的真实id"},'
-    '{"role":"feet","gap":{"category":"鞋","desc":"补买建议","reason":"理由"}}'
-    '],"style_tags":[],"occasion":"","reasoning":"一句话理由"}]}'
+    '{"role":"torso|bottom|outer|feet|accessory",'
+    '"layer_role":"base|mid|outer|null","id":"候选池里的真实id"},'
+    '{"role":"feet","layer_role":null,'
+    '"gap":{"category":"鞋","desc":"补买建议","reason":"理由"}}'
+    '],"primary_style":"主风格","secondary_style":"辅风格或空",'
+    '"style_tags":[],"occasion":"","reasoning":"一句话理由"}]}'
 )
 
 
 def build_gen_messages(ctx: RequestContext, scene: SceneSpec, pool: CandidatePool,
-                       exemplars: list[dict], k: int) -> list[dict]:
+                       exemplars: list[dict], k: int,
+                       violations: list[str] | None = None) -> list[dict]:
     prof = ctx.user_profile
+    policy = build_constraint_policy(ctx, scene)
+    retry_codes = [
+        code for code in (violations or [])
+        if isinstance(code, str) and code.startswith(("H_", "D_")) and len(code) <= 64
+    ]
+    retry_header = (
+        f"上轮候选全部未通过代码校验。这是定向重生成，重新生成 {k} 套。\n"
+        if retry_codes else ""
+    )
     sys = (
-        "你是资深个人穿搭师。从给定『候选池』里按 id 选用户真实拥有的单品,组成整套搭配。\n"
+        retry_header
+        + "你是资深个人穿搭师。从给定『候选池』里按 id 选用户真实拥有的单品,组成整套搭配。\n"
         "硬规则(必须遵守):\n"
-        "1) 只能引用候选池里出现过的 id,绝不编造不存在的单品;\n"
-        "2) 上身恰好 1 件(上装 或 连衣裙);若选连衣裙则不要下装,否则下装恰好 1 件;\n"
-        "3) 鞋恰好 1 双;外套至多 1 件(冷天/需外套时要有);配饰可选;\n"
-        "4) 某个必需槽位候选池为空时,用 gap 给出补买建议(不要硬塞不合适的);\n"
-        "5) 参考给的『审美范例』的搭配套路,但只用用户自己的衣物;\n"
-        "6) 兼顾:身材修饰 > 场景适配 > 风格塑造 > 色彩适配;\n"
-        "7) gap.desc 只写简短单品名(如‘白色帆布鞋’),最多 12 个汉字,"
+        "1) 已有单品只能引用候选池里出现过的真实 id,同一 id 不重复,绝不编造;\n"
+        "2) 全身必须完整覆盖:至少 1 件上装+恰好 1 件下装,或恰好 1 件连衣裙;连衣裙不与上装/下装混穿;\n"
+        "3) 上身叠穿最多 3 层;上装用 layer_role=base|mid,外套用 outer;外套至多 1 件;\n"
+        "4) 鞋恰好 1 双;包至多 1 个;帽至多 1 顶;\n"
+        "5) 某个必需槽位没有合适已有单品时必须用 gap;gap 与已有单品同样参与数量、分层和覆盖约束;\n"
+        "默认规则(用户明确要求冲突时，以用户要求为准):\n"
+        "6) 彩色家族至多 3 种、中性色家族至多 2 种;彩色单品至多 3 件;荧光色单品至多 1 件;\n"
+        "7) 单品正式度跨度至多 1 级;主风格属于场景风格池;同套不混用互斥风格;冷天应有外套;\n"
+        "生成要求:\n"
+        "8) 参考『审美范例』的搭配套路,并兼顾:身材修饰 > 场景适配 > 风格塑造 > 色彩适配;\n"
+        "9) 尽量满足:仅 1 个视觉焦点、松紧平衡、腰线清晰、材质不超过 3 种且质感统一、配色 7:2:1、长短有层次;\n"
+        "10) gap.desc 只写简短单品名(如‘白色帆布鞋’),最多 12 个汉字,"
         "不要写‘建议购买/选择一件/适合某场景的’等句子。\n"
         f"输出严格 JSON,出 {k} 套且彼此尽量多样。schema:" + _GEN_SCHEMA
     )
+    allowed_styles = allowed_styles_for_scene(scene)
     usr = json.dumps({
         "场景规格": {"occasions": scene.occasions, "formality": scene.formality.value,
                    "style_keywords": scene.style_keywords, "vibe": scene.vibe},
+        "当前场景可用风格池": sorted(allowed_styles) if allowed_styles is not None else [],
+        "用户明确覆盖的默认规则": sorted(policy.overridden_rules),
+        "上轮稳定违规错误码": retry_codes,
         "天气": {"温度": ctx.weather.temp_c, "状况": ctx.weather.condition,
                "时段": ctx.weather.time_of_day},
         "用户": {"体型": prof.body_shape.value if prof.body_shape else None,
@@ -230,6 +255,13 @@ def _as_category(s: str) -> Category:
     return Category.TOP
 
 
+def _as_layer(s: str | None) -> LayerRole | None:
+    for layer in LayerRole:
+        if layer.value == s:
+            return layer
+    return None
+
+
 def parse_outfits_json(data: dict) -> list[Outfit]:
     """把模型 JSON 解析成 Outfit 列表。id 真伪/槽位合法性交给 B4 校验,这里只做结构转换。"""
     outfits: list[Outfit] = []
@@ -237,6 +269,7 @@ def parse_outfits_json(data: dict) -> list[Outfit]:
         items: list[OutfitItemRef] = []
         for it in o.get("items") or []:
             role = _as_slot(it.get("role", "accessory"))
+            layer_role = _as_layer(it.get("layer_role"))
             if it.get("gap"):
                 g = it["gap"]
                 category = _as_category(g.get("category", "上装"))
@@ -245,13 +278,18 @@ def parse_outfits_json(data: dict) -> list[Outfit]:
                     role=CATEGORY_SLOT[category], owned=False,
                     suggest=GapSuggestion(category,
                                           g.get("desc", ""), g.get("reason", "")),
+                    layer_role=layer_role,
                 ))
             elif it.get("id"):
-                items.append(OutfitItemRef(role=role, ref=str(it["id"]), owned=True))
+                items.append(OutfitItemRef(
+                    role=role, ref=str(it["id"]), owned=True, layer_role=layer_role,
+                ))
         if items:
             outfits.append(Outfit(
                 items=items,
                 style_tags=list(o.get("style_tags") or [])[:3],
+                primary_style=o.get("primary_style", "") or "",
+                secondary_style=o.get("secondary_style", "") or "",
                 occasion=o.get("occasion", "") or "",
                 reasoning=o.get("reasoning", "") or "",
             ))
@@ -293,6 +331,14 @@ class OpenAICompatProvider(LLMProvider):
     def generate_outfits(self, ctx, scene, pool, exemplars, k) -> list[Outfit]:
         data = self._call(build_gen_messages(ctx, scene, pool, exemplars, k),
                           self.t_gen, self.model_gen)
+        return parse_outfits_json(data)
+
+    def regenerate_outfits(self, ctx, scene, pool, exemplars, k, violations) -> list[Outfit]:
+        data = self._call(
+            build_gen_messages(ctx, scene, pool, exemplars, k, violations=violations),
+            self.t_gen,
+            self.model_gen,
+        )
         return parse_outfits_json(data)
 
 

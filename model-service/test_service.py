@@ -49,13 +49,32 @@ def test_outfits_to_app():
                       OutfitItemRef(role=Slot.FEET, owned=False,
                                     suggest=GapSuggestion(Category.SHOES, "小白鞋", "缺鞋"))],
                occasion="约会", reasoning="上紧下松")
-    res = RecommendationResult(outfits=[o], trace={"rag_mode": "vector", "candidate_pool_size": 16})
+    res = RecommendationResult(outfits=[o], trace={
+        "rag_mode": "vector",
+        "candidate_pool_size": 16,
+        "first_pass_valid": 2,
+        "rejected_by_rule": {"H_FEET_EXACTLY_ONE": 1},
+        "query_overridden_rules": [],
+        "retry_triggered": False,
+        "retry_candidate_count": 0,
+        "retry_duration_ms": 0,
+        "recommended_gap_count": 1,
+        "fallback_type": "none",
+        "not_public": "must-not-leak",
+    })
     ctx = RequestContext(input_mode=InputMode.NL, wardrobe=[])
     app = outfits_to_app(res, ctx)
     assert app["outfits"][0]["owned_item_ids"] == ["i1"]
     assert app["outfits"][0]["recommended_items"][0]["category"] == "鞋履"
     assert app["outfits"][0]["comment"] == "上紧下松"
+    assert set(app["outfits"][0]) == {
+        "name", "owned_item_ids", "recommended_items", "comment",
+    }
     assert app["trace"]["rag_mode"] == "vector" and app["trace"]["pool"] == 16
+    assert app["trace"]["first_pass_valid"] == 2
+    assert app["trace"]["retry_candidate_count"] == 0
+    assert app["trace"]["fallback_type"] == "none"
+    assert "not_public" not in app["trace"]
 
 
 def test_compact_recommended_name():
@@ -182,6 +201,9 @@ def test_server_smoke():
         assert b["trace"]["request_id"] == "req-smoke-recommend"
         assert b["trace"]["stage_ms"]["B0.parse_intent"] >= 0
         assert b["trace"]["stage_ms"]["B3.generate_outfits"] >= 0
+        assert b["trace"]["first_pass_valid"] >= 0
+        assert b["trace"]["retry_candidate_count"] >= 0
+        assert b["trace"]["fallback_type"] in {"none", "deterministic", "failed"}
 
         original_recommend = server_service.recommend
         server_service.recommend = lambda *args, **kwargs: (_ for _ in ()).throw(

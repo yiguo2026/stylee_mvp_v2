@@ -13,6 +13,7 @@ from ..contracts import (
     Formality,
     GapSuggestion,
     InputMode,
+    LayerRole,
     Outfit,
     OutfitItemRef,
     RequestContext,
@@ -113,14 +114,18 @@ class MockProvider(LLMProvider):
             # 上身(含连衣裙判定)
             if torso_choices:
                 t = torso_choices[i % len(torso_choices)]
-                items.append(OutfitItemRef(role=Slot.TORSO, ref=t.id, owned=True))
+                items.append(OutfitItemRef(
+                    role=Slot.TORSO, ref=t.id, owned=True, layer_role=LayerRole.BASE,
+                ))
                 picked.append(t)
                 style_tags.update(t.style_tags)
                 is_dress = covers_bottom(t)
             else:
                 cat, desc = _gap_desc(Slot.TORSO)
-                items.append(OutfitItemRef(role=Slot.TORSO, owned=False,
-                             suggest=GapSuggestion(cat, desc, f"衣橱缺{scene.vibe}的上身")))
+                items.append(OutfitItemRef(
+                    role=Slot.TORSO, owned=False, layer_role=LayerRole.BASE,
+                    suggest=GapSuggestion(cat, desc, f"衣橱缺{scene.vibe}的上身"),
+                ))
                 is_dress = False
 
             # 下身(连衣裙则跳过)
@@ -149,7 +154,9 @@ class MockProvider(LLMProvider):
             # 外套:冷天必加;否则隔套加一件做层次
             if outers and (pool.band.outer_required or i % 2 == 1):
                 o = outers[i % len(outers)]
-                items.append(OutfitItemRef(role=Slot.OUTER, ref=o.id, owned=True))
+                items.append(OutfitItemRef(
+                    role=Slot.OUTER, ref=o.id, owned=True, layer_role=LayerRole.OUTER,
+                ))
                 picked.append(o)
                 style_tags.update(o.style_tags)
 
@@ -160,9 +167,11 @@ class MockProvider(LLMProvider):
                 picked.append(a)
 
             reason = self._reason(scene, picked, exemplar_style, ctx)
+            normalized_styles = list(style_tags)[:3]
             outfits.append(Outfit(
                 items=items,
-                style_tags=list(style_tags)[:3],
+                style_tags=normalized_styles,
+                primary_style=normalized_styles[0] if normalized_styles else "",
                 occasion=scene.occasions[0] if scene.occasions else "日常",
                 reasoning=reason,
             ))
