@@ -54,34 +54,37 @@ export function StyleeOutfitItemCard({
     : styles.mobileCard;
   const content = (
     <>
-      <StyleeGarmentMedia
-        imageUri={imageUri}
-        tone={mediaTone ?? (ownership === 'owned' ? 'owned' : 'recommended')}
-        placeholder={media}
+      <View
         style={[
           styles.media,
           error && styles.mediaError,
         ]}
       >
-        {showOwnership ? (
-          <View style={styles.badgePosition}>
-            <StyleeStatusBadge
-              label={ownership === 'owned' ? '已拥有' : '你还没有'}
-              tone={ownership === 'owned' ? 'positive' : 'attention'}
-            />
-          </View>
-        ) : null}
-        {adjustMode ? (
-          <View style={styles.adjustBadge}>
-            <Feather name="refresh-cw" size={12} color={ds.color.semantic.text.inverse} />
-          </View>
-        ) : null}
-        {loading ? (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator color={ds.color.semantic.text.primary} />
-          </View>
-        ) : null}
-      </StyleeGarmentMedia>
+        <StyleeGarmentMedia
+          imageUri={imageUri}
+          tone={mediaTone ?? (ownership === 'owned' ? 'owned' : 'recommended')}
+          placeholder={media}
+        >
+          {showOwnership ? (
+            <View style={styles.badgePosition}>
+              <StyleeStatusBadge
+                label={ownership === 'owned' ? '已拥有' : '你还没有'}
+                tone={ownership === 'owned' ? 'positive' : 'attention'}
+              />
+            </View>
+          ) : null}
+          {adjustMode ? (
+            <View style={styles.adjustBadge}>
+              <Feather name="refresh-cw" size={12} color={ds.color.semantic.text.inverse} />
+            </View>
+          ) : null}
+          {loading ? (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator color={ds.color.semantic.text.primary} />
+            </View>
+          ) : null}
+        </StyleeGarmentMedia>
+      </View>
       <Text numberOfLines={2} style={styles.name}>{name}</Text>
       {actions ? <View style={styles.actions}>{actions}</View> : null}
     </>

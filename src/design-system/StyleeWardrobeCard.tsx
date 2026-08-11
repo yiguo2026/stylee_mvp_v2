@@ -52,20 +52,21 @@ export function StyleeWardrobeCard({
         style,
       ]}
     >
-      {/* Wardrobe garment media delegates its resizeMode="contain" contract here. */}
-      <StyleeGarmentMedia
-        imageUri={imageUri}
-        imageSource={imageSource}
-        tone="neutral"
-        placeholder={placeholder}
-        style={styles.media}
-      >
-        {loading ? (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator color={ds.color.semantic.text.primary} />
-          </View>
-        ) : null}
-      </StyleeGarmentMedia>
+      <View style={styles.media}>
+        {/* Wardrobe garment media delegates its resizeMode="contain" contract here. */}
+        <StyleeGarmentMedia
+          imageUri={imageUri}
+          imageSource={imageSource}
+          tone="neutral"
+          placeholder={placeholder}
+        >
+          {loading ? (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator color={ds.color.semantic.text.primary} />
+            </View>
+          ) : null}
+        </StyleeGarmentMedia>
+      </View>
       <View style={styles.info}>
         <Text numberOfLines={1} style={styles.name}>{name}</Text>
         <Text numberOfLines={1} style={styles.metadata}>{metadata}</Text>
