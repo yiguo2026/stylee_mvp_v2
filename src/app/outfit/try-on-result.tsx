@@ -11,6 +11,7 @@ import { Toast } from '@/components/Toast';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { trimWhitespace } from '@/lib/trimImage';
 import * as MediaLibrary from 'expo-media-library';
+import { StyleeGarmentMedia } from '@/design-system';
 // expo-file-system v19 将 downloadAsync / cacheDirectory 移到了 legacy 入口
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -172,7 +173,7 @@ export default function TryOnResultScreen() {
                 <View key={`${idx}-${item.name}-${item.category}`} style={styles.itemRow}>
                   <View style={styles.itemIcon}>
                     {item.image_url
-                      ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
+                      ? <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
                       : <CategoryIcon category={item.category ?? ''} size={24} color={Colors.walnut2} />
                     }
                   </View>

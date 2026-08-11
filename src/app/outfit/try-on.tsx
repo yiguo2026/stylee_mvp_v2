@@ -15,6 +15,7 @@ import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import type { ClothingCategory } from '@/types';
+import { StyleeGarmentMedia } from '@/design-system';
 
 const TRYON_SCENES = [
   { id: 'cafe', label: '咖啡馆' },
@@ -306,7 +307,7 @@ export default function TryOnScreen() {
                   <View key={item.item_id ?? `${item.name}-${item.category}-${item.color}-${item.image_url ?? ''}`} style={styles.itemRow}>
                     <View style={styles.itemIcon}>
                       {item.image_url
-                        ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
+                        ? <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
                         : <CategoryIcon category={item.category} size={24} color={Colors.walnut2} />
                       }
                     </View>
@@ -360,7 +361,7 @@ export default function TryOnScreen() {
                       {/* Thumbnail: first item image or collage */}
                       <View style={styles.outfitThumb}>
                         {outfit.items[0]?.image_url ? (
-                          <Image source={{ uri: outfit.items[0].image_url }} style={styles.outfitThumbImg} resizeMode="cover" />
+                          <StyleeGarmentMedia imageUri={outfit.items[0].image_url} tone="owned" />
                         ) : (
                           <View style={styles.outfitThumbPlaceholder}>
                             <CategoryIcon category={outfit.items[0]?.category ?? ''} size={28} color={Colors.walnut2} />

@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useTryOnStore, TryOnRecord } from '@/stores/tryonStore';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { StyleeGarmentMedia } from '@/design-system';
 
 const SCENE_IMAGES: Record<string, any> = {
   cafe: require('../../../assets/tryon/casual.png'),
@@ -104,7 +105,7 @@ export default function TryOnDetailScreen() {
                 <View key={`${idx}-${item.name}-${item.category}`} style={styles.itemRow}>
                   <View style={styles.itemIcon}>
               {item.image_url
-                ? <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
+                ? <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
                 : <CategoryIcon category={item.category ?? ''} size={24} color={Colors.walnut2} />
               }
                   </View>

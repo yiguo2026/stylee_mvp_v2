@@ -125,6 +125,18 @@ const garmentSceneFiles = [
     file: 'src/app/outfit/result.tsx',
     directImage: /\b(?:fi|item|rec)(?:[!?])?\.image_url|\boi(?:[!?])?\.item(?:[!?])?\.image_url/,
   },
+  {
+    file: 'src/app/outfit/try-on.tsx',
+    directImage: /\bitem(?:[!?])?\.image_url|\boutfit(?:[!?])?\.items(?:!\[|\?\.\[|\[)\s*0\s*\](?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/try-on-result.tsx',
+    directImage: /\bitem(?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/try-on-detail.tsx',
+    directImage: /\bitem(?:[!?])?\.image_url/,
+  },
 ];
 
 const garmentMediaRule = {
