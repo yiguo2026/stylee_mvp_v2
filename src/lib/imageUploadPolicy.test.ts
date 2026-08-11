@@ -521,7 +521,7 @@ test('ordinary edit save cannot standardize or persist an untouched image', () =
   assert.doesNotMatch(ordinarySaveFlow, /aiStandardizeGarment\s*\(|persistGarmentMaster\s*\(/);
 });
 
-test('add failure state keeps the fallback copy without a manual retry action', () => {
+test('add failure state offers retry and explicit original-image fallback actions', () => {
   const testDirectory = dirname(fileURLToPath(import.meta.url));
   const addSource = readFileSync(
     resolve(testDirectory, '../app/wardrobe/add.tsx'),
@@ -532,7 +532,10 @@ test('add failure state keeps the fallback copy without a manual retry action', 
   assert.ok(failureStart >= 0 && actionsStart > failureStart);
 
   const failureState = addSource.slice(failureStart, actionsStart);
-  assert.match(failureState, /透明主图生成失败，已保留原图/);
-  assert.doesNotMatch(failureState, /TouchableOpacity|refresh-cw|>重试</);
-  assert.doesNotMatch(addSource, /stdRetryBtn|stdRetryBtnText/);
+  assert.match(failureState, /透明主图生成失败/);
+  assert.match(failureState, /TouchableOpacity/);
+  assert.match(failureState, /refresh-cw/);
+  assert.match(failureState, />重试</);
+  assert.match(failureState, />用原图保存</);
+  assert.match(addSource, /stdRetryBtn|stdRetryBtnText/);
 });
