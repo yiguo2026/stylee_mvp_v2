@@ -111,19 +111,19 @@ for (const line of diff.split('\n')) {
 const garmentSceneFiles = [
   {
     file: 'src/app/(tabs)/index.tsx',
-    directImage: /entry\.item\.image_url/,
+    directImage: /\bentry(?:[!?])?\.item(?:[!?])?\.image_url/,
   },
   {
     file: 'src/app/wardrobe/[id].tsx',
-    directImage: /(?:rec|item!)\.image_url/,
+    directImage: /\b(?:rec|item)(?:[!?])?\.image_url/,
   },
   {
     file: 'src/app/outfit/[id].tsx',
-    directImage: /item\.image_url/,
+    directImage: /\bitem(?:[!?])?\.image_url/,
   },
   {
     file: 'src/app/outfit/result.tsx',
-    directImage: /(?:fi|item|rec)\.image_url|oi\.item\.image_url/,
+    directImage: /\b(?:fi|item|rec)(?:[!?])?\.image_url|\boi(?:[!?])?\.item(?:[!?])?\.image_url/,
   },
 ];
 
