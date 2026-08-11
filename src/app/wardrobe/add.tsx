@@ -14,14 +14,13 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
 import type { GarmentStandardizationResult } from '@/lib/ai';
 import { consumePendingImages } from '@/lib/pendingImages';
-import { uploadWardrobeImage } from '@/lib/uploadImage';
+import { persistGarmentMaster } from '@/lib/uploadImage';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, SleeveLength, DetectedItem, PhotoType } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { showToast } from '@/components/Toast';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
-import { buildStandardizationMetadata } from '@/lib/standardizationPolicy';
 
 const isWeb = Platform.OS === 'web';
 
@@ -328,41 +327,28 @@ export default function AddWardrobeItem() {
       let finalImageUrl: string | null = null;
       let persistedAttrs = recognizedAttrs ?? undefined;
       if (imageUri) {
-        const durableOriginalUrl = await uploadWardrobeImage(imageUri, user.id, 'originals', {
-          persistRemote: true,
-          timeoutMs: 45000,
+        const persistedImage = await persistGarmentMaster({
+          sourceUri: imageUri,
+          userId: user.id,
+          photoType,
+          acceptance: standardizationResult?.acceptance
+            ?? { ok: false, reason: 'missing' },
         });
-        if (!durableOriginalUrl) {
+        if (!persistedImage.ok) {
           showToast('图片上传失败，请检查网络后重试', 'error');
           return;
         }
 
-        let transparentMasterUrl: string | null = null;
-        let persistedAcceptance = standardizationResult?.acceptance
-          ?? { ok: false as const, reason: 'missing' as const };
-        if (persistedAcceptance.ok) {
-          transparentMasterUrl = await uploadWardrobeImage(persistedAcceptance.uri, user.id, undefined, {
-            timeoutMs: 45000,
-          });
-          if (!transparentMasterUrl) {
-            persistedAcceptance = {
-              ok: false,
-              reason: 'missing',
-              response: { ...persistedAcceptance.response, failure_stage: 'transparent_upload' },
-            };
-          }
-        }
-
-        finalImageUrl = transparentMasterUrl ?? durableOriginalUrl;
+        finalImageUrl = persistedImage.imageUrl;
         persistedAttrs = {
           ...(recognizedAttrs ?? {}),
-          ...buildStandardizationMetadata(persistedAcceptance, durableOriginalUrl, photoType),
-          original_image_url: durableOriginalUrl,
-          ...(transparentMasterUrl ? { standardized_image_url: transparentMasterUrl } : {}),
+          ...persistedImage.metadata,
         };
         showToast(
-          transparentMasterUrl ? '已更新为透明主图' : '透明主图生成失败，已保留原图',
-          transparentMasterUrl ? undefined : 'error',
+          persistedImage.status === 'transparent_master'
+            ? '已更新为透明主图'
+            : '透明主图生成失败，已保留原图',
+          persistedImage.status === 'transparent_master' ? undefined : 'error',
         );
       }
 

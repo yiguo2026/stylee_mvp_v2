@@ -4,8 +4,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
 import type { GarmentStandardizationResult } from '@/lib/ai';
 import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
-import { uploadWardrobeImage } from '@/lib/uploadImage';
-import { buildStandardizationMetadata } from '@/lib/standardizationPolicy';
+import { persistGarmentMaster } from '@/lib/uploadImage';
 import { track } from '@/lib/track';
 import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
 
@@ -285,39 +284,20 @@ async function handleFinalize(taskId: string, userId: string) {
         } : t)
       }));
 
-      const durableOriginalUrl = await uploadWardrobeImage(sourceUri, userId, 'originals', {
-        persistRemote: true,
-        timeoutMs: 45000,
-      });
-      if (!durableOriginalUrl) throw new Error('原图上传失败');
-
-      let transparentMasterUrl: string | null = null;
-      let persistedAcceptance = standardized.acceptance;
-      if (standardized.acceptance.ok) {
-        transparentMasterUrl = await uploadWardrobeImage(standardized.acceptance.uri, userId, undefined, {
-          timeoutMs: 45000,
-        });
-        if (!transparentMasterUrl) {
-          console.warn('[importStore] transparent master persistence failed, falling back to original');
-          persistedAcceptance = {
-            ok: false,
-            reason: 'missing',
-            response: { ...standardized.acceptance.response, failure_stage: 'transparent_upload' },
-          };
-        }
-      }
-      const finalImageUrl = transparentMasterUrl ?? durableOriginalUrl;
-      const standardizationMetadata = buildStandardizationMetadata(
-        persistedAcceptance,
-        durableOriginalUrl,
+      const persistedImage = await persistGarmentMaster({
+        sourceUri,
+        userId,
         photoType,
-      );
+        acceptance: standardized.acceptance,
+      });
+      if (!persistedImage.ok) throw new Error('原图上传失败');
+      const finalImageUrl = persistedImage.imageUrl;
 
       store.setState(state => ({
         tasks: state.tasks.map(t => t.id === taskId ? {
           ...t,
           standardizedImageUri: finalImageUrl,
-          standardizationFallback: !transparentMasterUrl,
+          standardizationFallback: persistedImage.status === 'fallback_original',
         } : t)
       }));
 
@@ -349,9 +329,7 @@ async function handleFinalize(taskId: string, userId: string) {
         ai_recognized_attrs: {
           async_import: true,
           detection_index: item.index,
-          ...standardizationMetadata,
-          original_image_url: durableOriginalUrl,
-          ...(transparentMasterUrl ? { standardized_image_url: transparentMasterUrl } : {}),
+          ...persistedImage.metadata,
         },
         source_type: 'album_ai',
         source_label: '相册导入',
