@@ -16,7 +16,6 @@ export function isTrustedRecognition(provider?: string, degraded?: boolean): boo
   return Boolean(provider && provider !== 'mock' && degraded !== true);
 }
 
-export function shouldStandardizePhotoType(photoType?: string): boolean {
-  const normalized = (photoType || '').trim().toLowerCase();
-  return normalized !== 'web' && normalized !== 'product';
+export function shouldStandardizePhotoType(_photoType?: string): boolean {
+  return true;
 }
