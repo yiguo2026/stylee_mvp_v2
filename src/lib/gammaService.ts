@@ -1,5 +1,5 @@
 import type { WardrobeItem } from '@/types';
-import { serviceFeature, uriToBase64 } from './styleeService';
+import { serviceFeature, uriToBase64 } from './styleeService.ts';
 
 export type GammaAction = 'generate' | 'replace_item' | 'replace_all';
 
