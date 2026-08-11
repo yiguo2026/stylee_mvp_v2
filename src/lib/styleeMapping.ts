@@ -18,7 +18,18 @@ export interface RecognizeManyResp {
   provider?: string;
   trace?: ModelServiceTrace;
 }
-export interface StandardizeResp { image_ref: string; method: string; verified: boolean; provider?: string; }
+export interface StandardizeResp {
+  image_ref: string;
+  method: string;
+  verified: boolean;
+  mime?: string;
+  background?: string;
+  alpha_verified?: boolean;
+  matte_provider?: string;
+  failure_stage?: string | null;
+  provider?: string;
+  trace?: ModelServiceTrace;
+}
 export interface ModelServiceTrace {
   request_id?: string;
   duration_ms?: number;
