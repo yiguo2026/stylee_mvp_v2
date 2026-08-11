@@ -96,21 +96,22 @@ export default function InspirationDetailScreen() {
   // 收敛到单一数据源：route params 缺 items/image_url 时，按 card_id 从编辑精选灵感回填真实单品图片。
   breakdownItems = reconcileBreakdownItems(breakdownItems, cardId);
 
-  // Match each inspiration item against user's wardrobe
-  // Same category = owned (user has something that can serve the same role)
-  // Same category + same color = exact match (click navigates to that wardrobe item)
+  // Match each inspiration item against user's wardrobe.
+  // 「已拥有」必须是真实命中：同品类 + 同色（或同名），才算用户衣橱里确有这件。
+  // 仅「同品类」不算拥有（例如有件白T不代表拥有条纹抹胸），否则会大面积误报「已拥有」。
   const matchedItems = breakdownItems.map((bi) => {
     const normalizedCat = normalizeCategory(bi.category);
     const sameCatItems = wardrobeItems.filter(wi => normalizeCategory(wi.category) === normalizedCat);
-    const colorMatch = sameCatItems.find(wi => wi.color === bi.color);
-    const anyMatch = colorMatch ?? sameCatItems[0];
+    const realMatch =
+      sameCatItems.find(wi => wi.name === bi.name) ??
+      sameCatItems.find(wi => wi.color === bi.color);
     return {
       ...bi,
       normalizedCategory: normalizedCat,
-      owned: sameCatItems.length > 0,
-      wardrobeItemId: anyMatch?.item_id ?? null,
-      wardrobeImageUrl: anyMatch?.image_url ?? null,
-      wardrobeName: anyMatch?.name ?? null,
+      owned: !!realMatch,
+      wardrobeItemId: realMatch?.item_id ?? null,
+      wardrobeImageUrl: realMatch?.image_url ?? null,
+      wardrobeName: realMatch?.name ?? null,
     };
   });
 
