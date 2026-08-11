@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from stylee import recommend
 from stylee.constraints import build_candidate_pool, validate_outfit
-from stylee.contracts import Formality, InputMode, Slot
+from stylee.contracts import Formality, InputMode, LayerRole, Slot
 from stylee.pipeline import _item_index, _signature
 from stylee.providers import ProviderError, deepseek, qwen
 from stylee.providers.openai_compat import (
@@ -63,10 +63,23 @@ def main() -> None:
     torso_id = pool.get(Slot.TORSO)[0].id
     _check(torso_id in gen_msgs[1]["content"], "生成 prompt 含候选池真实 id")
     _check("绝不编造" in gen_msgs[0]["content"], "生成 prompt 强调不许编造 id")
+    _check("上身叠穿最多 3 层" in gen_msgs[0]["content"], "生成 prompt 含三层叠穿硬约束")
+    _check("视觉焦点" in gen_msgs[0]["content"] and "7:2:1" in gen_msgs[0]["content"],
+           "生成 prompt 含当前不可硬判的软审美规则")
+
+    retry_msgs = build_gen_messages(
+        ctx, scene, pool, [], k=4,
+        violations=["H_FEET_EXACTLY_ONE", "D_STYLE_CONFLICT"],
+    )
+    _check("重新生成 4 套" in retry_msgs[0]["content"], "重生成 prompt 使用 n+1 候选数")
+    _check("H_FEET_EXACTLY_ONE" in retry_msgs[1]["content"]
+           and "D_STYLE_CONFLICT" in retry_msgs[1]["content"],
+           "重生成只携带稳定违规错误码")
 
     print("\n[2] 响应解析 → Outfit,并走 B4 校验 + 打分")
     bottom_id = pool.get(Slot.BOTTOM)[0].id
-    feet_id = pool.get(Slot.FEET)[0].id
+    # 选与半正式上/下装跨度不超过一级的乐福鞋，确保“合法样例”符合新默认规则。
+    feet_id = next(item.id for item in pool.get(Slot.FEET) if item.id == "s2")
     good = {"outfits": [{"items": [
         {"role": "torso", "id": torso_id},
         {"role": "bottom", "id": bottom_id},
@@ -79,6 +92,20 @@ def main() -> None:
     _check(validate_outfit(outfits[0], ctx, scene, idx) == [], "合法套通过 B4 校验")
     sc = score_outfit(outfits[0], ctx, scene, idx)
     _check(0 <= sc.body_fit <= 1 and 0 <= sc.color_harmony <= 1, "四维打分在 [0,1]")
+
+    internal = parse_outfits_json({"outfits": [{
+        "items": [
+            {"role": "torso", "layer_role": "base", "id": torso_id},
+            {"role": "bottom", "id": bottom_id},
+            {"role": "feet", "id": feet_id},
+        ],
+        "style_tags": ["法式慵懒", "都市酷感"],
+        "primary_style": "法式慵懒",
+        "secondary_style": "都市酷感",
+    }]} )[0]
+    _check(internal.items[0].layer_role == LayerRole.BASE, "模型 layer_role 被解析为内部枚举")
+    _check(internal.primary_style == "法式慵懒" and internal.secondary_style == "都市酷感",
+           "模型主辅风格被保留供服务端校验")
 
     print("\n[3] 幻觉防护 — 引用不存在 id 被 B4 拒")
     bad = {"outfits": [{"items": [

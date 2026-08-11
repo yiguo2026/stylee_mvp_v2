@@ -35,6 +35,13 @@ class Slot(str, Enum):
     ACCESSORY = "accessory"  # 配饰:BAG/HAT/SCARF
 
 
+class LayerRole(str, Enum):
+    """上身穿着顺序；只用于服务端生成与校验，不暴露给 App。"""
+    BASE = "base"
+    MID = "mid"
+    OUTER = "outer"
+
+
 # 品类 → 它能占的槽位
 CATEGORY_SLOT: dict[Category, Slot] = {
     Category.TOP: Slot.TORSO,
@@ -197,6 +204,7 @@ class OutfitItemRef:
     ref: Optional[str] = None              # 衣橱 item id;owned=True 时必填
     owned: bool = True
     suggest: Optional[GapSuggestion] = None  # owned=False 时填
+    layer_role: Optional[LayerRole] = None   # 上身内部层级；旧输出缺失时由品类推断
 
 
 @dataclass
@@ -219,6 +227,8 @@ class OutfitScores:
 class Outfit:
     items: list[OutfitItemRef]
     style_tags: list[str] = field(default_factory=list)
+    primary_style: str = ""
+    secondary_style: str = ""
     occasion: str = ""
     reasoning: str = ""
     scores: OutfitScores = field(default_factory=OutfitScores)

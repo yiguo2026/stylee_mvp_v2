@@ -234,13 +234,15 @@ export default function InspirationDetailScreen() {
                     >
                       <Text style={styles.badgeOwned}>已拥有</Text>
                       <View style={styles.gridThumb}>
+                        {/* 单品拆解始终优先展示灵感卡自身的真实抠图 (/inspirations/items/*.png)，
+                            衣橱匹配仅用于「已拥有」角标与跳转，不覆盖图片/名称，避免预置衣橱 seed 数据污染。 */}
                         <ItemThumb
-                          uri={item.wardrobeImageUrl || item.image_url}
+                          uri={item.image_url || item.wardrobeImageUrl}
                           category={item.normalizedCategory}
                           imgStyle={styles.gridThumbImg}
                         />
                       </View>
-                      <Text style={styles.gridName} numberOfLines={1}>{item.wardrobeName || item.name}</Text>
+                      <Text style={styles.gridName} numberOfLines={1}>{item.name}</Text>
                       <Text style={styles.gridMeta} numberOfLines={1}>{item.normalizedCategory} · {item.color}</Text>
                     </TouchableOpacity>
                   );

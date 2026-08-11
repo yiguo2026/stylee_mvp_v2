@@ -8,11 +8,15 @@ key 到位后,换成 DeepseekProvider / QwenProvider 即出真审美结果,pipel
 """
 from __future__ import annotations
 
+from copy import deepcopy
+from itertools import product
+
 from ..contracts import (
     Category,
     Formality,
     GapSuggestion,
     InputMode,
+    LayerRole,
     Outfit,
     OutfitItemRef,
     RequestContext,
@@ -20,7 +24,8 @@ from ..contracts import (
     Slot,
     WardrobeItem,
 )
-from ..constraints import CandidatePool, covers_bottom
+from ..constraints import CandidatePool, covers_bottom, validate_outfit_result
+from ..outfit_policy import build_constraint_policy
 from .base import LLMProvider
 
 
@@ -43,6 +48,7 @@ def _gap_desc(slot: Slot) -> tuple[Category, str]:
         Slot.TORSO: (Category.TOP, "百搭基础上衣"),
         Slot.BOTTOM: (Category.BOTTOM, "直筒长裤"),
         Slot.FEET: (Category.SHOES, "小白鞋"),
+        Slot.OUTER: (Category.OUTERWEAR, "基础保暖外套"),
     }.get(slot, (Category.TOP, "基础单品"))
 
 
@@ -91,82 +97,104 @@ class MockProvider(LLMProvider):
     # ----- B3 -----
     def generate_outfits(self, ctx, scene, pool: CandidatePool, exemplars, k) -> list[Outfit]:
         torsos = pool.get(Slot.TORSO)
-        tops = [i for i in torsos if not covers_bottom(i)]
-        dresses = [i for i in torsos if covers_bottom(i)]
         bottoms = pool.get(Slot.BOTTOM)
         shoes = pool.get(Slot.FEET)
         outers = pool.get(Slot.OUTER)
-        accs = pool.get(Slot.ACCESSORY)
-
-        # 上身候选 = 上装 + 连衣裙,轮转保证多样
-        torso_choices = tops + dresses
-        outfits: list[Outfit] = []
         exemplar_style = ""
         if exemplars:
             exemplar_style = "、".join(exemplars[0].get("style_keywords", [])[:2])
 
-        for i in range(k):
-            items: list[OutfitItemRef] = []
-            style_tags: set[str] = set()
-            picked: list[WardrobeItem] = []
+        # Mock 同样受生产校验约束：穷举小候选池，保留合法模板后再按需循环填满 k。
+        # 这样评测测到的是 prompt/管线质量，而不是旧轮转器制造的已知非法草稿。
+        torso_choices: list[WardrobeItem | None] = list(torsos) or [None]
+        shoe_choices: list[WardrobeItem | None] = list(shoes) or [None]
+        if pool.band.outer_required:
+            outer_choices: list[WardrobeItem | None] = list(outers) or [None]
+        else:
+            outer_choices = [None, *outers]
 
-            # 上身(含连衣裙判定)
-            if torso_choices:
-                t = torso_choices[i % len(torso_choices)]
-                items.append(OutfitItemRef(role=Slot.TORSO, ref=t.id, owned=True))
-                picked.append(t)
-                style_tags.update(t.style_tags)
-                is_dress = covers_bottom(t)
-            else:
-                cat, desc = _gap_desc(Slot.TORSO)
-                items.append(OutfitItemRef(role=Slot.TORSO, owned=False,
-                             suggest=GapSuggestion(cat, desc, f"衣橱缺{scene.vibe}的上身")))
-                is_dress = False
+        idx = {item.id: item for item in ctx.wardrobe}
+        policy = build_constraint_policy(ctx, scene)
+        templates: list[Outfit] = []
+        for torso in torso_choices:
+            is_dress = bool(torso and covers_bottom(torso))
+            bottom_choices: list[WardrobeItem | None] = (
+                [None] if is_dress else (list(bottoms) or [None])
+            )
+            for bottom, shoe, outer in product(bottom_choices, shoe_choices, outer_choices):
+                items: list[OutfitItemRef] = []
+                picked: list[WardrobeItem] = []
 
-            # 下身(连衣裙则跳过)
-            if not is_dress:
-                if bottoms:
-                    b = bottoms[i % len(bottoms)]
-                    items.append(OutfitItemRef(role=Slot.BOTTOM, ref=b.id, owned=True))
-                    picked.append(b)
-                    style_tags.update(b.style_tags)
+                if torso:
+                    items.append(OutfitItemRef(
+                        role=Slot.TORSO,
+                        ref=torso.id,
+                        owned=True,
+                        layer_role=LayerRole.BASE,
+                    ))
+                    picked.append(torso)
                 else:
-                    cat, desc = _gap_desc(Slot.BOTTOM)
-                    items.append(OutfitItemRef(role=Slot.BOTTOM, owned=False,
-                                 suggest=GapSuggestion(cat, desc, "衣橱缺合适下装")))
+                    cat, desc = _gap_desc(Slot.TORSO)
+                    items.append(OutfitItemRef(
+                        role=Slot.TORSO,
+                        owned=False,
+                        layer_role=LayerRole.BASE,
+                        suggest=GapSuggestion(cat, desc, f"衣橱缺{scene.vibe}的上身"),
+                    ))
 
-            # 鞋
-            if shoes:
-                s = shoes[i % len(shoes)]
-                items.append(OutfitItemRef(role=Slot.FEET, ref=s.id, owned=True))
-                picked.append(s)
-                style_tags.update(s.style_tags)
-            else:
-                cat, desc = _gap_desc(Slot.FEET)
-                items.append(OutfitItemRef(role=Slot.FEET, owned=False,
-                             suggest=GapSuggestion(cat, desc, "衣橱缺合脚的鞋")))
+                if not is_dress:
+                    if bottom:
+                        items.append(OutfitItemRef(
+                            role=Slot.BOTTOM, ref=bottom.id, owned=True,
+                        ))
+                        picked.append(bottom)
+                    else:
+                        cat, desc = _gap_desc(Slot.BOTTOM)
+                        items.append(OutfitItemRef(
+                            role=Slot.BOTTOM,
+                            owned=False,
+                            suggest=GapSuggestion(cat, desc, "衣橱缺合适下装"),
+                        ))
 
-            # 外套:冷天必加;否则隔套加一件做层次
-            if outers and (pool.band.outer_required or i % 2 == 1):
-                o = outers[i % len(outers)]
-                items.append(OutfitItemRef(role=Slot.OUTER, ref=o.id, owned=True))
-                picked.append(o)
-                style_tags.update(o.style_tags)
+                if shoe:
+                    items.append(OutfitItemRef(role=Slot.FEET, ref=shoe.id, owned=True))
+                    picked.append(shoe)
+                else:
+                    cat, desc = _gap_desc(Slot.FEET)
+                    items.append(OutfitItemRef(
+                        role=Slot.FEET,
+                        owned=False,
+                        suggest=GapSuggestion(cat, desc, "衣橱缺合脚的鞋"),
+                    ))
 
-            # 配饰:点缀一件
-            if accs:
-                a = accs[i % len(accs)]
-                items.append(OutfitItemRef(role=Slot.ACCESSORY, ref=a.id, owned=True))
-                picked.append(a)
+                if outer:
+                    items.append(OutfitItemRef(
+                        role=Slot.OUTER,
+                        ref=outer.id,
+                        owned=True,
+                        layer_role=LayerRole.OUTER,
+                    ))
+                    picked.append(outer)
+                elif pool.band.outer_required:
+                    cat, desc = _gap_desc(Slot.OUTER)
+                    items.append(OutfitItemRef(
+                        role=Slot.OUTER,
+                        owned=False,
+                        layer_role=LayerRole.OUTER,
+                        suggest=GapSuggestion(cat, desc, "当前温度需要外套"),
+                    ))
 
-            reason = self._reason(scene, picked, exemplar_style, ctx)
-            outfits.append(Outfit(
-                items=items,
-                style_tags=list(style_tags)[:3],
-                occasion=scene.occasions[0] if scene.occasions else "日常",
-                reasoning=reason,
-            ))
-        return outfits
+                candidate = Outfit(
+                    items=items,
+                    occasion=scene.occasions[0] if scene.occasions else "日常",
+                    reasoning=self._reason(scene, picked, exemplar_style, ctx),
+                )
+                if validate_outfit_result(candidate, ctx, scene, idx, policy=policy).valid:
+                    templates.append(candidate)
+
+        if not templates:
+            return []
+        return [deepcopy(templates[i % len(templates)]) for i in range(k)]
 
     @staticmethod
     def _reason(scene, picked, exemplar_style, ctx) -> str:

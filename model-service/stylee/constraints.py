@@ -23,6 +23,14 @@ from .contracts import (
     WardrobeItem,
     Weather,
 )
+from .outfit_policy import (
+    ConstraintPolicy,
+    allowed_styles_for_scene,
+    build_constraint_policy,
+    build_item_facts,
+    has_style_conflict,
+    normalize_style,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -140,64 +148,184 @@ def build_candidate_pool(ctx: RequestContext, scene: SceneSpec) -> CandidatePool
 # ---------------------------------------------------------------------------
 # B4:后置硬校验(对模型生成的整套)
 # ---------------------------------------------------------------------------
-def validate_outfit(outfit: Outfit, ctx: RequestContext, scene: SceneSpec,
-                    item_index: dict[str, WardrobeItem]) -> list[str]:
-    """返回违规原因列表;空列表 = 合法。这是"模型出错也兜得住"的最后一道关。"""
-    errors: list[str] = []
+@dataclass(frozen=True)
+class ValidationIssue:
+    code: str
+    message: str
+    retryable: bool = True
+
+
+@dataclass
+class ValidationResult:
+    errors: list[ValidationIssue] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def valid(self) -> bool:
+        return not self.errors
+
+    @property
+    def error_codes(self) -> list[str]:
+        return [issue.code for issue in self.errors]
+
+
+def validate_outfit_result(
+    outfit: Outfit,
+    ctx: RequestContext,
+    scene: SceneSpec,
+    item_index: dict[str, WardrobeItem],
+    policy: ConstraintPolicy | None = None,
+) -> ValidationResult:
+    """用权威品类和衣橱索引校验整套，返回稳定错误码。"""
+    result = ValidationResult()
+    policy = policy or build_constraint_policy(ctx, scene)
     band = warmth_band(ctx.weather.temp_c)
 
-    owned = [it for it in outfit.items if it.owned]
-    # 1) 引用的 id 必须真实存在(防模型幻觉出不存在的衣服)
-    for it in owned:
-        if not it.ref or it.ref not in item_index:
-            errors.append(f"引用了不存在的单品 id: {it.ref}")
+    def add(code: str, message: str, retryable: bool = True) -> None:
+        if code not in result.error_codes:
+            result.errors.append(ValidationIssue(code, message, retryable))
 
-    # 槽位计数：已有单品信任衣橱里的真实品类；缺口建议必须由 category
-    # 推导槽位，不能信任模型同时生成的 role。否则模型把第二条短裤误标成
-    # accessory 时，会绕过“下装恰好一件”的硬约束。
-    def slot_of(it) -> Slot:
-        if it.owned:
-            return item_index[it.ref].slot if it.ref in item_index else it.role
-        if it.suggest:
-            return CATEGORY_SLOT[it.suggest.category]
-        return it.role
+    def warn(code: str) -> None:
+        if code not in result.warnings:
+            result.warnings.append(code)
 
-    items_by_slot: dict[Slot, list] = {}
-    for it in outfit.items:
-        items_by_slot.setdefault(slot_of(it), []).append(it)
+    owned_refs: list[str] = []
+    categories: list[tuple[object, Category]] = []
+    for ref in outfit.items:
+        if ref.owned:
+            if ref.suggest is not None:
+                add("H_GAP_SOURCE_EXPLICIT", "已有单品不能同时携带 gap")
+            if not ref.ref or ref.ref not in item_index:
+                add("H_OWNED_REF_EXISTS", f"引用了不存在的单品 id: {ref.ref}")
+                continue
+            owned_refs.append(ref.ref)
+            categories.append((ref, item_index[ref.ref].category))
+        else:
+            if ref.ref or ref.suggest is None:
+                add("H_GAP_SOURCE_EXPLICIT", "建议单品必须 owned=false 且提供 gap")
+                continue
+            categories.append((ref, ref.suggest.category))
 
-    has_dress = any(
-        (it.owned and it.ref in item_index and covers_bottom(item_index[it.ref]))
-        or (not it.owned and it.suggest and it.suggest.category == Category.DRESS)
-        for it in outfit.items
-    )
+    if len(owned_refs) != len(set(owned_refs)):
+        add("H_OWNED_REF_UNIQUE", "同一已有单品不能在一套中重复出现")
 
-    # 2) 槽位逻辑
-    n_torso = len(items_by_slot.get(Slot.TORSO, []))
-    n_bottom = len(items_by_slot.get(Slot.BOTTOM, []))
-    n_feet = len(items_by_slot.get(Slot.FEET, []))
-    n_outer = len(items_by_slot.get(Slot.OUTER, []))
+    def count(category: Category) -> int:
+        return sum(1 for _, actual in categories if actual == category)
 
-    if n_torso != 1:
-        errors.append(f"上身(TORSO)应恰好 1 件,实为 {n_torso}")
-    if has_dress and n_bottom > 0:
-        errors.append("连衣裙不能再叠下装(两件下身冲突)")
-    if not has_dress and n_bottom != 1:
-        errors.append(f"下身(BOTTOM)应恰好 1 件,实为 {n_bottom}")
+    n_top = count(Category.TOP)
+    n_bottom = count(Category.BOTTOM)
+    n_dress = count(Category.DRESS)
+    n_feet = count(Category.SHOES)
+    n_outer = count(Category.OUTERWEAR)
+    n_bag = count(Category.BAG)
+
+    if n_dress:
+        if n_dress != 1 or n_top or n_bottom:
+            add("H_DRESS_BOTTOM_EXCLUSIVE", "连体装不能再叠上装或普通下装")
+    else:
+        if n_top < 1:
+            add("H_BODY_COVERAGE", f"上身(TORSO)应至少 1 件,实为 {n_top}")
+        if n_bottom != 1:
+            add("H_BODY_COVERAGE", f"下身(BOTTOM)应恰好 1 件,实为 {n_bottom}")
+
     if n_feet != 1:
-        errors.append(f"鞋(FEET)应恰好 1 双,实为 {n_feet}")
+        add("H_FEET_EXACTLY_ONE", f"鞋(FEET)应恰好 1 双,实为 {n_feet}")
+    if n_bag > 1:
+        add("H_BAG_AT_MOST_ONE", f"包至多 1 个,实为 {n_bag}")
+
+    definite_hats = 0
+    for ref, category in categories:
+        if category != Category.HAT:
+            continue
+        if not ref.owned:
+            definite_hats += 1
+            continue
+        facts = build_item_facts(item_index[ref.ref])
+        if facts.definite_hat is True:
+            definite_hats += 1
+        elif facts.definite_hat is None:
+            warn("W_HAT_KIND_UNKNOWN")
+    if definite_hats > 1:
+        add("H_HAT_AT_MOST_ONE", f"帽至多 1 顶,实为 {definite_hats}")
+
+    upper_layers = n_top + n_dress + n_outer
+    if not 1 <= upper_layers <= 3:
+        add("H_UPPER_LAYER_RANGE", f"上身叠穿应为 1-3 层,实为 {upper_layers}")
     if n_outer > 1:
-        errors.append(f"外套(OUTER)至多 1 件,实为 {n_outer}")
+        add("H_OUTER_AT_MOST_ONE", f"外套(OUTER)至多 1 件,实为 {n_outer}")
 
-    # 3) 环境:需要外套的天气却没穿外套
-    if band.outer_required and n_outer == 0:
-        errors.append(f"{ctx.weather.temp_c}°C 需要外套,但这套没有外套")
+    if policy.enforce_weather and policy.enforces("D_WEATHER_COMPAT"):
+        if band.outer_required and n_outer == 0:
+            add("D_WEATHER_COMPAT", f"{ctx.weather.temp_c}°C 需要外套,但这套没有外套")
+        if not band.allow_short_sleeve and n_outer == 0:
+            for ref, category in categories:
+                if category != Category.TOP or not ref.owned:
+                    continue
+                item = item_index[ref.ref]
+                if item.sleeve in (Sleeve.SHORT, Sleeve.NONE):
+                    add("D_WEATHER_COMPAT", "冷天裸穿短/无袖且无外套")
+                    break
 
-    # 4) 环境:裸露短/无袖且无外套盖 + 冷天
-    if not band.allow_short_sleeve and n_outer == 0:
-        for it in items_by_slot.get(Slot.TORSO, []):
-            if it.owned and it.ref in item_index:
-                if item_index[it.ref].sleeve in (Sleeve.SHORT, Sleeve.NONE):
-                    errors.append("冷天裸穿短/无袖且无外套")
+    facts = [build_item_facts(item_index[ref.ref]) for ref, _ in categories
+             if ref.owned and ref.ref in item_index]
+    if any(not fact.color_families for fact in facts) or any(not ref.owned for ref, _ in categories):
+        warn("W_COLOR_UNKNOWN")
+    known_families = frozenset().union(*(fact.color_families for fact in facts)) if facts else frozenset()
+    neutral_families = frozenset().union(*(fact.neutral_families for fact in facts)) if facts else frozenset()
+    chromatic_families = known_families - neutral_families
+    if policy.enforces("D_COLOR_FAMILY_MAX"):
+        if len(chromatic_families) > 3 or len(neutral_families) > 2:
+            add(
+                "D_COLOR_FAMILY_MAX",
+                f"彩色家族至多 3 种且中性色家族至多 2 种,实为 {len(chromatic_families)}/{len(neutral_families)}",
+            )
+    if policy.enforces("D_COLORED_ITEM_MAX"):
+        colored_items = sum(bool(fact.color_families - fact.neutral_families) for fact in facts)
+        if colored_items > 3:
+            add("D_COLORED_ITEM_MAX", f"彩色单品至多 3 件,实为 {colored_items}")
+    if policy.enforces("D_FLUORESCENT_MAX"):
+        fluorescent_items = sum(fact.fluorescent is True for fact in facts)
+        if fluorescent_items > 1:
+            add("D_FLUORESCENT_MAX", f"荧光色单品至多 1 件,实为 {fluorescent_items}")
 
-    return errors
+    formalities = [fact.formality_level for fact in facts if fact.formality_level is not None]
+    if len(formalities) < len(facts) or any(not ref.owned for ref, _ in categories):
+        warn("W_FORMALITY_UNKNOWN")
+    if policy.enforces("D_FORMALITY_SPAN") and formalities:
+        if max(formalities) - min(formalities) > 1:
+            add(
+                "D_FORMALITY_SPAN",
+                f"单品正式度跨度至多 1 级,实为 L{min(formalities)}-L{max(formalities)}",
+            )
+
+    declared_style_list = list(dict.fromkeys(
+        normalized for tag in (
+            outfit.primary_style,
+            outfit.secondary_style,
+            *outfit.style_tags,
+        )
+        if (normalized := normalize_style(tag))
+    ))
+    declared_styles = frozenset(declared_style_list)
+    item_styles = frozenset().union(*(fact.styles for fact in facts)) if facts else frozenset()
+    effective_styles = declared_styles or item_styles
+    if not effective_styles:
+        warn("W_STYLE_UNKNOWN")
+    if policy.enforces("D_SCENE_STYLE_POOL") and declared_styles:
+        allowed = allowed_styles_for_scene(scene)
+        primary = declared_style_list[0]
+        if allowed is not None and primary not in allowed:
+            add("D_SCENE_STYLE_POOL", f"主风格 {primary} 不在当前场景可用风格池")
+    if policy.enforces("D_STYLE_CONFLICT") and has_style_conflict(effective_styles):
+        add("D_STYLE_CONFLICT", "同套包含默认互斥风格")
+
+    return result
+
+
+def validate_outfit(outfit: Outfit, ctx: RequestContext, scene: SceneSpec,
+                    item_index: dict[str, WardrobeItem]) -> list[str]:
+    """兼容旧调用方：只执行原有绝对守门，返回可读错误字符串。"""
+    result = validate_outfit_result(
+        outfit, ctx, scene, item_index, policy=ConstraintPolicy.absolute_only()
+    )
+    return [f"{issue.code}: {issue.message}" for issue in result.errors]

@@ -23,6 +23,16 @@ _STYLE = {"korean": "韩系", "sweet": "甜美", "new_chinese": "新中式", "pr
 _COLOR = {"black": "黑色", "white": "白色", "gray": "灰色", "blue": "蓝色",
           "green": "绿色", "warm": "暖色", "morandi": "莫兰迪", "clash": "撞色"}
 _TEMP = {"temp_hot": 30.0, "temp_warm": 22.0, "temp_cool": 14.0, "temp_cold": 5.0}
+_CONSTRAINT_TRACE_KEYS = (
+    "first_pass_valid",
+    "rejected_by_rule",
+    "query_overridden_rules",
+    "retry_triggered",
+    "retry_candidate_count",
+    "retry_duration_ms",
+    "recommended_gap_count",
+    "fallback_type",
+)
 
 
 def label(tag_id: str) -> str:
@@ -175,9 +185,14 @@ def outfits_to_app(result, ctx) -> dict:
             "recommended_items": rec,
             "comment": o.reasoning or "",
         })
-    return {"outfits": outfits,
-            "trace": {"rag_mode": result.trace.get("rag_mode", "?"),
-                      "pool": result.trace.get("candidate_pool_size", 0)}}
+    trace = {
+        "rag_mode": result.trace.get("rag_mode", "?"),
+        "pool": result.trace.get("candidate_pool_size", 0),
+    }
+    for key in _CONSTRAINT_TRACE_KEYS:
+        if key in result.trace:
+            trace[key] = result.trace[key]
+    return {"outfits": outfits, "trace": trace}
 
 
 def ingest_to_app(res) -> dict:
