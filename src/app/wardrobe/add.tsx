@@ -12,8 +12,9 @@ import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
+import type { GarmentStandardizationResult } from '@/lib/ai';
 import { consumePendingImages } from '@/lib/pendingImages';
-import { uploadWardrobeImage } from '@/lib/uploadImage';
+import { persistGarmentMaster } from '@/lib/uploadImage';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, SleeveLength, DetectedItem, PhotoType } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
@@ -76,11 +77,9 @@ export default function AddWardrobeItem() {
   // Standardization state
   const [photoType, setPhotoType] = useState<PhotoType>('on_body');
   const [recognizedAttrs, setRecognizedAttrs] = useState<Record<string, unknown> | null>(null);
-  const [standardizedUri, setStandardizedUri] = useState<string | null>(null);
+  const [standardizationResult, setStandardizationResult] = useState<GarmentStandardizationResult | null>(null);
   const [stdState, setStdState] = useState<'idle' | 'generating' | 'done' | 'failed'>('idle');
-  const [useStandardized, setUseStandardized] = useState(true);
   const [recognizeMeta, setRecognizeMeta] = useState<AIMeta | null>(null);
-  const [stdMeta, setStdMeta] = useState<AIMeta | null>(null);
 
   const reqTokenRef = useRef(0);
 
@@ -196,8 +195,7 @@ export default function AddWardrobeItem() {
     setBrand(''); setPrice(''); setFitType(''); setSleeveLength(undefined); setSeasons([]);
     setOccasionTags([]); setPurchaseDate('');
     setPhotoType('on_body'); setRecognizedAttrs(null);
-    setStandardizedUri(null); setStdState('idle'); setUseStandardized(true);
-    setStdMeta(null);
+    setStandardizationResult(null); setStdState('idle');
   };
 
   const fillFormFromDetected = (item: DetectedItem): PhotoType => {
@@ -224,19 +222,32 @@ export default function AddWardrobeItem() {
 
   const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string; description?: string }) => {
     setStdState('generating');
-    const { url, meta, skipped } = await aiStandardizeGarment(uri, cat, pt, extras);
+    let result: GarmentStandardizationResult;
+    try {
+      result = await aiStandardizeGarment(uri, cat, pt, extras);
+    } catch (error) {
+      console.warn('[AddWardrobe] aiStandardizeGarment failed:', error);
+      result = {
+        url: null,
+        skipped: false,
+        acceptance: { ok: false, reason: 'missing' },
+        meta: { source: 'model-service/error', durationMs: 0, ok: false },
+      };
+    }
     if (reqTokenRef.current !== token) return;
-    setStdMeta(meta);
-    if (skipped) { setStandardizedUri(null); setUseStandardized(false); setStdState('idle'); }
-    else if (url) { setStandardizedUri(url); setUseStandardized(true); setStdState('done'); }
-    else { setStdState('failed'); }
+    setStandardizationResult(result);
+    if (result.acceptance.ok) {
+      setStdState('done');
+    } else {
+      setStdState('failed');
+      showToast('透明主图生成失败，已保留原图', 'error');
+    }
   };
 
   const runRecognition = async (uri: string) => {
     const token = ++reqTokenRef.current;
     setRecognizing(true);
-    setRecognizeMeta(null); setStdMeta(null);
-    setStandardizedUri(null); setStdState('idle');
+    setRecognizeMeta(null); setStandardizationResult(null); setStdState('idle');
     setDetectedItems([]); setSelectedIndices(new Set()); setShowItemPicker(false);
     try {
       const { items, meta } = await aiDetectMultiItems(uri);
@@ -313,25 +324,33 @@ export default function AddWardrobeItem() {
     setSaving(true);
 
     try {
-      // Determine the image to save
       let finalImageUrl: string | null = null;
-      const usingStandardized = Boolean(useStandardized && standardizedUri);
-      const chosen = usingStandardized ? standardizedUri : imageUri;
-      if (chosen) {
-        finalImageUrl = await uploadWardrobeImage(chosen, user.id, undefined, {
-          persistRemote: usingStandardized,
+      let persistedAttrs = recognizedAttrs ?? undefined;
+      if (imageUri) {
+        const persistedImage = await persistGarmentMaster({
+          sourceUri: imageUri,
+          userId: user.id,
+          photoType,
+          acceptance: standardizationResult?.acceptance
+            ?? { ok: false, reason: 'missing' },
+          diagnostics: standardizationResult?.meta,
         });
-
-        // Never store an expiring provider URL. If copying the standardized
-        // image fails, preserve the import by uploading the original instead.
-        if (!finalImageUrl && usingStandardized && imageUri) {
-          showToast('标准图保存失败，已改用原图', 'error');
-          finalImageUrl = await uploadWardrobeImage(imageUri, user.id);
-        }
-        if (!finalImageUrl) {
+        if (!persistedImage.ok) {
           showToast('图片上传失败，请检查网络后重试', 'error');
           return;
         }
+
+        finalImageUrl = persistedImage.imageUrl;
+        persistedAttrs = {
+          ...(recognizedAttrs ?? {}),
+          ...persistedImage.metadata,
+        };
+        showToast(
+          persistedImage.status === 'transparent_master'
+            ? '已更新为透明主图'
+            : '透明主图生成失败，已保留原图',
+          persistedImage.status === 'transparent_master' ? undefined : 'error',
+        );
       }
 
       const saved = await addItem({
@@ -348,7 +367,7 @@ export default function AddWardrobeItem() {
         occasion_tags: occasionTags.length > 0 ? occasionTags : undefined,
         purchase_date: purchaseDate || undefined,
         image_url: finalImageUrl ?? undefined,
-        ai_recognized_attrs: recognizedAttrs ?? undefined,
+        ai_recognized_attrs: persistedAttrs,
         source_type: imageUri ? 'photo_ai' : 'manual',
         source_label: '相册导入',
         status: 'active',
@@ -367,7 +386,7 @@ export default function AddWardrobeItem() {
     } finally {
       setSaving(false);
     }
-  }, [user, name, category, color, material, brand, price, fitType, sleeveLength, seasons, occasionTags, purchaseDate, imageUri, useStandardized, standardizedUri, recognizedAttrs, addItem]);
+  }, [user, name, category, color, material, brand, price, fitType, sleeveLength, seasons, occasionTags, purchaseDate, imageUri, standardizationResult, photoType, recognizedAttrs, addItem]);
 
   const pickerOptions: Record<PickerField, string[]> = {
     category: CATEGORY_OPTIONS,
@@ -474,7 +493,7 @@ export default function AddWardrobeItem() {
           {imageUri ? (
             <View style={styles.imageContainer}>
               <Image
-                source={{ uri: useStandardized && standardizedUri ? standardizedUri : imageUri }}
+                source={{ uri: standardizationResult?.acceptance.ok ? standardizationResult.acceptance.uri : imageUri }}
                 style={styles.image}
                 resizeMode="contain"
               />
@@ -500,38 +519,34 @@ export default function AddWardrobeItem() {
 
           {stdState === 'done' ? (
             <View style={styles.stdToggleRow}>
-              <TouchableOpacity
-                style={[styles.stdToggleBtn, !useStandardized && styles.stdToggleBtnActive]}
-                onPress={() => setUseStandardized(false)}
-              >
-                <Text style={[styles.stdToggleBtnText, !useStandardized && styles.stdToggleBtnTextActive]}>原图</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.stdToggleBtn, useStandardized && styles.stdToggleBtnActive]}
-                onPress={() => setUseStandardized(true)}
-              >
-                <Text style={[styles.stdToggleBtnText, useStandardized && styles.stdToggleBtnTextActive]}>标准图</Text>
-              </TouchableOpacity>
-              <Text style={styles.stdDoneCaption}>已生成标准图</Text>
+              <Text style={styles.stdDoneCaption}>已更新为透明主图</Text>
             </View>
           ) : null}
           {stdState === 'failed' ? (
             <View style={styles.stdFailedRow}>
-              <Text style={styles.stdFailedCaption}>标准图生成失败</Text>
+              <Text style={styles.stdFailedCaption}>透明主图生成失败，已保留原图</Text>
               <TouchableOpacity
                 style={styles.stdRetryBtn}
                 onPress={() => {
                   if (!imageUri) return;
                   const token = ++reqTokenRef.current;
-                  void runStandardize(imageUri, category, photoType, token, { color, material, description: name });
+                  void runStandardize(imageUri, category, photoType, token, {
+                    color,
+                    material,
+                    description: name,
+                  });
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="重新生成透明主图"
               >
                 <Feather name="refresh-cw" size={13} color={Colors.terracotta} />
                 <Text style={styles.stdRetryBtnText}>重试</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.stdUseOriginalBtn}
-                onPress={() => { setUseStandardized(false); }}
+                onPress={() => setStdState('idle')}
+                accessibilityRole="button"
+                accessibilityLabel="使用原图保存"
               >
                 <Text style={styles.stdUseOriginalBtnText}>用原图保存</Text>
               </TouchableOpacity>
@@ -623,7 +638,7 @@ export default function AddWardrobeItem() {
         ) : null}
 
         {recognizeMeta && <AIResultBanner {...recognizeMeta} />}
-        {stdState !== 'idle' && stdState !== 'generating' && stdMeta && <AIResultBanner {...stdMeta} />}
+        {stdState !== 'idle' && stdState !== 'generating' && standardizationResult && <AIResultBanner {...standardizationResult.meta} />}
 
         {/* Form — only visible when not in item picker mode or after selection */}
         {!showItemPicker ? (

@@ -12,6 +12,7 @@ COPY . /app
 
 RUN useradd --create-home --uid 10001 stylee \
     && chown -R stylee:stylee /app
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 USER stylee
 
 EXPOSE 10000

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, Image, TouchableOpacity,
+  View, Text, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -11,6 +11,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { ItemOutfits } from '@/components/ItemOutfits';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
+import { StyleeGarmentMedia } from '@/design-system';
 import { WardrobeItem, RecommendedItem, OCCASION_TAGS } from '@/types';
 
 // Unified add-source labels for display
@@ -91,7 +92,7 @@ export default function ItemDetailScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.imageWrap}>
             {rec.image_url
-              ? <Image source={{ uri: rec.image_url }} style={styles.image} resizeMode="contain" />
+              ? <StyleeGarmentMedia imageUri={rec.image_url} tone="neutral" />
               : <View style={styles.imagePlaceholder}><CategoryIcon category={rec.category} size={80} color={Colors.walnut2} /></View>
             }
           </View>
@@ -172,7 +173,7 @@ export default function ItemDetailScreen() {
         {/* Hero Image */}
         <View style={styles.imageWrap}>
           {item!.image_url
-            ? <Image source={{ uri: item!.image_url }} style={styles.image} resizeMode="contain" />
+            ? <StyleeGarmentMedia imageUri={item!.image_url} tone="neutral" />
             : <View style={styles.imagePlaceholder}><CategoryIcon category={item!.category} size={80} color={Colors.walnut2} /></View>
           }
         </View>
@@ -274,7 +275,6 @@ const styles = StyleSheet.create({
     minHeight: 240, maxHeight: 400, borderRadius: Radius.lg, overflow: 'hidden',
     backgroundColor: Colors.paperCard, ...Shadow.two,
   },
-  image: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
 
   itemName: { ...T.sectionTitle, fontSize: 22 },

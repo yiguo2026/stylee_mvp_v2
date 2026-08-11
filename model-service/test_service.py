@@ -95,8 +95,25 @@ def test_ingest_to_app():
 
 
 def test_std_to_app():
-    assert std_to_app(StandardizedImage(image_ref="http://o/x.png", method="img2img", verified=True)) == {
-        "image_ref": "http://o/x.png", "method": "img2img", "verified": True}
+    assert std_to_app(StandardizedImage(
+        image_ref="data:image/png;base64,AAAA",
+        method="img2img_alpha",
+        verified=True,
+        mime="image/png",
+        background="transparent",
+        alpha_verified=True,
+        matte_provider="pillow-border-connected-v1",
+        failure_stage=None,
+    )) == {
+        "image_ref": "data:image/png;base64,AAAA",
+        "mime": "image/png",
+        "method": "img2img_alpha",
+        "verified": True,
+        "background": "transparent",
+        "alpha_verified": True,
+        "matte_provider": "pillow-border-connected-v1",
+        "failure_stage": None,
+    }
 
 
 def test_normalize_multi_item_contract():
@@ -117,7 +134,7 @@ import threading
 import urllib.error
 import urllib.request
 from stylee.providers import ProviderTimeoutError
-from stylee.service.server import run_server
+from stylee.service.server import _photo_type, run_server
 from stylee.service import gamma as gamma_service
 
 
@@ -137,6 +154,10 @@ def _post(url, payload, request_id=None):
 def _get(url):
     with urllib.request.urlopen(url, timeout=10) as r:
         return r.status, _json.loads(r.read().decode())
+
+
+def test_standardize_request_normalizes_legacy_flat_lay_to_flatlay():
+    assert _photo_type("flat_lay") == PhotoType.FLATLAY
 
 
 def test_server_smoke():
@@ -184,11 +205,18 @@ def test_server_smoke():
 
         st, b = _post(base + "/standardize",
                       {"image_url": "mock://x", "photo_type": "flatlay", "item": {"category": "上装"}})
-        assert st == 200 and b["method"] == "cutout"
+        assert st == 200 and b["method"] == "cutout_alpha"
+        assert b["image_ref"].startswith("data:image/png;base64,")
+        assert b["mime"] == "image/png" and b["background"] == "transparent"
+        assert b["verified"] is True and b["alpha_verified"] is True
+        assert b["matte_provider"] == "mock-alpha-matte-v1" and b["failure_stage"] is None
 
         st, b = _post(base + "/standardize",
                       {"image_url": "mock://x", "photo_type": "flat", "item": {"category": "上装"}})
-        assert st == 200 and b["method"] == "cutout"
+        assert st == 200 and b["method"] == "cutout_alpha"
+        assert b["image_ref"].startswith("data:image/png;base64,")
+        assert b["mime"] == "image/png" and b["background"] == "transparent"
+        assert b["verified"] is True and b["alpha_verified"] is True
 
         st, b = _post(base + "/recommend", {
             "input_mode": "nl", "query": "周末约会", "n": 2,
@@ -298,6 +326,7 @@ def main():
     test_ingest_to_app()
     test_std_to_app()
     test_normalize_multi_item_contract()
+    test_standardize_request_normalizes_legacy_flat_lay_to_flatlay()
     test_server_smoke()
     print("ok")
 

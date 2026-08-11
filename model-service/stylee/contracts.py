@@ -254,10 +254,15 @@ class RecommendationResult:
 
 @dataclass
 class StandardizedImage:
-    """触点 A 的标准化展示图。method: cutout|img2img|cropped_fallback。"""
+    """触点 A 的透明标准图或显式原图回退。"""
     image_ref: str
     method: str
     verified: bool = False
+    mime: str = ""
+    background: str = ""
+    alpha_verified: bool = False
+    matte_provider: str = ""
+    failure_stage: str | None = None
 
 
 @dataclass

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Image, ScrollView, ActivityIndicator, SafeAreaView,
+  ScrollView, ActivityIndicator, SafeAreaView,
   Animated, Modal, FlatList, Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -24,6 +24,7 @@ import { AIResultBanner } from '@/components/AIResultBanner';
 import {
   ds,
   StyleeButton,
+  StyleeGarmentMedia,
   StyleeInlineStatus,
   StyleeNavigationBar,
   StyleeOutfitItemCard,
@@ -546,7 +547,7 @@ export default function OutfitResultScreen() {
     <View key={fi.id} style={styles.flatlayTopWrap}>
       <View style={[styles.flatlayTopShape, !fi.image_url && { backgroundColor: Colors.paperCard }]}>
         {fi.image_url ? (
-          <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
+          <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
         ) : (
           <View style={styles.flatlayGarmentInner}>
             <CategoryIcon category={fi.category} size={30} color={Colors.walnut2} />
@@ -586,7 +587,7 @@ export default function OutfitResultScreen() {
                   <View key={fi.id} style={styles.flatlayBottomWrap}>
                     <View style={[styles.flatlayBottomShape, !fi.image_url && { backgroundColor: Colors.ink }]}>
                       {fi.image_url ? (
-                        <Image source={{ uri: fi.image_url }} style={styles.flatlayGarmentImg} resizeMode="cover" />
+                        <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
                       ) : (
                         <View style={styles.flatlayGarmentInner}>
                           <CategoryIcon category={fi.category} size={30} color={Colors.paper} />
@@ -603,7 +604,7 @@ export default function OutfitResultScreen() {
                       <View key={fi.id} style={styles.flatlayShoeWrap}>
                         <View style={styles.flatlayShoeShape}>
                           {fi.image_url ? (
-                            <Image source={{ uri: fi.image_url }} style={styles.flatlayShoeImg} resizeMode="cover" />
+                            <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
                           ) : (
                             <CategoryIcon category={fi.category} size={28} color={Colors.walnut2} />
                           )}
@@ -620,7 +621,7 @@ export default function OutfitResultScreen() {
                     <View key={fi.id} style={styles.flatlaySideItem}>
                       <View style={styles.flatlaySideCircle}>
                         {fi.image_url ? (
-                          <Image source={{ uri: fi.image_url }} style={styles.flatlaySideImg} resizeMode="cover" />
+                          <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
                         ) : (
                           <CategoryIcon category={fi.category} size={24} color={Colors.walnut2} />
                         )}
@@ -654,13 +655,9 @@ export default function OutfitResultScreen() {
                   showOwnership={recommendedItems.length > 0}
                   adjustMode={adjustMode}
                   onPress={() => handleItemTap(oi)}
-                  media={
-                    oi.item?.image_url ? (
-                      <Image source={{ uri: oi.item.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
-                    ) : (
-                      <CategoryIcon category={oi.item?.category ?? ''} size={26} color={Colors.walnut2} />
-                    )
-                  }
+                  imageUri={oi.item?.image_url}
+                  mediaTone="owned"
+                  media={<CategoryIcon category={oi.item?.category ?? ''} size={26} color={ds.color.semantic.text.tertiary} />}
                 />
               ))}
               {recommendedItems.map((rec, idx) => {
@@ -672,13 +669,9 @@ export default function OutfitResultScreen() {
                     name={rec.name}
                     ownership="missing"
                     loading={addingRecIdx === idx}
-                    media={
-                      rec.image_url ? (
-                        <Image source={{ uri: rec.image_url }} style={styles.gridThumbImg} resizeMode="cover" />
-                      ) : (
-                        <CategoryIcon category={rec.category} size={26} color={Colors.walnut2} />
-                      )
-                    }
+                    imageUri={rec.image_url}
+                    mediaTone="recommended"
+                    media={<CategoryIcon category={rec.category} size={26} color={ds.color.semantic.text.tertiary} />}
                     actions={
                       <>
                         <TouchableOpacity style={styles.recAddBtn} activeOpacity={0.7}
@@ -759,7 +752,9 @@ export default function OutfitResultScreen() {
                   renderItem={({ item }) => (
                     <TouchableOpacity style={styles.swapOption} onPress={() => confirmSwap(item)}>
                       {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={styles.swapOptionImage} resizeMode="cover" />
+                        <View style={[styles.swapOptionImage, styles.garmentMediaClip]}>
+                          <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
+                        </View>
                       ) : (
                         <View style={styles.swapOptionPlaceholder}>
                           <CategoryIcon category={item.category} size={28} color={Colors.walnut2} />
@@ -791,7 +786,9 @@ export default function OutfitResultScreen() {
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.swapOption} onPress={() => confirmSwap(item)}>
                     {item.image_url ? (
-                      <Image source={{ uri: item.image_url }} style={styles.swapOptionImage} resizeMode="cover" />
+                      <View style={[styles.swapOptionImage, styles.garmentMediaClip]}>
+                        <StyleeGarmentMedia imageUri={item.image_url} tone="owned" />
+                      </View>
                     ) : (
                       <View style={styles.swapOptionPlaceholder}>
                         <CategoryIcon category={item.category} size={28} color={Colors.walnut2} />
@@ -857,7 +854,6 @@ const styles = StyleSheet.create({
   flatlayTopShape: { width: 140, height: 80, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   flatlayBottomWrap: { alignItems: 'center', gap: 4 },
   flatlayBottomShape: { width: 160, height: 120, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlayGarmentImg: { width: '100%', height: '100%' },
   flatlayGarmentInner: { alignItems: 'center', gap: 2 },
   flatlayGarmentLabel: { fontSize: 10, opacity: 0.7, color: '#fff', textAlign: 'center' },
   flatlayEmoji: { fontSize: 24, textAlign: 'center' },
@@ -865,11 +861,9 @@ const styles = StyleSheet.create({
   flatlayShoesRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.three },
   flatlayShoeWrap: { alignItems: 'center', gap: 4 },
   flatlayShoeShape: { width: 60, height: 36, borderRadius: 18, backgroundColor: Colors.paperCard, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlayShoeImg: { width: '100%', height: '100%' },
   flatlaySide: { width: 64, alignItems: 'center', gap: Spacing.three, paddingTop: Spacing.two },
   flatlaySideItem: { alignItems: 'center', gap: 4 },
   flatlaySideCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.signalSoft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlaySideImg: { width: '100%', height: '100%', borderRadius: 26 },
   flatlaySideEmoji: { fontSize: 20, textAlign: 'center' },
   flatlaySideName: { fontSize: 10, color: Colors.walnut2, textAlign: 'center', maxWidth: 60 },
   flatlayEmpty: { padding: Spacing.five, alignItems: 'center' },
@@ -925,7 +919,6 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 1.25, borderRadius: 10, overflow: 'hidden',
     backgroundColor: Colors.signalSoft, alignItems: 'center', justifyContent: 'center',
   },
-  gridThumbImg: { width: '100%', height: '100%' },
   gridName: { fontFamily: Fonts.ui, fontSize: 12, color: Colors.ink, textAlign: 'center', marginTop: 4 },
   badgeOwned: { position: 'absolute', top: 6, right: 8, zIndex: 2, fontSize: 10, color: Colors.walnut2 },
   badgeRec: { position: 'absolute', top: 6, right: 8, zIndex: 2, fontSize: 10, color: Colors.terracotta, fontFamily: Fonts.uiSemiBold },
@@ -972,6 +965,7 @@ const styles = StyleSheet.create({
   swapGrid: { padding: Spacing.three, gap: Spacing.two },
   swapOption: { flex: 1, margin: Spacing.one, alignItems: 'center', gap: 4 },
   swapOptionImage: { width: '100%', aspectRatio: 1, borderRadius: Radius.md },
+  garmentMediaClip: { overflow: 'hidden' },
   swapOptionPlaceholder: { width: '100%', aspectRatio: 1, borderRadius: Radius.md, backgroundColor: Colors.paperCard, alignItems: 'center', justifyContent: 'center' },
   swapOptionName: { ...T.micro, textAlign: 'center' },
 

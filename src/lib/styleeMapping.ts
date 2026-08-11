@@ -18,7 +18,18 @@ export interface RecognizeManyResp {
   provider?: string;
   trace?: ModelServiceTrace;
 }
-export interface StandardizeResp { image_ref: string; method: string; verified: boolean; provider?: string; }
+export interface StandardizeResp {
+  image_ref: string;
+  method: string;
+  verified: boolean;
+  mime?: string;
+  background?: string;
+  alpha_verified?: boolean;
+  matte_provider?: string;
+  failure_stage?: string | null;
+  provider?: string;
+  trace?: ModelServiceTrace;
+}
 export interface ModelServiceTrace {
   request_id?: string;
   duration_ms?: number;
@@ -54,7 +65,7 @@ export type RecommendContext = {
 
 /** Normalize legacy/client aliases to the model-service PhotoType contract. */
 export function normalizePhotoType(value?: string | null): PhotoType {
-  if (value === 'flat' || value === 'flatlay') return 'flatlay';
+  if (value === 'flat' || value === 'flat_lay' || value === 'flatlay') return 'flatlay';
   if (value === 'product' || value === 'web') return 'web';
   if (value === 'angled') return 'angled';
   return 'on_body';

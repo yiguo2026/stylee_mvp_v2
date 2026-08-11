@@ -21,7 +21,8 @@ from .contracts import (
     StandardizedImage,
     WardrobeItem,
 )
-from .vision.base import ImageStandardizer, VisionProvider
+from .vision.base import AlphaMatteProcessor, ImageRefSource, ImageStandardizer, VisionProvider
+from .vision.alpha_matte import AlphaMatteError, AlphaMatteOutput
 from .vision.dashscope import VisionError
 
 
@@ -144,33 +145,93 @@ def mode_for(photo_type: PhotoType) -> str:
 
 def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
                      provider: VisionProvider, standardizer: ImageStandardizer,
+                     matte_processor: AlphaMatteProcessor,
                      stage_timer: Callable[[str], ContextManager[None]] | None = None,
                      on_fallback: Callable[[str, BaseException], None] | None = None,
                      ) -> StandardizedImage:
-    """A2:按 photo_type 路由生成标准化图 → 回验漂移 → 失败/漂移回退原图。"""
-    mode = mode_for(photo_type)
-    edit_error = None
-    with stage_timer("A2.image_edit") if stage_timer else nullcontext():
-        try:
-            result_url = standardizer.standardize(image_url, item, mode)
-        except Exception as error:
-            edit_error = error
-            result_url = ""
-    if edit_error is not None:
+    """A2:透明化优先，必要时白底准备后透明化，再对透明 PNG 回验。"""
+    first_failed_stage: str | None = None
+
+    def record_failure(stage: str, error: BaseException) -> None:
+        nonlocal first_failed_stage
+        if first_failed_stage is None:
+            first_failed_stage = stage
         if on_fallback:
-            on_fallback("A2.image_edit", edit_error)
-        return StandardizedImage(image_ref=image_url, method="cropped_fallback", verified=False)
+            on_fallback(stage, error)
+
+    def terminal_failure() -> StandardizedImage:
+        return StandardizedImage(
+            image_ref=image_url,
+            method="cropped_fallback",
+            verified=False,
+            alpha_verified=False,
+            matte_provider=matte_processor.name,
+            failure_stage=first_failed_stage,
+        )
+
+    def apply_matte(
+        image_ref: str,
+        source: ImageRefSource,
+        failure_stage: str | None = None,
+    ) -> AlphaMatteOutput | None:
+        try:
+            output = matte_processor.process(image_ref, stage_timer=stage_timer, source=source)
+            if not output.alpha_verified:
+                raise AlphaMatteError("A2.alpha_validate", "matte output was not alpha verified")
+            return output
+        except Exception as error:
+            stage = failure_stage or getattr(error, "stage", "A2.alpha_matte")
+            record_failure(stage, error)
+            return None
+
+    method: str
+    matte_output: AlphaMatteOutput | None = None
+    if photo_type == PhotoType.WEB:
+        matte_output = apply_matte(
+            image_url, ImageRefSource.CLIENT, "A2.direct_matte",
+        )
+        method = "direct_matte"
+
+    if matte_output is None:
+        mode = mode_for(photo_type)
+        edit_error = None
+        with stage_timer("A2.image_edit") if stage_timer else nullcontext():
+            try:
+                prepared_ref = standardizer.standardize(image_url, item, mode)
+            except Exception as error:
+                edit_error = error
+                prepared_ref = ""
+        if edit_error is not None:
+            record_failure("A2.image_edit", edit_error)
+            return terminal_failure()
+
+        matte_output = apply_matte(prepared_ref, ImageRefSource.PROVIDER_OUTPUT)
+        if matte_output is None:
+            return terminal_failure()
+        method = "cutout_alpha" if mode == "cutout" else "img2img_alpha"
 
     expected = {"category": item.category.value, "colors": item.colors}
     verify_error = None
     with stage_timer("A2.visual_verify") if stage_timer else nullcontext():
         try:
-            vres = provider.verify(result_url, expected)
+            vres = provider.verify(matte_output.data_uri, expected)
         except Exception as error:
             verify_error = error
             vres = {"drift": True, "reason": "verify failed"}
-    if verify_error is not None and on_fallback:
-        on_fallback("A2.visual_verify", verify_error)
+    if verify_error is not None:
+        record_failure("A2.visual_verify", verify_error)
+    elif vres.get("drift"):
+        record_failure("A2.visual_verify", VisionError(str(vres.get("reason") or "visual drift")))
     if vres.get("drift"):
-        return StandardizedImage(image_ref=image_url, method="cropped_fallback", verified=False)
-    return StandardizedImage(image_ref=result_url, method=mode, verified=True)
+        return terminal_failure()
+
+    return StandardizedImage(
+        image_ref=matte_output.data_uri,
+        method=method,
+        verified=True,
+        mime=matte_output.mime,
+        background="transparent",
+        alpha_verified=True,
+        matte_provider=matte_output.provider,
+        failure_stage=None,
+    )

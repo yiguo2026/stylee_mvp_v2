@@ -10,7 +10,7 @@ import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
-import { uploadWardrobeImage } from '@/lib/uploadImage';
+import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Toast } from '@/components/Toast';
@@ -131,35 +131,77 @@ export default function EditItemScreen() {
     if (result.canceled || !result.assets[0]) return;
 
     const localUri = result.assets[0].uri;
+    if (!shouldPersistReplacementImage(localUri)) return;
     setImageUri(localUri); // 立即预览
     setStandardizing(true);
 
-    let finalUrl = localUri;
-    let standardized = false;
+    let finalUrl = item.image_url ?? '';
+    let shouldRecognizeReplacement = false;
     try {
-      const { url } = await aiStandardizeGarment(localUri, category, 'flat_lay', {
-        color, material, description: name || item.name,
+      const standardizationResult = await aiStandardizeGarment(localUri, category, 'flatlay', {
+        color,
+        material,
+        description: name || item.name,
+      }).catch((error) => {
+        console.warn('[EditItem] aiStandardizeGarment failed:', error);
+        return {
+          url: null,
+          skipped: false as const,
+          acceptance: { ok: false as const, reason: 'missing' as const },
+          meta: {
+            source: 'model-service/error',
+            durationMs: 0,
+            ok: false,
+            requestId: undefined,
+            failedStage: undefined,
+          },
+        };
       });
-      if (url) {
-        // 标准化成功，上传标准图
-        const uploaded = await uploadWardrobeImage(url, item.user_id, undefined, { persistRemote: true, timeoutMs: 45000 });
-        if (uploaded) { finalUrl = uploaded; standardized = true; }
+
+      const persistedImage = await persistGarmentMaster({
+        sourceUri: localUri,
+        userId: item.user_id,
+        photoType: 'flatlay',
+        acceptance: standardizationResult.acceptance,
+        diagnostics: standardizationResult.meta,
+      });
+      if (!persistedImage.ok) {
+        setImageUri(finalUrl);
+        showToast('图片上传失败，请检查网络后重试');
+        return;
       }
-      if (!standardized) {
-        // 标准化失败或上传失败，用原图上传
-        const uploaded = await uploadWardrobeImage(localUri, item.user_id);
-        if (uploaded) finalUrl = uploaded;
-      }
+      finalUrl = persistedImage.imageUrl;
       setImageUri(finalUrl);
-      await updateItem(item.item_id, { image_url: finalUrl });
-      showToast(standardized ? '已更新为标准图' : '图片标准化未成功，已使用原图');
+      await updateItem(item.item_id, {
+        image_url: finalUrl,
+        ai_recognized_attrs: {
+          ...(item.ai_recognized_attrs ?? {}),
+          ...persistedImage.metadata,
+        },
+      });
+
+      const committedItem = useWardrobeStore.getState().items.find(
+        (candidate) => candidate.item_id === item.item_id,
+      );
+      if (committedItem?.image_url !== finalUrl) {
+        setImageUri(item.image_url ?? '');
+        showToast('图片保存失败，请重试');
+        return;
+      }
+
+      shouldRecognizeReplacement = true;
+      showToast(
+        persistedImage.status === 'transparent_master'
+          ? '已更新为透明主图'
+          : '透明主图生成失败，已保留原图',
+      );
     } catch (e) {
       console.warn('[EditItem] pickMainImage error:', e);
-      setImageUri(localUri);
-      showToast('换图处理失败，已使用原图');
+      setImageUri(item.image_url ?? '');
+      showToast('图片保存失败，请重试');
     } finally {
       setStandardizing(false);
-      void runRecognition(finalUrl);
+      if (shouldRecognizeReplacement) void runRecognition(finalUrl);
     }
   };
 

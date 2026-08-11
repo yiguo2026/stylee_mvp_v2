@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from ..contracts import WardrobeItem
 
@@ -30,4 +31,24 @@ class ImageStandardizer(ABC):
     @abstractmethod
     def standardize(self, image_url: str, item: WardrobeItem, mode: str) -> str:
         """以原图为条件生成标准化展示图,返回结果图 url。mode ∈ {cutout, img2img}。"""
+        raise NotImplementedError
+
+
+class ImageRefSource(str, Enum):
+    """Trust boundary for alpha-matte image references."""
+
+    CLIENT = "client"
+    PROVIDER_OUTPUT = "provider_output"
+
+
+class AlphaMatteProcessor(ABC):
+    name: str
+
+    @abstractmethod
+    def process(
+        self,
+        image_ref: str,
+        stage_timer=None,
+        source: ImageRefSource = ImageRefSource.CLIENT,
+    ):
         raise NotImplementedError

@@ -33,6 +33,7 @@ Always pull after first connecting. For later design updates:
 - `StyleeIconButton`
 - `StyleeStatusBadge`
 - `StyleeInlineStatus`
+- `StyleeGarmentMedia`
 - `StyleeOutfitItemCard`
 - `StyleeNavigationBar`
 - `StyleeStickyDecisionBar`
@@ -43,6 +44,38 @@ Always pull after first connecting. For later design updates:
 - `StyleeWardrobeGrid`
 - Existing app Tab Bar and Toast retain the v3.7 semantic foundation.
 - Choice chips, four-level typography, and wardrobe density form the v3.8 release slice.
+
+## Garment media
+
+`StyleeGarmentMedia` is the shared semantic surface for garment imagery. It
+accepts a URI or React Native image source, always renders images with
+`resizeMode="contain"`, and supports overlays through `children`.
+
+Use `neutral`, `owned`, `recommended`, or `inverse` tones instead of assigning
+media background colors in consumers. The consumer continues to own aspect
+ratio, radius, clipping, and all other geometry.
+
+New or replaced garment images use a verified transparent PNG master. The
+service contract requires `verified=true`, `alpha_verified=true`,
+`background=transparent`, `mime=image/png`, and a PNG data URI; the App rejects
+anything else and limits the data URI to 12 MiB. Service processing uses Pillow
+12.3.0 with a 20 MiB encoded-input limit, a 16,000,000-pixel decoded limit, a
+1600 px longest processing edge, and an 8 MiB encoded-PNG output limit.
+
+Scene backgrounds are semantic presentation, not exported garment pixels:
+
+- `neutral`: standalone wardrobe and detail media;
+- `owned`: garments the user owns in outfit and try-on contexts;
+- `recommended`: missing or proposed garments;
+- `inverse`: inverse/contrast presentation where the scene requires it.
+
+Do not infer a surface from image pixels or bake a white/colored canvas into a
+new master. Existing historical white-background or opaque images remain
+untouched: there is no bulk migration, background variant, or database
+migration. The same semantic surfaces must continue to render those historical
+assets safely. Persistence success copy is exactly `已更新为透明主图`; rejected
+or failed standardization preserves the original and uses exactly
+`透明主图生成失败，已保留原图`.
 
 ## Engineering rules
 
@@ -105,6 +138,26 @@ Run `npm run wardrobe-density:check` after any wardrobe card, grid, header,
 search, choice-chip, or Tab Bar change. Use the account-independent visual
 preview documented in `docs/STYLEE_DESIGN_SYSTEM_V3_8_MIGRATION.md` for manual
 multi-size review.
+
+Before release, modify and test the canonical `style-model` repository first,
+sync its governed files into `model-service/`, then run:
+
+```bash
+./scripts/check-model-service-sync.sh /Users/bytedance/Documents/style-model
+node --test src/lib/*.test.ts src/design-system/*.test.ts
+npm run tokens:check
+npm run design-system:check
+npm run wardrobe-density:check
+npm run check
+npm run build:web
+```
+
+At 320, 375, 393, 430, and 768 pt, inspect wardrobe grid/detail, outfit result,
+swap selection, and try-on thumbnails. Preserve existing density, `contain`,
+44 x 44 pt minimum touch targets, and historical-image compatibility. A real
+service release also requires approved white and patterned samples inspected on
+`neutral`, `inverse`, and `recommended`; automated guards do not replace that
+visual gate.
 
 ## Migration order
 

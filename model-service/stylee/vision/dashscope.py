@@ -28,8 +28,8 @@ class VisionError(RuntimeError):
 
 
 _EDIT_PROMPTS = {
-    "cutout": "去掉背景,把这件衣物单独放到纯白背景上,平铺商品图,保留原本的颜色、材质和图案。",
-    "img2img": "以这张图里的衣物为准,重绘成干净的纯白背景平铺商品图,保留颜色、材质、版型和图案,不要人物。",
+    "cutout": "去掉背景,把这件衣物单独放到均匀纯白 #FFFFFF 背景，无投影、无地面、无人物、无文字的平铺商品图中,保留颜色、材质、轮廓和印花。",
+    "img2img": "以这张图里的衣物为准,重绘成均匀纯白 #FFFFFF 背景，无投影、无地面、无人物、无文字的平铺商品图,保留颜色、材质、轮廓和印花，并保留版型。",
 }
 
 _MM_URL_PATH = "/services/aigc/multimodal-generation/generation"

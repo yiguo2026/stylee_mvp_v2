@@ -2,7 +2,7 @@ from stylee.vision.prompts import (
     build_recognize_messages, parse_recognize_json,
     build_verify_messages, parse_verify_json,
 )
-from stylee.vision.base import VisionProvider, ImageStandardizer
+from stylee.vision.base import ImageRefSource, VisionProvider, ImageStandardizer
 from stylee.contracts import StandardizedImage, IngestResult, WardrobeItem, Category, PhotoType, Sleeve, Fit, Season
 from stylee.ingest import to_data_url, derive_warmth, normalize_attrs, recognize_item, mode_for, standardize_item
 
@@ -113,6 +113,50 @@ class _BoomStd:
     def standardize(self, image_url, item, mode): raise RuntimeError("api down")
 
 
+class _FakeMatte:
+    name = "pillow-border-connected-v1"
+    def __init__(self, fail_first=False):
+        self.refs = []
+        self.fail_first = fail_first
+    def process(self, image_ref, stage_timer=None, source=ImageRefSource.CLIENT):
+        self.refs.append((source, image_ref))
+        if self.fail_first and len(self.refs) == 1:
+            from stylee.vision.alpha_matte import AlphaMatteError
+            raise AlphaMatteError("A2.alpha_validate", "not transparent")
+        from stylee.vision.alpha_matte import AlphaMatteOutput, AlphaStats
+        return AlphaMatteOutput(
+            "data:image/png;base64,AAAA", "image/png", True, self.name,
+            AlphaStats(0.5, 0.5, 1.0, (1, 1, 2, 2)),
+        )
+
+
+def test_web_uses_direct_matte_before_edit():
+    matte = _FakeMatte()
+    item = WardrobeItem(id="i", category=Category.TOP)
+    si = standardize_item("orig://web", item, PhotoType.WEB, _FakeVP({}), _BoomStd(), matte)
+    assert matte.refs == [(ImageRefSource.CLIENT, "orig://web")]
+    assert si.method == "direct_matte" and si.alpha_verified is True
+
+
+def test_web_direct_failure_falls_back_to_edit_then_matte():
+    from stylee.vision.mock import MockImageStandardizer
+    matte = _FakeMatte(fail_first=True)
+    item = WardrobeItem(id="i", category=Category.TOP)
+    si = standardize_item("orig://web", item, PhotoType.WEB, _FakeVP({}), MockImageStandardizer(), matte)
+    assert matte.refs == [
+        (ImageRefSource.CLIENT, "orig://web"),
+        (ImageRefSource.PROVIDER_OUTPUT, "mock://std/img2img"),
+    ]
+    assert si.method == "img2img_alpha" and si.verified is True
+
+
+def test_terminal_failure_never_verifies_white_output():
+    item = WardrobeItem(id="i", category=Category.TOP)
+    si = standardize_item("orig://x", item, PhotoType.FLATLAY, _FakeVP({}), _BoomStd(), _FakeMatte())
+    assert si.verified is False and si.alpha_verified is False
+    assert si.failure_stage == "A2.image_edit"
+
+
 def test_recognize_item_provider_exception_safe():
     fallbacks = []
     res = recognize_item(
@@ -124,7 +168,7 @@ def test_recognize_item_provider_exception_safe():
 
 
 def test_mock_recognize_and_standardize():
-    from stylee.vision.mock import MockVisionProvider, MockImageStandardizer
+    from stylee.vision.mock import MockAlphaMatteProcessor, MockVisionProvider, MockImageStandardizer
     vp = MockVisionProvider()
     raw = vp.recognize("data:image/png;base64,AAAA")
     assert raw["category"] in (c.value for c in Category)
@@ -133,6 +177,8 @@ def test_mock_recognize_and_standardize():
     assert res.item.id == "m1" and res.needs_review is False
     std = MockImageStandardizer().standardize("u", res.item, "cutout")
     assert std == "mock://std/cutout"
+    matte = MockAlphaMatteProcessor().process(std)
+    assert matte.data_uri.startswith("data:image/png;base64,") and matte.alpha_verified is True
 
 
 def test_mode_for():
@@ -145,15 +191,15 @@ def test_standardize_ok_cutout():
     from stylee.vision.mock import MockVisionProvider, MockImageStandardizer
     item = WardrobeItem(id="i", category=Category.TOP)
     si = standardize_item("orig://x", item, PhotoType.FLATLAY,
-                          MockVisionProvider(), MockImageStandardizer())
-    assert si.image_ref == "mock://std/cutout" and si.method == "cutout" and si.verified is True
+                          MockVisionProvider(), MockImageStandardizer(), _FakeMatte())
+    assert si.image_ref == "data:image/png;base64,AAAA" and si.method == "cutout_alpha" and si.verified is True
 
 
 def test_standardize_drift_falls_back():
     from stylee.vision.mock import MockImageStandardizer
     item = WardrobeItem(id="i", category=Category.TOP)
     si = standardize_item("orig://x", item, PhotoType.ON_BODY,
-                          _DriftVP(), MockImageStandardizer())
+                          _DriftVP(), MockImageStandardizer(), _FakeMatte())
     assert si.method == "cropped_fallback" and si.image_ref == "orig://x" and si.verified is False
 
 
@@ -162,7 +208,7 @@ def test_standardize_api_error_falls_back():
     item = WardrobeItem(id="i", category=Category.TOP)
     fallbacks = []
     si = standardize_item(
-        "orig://x", item, PhotoType.WEB, MockVisionProvider(), _BoomStd(),
+        "orig://x", item, PhotoType.FLATLAY, MockVisionProvider(), _BoomStd(), _FakeMatte(),
         on_fallback=lambda stage, error: fallbacks.append((stage, type(error).__name__)),
     )
     assert si.method == "cropped_fallback" and si.image_ref == "orig://x"
@@ -170,8 +216,10 @@ def test_standardize_api_error_falls_back():
 
 
 import os
+import json as _json
+import stylee.vision.dashscope as _dashscope
 from stylee.vision.dashscope import (
-    build_edit_payload, parse_edit_response, VisionError,
+    build_edit_payload, parse_edit_response, VisionError, DashScopeImageStandardizer,
     build_vision_provider, build_image_standardizer,
 )
 from stylee.vision.mock import MockVisionProvider as _MVP
@@ -182,6 +230,43 @@ def test_build_edit_payload():
     msgs = p["input"]["messages"][0]["content"]
     assert p["model"] == "qwen-image-edit"
     assert {"image": "data:img"} in msgs and {"text": "去背"} in msgs
+
+
+def test_standardizer_prompts_preserve_prints_for_every_mode():
+    captured_prompts = []
+
+    class _Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def read(self):
+            return _json.dumps({
+                "output": {"choices": [{"message": {"content": [{"image": "https://example.test/out.png"}]}}]},
+                "usage": {},
+                "request_id": "req-test",
+            }).encode()
+
+    def fake_urlopen(request, timeout):
+        payload = _json.loads(request.data.decode())
+        captured_prompts.append(payload["input"]["messages"][0]["content"][1]["text"])
+        return _Response()
+
+    original_urlopen = _dashscope.urllib.request.urlopen
+    original_log_usage = _dashscope.log_usage
+    _dashscope.urllib.request.urlopen = fake_urlopen
+    _dashscope.log_usage = lambda *args, **kwargs: None
+    try:
+        standardizer = DashScopeImageStandardizer("https://example.test", "key", "qwen-image-edit")
+        item = WardrobeItem(id="i", category=Category.TOP)
+        standardizer.standardize("data:image/png;base64,AAAA", item, "cutout")
+        standardizer.standardize("data:image/png;base64,AAAA", item, "img2img")
+    finally:
+        _dashscope.urllib.request.urlopen = original_urlopen
+        _dashscope.log_usage = original_log_usage
+
+    assert len(captured_prompts) == 2
+    assert all("保留颜色、材质、轮廓和印花" in prompt for prompt in captured_prompts)
 
 
 def test_parse_edit_response_ok_and_bad():
@@ -222,7 +307,11 @@ def main():
     test_standardize_ok_cutout()
     test_standardize_drift_falls_back()
     test_standardize_api_error_falls_back()
+    test_web_uses_direct_matte_before_edit()
+    test_web_direct_failure_falls_back_to_edit_then_matte()
+    test_terminal_failure_never_verifies_white_output()
     test_build_edit_payload()
+    test_standardizer_prompts_preserve_prints_for_every_mode()
     test_parse_edit_response_ok_and_bad()
     test_factories_no_key_fall_back_to_mock()
     print("ok")

@@ -1,4 +1,5 @@
 import type { RecognizeResp, RecognizeManyResp, StandardizeResp, RecommendReq, RecommendResp } from './styleeMapping.ts';
+import { normalizePhotoType } from './styleeMapping.ts';
 
 export const STYLEE_API = process.env.EXPO_PUBLIC_STYLEE_API ?? 'http://127.0.0.1:8000';
 
@@ -143,10 +144,17 @@ export async function serviceStandardize(
   b64: string, mime: string, photoType: string, category: string,
   extras?: { color?: string; material?: string; description?: string },
 ): Promise<StandardizeResp | null> {
+  return (await serviceStandardizeDetailed(b64, mime, photoType, category, extras)).data;
+}
+
+export async function serviceStandardizeDetailed(
+  b64: string, mime: string, photoType: string, category: string,
+  extras?: { color?: string; material?: string; description?: string },
+): Promise<ServiceResult<StandardizeResp>> {
   // Backend performs image edit followed by visual verification. Its defaults are
   // 60s + 20s, so keep the client deadline above the complete server operation.
-  return _postJson<StandardizeResp>('/standardize',
-    { image_b64: b64, mime, photo_type: photoType, item: { category, ...extras } }, 90000);
+  return _postJsonDetailed<StandardizeResp>('/standardize',
+    { image_b64: b64, mime, photo_type: normalizePhotoType(photoType), item: { category, ...extras } }, 90000);
 }
 
 export async function serviceRecommend(req: RecommendReq): Promise<RecommendResp | null> {

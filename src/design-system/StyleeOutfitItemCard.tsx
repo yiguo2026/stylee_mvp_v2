@@ -12,12 +12,16 @@ import {
 import Feather from '@expo/vector-icons/Feather';
 import { Fonts } from '@/constants/theme';
 import { ds } from './tokens';
+import { GarmentMediaTone } from './garmentMediaTone';
+import { StyleeGarmentMedia } from './StyleeGarmentMedia';
 import { StyleeStatusBadge } from './StyleeStatus';
 
 interface StyleeOutfitItemCardProps {
   name: string;
   ownership: 'owned' | 'missing';
-  media: ReactNode;
+  media?: ReactNode;
+  imageUri?: string | null;
+  mediaTone?: GarmentMediaTone;
   actions?: ReactNode;
   showOwnership?: boolean;
   adjustMode?: boolean;
@@ -32,6 +36,8 @@ export function StyleeOutfitItemCard({
   name,
   ownership,
   media,
+  imageUri,
+  mediaTone,
   actions,
   showOwnership = true,
   adjustMode = false,
@@ -51,29 +57,33 @@ export function StyleeOutfitItemCard({
       <View
         style={[
           styles.media,
-          ownership === 'missing' ? styles.mediaMissing : styles.mediaOwned,
           error && styles.mediaError,
         ]}
       >
-        {media}
-        {showOwnership ? (
-          <View style={styles.badgePosition}>
-            <StyleeStatusBadge
-              label={ownership === 'owned' ? '已拥有' : '你还没有'}
-              tone={ownership === 'owned' ? 'positive' : 'attention'}
-            />
-          </View>
-        ) : null}
-        {adjustMode ? (
-          <View style={styles.adjustBadge}>
-            <Feather name="refresh-cw" size={12} color={ds.color.semantic.text.inverse} />
-          </View>
-        ) : null}
-        {loading ? (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator color={ds.color.semantic.text.primary} />
-          </View>
-        ) : null}
+        <StyleeGarmentMedia
+          imageUri={imageUri}
+          tone={mediaTone ?? (ownership === 'owned' ? 'owned' : 'recommended')}
+          placeholder={media}
+        >
+          {showOwnership ? (
+            <View style={styles.badgePosition}>
+              <StyleeStatusBadge
+                label={ownership === 'owned' ? '已拥有' : '你还没有'}
+                tone={ownership === 'owned' ? 'positive' : 'attention'}
+              />
+            </View>
+          ) : null}
+          {adjustMode ? (
+            <View style={styles.adjustBadge}>
+              <Feather name="refresh-cw" size={12} color={ds.color.semantic.text.inverse} />
+            </View>
+          ) : null}
+          {loading ? (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator color={ds.color.semantic.text.primary} />
+            </View>
+          ) : null}
+        </StyleeGarmentMedia>
       </View>
       <Text numberOfLines={2} style={styles.name}>{name}</Text>
       {actions ? <View style={styles.actions}>{actions}</View> : null}
@@ -123,12 +133,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  mediaOwned: {
-    backgroundColor: ds.color.semantic.surface.input,
-  },
-  mediaMissing: {
-    backgroundColor: ds.color.semantic.status.attentionSubtle,
   },
   mediaError: {
     borderWidth: 1,

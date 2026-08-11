@@ -7,16 +7,17 @@ import {
   serviceRecognizeDetailed,
   serviceRecognizeMultiDetailed,
   serviceRecommendDetailed,
-  serviceStandardize,
+  serviceStandardizeDetailed,
   uriToBase64,
 } from '@/lib/styleeService';
 import type { ServiceErrorInfo } from '@/lib/styleeService';
 import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
+import { acceptTransparentStandardization } from '@/lib/standardizationPolicy';
+import type { TransparentAcceptance } from '@/lib/standardizationPolicy';
 import {
   acceptedRecognitionItems,
   isTrustedRecognition,
   shouldFallbackToSingleRecognition,
-  shouldStandardizePhotoType,
 } from '@/lib/recognitionPolicy';
 
 // ─── AI 元信息 ───────────────────────────────────────────
@@ -135,28 +136,40 @@ export const aiDetectMultiItems = async (
   };
 };
 
+export interface GarmentStandardizationResult {
+  url: string | null;
+  meta: AIMeta;
+  skipped: false;
+  acceptance: TransparentAcceptance;
+}
+
 export const aiStandardizeGarment = async (
   imageUri: string, category: string, photoType: string,
   extras?: { color?: string; material?: string; description?: string },
-): Promise<{ url: string | null; meta: AIMeta; skipped: boolean }> => {
+): Promise<GarmentStandardizationResult> => {
   const t0 = Date.now();
-  if (!shouldStandardizePhotoType(photoType)) {
-    return {
-      url: null,
-      skipped: true,
-      meta: { source: 'original/web', durationMs: Date.now() - t0, ok: true },
-    };
-  }
   const encoded = await uriToBase64(imageUri);
-  const response = encoded
-    ? await serviceStandardize(encoded.b64, encoded.mime, photoType, category, extras)
-    : null;
-  const usable = response?.verified && response.image_ref?.startsWith('http')
-    ? response.image_ref : null;
+  const detailed = encoded
+    ? await serviceStandardizeDetailed(encoded.b64, encoded.mime, photoType, category, extras)
+    : { data: null };
+  const response = detailed.data;
+  const acceptance = acceptTransparentStandardization(response ?? undefined);
+  const provider = response?.provider || 'model';
+  const method = response?.method || 'standardize';
   return {
-    url: usable,
+    url: acceptance.ok ? acceptance.uri : null,
     skipped: false,
-    meta: { source: usable ? 'model-service/qwen-image-edit' : 'mock', durationMs: Date.now() - t0, ok: !!usable },
+    acceptance,
+    meta: {
+      source: `model-service/${provider}/${method}`,
+      durationMs: Date.now() - t0,
+      ok: acceptance.ok,
+      requestId: response?.trace?.request_id || detailed.error?.requestId,
+      failedStage: response?.failure_stage || detailed.error?.stage,
+      errorType: detailed.error?.errorType,
+      serverDurationMs: response?.trace?.duration_ms ?? detailed.error?.serverDurationMs,
+      degraded: response?.trace?.degraded,
+    },
   };
 };
 

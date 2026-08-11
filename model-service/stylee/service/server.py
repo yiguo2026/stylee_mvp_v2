@@ -14,6 +14,8 @@ from ..pipeline import recommend
 from ..providers import build_provider
 from ..rag import default_retriever
 from ..vision import build_image_standardizer, build_vision_provider
+from ..vision.alpha_matte import PillowAlphaMatteProcessor
+from ..vision.mock import MockAlphaMatteProcessor, MockImageStandardizer
 from . import adapter
 from . import ai_features
 from . import gamma
@@ -28,7 +30,7 @@ _CORS = {
 
 
 def _photo_type(value):
-    value = {"flat": "flatlay", "product": "web"}.get(value, value)
+    value = {"flat": "flatlay", "flat_lay": "flatlay", "product": "web"}.get(value, value)
     for p in PhotoType:
         if p.value == value:
             return p
@@ -257,14 +259,18 @@ class Handler(BaseHTTPRequestHandler):
         with trace.stage("vision_provider_init"):
             vision = build_vision_provider(timeout=verify_timeout)
             standardizer = build_image_standardizer(timeout=edit_timeout)
+            matte_processor = (
+                MockAlphaMatteProcessor()
+                if isinstance(standardizer, MockImageStandardizer)
+                else PillowAlphaMatteProcessor()
+            )
         trace.annotate(
             provider=standardizer.name,
             verifier=vision.name,
-            image_edit_timeout_seconds=edit_timeout,
-            visual_verify_timeout_seconds=verify_timeout,
+            matte_provider=matte_processor.name,
         )
         si = standardize_item(_image_url(payload), item, _photo_type(payload.get("photo_type")),
-                              vision, standardizer, stage_timer=trace.stage,
+                              vision, standardizer, matte_processor, stage_timer=trace.stage,
                               on_fallback=trace.record_fallback)
         with trace.stage("response_adapter"):
             response = adapter.std_to_app(si)

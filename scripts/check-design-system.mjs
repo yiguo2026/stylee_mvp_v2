@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const guardedPaths = ['src/app', 'src/components'];
 const requestedBase = process.env.DESIGN_SYSTEM_BASE || process.argv[2];
@@ -104,6 +105,55 @@ for (const line of diff.split('\n')) {
     newLine += 1;
   } else if (!line.startsWith('-')) {
     newLine += 1;
+  }
+}
+
+const garmentSceneFiles = [
+  {
+    file: 'src/app/(tabs)/index.tsx',
+    directImage: /\bentry(?:[!?])?\.item(?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/wardrobe/[id].tsx',
+    directImage: /\b(?:rec|item)(?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/[id].tsx',
+    directImage: /\bitem(?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/result.tsx',
+    directImage: /\b(?:fi|item|rec)(?:[!?])?\.image_url|\boi(?:[!?])?\.item(?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/try-on.tsx',
+    directImage: /\bitem(?:[!?])?\.image_url|\boutfit(?:[!?])?\.items(?:!\[|\?\.\[|\[)\s*0\s*\](?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/try-on-result.tsx',
+    directImage: /\bitem(?:[!?])?\.image_url/,
+  },
+  {
+    file: 'src/app/outfit/try-on-detail.tsx',
+    directImage: /\bitem(?:[!?])?\.image_url/,
+  },
+];
+
+const garmentMediaRule = {
+  id: 'garment-media',
+  message: 'Render wardrobe-item images with StyleeGarmentMedia or StyleeOutfitItemCard imageUri.',
+};
+
+for (const scene of garmentSceneFiles) {
+  const source = readFileSync(scene.file, 'utf8');
+  for (const match of source.matchAll(/<Image\b[\s\S]*?>/g)) {
+    if (!scene.directImage.test(match[0])) continue;
+    violations.push({
+      file: scene.file,
+      line: source.slice(0, match.index).split('\n').length,
+      rule: garmentMediaRule,
+      source: match[0].replace(/\s+/g, ' ').trim(),
+    });
   }
 }
 
