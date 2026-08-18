@@ -38,4 +38,15 @@ test('released cards keep geometry outside the shared garment media root', () =>
   );
   assert.doesNotMatch(wardrobeMediaTag, /\bstyle=/);
   assert.doesNotMatch(outfitMediaTag, /\bstyle=/);
+  assert.match(wardrobeMediaTag, /tone="owned"/);
+});
+
+test('wardrobe detail media uses the same owned-item background', () => {
+  const designSystemDir = dirname(fileURLToPath(import.meta.url));
+  const wardrobeDetail = readFileSync(
+    resolve(designSystemDir, '../app/wardrobe/[id].tsx'),
+    'utf8',
+  );
+  assert.doesNotMatch(wardrobeDetail, /StyleeGarmentMedia[^>]+tone="neutral"/);
+  assert.match(wardrobeDetail, /StyleeGarmentMedia[^>]+tone="owned"/);
 });

@@ -92,7 +92,7 @@ export default function ItemDetailScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.imageWrap}>
             {rec.image_url
-              ? <StyleeGarmentMedia imageUri={rec.image_url} tone="neutral" />
+              ? <StyleeGarmentMedia imageUri={rec.image_url} tone="recommended" />
               : <View style={styles.imagePlaceholder}><CategoryIcon category={rec.category} size={80} color={Colors.walnut2} /></View>
             }
           </View>
@@ -173,7 +173,7 @@ export default function ItemDetailScreen() {
         {/* Hero Image */}
         <View style={styles.imageWrap}>
           {item!.image_url
-            ? <StyleeGarmentMedia imageUri={item!.image_url} tone="neutral" />
+                ? <StyleeGarmentMedia imageUri={item!.image_url} tone="owned" />
             : <View style={styles.imagePlaceholder}><CategoryIcon category={item!.category} size={80} color={Colors.walnut2} /></View>
           }
         </View>
