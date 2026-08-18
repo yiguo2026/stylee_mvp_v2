@@ -40,9 +40,12 @@ def parse_recognize_json(content: str) -> dict:
 def build_verify_messages(image_url: str, expected: dict) -> list[dict]:
     cat = expected.get("category", "")
     colors = "、".join(expected.get("colors", []))
-    system = ('你是图像质检器。判断图中服装与期望属性是否一致(品类/主色)。'
-              '只输出 JSON:{"drift": true 或 false, "reason": "一句话"}。drift=true 表示明显不符。')
-    usr = f"期望品类:{cat};期望主色:{colors}。图中是否明显不符?"
+    system = ('你是透明服装主图质检器。除判断服装与期望属性是否一致(品类/主色)外，'
+              '还必须检查透明背景是否干净。若图中保留了棋盘格、白色矩形、灰色底板、'
+              '场景或其他可见背景，或混入人物、文字和其他非目标物品，都判定 drift=true。'
+              '只输出 JSON:{"drift": true 或 false, "reason": "一句话"}。')
+    usr = (f"期望品类:{cat};期望主色:{colors}。检查单品是否明显不符，"
+           "以及透明区域是否仍含可见背景或伪透明图案。")
     return _img_messages(system, usr, image_url)
 
 

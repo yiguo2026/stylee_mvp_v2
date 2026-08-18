@@ -184,13 +184,39 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
             record_failure(stage, error)
             return None
 
+    expected = {"category": item.category.value, "colors": item.colors}
+
+    def visually_clean(output: AlphaMatteOutput) -> bool:
+        verify_error = None
+        with stage_timer("A2.visual_verify") if stage_timer else nullcontext():
+            try:
+                result = provider.verify(output.data_uri, expected)
+            except Exception as error:
+                verify_error = error
+                result = {"drift": True, "reason": "verify failed"}
+        if verify_error is not None:
+            record_failure("A2.visual_verify", verify_error)
+        elif result.get("drift"):
+            record_failure(
+                "A2.visual_verify",
+                VisionError(str(result.get("reason") or "visual drift")),
+            )
+        return not bool(result.get("drift"))
+
     method: str
     matte_output: AlphaMatteOutput | None = None
+    visually_verified = False
     if photo_type == PhotoType.WEB:
         matte_output = apply_matte(
             image_url, ImageRefSource.CLIENT, "A2.direct_matte",
         )
         method = "direct_matte"
+        if matte_output is not None:
+            visually_verified = visually_clean(matte_output)
+            if not visually_verified:
+                # A visible checkerboard/background is an input-image problem,
+                # not valid alpha. Give the full edit + matte path one chance.
+                matte_output = None
 
     if matte_output is None:
         mode = mode_for(photo_type)
@@ -209,20 +235,9 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
         if matte_output is None:
             return terminal_failure()
         method = "cutout_alpha" if mode == "cutout" else "img2img_alpha"
+        visually_verified = False
 
-    expected = {"category": item.category.value, "colors": item.colors}
-    verify_error = None
-    with stage_timer("A2.visual_verify") if stage_timer else nullcontext():
-        try:
-            vres = provider.verify(matte_output.data_uri, expected)
-        except Exception as error:
-            verify_error = error
-            vres = {"drift": True, "reason": "verify failed"}
-    if verify_error is not None:
-        record_failure("A2.visual_verify", verify_error)
-    elif vres.get("drift"):
-        record_failure("A2.visual_verify", VisionError(str(vres.get("reason") or "visual drift")))
-    if vres.get("drift"):
+    if not visually_verified and not visually_clean(matte_output):
         return terminal_failure()
 
     return StandardizedImage(

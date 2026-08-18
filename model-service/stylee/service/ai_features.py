@@ -13,6 +13,7 @@ import urllib.request
 from ..providers.openai_compat import _chat_completion, _extract_json
 from ..usage_log import log_usage
 from ..vision.dashscope import build_edit_payload, parse_edit_response
+from ..vision.recognition_input import prepare_recognition_data_uri
 
 _SCENES = {
     "cafe": "坐在咖啡馆里，暖色调灯光，悠闲氛围",
@@ -86,6 +87,7 @@ def recognize_many(image_url: str) -> dict:
         return {"items": [], "provider": "mock"}
     model = os.environ.get("VL_MULTI_MODEL", os.environ.get("VL_MODEL", "qwen3-vl-plus"))
     max_pixels = multi_max_pixels()
+    prepared = prepare_recognition_data_uri(image_url)
     schema = ('{"items":[{"category":"上装|下装|连体装|外套|鞋履|包袋|帽巾|配饰",'
               '"color":"颜色","material":"材质","style":"风格","brand":"",'
               '"sleeve_length":"无袖|短袖|长袖|null","fit_type":"版型|null",'
@@ -99,7 +101,7 @@ def recognize_many(image_url: str) -> dict:
     messages = [{"role": "system", "content": "识别图片中所有服饰单品，只输出JSON。" + photo_type_rules + "schema:" + schema},
                 {"role": "user", "content": [
                     {"type": "text", "text": "逐件识别所有可辨认的服饰。"},
-                    {"type": "image_url", "image_url": {"url": image_url}, "max_pixels": max_pixels},
+                    {"type": "image_url", "image_url": {"url": prepared.data_uri}, "max_pixels": max_pixels},
                 ]}]
     content = _chat_completion(
         os.environ.get("VL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
@@ -109,7 +111,16 @@ def recognize_many(image_url: str) -> dict:
     data = _extract_json(content)
     raw_items = data.get("items") if isinstance(data.get("items"), list) else []
     items = [normalize_multi_item(item, i) for i, item in enumerate(raw_items) if isinstance(item, dict)]
-    return {"items": items, "provider": model}
+    return {
+        "items": items,
+        "provider": model,
+        "input_info": {
+            "encoded_bytes": prepared.encoded_bytes,
+            "width": prepared.width,
+            "height": prepared.height,
+            "compressed": prepared.compressed,
+        },
+    }
 
 
 def intent(query: str) -> dict:
@@ -150,8 +161,22 @@ def tryon_image(payload: dict) -> str:
     scene = _SCENES.get(str(payload.get("scene") or ""), _SCENES["street"])
     prompt = ("严格保持参考照片中人物的面部五官、脸型轮廓、肤色和发型完全一致，"
               f"一位{body_shape}身材的年轻女性穿着{items_desc}，{scene}，"
-              "全身照，时尚杂志风格，高质量摄影")
+              "全身照，时尚杂志摄影质感，高质量摄影，但不是杂志封面。"
+              "画面中禁止出现任何文字、字母、数字、标题、Logo或水印。")
     return edit_image(str(payload.get("image_url") or ""), prompt, "tryon")
+
+
+def tryon_edit_parameters(model: str) -> dict:
+    """Use only parameters supported by the selected image-edit model."""
+    parameters = {
+        "watermark": False,
+        "negative_prompt": "文字，字母，数字，标题，Logo，水印，杂志封面排版",
+    }
+    # The legacy qwen-image-edit endpoint rejects prompt_extend. Newer image
+    # models accept it and disabling expansion reduces accidental cover text.
+    if model != "qwen-image-edit":
+        parameters["prompt_extend"] = False
+    return parameters
 
 
 def edit_image(image_url: str, prompt: str, feature: str) -> str:
@@ -159,7 +184,8 @@ def edit_image(image_url: str, prompt: str, feature: str) -> str:
     if not key:
         return ""
     model = os.environ.get("IMG_EDIT_MODEL", "qwen-image-edit")
-    data = json.dumps(build_edit_payload(model, image_url, prompt)).encode("utf-8")
+    parameters = tryon_edit_parameters(model) if feature == "tryon" else None
+    data = json.dumps(build_edit_payload(model, image_url, prompt, parameters)).encode("utf-8")
     req = urllib.request.Request(
         os.environ.get("IMG_BASE_URL", "https://dashscope.aliyuncs.com/api/v1").rstrip("/")
         + "/services/aigc/multimodal-generation/generation",

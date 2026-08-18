@@ -145,6 +145,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 with trace.stage("A1.multi_vision_recognize"):
                     response = ai_features.recognize_many(_image_url(payload))
+                input_info = response.pop("input_info", {}) if isinstance(response, dict) else {}
                 items = response.get("items") if isinstance(response, dict) else None
                 photo_types = [
                     str(item.get("photo_type"))
@@ -155,6 +156,10 @@ class Handler(BaseHTTPRequestHandler):
                     provider=response.get("provider"),
                     recognized_item_count=len(items) if isinstance(items, list) else 0,
                     recognized_photo_types=photo_types,
+                    recognition_input_bytes=input_info.get("encoded_bytes"),
+                    recognition_input_width=input_info.get("width"),
+                    recognition_input_height=input_info.get("height"),
+                    recognition_input_compressed=input_info.get("compressed"),
                 )
             elif self.path == "/intent":
                 with trace.stage("intent.model_call"):
