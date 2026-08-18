@@ -114,8 +114,8 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   } else {
     if (top) {
       result.push(placement(top.item, top.role, outer
-        ? { zone: 'core', left: 35, top: 8, width: 44, height: 31, rotation: 0, zIndex: 5 }
-        : { zone: 'core', left: 14, top: 3, width: 52, height: 34, rotation: 0, zIndex: 5 }));
+        ? { zone: 'core', left: 38, top: 8, width: 44, height: 31, rotation: 0, zIndex: 5 }
+        : { zone: 'core', left: 16, top: 3, width: 52, height: 34, rotation: 0, zIndex: 5 }));
     }
     if (bottom) {
       result.push(placement(bottom.item, bottom.role, outer

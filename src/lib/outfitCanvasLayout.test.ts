@@ -29,8 +29,10 @@ function overlaps(a: OutfitCanvasPlacement, b: OutfitCanvasPlacement) {
 
 test('three-item layout keeps smaller shoes centered below trousers', () => {
   const layout = buildOutfitCanvasLayout(base);
+  const top = placement(layout, 'top');
   const bottom = placement(layout, 'bottom');
   const shoes = placement(layout, 'shoes');
+  assert.equal(top.left + top.width / 2, bottom.left + bottom.width / 2);
   assert.ok(shoes.width <= 22, `shoe width was ${shoes.width}`);
   assert.ok(shoes.top >= bottom.top + bottom.height);
   assert.ok(Math.abs(
@@ -46,9 +48,11 @@ test('layered layout places outerwear behind the central clothing axis', () => {
   ]);
   const outer = placement(layout, 'outer');
   const top = placement(layout, 'top');
+  const bottom = placement(layout, 'bottom');
   assert.ok(outer.left < top.left);
   assert.ok(outer.zIndex < top.zIndex);
-  assert.equal(overlaps(placement(layout, 'bottom'), placement(layout, 'shoes')), false);
+  assert.equal(top.left + top.width / 2, bottom.left + bottom.width / 2);
+  assert.equal(overlaps(bottom, placement(layout, 'shoes')), false);
 });
 
 test('accessories orbit only when present and never create placeholders', () => {
