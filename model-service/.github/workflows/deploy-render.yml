@@ -1,0 +1,68 @@
+name: Deploy Model Service to Render
+
+on:
+  workflow_run:
+    workflows: ["Model Service CI"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger exact commit deployment
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set +x
+          python - <<'PY'
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          hook_url = os.environ.get("RENDER_DEPLOY_HOOK_URL")
+          deploy_sha = os.environ["DEPLOY_SHA"]
+          if not hook_url:
+              raise SystemExit("RENDER_DEPLOY_HOOK_URL is not configured")
+
+          parsed = urllib.parse.urlsplit(hook_url)
+          query = [(key, value) for key, value in urllib.parse.parse_qsl(
+              parsed.query, keep_blank_values=True
+          ) if key != "ref"]
+          query.append(("ref", deploy_sha))
+          deploy_url = urllib.parse.urlunsplit(parsed._replace(
+              query=urllib.parse.urlencode(query)
+          ))
+          try:
+              request = urllib.request.Request(deploy_url, method="POST")
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  status = response.status
+          except Exception as error:
+              print(f"Render deploy request failed: {type(error).__name__}", file=sys.stderr)
+              raise SystemExit(1)
+          if not 200 <= status < 300:
+              print(f"Render deploy request failed: status={status}", file=sys.stderr)
+              raise SystemExit(1)
+          print(f"Render deploy accepted: status={status} ref={deploy_sha[:12]}")
+          PY
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Wait for exact production release
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: >-
+          python scripts/wait_for_release.py
+          --url https://stylee-model-service.onrender.com/health
+          --expected-sha "$RELEASE_SHA"
+          --timeout-seconds 900

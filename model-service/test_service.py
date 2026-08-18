@@ -1,3 +1,12 @@
+import hashlib
+import json as _json
+import os
+import threading
+import urllib.error
+import urllib.request
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from stylee.service.adapter import (
     label, model_category, app_category, wardrobe_item, to_request_context,
     compact_recommended_name, outfits_to_app, ingest_to_app, std_to_app
@@ -129,10 +138,6 @@ def test_normalize_multi_item_contract():
     assert invalid["needs_review"] is True and invalid["confidence"] == 0.4
 
 
-import json as _json
-import threading
-import urllib.error
-import urllib.request
 from stylee.providers import ProviderTimeoutError
 from stylee.service.server import _photo_type, run_server
 from stylee.service import gamma as gamma_service
@@ -156,6 +161,27 @@ def _get(url):
         return r.status, _json.loads(r.read().decode())
 
 
+def _write_rag_fixture(root: Path) -> None:
+    (root / "index.meta.json").write_text(_json.dumps({
+        "signature": "openai_compat:text-embedding-v4:1024",
+        "dim": 1024,
+        "count": 3000,
+    }), encoding="utf-8")
+    (root / "exemplars.jsonl").write_text('{"text":"look"}\n', encoding="utf-8")
+    (root / "exemplars.vecs").write_bytes(b"vectors")
+    files = {
+        name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+        for name in ("index.meta.json", "exemplars.jsonl", "exemplars.vecs")
+    }
+    (root / "manifest.json").write_text(_json.dumps({
+        "schema_version": 1,
+        "signature": "openai_compat:text-embedding-v4:1024",
+        "dim": 1024,
+        "count": 3000,
+        "files": files,
+    }), encoding="utf-8")
+
+
 def test_standardize_request_normalizes_legacy_flat_lay_to_flatlay():
     assert _photo_type("flat_lay") == PhotoType.FLATLAY
 
@@ -176,13 +202,34 @@ def test_server_smoke():
         "image_url": "mock://gamma-tryon.png",
         "trace": {"engine": "gamma", "input_image_count": 2},
     }
-    srv = run_server("127.0.0.1", 8765, "mock")
-    t = threading.Thread(target=srv.serve_forever, daemon=True)
-    t.start()
+    health_environment = {
+        "RENDER_GIT_COMMIT": "abc123",
+        "RENDER_GIT_BRANCH": "main",
+        "RENDER_GIT_REPO_SLUG": "fitzw/style-model",
+    }
+    original_environment = {
+        name: os.environ.get(name)
+        for name in (*health_environment, "STYLEE_RAG_INDEX_DIR")
+    }
+    fixture_directory = TemporaryDirectory()
+    fixture_root = Path(fixture_directory.name)
+    _write_rag_fixture(fixture_root)
+    srv = None
     try:
+        os.environ.update(health_environment)
+        os.environ["STYLEE_RAG_INDEX_DIR"] = str(fixture_root)
+        srv = run_server("127.0.0.1", 8765, "mock")
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
         base = "http://127.0.0.1:8765"
         st, b = _get(base + "/health")
         assert st == 200 and b["status"] == "ok"
+        assert b["contract_version"] == "2026-08-18"
+        assert b["git_sha"] == "abc123"
+        assert b["git_branch"] == "main"
+        assert b["repo_slug"] == "fitzw/style-model"
+        assert b["rag"]["artifact_available"] is True
+        assert b["rag"]["count"] == 3000
 
         st, b = _post(base + "/recognize", {"image_url": "data:image/png;base64,AAAA"})
         assert st == 200 and b["category"] in [c for c in ("上装", "下装", "连衣裙", "外套", "鞋", "包", "帽子", "围巾")]
@@ -311,7 +358,14 @@ def test_server_smoke():
         st, b = _post(base + "/nope", {})
         assert st == 404
     finally:
-        srv.shutdown()
+        if srv is not None:
+            srv.shutdown()
+        fixture_directory.cleanup()
+        for name, value in original_environment.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
         gamma_service.import_garment = original_gamma_import
         gamma_service.outfit = original_gamma_outfit
         gamma_service.tryon = original_gamma_tryon

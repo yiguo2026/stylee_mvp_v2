@@ -1,0 +1,11 @@
+{
+  "count": 3000,
+  "dim": 1024,
+  "files": {
+    "exemplars.jsonl": "f895c50f7538d90026bf5ba0a9478818f3123acd2b1308ce898bc6a21a295147",
+    "exemplars.vecs": "dd216d9f37f80bb3279219ecf0ab979cd5f563b677496e13a0268b29a7290231",
+    "index.meta.json": "212fed51f842fc4c70198eab022a34183d8e56354b15aa472653477279616d5f"
+  },
+  "schema_version": 1,
+  "signature": "openai_compat:text-embedding-v4:1024"
+}

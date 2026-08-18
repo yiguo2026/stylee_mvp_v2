@@ -13,6 +13,7 @@ from ..ingest import recognize_item, standardize_item
 from ..pipeline import recommend
 from ..providers import build_provider
 from ..rag import default_retriever
+from ..release_info import health_payload
 from ..vision import build_image_standardizer, build_vision_provider
 from ..vision.alpha_matte import PillowAlphaMatteProcessor
 from ..vision.mock import MockAlphaMatteProcessor, MockImageStandardizer
@@ -88,7 +89,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send(200, {"status": "ok"})
+            self._send(200, health_payload(
+                os.environ,
+                os.environ.get("STYLEE_RAG_INDEX_DIR", "data/garments2look"),
+            ))
         else:
             self._send(404, {"error": "not found"})
 

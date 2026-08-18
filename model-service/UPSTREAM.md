@@ -2,10 +2,17 @@
 
 Canonical source: `https://github.com/fitzw/style-model`
 
-This directory is a vendored copy for Stylee App local development. Model-service code must be changed in the canonical repository first (or mirrored there in the same change), then verified with:
+This directory is a generated mirror for Stylee App local development. Model-service code, tests, deployment files, canonical scripts, and RAG artifacts must be changed in the canonical repository first. The mirror is pinned to the exact canonical Git SHA in `UPSTREAM_COMMIT`.
+
+Regenerate and verify it with:
 
 ```bash
+./scripts/sync-model-service.sh /path/to/style-model
 ./scripts/check-model-service-sync.sh /path/to/style-model
 ```
 
-The App repository intentionally carries additional generated RAG index files under `data/garments2look/`. README text can also differ because the App copy documents monorepo commands. Python source, service contracts, deployment files, architecture decisions, and common tests must not drift.
+The governed paths are declared once in `scripts/model-service-governed-paths.txt`; root `test_*.py` files are discovered dynamically. Sync refuses dirty or non-Git canonical checkouts, replaces only governed directories/files, removes stale governed tests, copies binary artifacts byte-for-byte, updates the pin, and runs the strict checker.
+
+Canonical workflow source is mirrored byte-for-byte under `model-service/.github/workflows/` because the canonical release tests read it as governed test context. It is inert there: GitHub activates workflows only from the App repository's root `.github/workflows/` directory.
+
+`model-service/UPSTREAM.md`, `model-service/README.md`, App UI code, and App-root workflows are Stylee-owned and are never copied by the sync script. Do not edit generated mirror files directly.

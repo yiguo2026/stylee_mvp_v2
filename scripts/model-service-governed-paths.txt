@@ -1,0 +1,16 @@
+# Directories are mirrored recursively and deleted strictly within each target.
+stylee
+scripts
+data/garments2look
+.github/workflows
+
+# Canonical runtime and deployment files.
+serve.py
+requirements.txt
+Dockerfile
+.dockerignore
+render.yaml
+.env.example
+ARCHITECTURE.md
+LOCAL_SETUP.md
+QUOTA_ARCHITECTURE.md

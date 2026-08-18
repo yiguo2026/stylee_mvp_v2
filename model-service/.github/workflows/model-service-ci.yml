@@ -1,0 +1,22 @@
+name: Model Service CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: for test_file in test_*.py; do python "$test_file" || exit 1; done
+      - run: python scripts/build_rag_manifest.py --dir data/garments2look --check
+      - run: docker build -t stylee-model-service:${{ github.sha }} .
