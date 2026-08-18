@@ -97,7 +97,7 @@ CI 必须验证文件存在、哈希一致、`signature=openai_compat:text-embed
   "git_branch": "main",
   "repo_slug": "fitzw/style-model",
   "rag": {
-    "available": true,
+    "artifact_available": true,
     "signature": "openai_compat:text-embedding-v4:1024",
     "count": 3000
   }
@@ -132,7 +132,7 @@ CI 必须验证文件存在、哈希一致、`signature=openai_compat:text-embed
 1. 轮询 `/health`；
 2. 要求 `git_sha == GITHUB_SHA`；
 3. 要求 `contract_version == 2026-08-18`；
-4. 要求 `rag.available == true`、`rag.count == 3000`；
+4. 要求 `rag.artifact_available == true`、`rag.count == 3000`；
 5. 使用 GitHub Secrets 中的专用 Supabase 测试账号取得短期 access token；
 6. 执行 `/recognize-multi`、`/standardize`、`/recommend` 和 `/tryon-image` 的安全 smoke；
 7. smoke 只记录 request ID、状态、阶段、耗时和合同标量，不记录图片 base64、token 或密钥。
@@ -199,5 +199,5 @@ Stylee GitHub CI 根据 `UPSTREAM_COMMIT` 拉取 canonical 快照并执行检查
 
 - Render deploy hook 使用明确 SHA，可重新部署上一已验证 SHA；
 - App 在服务端合同不匹配时不合并；
-- RAG 索引校验失败时服务仍可安全回退关键词，但发布门禁判定失败；
+- RAG 索引校验失败时服务仍可安全回退关键词，但发布门禁判定失败；真实 smoke 的推荐 trace 负责证明运行态 `rag_mode=vector`；
 - 回滚不修改用户数据库、不删除衣橱数据，也不重处理历史图片。
