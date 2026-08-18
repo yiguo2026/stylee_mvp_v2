@@ -62,6 +62,21 @@ validate_destination_path() {
   fi
 }
 
+reject_nested_destination_symlinks() {
+  local path=$1
+  local subtree="$vendor/$path"
+  local symlinks
+
+  [[ -e "$subtree" ]] || return
+  [[ -d "$subtree" && ! -L "$subtree" ]] \
+    || die "governed mirror subtree is not a real directory: $path"
+  if ! symlinks=$(find -P "$subtree" -type l -print); then
+    die "cannot inspect governed mirror subtree: $path"
+  fi
+  [[ -z "$symlinks" ]] \
+    || die "governed mirror subtree contains a symlink: $path"
+}
+
 materialize_committed_snapshot() {
   local archive_path
   local metadata
@@ -182,6 +197,7 @@ while IFS= read -r path || [[ -n "$path" ]]; do
     || die "canonical governed path is missing: $path"
   if [[ -d "$source_snapshot/$path" ]]; then
     validate_destination_path "$path" directory
+    reject_nested_destination_symlinks "$path"
   elif [[ -f "$source_snapshot/$path" ]]; then
     validate_destination_path "$path" regular
   else

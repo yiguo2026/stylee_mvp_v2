@@ -327,6 +327,35 @@ expect_failure 'sync with symlinked governed target' \
 
 seed_matching_vendor
 printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
+nested_file_target="$fixture_root/nested-file-target.py"
+cp "$canonical/stylee/providers/base.py" "$nested_file_target"
+nested_file_before=$(<"$nested_file_target")
+rm "$vendor/stylee/providers/base.py"
+ln -s "$nested_file_target" "$vendor/stylee/providers/base.py"
+expect_failure 'checker with matching nested governed file symlink' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+expect_failure 'sync with matching nested governed file symlink' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ "$(<"$nested_file_target")" == "$nested_file_before" ]] \
+  || fail 'sync overwrote the external nested-file sentinel'
+
+seed_matching_vendor
+printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
+nested_directory_target="$fixture_root/nested-directory-target"
+mkdir -p "$nested_directory_target"
+cp "$canonical/stylee/providers/base.py" "$nested_directory_target/base.py"
+nested_directory_before=$(<"$nested_directory_target/base.py")
+rm -rf "$vendor/stylee/providers"
+ln -s "$nested_directory_target" "$vendor/stylee/providers"
+expect_failure 'checker with matching nested governed directory symlink' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+expect_failure 'sync with matching nested governed directory symlink' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ "$(<"$nested_directory_target/base.py")" == "$nested_directory_before" ]] \
+  || fail 'sync overwrote the external nested-directory sentinel'
+
+seed_matching_vendor
+printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
 matching_test_target="$fixture_root/matching-test-target.py"
 cp "$canonical/test_release_info.py" "$matching_test_target"
 rm "$vendor/test_release_info.py"
