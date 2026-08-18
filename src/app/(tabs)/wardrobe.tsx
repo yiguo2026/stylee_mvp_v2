@@ -33,6 +33,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { track } from '@/lib/track';
+import { matchesWardrobeSearch } from '@/lib/wardrobeSearchPolicy';
 import { CLOTHING_CATEGORIES_WITH_ALL, ClothingCategory, WardrobeItem } from '@/types';
 
 function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?: boolean }) {
@@ -214,21 +215,7 @@ export default function WardrobeTab() {
 
   const filteredItems = useMemo(() => items
     .filter((item) => selectedCategory === '全部' || item.category === selectedCategory)
-    .filter((item) => {
-      if (!searchText) return true;
-      const query = searchText.trim();
-      const SEARCH_ALIASES: Record<string, string[]> = {
-        裤子: ['裤', '下装'],
-        上衣: ['上装', '衬衫', 'T恤', '卫衣', '针织', '开衫'],
-        衣服: ['上装', '外套', '衬衫', 'T恤', '卫衣'],
-        裙子: ['裙', '连体装'],
-        鞋: ['鞋', '靴', '鞋履'],
-        包: ['包', '挎', '背包', '包袋'],
-      };
-      const terms = [query, ...(SEARCH_ALIASES[query] ?? [])];
-      const haystack = [item.name, item.category, item.color, item.brand ?? '', item.material ?? ''].join(' ');
-      return terms.some((term) => haystack.includes(term));
-    }), [items, searchText, selectedCategory]);
+    .filter((item) => matchesWardrobeSearch(item, searchText)), [items, searchText, selectedCategory]);
 
   const skeletonTasks = useMemo(
     () => [...tasks].reverse().filter((task) => task.status !== 'done'),
