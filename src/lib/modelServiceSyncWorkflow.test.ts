@@ -25,6 +25,7 @@ test('mirror CI separates untrusted PR verification from trusted canonical verif
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /push:\n    branches: \[main\]/);
+  assert.match(prJob, /if: github\.event_name == 'pull_request'/);
   assert.match(
     trustedJob,
     /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' && github\.repository == 'yiguo2026\/stylee_mvp_v2'/,
@@ -49,6 +50,11 @@ test('mirror CI separates untrusted PR verification from trusted canonical verif
   assert.match(workflow, /actions\/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7\.0\.0/);
   assert.match(workflow, /actions\/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7\.0\.0/);
   assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-python)@v/);
+  const actionRefs = [...workflow.matchAll(/^\s*uses:\s+([^\s#]+)/gm)].map((match) => match[1]);
+  assert.ok(actionRefs.length > 0, 'workflow must declare its action dependencies');
+  for (const actionRef of actionRefs) {
+    assert.match(actionRef, /@[0-9a-f]{40}$/, `action must use an immutable commit SHA: ${actionRef}`);
+  }
   assert.doesNotMatch(workflow, /if:.*secrets\.STYLE_MODEL_READ_TOKEN/);
   assert.doesNotMatch(workflow, /env:\n(?:.*\n)*?\sSTYLE_MODEL_READ_TOKEN:/);
   assert.deepEqual(

@@ -21,6 +21,7 @@ permissions:
 jobs:
   pr-mirror:
     name: Verify public mirror on pull requests
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout App source
