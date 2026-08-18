@@ -33,6 +33,8 @@ def test_parse_recognize_json_codefence():
 def test_verify_messages_and_parse():
     msgs = build_verify_messages("http://x/y.png", {"category": "上装", "colors": ["白色"]})
     assert _image_block(msgs) == "http://x/y.png"
+    prompt = str(msgs)
+    assert "棋盘格" in prompt and "白色矩形" in prompt and "可见背景" in prompt
     assert parse_verify_json('{"drift": true, "reason": "品类变了"}') == {"drift": True, "reason": "品类变了"}
 
 
@@ -109,6 +111,18 @@ class _DriftVP:
     def verify(self, image_url, expected): return {"drift": True, "reason": "品类不符"}
 
 
+class _DriftThenCleanVP:
+    name = "fake"
+    def __init__(self):
+        self.verified_refs = []
+    def recognize(self, image_url): return {}
+    def verify(self, image_url, expected):
+        self.verified_refs.append(image_url)
+        if len(self.verified_refs) == 1:
+            return {"drift": True, "reason": "仍有棋盘格背景"}
+        return {"drift": False, "reason": ""}
+
+
 class _BoomStd:
     def standardize(self, image_url, item, mode): raise RuntimeError("api down")
 
@@ -146,6 +160,23 @@ def test_web_direct_failure_falls_back_to_edit_then_matte():
     assert matte.refs == [
         (ImageRefSource.CLIENT, "orig://web"),
         (ImageRefSource.PROVIDER_OUTPUT, "mock://std/img2img"),
+    ]
+    assert si.method == "img2img_alpha" and si.verified is True
+
+
+def test_web_dirty_direct_matte_falls_back_to_edit_then_matte():
+    from stylee.vision.mock import MockImageStandardizer
+    provider = _DriftThenCleanVP()
+    matte = _FakeMatte()
+    item = WardrobeItem(id="i", category=Category.TOP)
+    si = standardize_item("orig://web", item, PhotoType.WEB, provider, MockImageStandardizer(), matte)
+    assert matte.refs == [
+        (ImageRefSource.CLIENT, "orig://web"),
+        (ImageRefSource.PROVIDER_OUTPUT, "mock://std/img2img"),
+    ]
+    assert provider.verified_refs == [
+        "data:image/png;base64,AAAA",
+        "data:image/png;base64,AAAA",
     ]
     assert si.method == "img2img_alpha" and si.verified is True
 
@@ -230,6 +261,14 @@ def test_build_edit_payload():
     msgs = p["input"]["messages"][0]["content"]
     assert p["model"] == "qwen-image-edit"
     assert {"image": "data:img"} in msgs and {"text": "去背"} in msgs
+    assert p["parameters"] == {}
+
+
+def test_build_edit_payload_accepts_explicit_parameters():
+    params = {"watermark": False, "negative_prompt": "文字，Logo，水印"}
+    p = build_edit_payload("qwen-image-edit", "data:img", "真实摄影", params)
+    assert p["parameters"] == params
+    assert p["parameters"] is not params
 
 
 def test_standardizer_prompts_preserve_prints_for_every_mode():
@@ -309,8 +348,10 @@ def main():
     test_standardize_api_error_falls_back()
     test_web_uses_direct_matte_before_edit()
     test_web_direct_failure_falls_back_to_edit_then_matte()
+    test_web_dirty_direct_matte_falls_back_to_edit_then_matte()
     test_terminal_failure_never_verifies_white_output()
     test_build_edit_payload()
+    test_build_edit_payload_accepts_explicit_parameters()
     test_standardizer_prompts_preserve_prints_for_every_mode()
     test_parse_edit_response_ok_and_bad()
     test_factories_no_key_fall_back_to_mock()

@@ -218,6 +218,13 @@ export default function SettingsPage() {
             </View>
             <Text style={styles.rowValue}>独立入口 ›</Text>
           </TouchableOpacity>
+          <View style={styles.rowBorder} />
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/outfit-layout-demo')}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowLabel}>搭配画布 Demo</Text>
+            </View>
+            <Text style={styles.rowValue}>3 / 4 / 6 件体验 ›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 退出登录 */}

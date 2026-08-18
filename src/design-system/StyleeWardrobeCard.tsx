@@ -57,7 +57,7 @@ export function StyleeWardrobeCard({
         <StyleeGarmentMedia
           imageUri={imageUri}
           imageSource={imageSource}
-          tone="neutral"
+          tone="owned"
           placeholder={placeholder}
         >
           {loading ? (

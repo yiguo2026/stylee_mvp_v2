@@ -1,6 +1,16 @@
+import base64
+import io
 import os
 
+from PIL import Image
+
 from stylee.service import ai_features
+
+
+def _png_data_uri(size=(1672, 2508)):
+    output = io.BytesIO()
+    Image.new("RGB", size, "beige").save(output, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(output.getvalue()).decode("ascii")
 
 
 def test_no_keys_do_not_call_external_models():
@@ -29,8 +39,22 @@ def test_tryon_prompt_is_built_server_side():
         assert result == "https://example/result.png"
         assert "白色衬衫" in seen["prompt"] and "办公室" in seen["prompt"]
         assert "客户端注入内容" not in seen["prompt"]
+        assert "时尚杂志摄影质感" in seen["prompt"]
+        assert "不是杂志封面" in seen["prompt"]
+        for forbidden in ("文字", "字母", "数字", "标题", "Logo", "水印"):
+            assert forbidden in seen["prompt"]
     finally:
         ai_features.edit_image = original
+
+
+def test_tryon_edit_parameters_suppress_text_without_breaking_legacy_model():
+    legacy = ai_features.tryon_edit_parameters("qwen-image-edit")
+    assert legacy["watermark"] is False
+    assert "文字" in legacy["negative_prompt"] and "Logo" in legacy["negative_prompt"]
+    assert "prompt_extend" not in legacy
+
+    modern = ai_features.tryon_edit_parameters("qwen-image-2.0-pro")
+    assert modern["watermark"] is False and modern["prompt_extend"] is False
 
 
 def test_multi_recognition_uses_server_deadline_env():
@@ -48,11 +72,17 @@ def test_multi_recognition_uses_server_deadline_env():
         seen.update(timeout=timeout, model=model, messages=messages) or '{"items":[]}'
     )
     try:
-        result = ai_features.recognize_many("data:image/png;base64,AA==")
-        assert result == {"items": [], "provider": "qwen3-vl-flash"}
+        source = _png_data_uri()
+        result = ai_features.recognize_many(source)
+        assert result["items"] == [] and result["provider"] == "qwen3-vl-flash"
+        assert result["input_info"]["compressed"] is True
+        assert result["input_info"]["width"] * result["input_info"]["height"] <= 1048576
         assert seen["timeout"] == 17
         assert seen["model"] == "qwen3-vl-flash"
         assert seen["messages"][1]["content"][1]["max_pixels"] == 1048576
+        sent_ref = seen["messages"][1]["content"][1]["image_url"]["url"]
+        assert sent_ref.startswith("data:image/jpeg;base64,")
+        assert len(sent_ref) < len(source)
         prompt = str(seen["messages"])
         assert "白底商品图优先判为 web" in prompt
         assert "有真实环境背景" in prompt
@@ -95,6 +125,7 @@ def test_multi_max_pixels_rejects_invalid_or_unsafe_values():
 def main():
     test_no_keys_do_not_call_external_models()
     test_tryon_prompt_is_built_server_side()
+    test_tryon_edit_parameters_suppress_text_without_breaking_legacy_model()
     test_multi_recognition_uses_server_deadline_env()
     test_multi_max_pixels_rejects_invalid_or_unsafe_values()
     print("ok")

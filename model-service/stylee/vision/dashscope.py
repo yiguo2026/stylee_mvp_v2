@@ -36,9 +36,14 @@ _MM_URL_PATH = "/services/aigc/multimodal-generation/generation"
 
 
 # --- 标准化:请求/响应纯函数(可离线测) ---
-def build_edit_payload(model: str, image_url: str, prompt: str) -> dict:
+def build_edit_payload(
+    model: str,
+    image_url: str,
+    prompt: str,
+    parameters: dict | None = None,
+) -> dict:
     return {"model": model, "input": {"messages": [{"role": "user", "content": [
-        {"image": image_url}, {"text": prompt}]}]}, "parameters": {}}
+        {"image": image_url}, {"text": prompt}]}]}, "parameters": dict(parameters or {})}
 
 
 def parse_edit_response(body: dict) -> str:

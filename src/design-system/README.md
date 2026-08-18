@@ -35,6 +35,7 @@ Always pull after first connecting. For later design updates:
 - `StyleeInlineStatus`
 - `StyleeGarmentMedia`
 - `StyleeOutfitItemCard`
+- `StyleeOutfitCanvas`
 - `StyleeNavigationBar`
 - `StyleeStickyDecisionBar`
 - `StyleeChoiceChip`
@@ -64,8 +65,8 @@ anything else and limits the data URI to 12 MiB. Service processing uses Pillow
 
 Scene backgrounds are semantic presentation, not exported garment pixels:
 
-- `neutral`: standalone wardrobe and detail media;
-- `owned`: garments the user owns in outfit and try-on contexts;
+- `neutral`: generic garment presentation without an ownership state;
+- `owned`: wardrobe media and garments the user owns in outfit and try-on contexts;
 - `recommended`: missing or proposed garments;
 - `inverse`: inverse/contrast presentation where the scene requires it.
 
@@ -76,6 +77,16 @@ migration. The same semantic surfaces must continue to render those historical
 assets safely. Persistence success copy is exactly `已更新为透明主图`; rejected
 or failed standardization preserves the original and uses exactly
 `透明主图生成失败，已保留原图`.
+
+## Editorial outfit canvas
+
+`StyleeOutfitCanvas` composes existing transparent garment masters directly in
+the client. It never requests a generated composite image. The pure layout
+policy in `src/lib/outfitCanvasLayout.ts` selects percentage-based positions by
+garment role and item count: core garments form a central dressing axis,
+outerwear sits behind it, shoes remain smaller and separate below the trousers,
+and accessories use natural surrounding space only when present. More than two
+accessories move to a compact lower band without shrinking the core outfit.
 
 ## Engineering rules
 

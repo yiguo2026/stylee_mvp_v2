@@ -27,11 +27,13 @@ import {
   StyleeGarmentMedia,
   StyleeInlineStatus,
   StyleeNavigationBar,
+  StyleeOutfitCanvas,
   StyleeOutfitItemCard,
   StyleeStickyDecisionBar,
 } from '@/design-system';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
-import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory, CLOTHING_CATEGORIES } from '@/types';
+import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory } from '@/types';
+import type { OutfitCanvasLayoutItem } from '@/lib/outfitCanvasLayout';
 
 const isWeb = Platform.OS === 'web';
 
@@ -465,43 +467,18 @@ export default function OutfitResultScreen() {
     showToast('已加入心愿单');
   };
 
-  const normalizeCategory = (raw: string): string => {
-    const s = raw.trim();
-    if (['上装', '衬衫', 'T恤', '毛衣', '卫衣', '上衣', '针织衫', '吊带', '背心', '打底衫', '马甲', 'Polo衫'].some(k => s.includes(k))) return '上装';
-    if (['下装', '裤子', '牛仔裤', '阔腿裤', '短裤', '长裤', '半裙', '西裤', '运动裤', '休闲裤', '哈伦裤', '工装裤', '直筒裤', '喇叭裤'].some(k => s.includes(k))) return '下装';
-    if (['连衣裙', '裙子', '长裙', '短裙', '裙装', 'onepiece', '连体装'].some(k => s.includes(k))) return '连体装';
-    if (['外套', '夹克', '大衣', '风衣', '羽绒服', '棉服', '西装', '开衫', '皮衣', '冲锋衣', '棒球服', '皮草'].some(k => s.includes(k))) return '外套';
-    if (['鞋', '鞋子', '高跟鞋', '运动鞋', '靴子', '凉鞋', '皮鞋', '单鞋', '帆布鞋', '板鞋', '拖鞋', '乐福鞋', '短靴', '长靴', '老爹鞋', '马丁靴'].some(k => s.includes(k))) return '鞋履';
-    if (['包', '包包', '手提包', '双肩包', '斜挎包', '手袋', '挎包', '托特包', '链条包', '腰包', '背包'].some(k => s.includes(k))) return '包袋';
-    if (['帽子', '帽', '棒球帽', '渔夫帽', '冷帽', '贝雷帽', '针织帽', '遮阳帽', '草帽', '围巾', '丝巾', '领巾', '披肩', '脖套'].some(k => s.includes(k))) return '帽巾';
-    if (['配饰', '腰带', '领带', '胸针', '耳饰', '项链', '手链', '戒指', '手表', '眼镜', '墨镜'].some(k => s.includes(k))) return '配饰';
-    if (CLOTHING_CATEGORIES.includes(s as ClothingCategory)) return s;
-    return '配饰';
-  };
-
-  // Build flatlay items
-  const allFlatlayItems = currentOutfit
+  const allCanvasItems: OutfitCanvasLayoutItem[] = currentOutfit
     ? [
         ...(currentOutfit.items ?? []).map(oi => ({
           id: oi.item_id, name: oi.item?.name ?? oi.item?.category ?? '',
-          category: normalizeCategory(oi.item?.category ?? ''), color: oi.item?.color ?? '',
-          image_url: oi.item?.image_url, owned: true,
+          category: oi.item?.category ?? '', imageUri: oi.item?.image_url, owned: true,
         })),
         ...(currentOutfit.recommended_items ?? []).map((rec, idx) => ({
-          id: `rec_${idx}`, name: rec.name, category: normalizeCategory(rec.category),
-          color: rec.color, image_url: rec.image_url, owned: false,
+          id: `rec_${idx}`, name: rec.name, category: rec.category,
+          imageUri: rec.image_url, owned: false,
         })),
       ]
     : [];
-
-  const MAIN_ORDER: Record<string, number> = { '外套': 0, '上装': 1, '下装': 2, '连体装': 2, '鞋履': 3 };
-  const mainItems = allFlatlayItems
-    .filter(fi => fi.category in MAIN_ORDER)
-    .sort((a, b) => (MAIN_ORDER[a.category] ?? 9) - (MAIN_ORDER[b.category] ?? 9));
-  const sideItems = allFlatlayItems.filter(fi => fi.category === '帽巾' || fi.category === '包袋' || fi.category === '配饰');
-  const topItems = mainItems.filter(fi => fi.category === '上装' || fi.category === '外套');
-  const bottomItems = mainItems.filter(fi => fi.category === '下装' || fi.category === '连体装');
-  const shoeItems = mainItems.filter(fi => fi.category === '鞋履');
 
   const ownedItems = currentOutfit?.items ?? [];
   const recommendedItems = currentOutfit?.recommended_items ?? [];
@@ -543,22 +520,6 @@ export default function OutfitResultScreen() {
     );
   }
 
-  const renderGarment = (fi: { id: string; name: string; category: string; image_url?: string }) => (
-    <View key={fi.id} style={styles.flatlayTopWrap}>
-      <View style={[styles.flatlayTopShape, !fi.image_url && { backgroundColor: Colors.paperCard }]}>
-        {fi.image_url ? (
-          <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
-        ) : (
-          <View style={styles.flatlayGarmentInner}>
-            <CategoryIcon category={fi.category} size={30} color={Colors.walnut2} />
-            <Text style={styles.flatlayGarmentLabel} numberOfLines={1}>{fi.name}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.flatlayItemName} numberOfLines={1}>{fi.name}</Text>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.safe}>
       <StyleeNavigationBar
@@ -577,65 +538,16 @@ export default function OutfitResultScreen() {
           {params.query ? <Text style={styles.queryText}>「{params.query}」</Text> : null}
         </View>
 
-        {/* ── 1. Flatlay ── */}
-        <View style={styles.flatlayArea}>
-          {allFlatlayItems.length > 0 ? (
-            <View style={styles.flatlayRow}>
-              <View style={styles.flatlayMain}>
-                {topItems.length > 0 ? <View style={styles.flatlayTopsRow}>{topItems.map(renderGarment)}</View> : null}
-                {bottomItems.map((fi) => (
-                  <View key={fi.id} style={styles.flatlayBottomWrap}>
-                    <View style={[styles.flatlayBottomShape, !fi.image_url && { backgroundColor: Colors.ink }]}>
-                      {fi.image_url ? (
-                        <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
-                      ) : (
-                        <View style={styles.flatlayGarmentInner}>
-                          <CategoryIcon category={fi.category} size={30} color={Colors.paper} />
-                          <Text style={styles.flatlayGarmentLabel} numberOfLines={1}>{fi.name}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.flatlayItemName} numberOfLines={1}>{fi.name}</Text>
-                  </View>
-                ))}
-                {shoeItems.length > 0 ? (
-                  <View style={styles.flatlayShoesRow}>
-                    {shoeItems.map((fi) => (
-                      <View key={fi.id} style={styles.flatlayShoeWrap}>
-                        <View style={styles.flatlayShoeShape}>
-                          {fi.image_url ? (
-                            <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
-                          ) : (
-                            <CategoryIcon category={fi.category} size={28} color={Colors.walnut2} />
-                          )}
-                        </View>
-                        <Text style={styles.flatlayItemName} numberOfLines={1}>{fi.name}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-              {sideItems.length > 0 ? (
-                <View style={styles.flatlaySide}>
-                  {sideItems.map((fi) => (
-                    <View key={fi.id} style={styles.flatlaySideItem}>
-                      <View style={styles.flatlaySideCircle}>
-                        {fi.image_url ? (
-                          <StyleeGarmentMedia imageUri={fi.image_url} tone="owned" />
-                        ) : (
-                          <CategoryIcon category={fi.category} size={24} color={Colors.walnut2} />
-                        )}
-                      </View>
-                      <Text style={styles.flatlaySideName} numberOfLines={1}>{fi.name}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.flatlayEmpty}><Text style={styles.flatlayEmptyText}>暂无搭配单品</Text></View>
-          )}
-        </View>
+        {/* Existing transparent garment masters are composed client-side; no image generation call. */}
+        <StyleeOutfitCanvas
+          items={allCanvasItems}
+          accessibilityLabel={`${currentOutfit.name || '推荐方案'}，${allCanvasItems.length}件单品`}
+          onItemPress={adjustMode ? (canvasItem) => {
+            const owned = currentOutfit.items?.find((item) => item.item_id === canvasItem.id);
+            if (owned) handleItemTap(owned);
+          } : undefined}
+          selectedItemId={swapTarget?.item_id}
+        />
 
         {/* ── 2. 搭配单品（已有 + 推荐合并） ── */}
         {(ownedItems.length > 0 || recommendedItems.length > 0) ? (
@@ -845,29 +757,6 @@ const styles = StyleSheet.create({
   contextRow: { gap: 2 },
   contextText: { ...T.caption, fontSize: 13, letterSpacing: 0.78 },
   queryText: { ...T.itemDesc, color: Colors.walnut },
-
-  flatlayArea: { marginHorizontal: Spacing.two, minHeight: 280, borderRadius: Radius.xl, backgroundColor: Colors.paperCard, position: 'relative', overflow: 'hidden', padding: Spacing.three, alignItems: 'center', justifyContent: 'center' },
-  flatlayRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three, width: '100%' },
-  flatlayMain: { flex: 1, alignItems: 'center', gap: Spacing.two },
-  flatlayTopsRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two },
-  flatlayTopWrap: { alignItems: 'center', gap: 4 },
-  flatlayTopShape: { width: 140, height: 80, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlayBottomWrap: { alignItems: 'center', gap: 4 },
-  flatlayBottomShape: { width: 160, height: 120, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlayGarmentInner: { alignItems: 'center', gap: 2 },
-  flatlayGarmentLabel: { fontSize: 10, opacity: 0.7, color: '#fff', textAlign: 'center' },
-  flatlayEmoji: { fontSize: 24, textAlign: 'center' },
-  flatlayItemName: { fontSize: 11, color: Colors.walnut2, textAlign: 'center', maxWidth: 160 },
-  flatlayShoesRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.three },
-  flatlayShoeWrap: { alignItems: 'center', gap: 4 },
-  flatlayShoeShape: { width: 60, height: 36, borderRadius: 18, backgroundColor: Colors.paperCard, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlaySide: { width: 64, alignItems: 'center', gap: Spacing.three, paddingTop: Spacing.two },
-  flatlaySideItem: { alignItems: 'center', gap: 4 },
-  flatlaySideCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.signalSoft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  flatlaySideEmoji: { fontSize: 20, textAlign: 'center' },
-  flatlaySideName: { fontSize: 10, color: Colors.walnut2, textAlign: 'center', maxWidth: 60 },
-  flatlayEmpty: { padding: Spacing.five, alignItems: 'center' },
-  flatlayEmptyText: { ...T.bodyText, color: Colors.walnut2, fontSize: 13 },
 
   dotIndicator: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: Spacing.two },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.line },
