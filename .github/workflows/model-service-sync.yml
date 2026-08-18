@@ -1,0 +1,82 @@
+name: Verify model-service mirror
+
+on:
+  pull_request:
+    paths:
+      - 'model-service/**'
+      - 'scripts/check-model-service-sync.sh'
+      - 'scripts/model-service-governed-paths.txt'
+      - '.github/workflows/model-service-sync.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'model-service/**'
+      - 'scripts/check-model-service-sync.sh'
+      - 'scripts/model-service-governed-paths.txt'
+      - '.github/workflows/model-service-sync.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout App source
+        uses: actions/checkout@v4
+
+      - name: Read pinned canonical commit
+        id: upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          pin_file=model-service/UPSTREAM_COMMIT
+          if [[ ! -f "$pin_file" || -L "$pin_file" ]]; then
+            echo "UPSTREAM_COMMIT must be a regular file."
+            exit 1
+          fi
+          if [[ "$(wc -l < "$pin_file" | tr -d '[:space:]')" != 1 ]]; then
+            echo "UPSTREAM_COMMIT must contain exactly one line."
+            exit 1
+          fi
+          sha=$(<"$pin_file")
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "UPSTREAM_COMMIT must be a 40-character lowercase Git SHA."
+            exit 1
+          fi
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Fail clearly if canonical read token is unavailable
+        if: ${{ secrets.STYLE_MODEL_READ_TOKEN == '' }}
+        run: |
+          echo "Missing required GitHub secret: STYLE_MODEL_READ_TOKEN"
+          exit 1
+
+      - name: Checkout pinned canonical source
+        uses: actions/checkout@v4
+        with:
+          repository: fitzw/style-model
+          ref: ${{ steps.upstream.outputs.sha }}
+          token: ${{ secrets.STYLE_MODEL_READ_TOKEN }}
+          persist-credentials: false
+          path: canonical-model-service
+
+      - name: Check generated mirror against canonical source
+        shell: bash
+        run: bash scripts/check-model-service-sync.sh canonical-model-service
+
+      - name: Run canonical and mirrored model-service tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for test_root in canonical-model-service model-service; do
+            tests=("$test_root"/test_*.py)
+            if (( ${#tests[@]} == 0 )); then
+              echo "No root test_*.py files found in $test_root."
+              exit 1
+            fi
+            for test_file in "${tests[@]}"; do
+              python "$test_file"
+            done
+          done
