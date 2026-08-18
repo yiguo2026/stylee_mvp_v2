@@ -12,6 +12,8 @@ export { StyleeGarmentMedia } from './StyleeGarmentMedia';
 export type { StyleeGarmentMediaProps } from './StyleeGarmentMedia';
 export type { GarmentMediaTone } from './garmentMediaTone';
 export { StyleeOutfitItemCard } from './StyleeOutfitItemCard';
+export { StyleeOutfitCanvas } from './StyleeOutfitCanvas';
+export type { StyleeOutfitCanvasProps } from './StyleeOutfitCanvas';
 export { StyleeWardrobeCard } from './StyleeWardrobeCard';
 export { StyleeWardrobeGrid } from './StyleeWardrobeGrid';
 export { StyleeNavigationBar } from './StyleeNavigationBar';

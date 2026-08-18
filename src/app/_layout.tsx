@@ -33,6 +33,7 @@ export default function RootLayout() {
   const pathname = usePathname();
   const designPreviewEnabled = process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1';
   const isDesignPreview = designPreviewEnabled && pathname.startsWith('/wardrobe-preview');
+  const isPublicPreview = isDesignPreview || pathname.startsWith('/outfit-layout-demo');
   const pendingSelectionCount = useImportStore((state) => state.pendingSelectionCount);
   const tasks = useImportStore((state) => state.tasks);
   const pendingToastCountRef = useRef(0);
@@ -75,6 +76,7 @@ export default function RootLayout() {
       if (authRestoredRef.current) { setSession(session); return; }
       authRestoredRef.current = true;
       setSession(session);
+      if (isPublicPreview) return;
       // 冷启动/记住登录：先用本地缓存的 profile 立即渲染，再解析路由 gender 立刻跳转，
       // 完整 profile + 风格偏好后台刷新，避免开屏对着转圈等 DB。
       const store = useUserStore.getState();
@@ -92,7 +94,7 @@ export default function RootLayout() {
 
     const goToLogin = () => {
       setSession(null);
-      if (!isDesignPreview) router.replace('/(auth)/login');
+      if (!isPublicPreview) router.replace('/(auth)/login');
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -112,7 +114,7 @@ export default function RootLayout() {
     });
 
     return () => subscription.unsubscribe();
-  }, [fontsReady, isDesignPreview]);
+  }, [fontsReady, isPublicPreview]);
 
   useEffect(() => {
     const shouldNotify = pendingSelectionCount > pendingToastCountRef.current && pathname !== '/wardrobe';
@@ -146,6 +148,7 @@ export default function RootLayout() {
         <Stack.Screen name="wardrobe/add" options={{ presentation: 'modal' }} />
         <Stack.Screen name="wardrobe/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="outfit/result" options={{ presentation: 'card' }} />
+        <Stack.Screen name="outfit-layout-demo" options={{ presentation: 'card' }} />
       </Stack>
       <ToastHost />
     </ErrorBoundary>
