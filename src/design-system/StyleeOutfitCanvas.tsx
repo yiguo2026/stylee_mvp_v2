@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {
   buildOutfitCanvasLayout,
+  garmentImageScale,
   type OutfitCanvasLayoutItem,
 } from '@/lib/outfitCanvasLayout';
 import { ds } from './tokens';
@@ -71,7 +72,10 @@ export function StyleeOutfitCanvas({
               <Image
                 accessibilityElementsHidden
                 source={source}
-                style={styles.image}
+                style={[
+                  styles.image,
+                  { transform: [{ scale: garmentImageScale(entry.role) }] },
+                ]}
                 resizeMode="contain"
               />
             ) : (

@@ -54,12 +54,12 @@ const scenarios: Record<ScenarioId, { label: string; roles: DemoRole[]; note: st
   base: {
     label: '3件基础',
     roles: ['top', 'bottom', 'shoes'],
-    note: '鞋子缩小后放在裤子右下方，与裤子轮廓分开；没有配饰时不保留空位。',
+    note: '鞋子缩小后沿裤装轴线放在正下方，并与裤腿留出间距；没有配饰时不保留空位。',
   },
   layered: {
     label: '4件叠穿',
     roles: ['outer', 'top', 'bottom', 'shoes'],
-    note: '外套后置，内搭与下装保持中央穿着轴线，鞋子独立落在底部。',
+    note: '外套后置，内搭、下装与鞋子保持连续穿着轴线，彼此不遮挡。',
   },
   accessories: {
     label: '6件配饰',

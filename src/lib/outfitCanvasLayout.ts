@@ -49,6 +49,20 @@ export function classifyOutfitCanvasRole(item: OutfitCanvasLayoutItem): OutfitCa
   return 'accessory';
 }
 
+export function garmentImageScale(role: OutfitCanvasRole): number {
+  switch (role) {
+    case 'outer': return 1.28;
+    case 'top': return 1.32;
+    case 'bottom': return 1.30;
+    case 'dress': return 1.24;
+    case 'shoes': return 1.12;
+    case 'bag': return 1.12;
+    case 'scarf': return 1.10;
+    case 'hat': return 1.08;
+    case 'accessory': return 1.06;
+  }
+}
+
 function placement(
   item: OutfitCanvasLayoutItem,
   role: OutfitCanvasRole,
@@ -111,9 +125,14 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   }
 
   if (shoes) {
+    const shoeAnchor = result.find((entry) => entry.role === 'bottom' || entry.role === 'dress')
+      ?? result.find((entry) => entry.role === 'top');
+    const centeredLeft = shoeAnchor
+      ? shoeAnchor.left + (shoeAnchor.width / 2) - 11
+      : 39;
     result.push(placement(shoes.item, shoes.role, {
-      zone: 'core', left: outer ? 72 : 67, top: 82, width: 22, height: 15,
-      rotation: outer ? 6 : -5, zIndex: 9,
+      zone: 'core', left: Math.max(2, Math.min(76, centeredLeft)), top: 82, width: 22, height: 15,
+      rotation: outer ? 4 : -4, zIndex: 9,
     }));
   }
 

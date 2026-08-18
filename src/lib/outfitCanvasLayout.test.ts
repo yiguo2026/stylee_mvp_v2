@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import {
   buildOutfitCanvasLayout,
   classifyOutfitCanvasRole,
+  garmentImageScale,
   type OutfitCanvasLayoutItem,
   type OutfitCanvasPlacement,
 } from './outfitCanvasLayout.ts';
@@ -26,12 +27,15 @@ function overlaps(a: OutfitCanvasPlacement, b: OutfitCanvasPlacement) {
     && a.top + a.height > b.top;
 }
 
-test('three-item layout keeps smaller shoes beside and below trousers', () => {
+test('three-item layout keeps smaller shoes centered below trousers', () => {
   const layout = buildOutfitCanvasLayout(base);
   const bottom = placement(layout, 'bottom');
   const shoes = placement(layout, 'shoes');
   assert.ok(shoes.width <= 22, `shoe width was ${shoes.width}`);
   assert.ok(shoes.top >= bottom.top + bottom.height);
+  assert.ok(Math.abs(
+    (shoes.left + shoes.width / 2) - (bottom.left + bottom.width / 2),
+  ) <= 2);
   assert.equal(overlaps(bottom, shoes), false);
 });
 
@@ -95,4 +99,12 @@ test('all placements stay inside the normalized canvas', () => {
     assert.ok(item.left + item.width <= 100);
     assert.ok(item.top + item.height <= 100);
   }
+});
+
+test('core garments are visually enlarged while shoes remain secondary', () => {
+  assert.ok(garmentImageScale('outer') >= 1.18);
+  assert.ok(garmentImageScale('top') >= 1.22);
+  assert.ok(garmentImageScale('bottom') >= 1.22);
+  assert.ok(garmentImageScale('shoes') < garmentImageScale('top'));
+  assert.ok(garmentImageScale('hat') < garmentImageScale('outer'));
 });
