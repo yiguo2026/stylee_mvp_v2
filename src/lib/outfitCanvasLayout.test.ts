@@ -102,9 +102,10 @@ test('all placements stay inside the normalized canvas', () => {
 });
 
 test('core garments are visually enlarged while shoes remain secondary', () => {
-  assert.ok(garmentImageScale('outer') >= 1.18);
-  assert.ok(garmentImageScale('top') >= 1.22);
-  assert.ok(garmentImageScale('bottom') >= 1.22);
+  assert.ok(garmentImageScale('outer') >= 1.50);
+  assert.ok(garmentImageScale('top') >= 1.58);
+  assert.ok(garmentImageScale('bottom') >= 1.54);
+  assert.ok(garmentImageScale('shoes') >= 1.24);
   assert.ok(garmentImageScale('shoes') < garmentImageScale('top'));
   assert.ok(garmentImageScale('hat') < garmentImageScale('outer'));
 });

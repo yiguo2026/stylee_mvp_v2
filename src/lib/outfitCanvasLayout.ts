@@ -51,15 +51,15 @@ export function classifyOutfitCanvasRole(item: OutfitCanvasLayoutItem): OutfitCa
 
 export function garmentImageScale(role: OutfitCanvasRole): number {
   switch (role) {
-    case 'outer': return 1.28;
-    case 'top': return 1.32;
-    case 'bottom': return 1.30;
-    case 'dress': return 1.24;
-    case 'shoes': return 1.12;
-    case 'bag': return 1.12;
-    case 'scarf': return 1.10;
-    case 'hat': return 1.08;
-    case 'accessory': return 1.06;
+    case 'outer': return 1.52;
+    case 'top': return 1.62;
+    case 'bottom': return 1.58;
+    case 'dress': return 1.50;
+    case 'shoes': return 1.26;
+    case 'bag': return 1.30;
+    case 'scarf': return 1.28;
+    case 'hat': return 1.25;
+    case 'accessory': return 1.20;
   }
 }
 
@@ -103,7 +103,7 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
 
   if (outer) {
     result.push(placement(outer.item, outer.role, {
-      zone: 'core', left: 1, top: 3, width: 58, height: 70, rotation: -2, zIndex: 1,
+      zone: 'core', left: 4, top: 3, width: 58, height: 70, rotation: -2, zIndex: 1,
     }));
   }
 
