@@ -7,6 +7,12 @@ import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
 import { persistGarmentMaster } from '@/lib/uploadImage';
 import { track } from '@/lib/track';
 import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
+import {
+  canOperateImportTask,
+  formatRecognitionFailure,
+  summarizeImportTasks,
+  tasksForUser,
+} from '@/lib/importTaskPolicy';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -22,6 +28,7 @@ export type ImportTaskStatus =
 
 export interface ImportTask {
   id: string;
+  ownerUserId: string;
   sourceUri: string;
   status: ImportTaskStatus;
   /** All detected items from this photo (filled after detection) */
@@ -36,6 +43,10 @@ export interface ImportTask {
   standardizationFallback?: boolean;
   /** Error message if failed */
   error?: string;
+  requestId?: string;
+  failedStage?: string;
+  errorType?: string;
+  serverDurationMs?: number;
 }
 
 interface ImportState {
@@ -45,10 +56,11 @@ interface ImportState {
   completedCount: number;
   failedCount: number;
   pendingSelectionCount: number;
-  _userId: string | null;
+  activeUserId: string | null;
 
   // Actions
   startImport: (uris: string[], userId: string) => void;
+  setActiveUser: (userId: string | null) => void;
   confirmSelection: (taskId: string, selectedItems: DetectedItem[]) => void;
   retryFailed: (taskId: string) => void;
   clearCompleted: () => void;
@@ -59,18 +71,31 @@ let taskIdCounter = 0;
 
 // ─── Store ────────────────────────────────────────────────
 
-export const useImportStore = create<ImportState>((set) => ({
+export const useImportStore = create<ImportState>((set, get) => ({
   tasks: [],
   isProcessing: false,
   totalCount: 0,
   completedCount: 0,
   failedCount: 0,
   pendingSelectionCount: 0,
-  _userId: null,
+  activeUserId: null,
+
+  setActiveUser: (userId) => {
+    set((state) => {
+      const tasks = tasksForUser(state.tasks, userId);
+      return {
+        activeUserId: userId,
+        tasks,
+        ...summarizeImportTasks(tasks),
+        isProcessing: false,
+      };
+    });
+  },
 
   startImport: (uris: string[], userId: string) => {
     const newTasks: ImportTask[] = uris.map((uri) => ({
       id: `import_${Date.now()}_${++taskIdCounter}`,
+      ownerUserId: userId,
       sourceUri: uri,
       status: 'pending',
     }));
@@ -78,12 +103,13 @@ export const useImportStore = create<ImportState>((set) => ({
     try { track('wardrobe_import_start', { source: 'album' }); } catch {}
 
     set(state => {
-      const allTasks = [...state.tasks, ...newTasks];
+      const retainedTasks = state.activeUserId === userId ? tasksForUser(state.tasks, userId) : [];
+      const allTasks = [...retainedTasks, ...newTasks];
       return {
         tasks: allTasks,
-        totalCount: allTasks.length,
+        ...summarizeImportTasks(allTasks),
         isProcessing: true,
-        _userId: userId,
+        activeUserId: userId,
       };
     });
 
@@ -92,50 +118,60 @@ export const useImportStore = create<ImportState>((set) => ({
   },
 
   confirmSelection: (taskId: string, selectedItems: DetectedItem[]) => {
+    const activeUserId = get().activeUserId;
+    if (!canOperateImportTask(get().tasks.find((task) => task.id === taskId), activeUserId)) return;
     set(state => ({
-      tasks: state.tasks.map(t =>
+      ...(() => {
+        const tasks = state.tasks.map(t =>
         t.id === taskId
-          ? { ...t, status: 'selected', confirmedItems: selectedItems }
+          ? { ...t, status: 'selected' as const, confirmedItems: selectedItems }
           : t
-      ),
-      pendingSelectionCount: Math.max(0, state.pendingSelectionCount - 1),
+        );
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
     }));
     void processQueue();
   },
 
   retryFailed: (taskId: string) => {
+    const activeUserId = get().activeUserId;
+    if (!canOperateImportTask(get().tasks.find((task) => task.id === taskId), activeUserId)) return;
     set(state => ({
-      tasks: state.tasks.map(t =>
-        t.id === taskId ? { ...t, status: 'pending', error: undefined } : t
-      ),
-      failedCount: Math.max(0, state.failedCount - 1),
-      isProcessing: true,
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          status: 'pending' as const,
+          error: undefined,
+          requestId: undefined,
+          failedStage: undefined,
+          errorType: undefined,
+          serverDurationMs: undefined,
+        } : t);
+        return { tasks, ...summarizeImportTasks(tasks), isProcessing: true };
+      })(),
     }));
     void processQueue();
   },
 
   clearCompleted: () => {
     set(state => {
-      const remainingTasks = state.tasks.filter(t => t.status !== 'done' && t.status !== 'failed');
+      const remainingTasks = tasksForUser(state.tasks, state.activeUserId)
+        .filter(t => t.status !== 'done' && t.status !== 'failed');
       return {
         tasks: remainingTasks,
-        totalCount: remainingTasks.length,
-        completedCount: 0,
-        failedCount: 0,
+        ...summarizeImportTasks(remainingTasks),
       };
     });
   },
 
   removeTask: (taskId: string) => {
+    const activeUserId = get().activeUserId;
+    if (!canOperateImportTask(get().tasks.find((task) => task.id === taskId), activeUserId)) return;
     set(state => {
-      const task = state.tasks.find(t => t.id === taskId);
       const newTasks = state.tasks.filter(t => t.id !== taskId);
       return {
         tasks: newTasks,
-        totalCount: newTasks.length,
-        completedCount: task?.status === 'done' ? state.completedCount - 1 : state.completedCount,
-        failedCount: task?.status === 'failed' ? state.failedCount - 1 : state.failedCount,
-        pendingSelectionCount: task?.status === 'needs_selection' ? state.pendingSelectionCount - 1 : state.pendingSelectionCount,
+        ...summarizeImportTasks(newTasks),
       };
     });
   }
@@ -145,12 +181,14 @@ export const useImportStore = create<ImportState>((set) => ({
 
 async function processQueue() {
   const store = useImportStore;
-  const { _userId } = store.getState();
-  
-  if (!_userId) return;
+  const { activeUserId } = store.getState();
+
+  if (!activeUserId) return;
 
   while (true) {
-    const { tasks } = store.getState();
+    const currentState = store.getState();
+    if (currentState.activeUserId !== activeUserId) return;
+    const tasks = tasksForUser(currentState.tasks, activeUserId);
     // Find next task that is pending or selected
     const nextTask = tasks.find(t => t.status === 'pending' || t.status === 'selected');
     
@@ -164,25 +202,43 @@ async function processQueue() {
     }
 
     if (nextTask.status === 'pending') {
-      await handleDetection(nextTask.id);
+      await handleDetection(nextTask.id, activeUserId);
     } else if (nextTask.status === 'selected') {
-      await handleFinalize(nextTask.id, _userId);
+      await handleFinalize(nextTask.id, activeUserId);
     }
   }
 }
 
-async function handleDetection(taskId: string) {
+function taskIsActive(taskId: string, ownerUserId: string): boolean {
+  const state = useImportStore.getState();
+  return state.activeUserId === ownerUserId
+    && canOperateImportTask(state.tasks.find((task) => task.id === taskId), ownerUserId);
+}
+
+async function handleDetection(taskId: string, ownerUserId: string) {
   const store = useImportStore;
   const task = store.getState().tasks.find(t => t.id === taskId);
-  if (!task) return;
+  if (!canOperateImportTask(task, ownerUserId)) return;
   
   store.setState(state => ({
     tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'detecting' } : t)
   }));
 
   let items: DetectedItem[] = [];
+  let diagnostics: {
+    requestId?: string;
+    failedStage?: string;
+    errorType?: string;
+    serverDurationMs?: number;
+  } = {};
   try {
     const result = await aiDetectMultiItems(task.sourceUri);
+    diagnostics = {
+      requestId: result.meta.requestId,
+      failedStage: result.meta.failedStage,
+      errorType: result.meta.errorType,
+      serverDurationMs: result.meta.serverDurationMs,
+    };
     items = acceptedRecognitionItems(result.meta.ok, result.items).map((item, index) => ({
       ...item,
       index: typeof item.index === 'number' ? item.index : index,
@@ -192,12 +248,19 @@ async function handleDetection(taskId: string) {
     console.warn('[importStore] aiDetectMultiItems failed:', err);
   }
 
+  if (!taskIsActive(taskId, ownerUserId)) return;
+
   if (items.length === 0) {
     store.setState(state => ({
-      tasks: state.tasks.map(t => t.id === taskId
-        ? { ...t, status: 'failed' as const, error: '识别失败，请重试' }
-        : t),
-      failedCount: state.failedCount + 1,
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          status: 'failed' as const,
+          error: formatRecognitionFailure(diagnostics),
+          ...diagnostics,
+        } : t);
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
     }));
     return;
   }
@@ -208,29 +271,36 @@ async function handleDetection(taskId: string) {
   // 不再有任何演示开关或强制多单品逻辑，路由完全由识别结果驱动。
   if (items.length > 1) {
     store.setState(state => ({
-      tasks: state.tasks.map(t => t.id === taskId ? { 
-        ...t, 
-        status: 'needs_selection', 
-        allDetectedItems: items 
-      } : t),
-      pendingSelectionCount: state.pendingSelectionCount + 1
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          status: 'needs_selection' as const,
+          allDetectedItems: items,
+          ...diagnostics,
+        } : t);
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
     }));
     try { track('wardrobe_import_result', { status: 'multi_selection', item_count: items.length, duration_ms: 0 }); } catch {}
   } else {
     store.setState(state => ({
-      tasks: state.tasks.map(t => t.id === taskId ? { 
-        ...t, 
-        status: 'selected', 
-        confirmedItems: items 
-      } : t)
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          status: 'selected' as const,
+          confirmedItems: items,
+          ...diagnostics,
+        } : t);
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
     }));
   }
 }
 
-async function handleFinalize(taskId: string, userId: string) {
+async function handleFinalize(taskId: string, ownerUserId: string) {
   const store = useImportStore;
   const task = store.getState().tasks.find(t => t.id === taskId);
-  if (!task || !task.confirmedItems) return;
+  if (!canOperateImportTask(task, ownerUserId) || !task.confirmedItems) return;
   const finalizeStart = Date.now();
 
   try {
@@ -277,6 +347,8 @@ async function handleFinalize(taskId: string, userId: string) {
         new Promise(resolve => setTimeout(resolve, 2200)),
       ]);
 
+      if (!taskIsActive(taskId, ownerUserId)) return;
+
       store.setState(state => ({
         tasks: state.tasks.map(t => t.id === taskId ? {
           ...t,
@@ -286,12 +358,13 @@ async function handleFinalize(taskId: string, userId: string) {
 
       const persistedImage = await persistGarmentMaster({
         sourceUri,
-        userId,
+        userId: ownerUserId,
         photoType,
         acceptance: standardized.acceptance,
         diagnostics: standardized.meta,
       });
       if (!persistedImage.ok) throw new Error('原图上传失败');
+      if (!taskIsActive(taskId, ownerUserId)) return;
       const finalImageUrl = persistedImage.imageUrl;
 
       store.setState(state => ({
@@ -320,8 +393,8 @@ async function handleFinalize(taskId: string, userId: string) {
 
       // Save to wardrobe. The primary image is the standardized/bg-removed image when available.
       const { addItem } = useWardrobeStore.getState();
-      await addItem({
-        user_id: userId,
+      const saved = await addItem({
+        user_id: ownerUserId,
         name: itemName,
         category: item.category,
         color: normalizeColor(item.color),
@@ -338,17 +411,27 @@ async function handleFinalize(taskId: string, userId: string) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as any);
+      if (!saved) throw new Error('衣橱保存失败');
     }
 
     store.setState(state => ({
-      tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'done' } : t),
-      completedCount: state.completedCount + 1
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? { ...t, status: 'done' as const } : t);
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
     }));
     try { track('wardrobe_import_result', { status: 'success', item_count: task.confirmedItems?.length ?? 1, duration_ms: Date.now() - finalizeStart }); } catch {}
   } catch (err: any) {
+    if (!taskIsActive(taskId, ownerUserId)) return;
     store.setState(state => ({
-      tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'failed', error: err.message || '导入失败' } : t),
-      failedCount: state.failedCount + 1
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          status: 'failed' as const,
+          error: err.message || '导入失败',
+        } : t);
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
     }));
     try { track('wardrobe_import_result', { status: 'failed', item_count: 0, duration_ms: Date.now() - finalizeStart, error_code: err.message }); } catch {}
   }

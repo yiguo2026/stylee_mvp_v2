@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { UserProfile, UserStylePreference } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
+import { useImportStore } from '@/stores/importStore';
 
 interface UserState {
   session: Session | null;
@@ -62,7 +63,10 @@ export const useUserStore = create<UserState>((set, get) => ({
   stylePreferences: [],
   isLoading: false,
 
-  setSession: (session) => set({ session, user: session?.user ?? null }),
+  setSession: (session) => {
+    useImportStore.getState().setActiveUser(session?.user.id ?? null);
+    set({ session, user: session?.user ?? null });
+  },
 
   setProfile: (profile) => set({ profile }),
 
@@ -169,6 +173,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     const { user } = get();
     await supabase.auth.signOut();
     if (user) clearProfileCache(user.id);
+    useImportStore.getState().setActiveUser(null);
     set({ session: null, user: null, profile: null, stylePreferences: [] });
   },
 }));
