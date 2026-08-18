@@ -86,6 +86,8 @@ create_canonical_fixture() {
     >"$canonical/.github/workflows/model-service-ci.yml"
   printf '%s\n' 'name: Canonical deploy fixture' \
     >"$canonical/.github/workflows/deploy-render.yml"
+  printf '%s\n' 'stylee/ignored.py' 'test_future_contract.py' \
+    >"$canonical/.gitignore"
 
   local path
   for path in "${deployment_files[@]}"; do
@@ -140,6 +142,75 @@ canonical_sha=$(git -C "$canonical" rev-parse HEAD)
 printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
 expect_success 'matching fixtures' \
   bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+
+printf '%s\n' 'IGNORED = "must not be mirrored"' >"$canonical/stylee/ignored.py"
+expect_success 'sync ignores non-HEAD governed bytes' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ ! -e "$vendor/stylee/ignored.py" ]] \
+  || fail 'sync copied ignored non-HEAD bytes under the canonical pin'
+expect_success 'checker ignores non-HEAD governed bytes' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+rm "$canonical/stylee/ignored.py"
+seed_matching_vendor
+printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
+
+printf '%s\n' 'assert "future contract"' >"$canonical/test_future_contract.py"
+git -C "$canonical" add -f test_future_contract.py
+git -C "$canonical" commit -qm 'add future contract test'
+canonical_sha=$(git -C "$canonical" rev-parse HEAD)
+expect_success 'sync dynamically added committed test' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+cmp "$canonical/test_future_contract.py" "$vendor/test_future_contract.py" >/dev/null \
+  || fail 'sync did not copy the future test byte-for-byte'
+[[ "$(<"$vendor/UPSTREAM_COMMIT")" == "$canonical_sha" ]] \
+  || fail 'sync did not pin the commit containing the future test'
+
+git -C "$canonical" rm -q test_future_contract.py
+git -C "$canonical" commit -qm 'remove future contract test'
+canonical_sha=$(git -C "$canonical" rev-parse HEAD)
+printf '%s\n' 'assert "ignored stale future contract"' \
+  >"$canonical/test_future_contract.py"
+expect_success 'sync dynamically removed committed test' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ ! -e "$vendor/test_future_contract.py" ]] \
+  || fail 'sync retained a test removed from the committed snapshot'
+[[ "$(<"$vendor/UPSTREAM_COMMIT")" == "$canonical_sha" ]] \
+  || fail 'sync did not pin the commit removing the future test'
+rm "$canonical/test_future_contract.py"
+
+ln -s core.py "$canonical/stylee/unsupported-link.py"
+git -C "$canonical" add stylee/unsupported-link.py
+git -C "$canonical" commit -qm 'add unsupported committed symlink'
+expect_failure 'checker rejects committed symlink objects' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+expect_failure 'sync rejects committed symlink objects' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+git -C "$canonical" rm -q stylee/unsupported-link.py
+git -C "$canonical" commit -qm 'remove unsupported committed symlink'
+canonical_sha=$(git -C "$canonical" rev-parse HEAD)
+expect_success 'sync after committed symlink removal' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+
+submodule_repo="$fixture_root/submodule-repo"
+mkdir -p "$submodule_repo"
+git -C "$submodule_repo" init -q
+git -C "$submodule_repo" config user.name 'Fixture Author'
+git -C "$submodule_repo" config user.email 'fixture@example.com'
+printf '%s\n' 'submodule fixture' >"$submodule_repo/README.md"
+git -C "$submodule_repo" add README.md
+git -C "$submodule_repo" commit -qm 'submodule fixture'
+git -C "$canonical" -c protocol.file.allow=always submodule add -q \
+  "$submodule_repo" stylee/unsupported-submodule
+git -C "$canonical" commit -qam 'add unsupported submodule'
+expect_failure 'checker rejects committed submodules' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+expect_failure 'sync rejects committed submodules' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+git -C "$canonical" rm -qf stylee/unsupported-submodule
+git -C "$canonical" commit -qam 'remove unsupported submodule'
+canonical_sha=$(git -C "$canonical" rev-parse HEAD)
+expect_success 'sync after committed submodule removal' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
 
 printf '%s\n' 'name: drifted model CI fixture' \
   >"$vendor/.github/workflows/model-service-ci.yml"
@@ -253,5 +324,52 @@ expect_failure 'sync with symlinked governed target' \
   bash "$app_scripts/sync-model-service.sh" "$canonical"
 [[ -f "$escaped_target/sentinel.txt" ]] \
   || fail 'sync deleted outside the resolved model-service mirror'
+
+seed_matching_vendor
+printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
+matching_test_target="$fixture_root/matching-test-target.py"
+cp "$canonical/test_release_info.py" "$matching_test_target"
+rm "$vendor/test_release_info.py"
+ln -s "$matching_test_target" "$vendor/test_release_info.py"
+expect_failure 'checker with matching symlinked test target' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+
+seed_matching_vendor
+printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
+test_sentinel="$fixture_root/test-sentinel.py"
+printf '%s\n' 'must survive test sync' >"$test_sentinel"
+test_sentinel_before=$(<"$test_sentinel")
+rm "$vendor/test_release_info.py"
+ln -s "$test_sentinel" "$vendor/test_release_info.py"
+expect_failure 'sync with symlinked test destination' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ "$(<"$test_sentinel")" == "$test_sentinel_before" ]] \
+  || fail 'sync overwrote the external test sentinel'
+
+seed_matching_vendor
+pin_target="$fixture_root/matching-pin-target"
+printf '%s\n' "$canonical_sha" >"$pin_target"
+ln -s "$pin_target" "$vendor/UPSTREAM_COMMIT"
+expect_failure 'checker with matching symlinked pin target' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+
+seed_matching_vendor
+pin_sentinel="$fixture_root/pin-sentinel"
+printf '%s\n' 'must survive pin sync' >"$pin_sentinel"
+pin_sentinel_before=$(<"$pin_sentinel")
+ln -s "$pin_sentinel" "$vendor/UPSTREAM_COMMIT"
+expect_failure 'sync with symlinked pin destination' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ "$(<"$pin_sentinel")" == "$pin_sentinel_before" ]] \
+  || fail 'sync overwrote the external pin sentinel'
+
+seed_matching_vendor
+old_pin=1111111111111111111111111111111111111111
+printf '%s\n' "$old_pin" >"$vendor/UPSTREAM_COMMIT"
+expect_failure 'post-copy validation fault' \
+  env STYLEE_MODEL_SYNC_TEST_FAIL_CONTENT_VALIDATION=1 \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+[[ "$(<"$vendor/UPSTREAM_COMMIT")" == "$old_pin" ]] \
+  || fail 'failed sync published a new pin before content validation'
 
 echo 'model-service sync integration tests passed'

@@ -29,3 +29,6 @@ Do not edit governed mirror files directly. The App-owned
 root workflows are outside the generated mirror and must be preserved.
 Canonical workflow sources under `model-service/.github/workflows/` are
 governed, inert test context; never copy them into the App root `.github`.
+Sync/check provenance comes only from a temporary `git archive` of the captured
+canonical SHA, never from live checkout bytes. The sync publishes
+`UPSTREAM_COMMIT` atomically and last, after archive parity validation.
