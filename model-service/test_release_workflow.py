@@ -3,12 +3,17 @@ import hashlib
 import io
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
 from threading import Event, Lock, Thread
+import textwrap
 import time
+import urllib.parse
+import urllib.request
 from unittest.mock import patch
 
 import scripts.wait_for_release as release_wait
@@ -17,11 +22,12 @@ from scripts.wait_for_release import ReleaseError, wait_for_release
 
 ROOT = Path(__file__).resolve().parent
 EXPECTED_CONTRACT_VERSION = "2026-08-18"
+MISSING = object()
 
 
 def _health(git_sha: str, *, contract_version=EXPECTED_CONTRACT_VERSION,
-            artifact_available=True) -> dict:
-    return {
+            artifact_available=True, rag_count=3000) -> dict:
+    payload = {
         "status": "ok",
         "contract_version": contract_version,
         "git_sha": git_sha,
@@ -31,9 +37,11 @@ def _health(git_sha: str, *, contract_version=EXPECTED_CONTRACT_VERSION,
             "artifact_available": artifact_available,
             "signature": "openai_compat:text-embedding-v4:1024",
             "dim": 1024,
-            "count": 3000,
         },
     }
+    if rag_count is not MISSING:
+        payload["rag"]["count"] = rag_count
+    return payload
 
 
 @contextlib.contextmanager
@@ -109,6 +117,18 @@ def test_wait_for_release_rejects_contract_mismatch():
 
 def test_wait_for_release_rejects_unavailable_rag_artifact():
     _expect_release_error(_health("a" * 40, artifact_available=False))
+
+
+def test_wait_for_release_rejects_missing_rag_count():
+    _expect_release_error(_health("a" * 40, rag_count=MISSING))
+
+
+def test_wait_for_release_rejects_wrong_rag_count():
+    _expect_release_error(_health("a" * 40, rag_count=2999))
+
+
+def test_wait_for_release_rejects_boolean_rag_count():
+    _expect_release_error(_health("a" * 40, rag_count=True))
 
 
 def test_wait_for_release_rejects_malformed_json():
@@ -324,6 +344,8 @@ def test_workflows_enforce_ci_and_exact_sha_deployment_contracts():
     assert 'for test_file in test_*.py; do python "$test_file" || exit 1; done' in ci
     assert "python scripts/build_rag_manifest.py --dir data/garments2look --check" in ci
     assert 'docker build -t stylee-model-service:${{ github.sha }} .' in ci
+    assert "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" in ci
+    assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in ci
 
     assert "workflow_run:" in deploy
     assert 'workflows: ["Model Service CI"]' in deploy
@@ -331,22 +353,186 @@ def test_workflows_enforce_ci_and_exact_sha_deployment_contracts():
     assert "github.event.workflow_run.event == 'push'" in deploy
     assert "github.event.workflow_run.head_branch == 'main'" in deploy
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in deploy
-    assert "ref: ${{ github.event.workflow_run.head_sha }}" in deploy
+    assert "github.event.workflow_run.head_sha" not in deploy
     assert "RENDER_DEPLOY_HOOK_URL" in deploy
     assert "urllib.parse.urlencode" in deploy
     assert 'query.append(("ref", deploy_sha))' in deploy
-    assert "RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}" in deploy
     assert '--expected-sha "$RELEASE_SHA"' in deploy
     assert "https://stylee-model-service.onrender.com/health" in deploy
     assert 'echo "$RENDER_DEPLOY_HOOK_URL"' not in deploy
+    assert "concurrency:" in deploy
+    assert "group: stylee-model-service-production" in deploy
+    assert "cancel-in-progress: false" in deploy
+    assert "timeout-minutes: 45" in deploy
+    assert "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" in deploy
+    assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in deploy
+    assert _top_level_permissions(ci) == {"contents": "read"}
+    assert _top_level_permissions(deploy) == {"actions": "read", "contents": "read"}
+    assert "https://api.github.com/repos/" in deploy
+    assert "/git/ref/heads/main" in deploy
+    assert "/actions/workflows/model-service-ci.yml/runs" in deploy
+    assert "COORDINATOR_TIMEOUT_SECONDS" in deploy
+    assert "id: coordinate" in deploy
+    current_main_step = deploy.index("- name: Coordinate current tested main")
     deploy_hook_step = deploy.index("- name: Trigger exact commit deployment")
-    checkout_step = deploy.index("- uses: actions/checkout@v4")
-    assert deploy_hook_step < checkout_step
+    checkout_step = deploy.index("- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0")
+    assert current_main_step < deploy_hook_step < checkout_step
     assert deploy.count("${{ secrets.RENDER_DEPLOY_HOOK_URL }}") == 1
     assert "RENDER_DEPLOY_HOOK_URL" not in deploy[checkout_step:]
 
+    wait_step = deploy.index("- name: Wait for exact production release")
+    smoke_step = deploy.index("- name: Authenticated provider smoke")
+    setup_step = deploy.index("- uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97")
+    install_step = deploy.index("python -m pip install -r requirements.txt")
+    assert checkout_step < setup_step < install_step < wait_step < smoke_step
+    selected_sha = "${{ steps.coordinate.outputs.sha }}"
+    assert f"DEPLOY_SHA: {selected_sha}" in deploy
+    assert f"ref: {selected_sha}" in deploy
+    assert f"RELEASE_SHA: {selected_sha}" in deploy
+    assert deploy.count(selected_sha) == 3
+    assert "python scripts/release_smoke.py" in deploy[smoke_step:]
+    assert "--timeout-seconds 600" in deploy[smoke_step:]
+    assert "fixtures/release-smoke/garment.png" in deploy[smoke_step:]
+    assert "fixtures/release-smoke/person.jpg" in deploy[smoke_step:]
+    for secret_name in (
+        "STYLEE_SMOKE_SUPABASE_URL",
+        "STYLEE_SMOKE_SUPABASE_ANON_KEY",
+        "STYLEE_SMOKE_EMAIL",
+        "STYLEE_SMOKE_PASSWORD",
+    ):
+        expression = "${{ secrets." + secret_name + " }}"
+        assert deploy.count(expression) == 1
+        assert secret_name not in deploy[:smoke_step]
+
+    workflow_paths = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
+    assert workflow_paths
+    for workflow_path in workflow_paths:
+        workflow = workflow_path.read_text()
+        uses_lines = [line.strip() for line in workflow.splitlines() if "uses:" in line]
+        assert uses_lines
+        for line in uses_lines:
+            assert re.fullmatch(r"- uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}", line), line
+
     assert "autoDeployTrigger: off" in render
     assert "GitHub Action is the only automated production trigger" in render
+
+
+def _top_level_permissions(workflow):
+    lines = workflow.splitlines()
+    start = lines.index("permissions:") + 1
+    permissions = {}
+    for line in lines[start:]:
+        if not line.startswith("  "):
+            break
+        name, value = line.strip().split(":", 1)
+        permissions[name] = value.strip()
+    assert permissions
+    assert all(value == "read" for value in permissions.values())
+    return permissions
+
+
+def _workflow_step_python(step_name):
+    deploy = (ROOT / ".github" / "workflows" / "deploy-render.yml").read_text()
+    step_start = deploy.index(f"- name: {step_name}")
+    heredoc = deploy.index("python - <<'PY'", step_start)
+    source_start = deploy.index("\n", heredoc) + 1
+    source_end = deploy.index("\n          PY", source_start)
+    return textwrap.dedent(deploy[source_start:source_end])
+
+
+class _CoordinatorResponse:
+    status = 200
+    headers = {}
+
+    def __init__(self, payload):
+        self.body = json.dumps(payload).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        pass
+
+    def read(self, limit=None):
+        assert limit is None or len(self.body) <= limit
+        return self.body
+
+
+def _run_coordinator(ref_shas, workflow_runs):
+    source = _workflow_step_python("Coordinate current tested main")
+    calls = []
+
+    def opener(request, timeout):
+        assert timeout > 0
+        calls.append(request.full_url)
+        parsed = urllib.parse.urlsplit(request.full_url)
+        if parsed.path.endswith("/git/ref/heads/main"):
+            return _CoordinatorResponse({"object": {"sha": ref_shas.pop(0)}})
+        if parsed.path.endswith("/actions/workflows/model-service-ci.yml/runs"):
+            return _CoordinatorResponse({"workflow_runs": workflow_runs.pop(0)})
+        raise AssertionError(request.full_url)
+
+    with TemporaryDirectory() as directory:
+        output_path = Path(directory) / "github-output"
+        environment = {
+            "GH_TOKEN": "github-token-must-not-log",
+            "REPOSITORY": "fitzw/style-model",
+            "GITHUB_OUTPUT": str(output_path),
+            "COORDINATOR_TIMEOUT_SECONDS": "1",
+            "COORDINATOR_POLL_SECONDS": "0",
+        }
+        stdout = io.StringIO()
+        with patch.dict(os.environ, environment, clear=False):
+            with patch.object(urllib.request, "urlopen", opener):
+                with contextlib.redirect_stdout(stdout):
+                    exec(compile(source, "deploy-render-coordinator", "exec"), {"__name__": "__main__"})
+        output = output_path.read_text() if output_path.exists() else ""
+    return output, stdout.getvalue(), calls
+
+
+def _ci_run(sha, *, status, conclusion):
+    return {
+        "name": "Model Service CI",
+        "head_sha": sha,
+        "head_branch": "main",
+        "event": "push",
+        "status": status,
+        "conclusion": conclusion,
+        "head_repository": {"full_name": "fitzw/style-model"},
+    }
+
+
+def test_coordinator_switches_to_new_current_main_and_emits_only_tested_sha():
+    first_sha = "a" * 40
+    current_sha = "b" * 40
+    output, logs, calls = _run_coordinator(
+        [first_sha, current_sha, current_sha],
+        [
+            [_ci_run(first_sha, status="in_progress", conclusion=None)],
+            [_ci_run(current_sha, status="completed", conclusion="success")],
+        ],
+    )
+    assert output == f"sha={current_sha}\n"
+    assert first_sha not in logs and current_sha not in logs
+    assert "github-token-must-not-log" not in logs
+    assert sum("/git/ref/heads/main" in call for call in calls) == 3
+    assert sum("/actions/workflows/model-service-ci.yml/runs" in call for call in calls) == 2
+
+
+def test_coordinator_rejects_failed_current_main_ci_without_output():
+    current_sha = "c" * 40
+    stderr = io.StringIO()
+    with contextlib.redirect_stderr(stderr):
+        try:
+            _run_coordinator(
+                [current_sha],
+                [[_ci_run(current_sha, status="completed", conclusion="failure")]],
+            )
+            assert False, "failed current-main CI must stop before Render"
+        except SystemExit as error:
+            assert error.code == 1
+    assert current_sha not in stderr.getvalue()
+    assert "github-token-must-not-log" not in stderr.getvalue()
 
 
 def main():
@@ -354,6 +540,9 @@ def main():
     test_wait_for_release_times_out_on_sha_mismatch()
     test_wait_for_release_rejects_contract_mismatch()
     test_wait_for_release_rejects_unavailable_rag_artifact()
+    test_wait_for_release_rejects_missing_rag_count()
+    test_wait_for_release_rejects_wrong_rag_count()
+    test_wait_for_release_rejects_boolean_rag_count()
     test_wait_for_release_rejects_malformed_json()
     test_wait_for_release_bounds_reads_and_rechecks_deadline_after_io()
     test_wait_for_release_rejects_oversized_health_response()
@@ -361,6 +550,8 @@ def main():
     test_wait_for_release_discards_late_attempt_then_retries_without_worker_overlap()
     test_manifest_check_validates_without_rewriting()
     test_workflows_enforce_ci_and_exact_sha_deployment_contracts()
+    test_coordinator_switches_to_new_current_main_and_emits_only_tested_sha()
+    test_coordinator_rejects_failed_current_main_ci_without_output()
     print("ok")
 
 

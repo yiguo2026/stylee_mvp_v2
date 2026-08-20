@@ -90,12 +90,13 @@ def _safe(value: object, *, limit: int = 32) -> str:
                    for character in text)[:limit] or "-"
 
 
-def _progress(payload: dict) -> tuple[str, str, str, object]:
+def _progress(payload: dict) -> tuple[str, str, str, object, object]:
     status = payload.get("status")
     observed_sha = payload.get("git_sha")
     contract_version = payload.get("contract_version")
     rag = payload.get("rag")
     rag_available = rag.get("artifact_available") if isinstance(rag, dict) else None
+    rag_count = rag.get("count") if isinstance(rag, dict) else None
     print(
         "release_poll "
         f"status={_safe(status)} "
@@ -104,7 +105,7 @@ def _progress(payload: dict) -> tuple[str, str, str, object]:
         f"rag={_safe(rag_available)}",
         flush=True,
     )
-    return str(status), str(observed_sha), str(contract_version), rag_available
+    return str(status), str(observed_sha), str(contract_version), rag_available, rag_count
 
 
 def wait_for_release(url: str, expected_sha: str, timeout_seconds: int) -> dict:
@@ -139,12 +140,15 @@ def wait_for_release(url: str, expected_sha: str, timeout_seconds: int) -> dict:
         if payload is not None:
             if not isinstance(payload, dict):
                 raise ReleaseError("health response was not a JSON object")
-            status, observed_sha, contract_version, rag_available = _progress(payload)
+            status, observed_sha, contract_version, rag_available, rag_count = _progress(payload)
             matches = (
                 status == "ok"
                 and observed_sha == expected_sha
                 and contract_version == EXPECTED_CONTRACT_VERSION
                 and rag_available is True
+                and isinstance(rag_count, int)
+                and not isinstance(rag_count, bool)
+                and rag_count == 3000
             )
             if matches:
                 return payload

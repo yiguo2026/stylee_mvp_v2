@@ -32,6 +32,7 @@ MATTE_PROVIDER = "pillow-border-connected-v1"
 MAX_PROVIDER_REDIRECTS = 3
 
 _DASHSCOPE_RESULT_HOSTS = frozenset({
+    "dashscope-7c2c.oss-cn-shanghai.aliyuncs.com",
     "dashscope-result-bj.oss-cn-beijing.aliyuncs.com",
     "dashscope-result-hz.oss-cn-hangzhou.aliyuncs.com",
     "dashscope-result-sg.oss-ap-southeast-1.aliyuncs.com",

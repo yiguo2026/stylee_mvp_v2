@@ -102,7 +102,7 @@ reject_nested_destination_symlinks() {
   local subtree="$vendor/$path"
   local symlinks
 
-  [[ -e "$subtree" ]] || return
+  [[ -e "$subtree" ]] || return 0
   [[ -d "$subtree" && ! -L "$subtree" ]] \
     || die "governed mirror subtree is not a real directory: $path"
   if ! symlinks=$(find -P "$subtree" -type l -print); then

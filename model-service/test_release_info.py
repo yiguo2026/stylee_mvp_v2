@@ -76,6 +76,38 @@ def test_health_payload_reports_render_sha_and_rag_status():
         assert payload["rag"]["count"] == 3000
 
 
+def test_health_payload_uses_local_defaults_for_empty_environment():
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        _write_fixture(root)
+        payload = health_payload({}, str(root))
+        assert payload["git_sha"] == "local"
+        assert payload["git_branch"] == "local"
+        assert payload["repo_slug"] == "local"
+
+
+def test_health_payload_reads_fresh_release_environment_each_call():
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        _write_fixture(root)
+        environment = {
+            "RENDER_GIT_COMMIT": "first-sha",
+            "RENDER_GIT_BRANCH": "first-branch",
+            "RENDER_GIT_REPO_SLUG": "first/repo",
+        }
+        first = health_payload(environment, str(root))
+        environment.update({
+            "RENDER_GIT_COMMIT": "second-sha",
+            "RENDER_GIT_BRANCH": "main",
+            "RENDER_GIT_REPO_SLUG": "fitzw/style-model",
+        })
+        second = health_payload(environment, str(root))
+        assert first["git_sha"] == "first-sha"
+        assert second["git_sha"] == "second-sha"
+        assert second["git_branch"] == "main"
+        assert second["repo_slug"] == "fitzw/style-model"
+
+
 def test_build_rag_manifest_rejects_float_metadata_dimension():
     with TemporaryDirectory() as directory:
         root = Path(directory)
@@ -97,6 +129,8 @@ def main():
     test_validate_rag_artifact_rejects_hash_drift()
     test_validate_rag_artifact_rejects_boolean_schema_version()
     test_health_payload_reports_render_sha_and_rag_status()
+    test_health_payload_uses_local_defaults_for_empty_environment()
+    test_health_payload_reads_fresh_release_environment_each_call()
     test_build_rag_manifest_rejects_float_metadata_dimension()
     print("ok")
 

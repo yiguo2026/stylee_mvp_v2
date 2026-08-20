@@ -2,6 +2,7 @@
 stylee
 scripts
 data/garments2look
+fixtures/release-smoke
 .github/workflows
 
 # Canonical runtime and deployment files.

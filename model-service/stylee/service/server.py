@@ -27,6 +27,7 @@ _CORS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
     "Access-Control-Expose-Headers": "X-Request-ID",
+    "Cache-Control": "no-store",
 }
 
 

@@ -143,7 +143,11 @@ from stylee.service.server import _photo_type, run_server
 from stylee.service import gamma as gamma_service
 
 
-def _post(url, payload, request_id=None):
+def _headers(response):
+    return {name.lower(): value for name, value in response.headers.items()}
+
+
+def _post_with_headers(url, payload, request_id=None):
     headers = {"Content-Type": "application/json"}
     if request_id:
         headers["X-Request-ID"] = request_id
@@ -151,14 +155,24 @@ def _post(url, payload, request_id=None):
                                  headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
-            return r.status, _json.loads(r.read().decode())
+            return r.status, _json.loads(r.read().decode()), _headers(r)
     except urllib.error.HTTPError as e:
-        return e.code, _json.loads(e.read().decode())
+        return e.code, _json.loads(e.read().decode()), _headers(e)
+
+
+def _post(url, payload, request_id=None):
+    status, body, _response_headers = _post_with_headers(url, payload, request_id)
+    return status, body
+
+
+def _get_with_headers(url):
+    with urllib.request.urlopen(url, timeout=10) as r:
+        return r.status, _json.loads(r.read().decode()), _headers(r)
 
 
 def _get(url):
-    with urllib.request.urlopen(url, timeout=10) as r:
-        return r.status, _json.loads(r.read().decode())
+    status, body, _response_headers = _get_with_headers(url)
+    return status, body
 
 
 def _write_rag_fixture(root: Path) -> None:
@@ -222,8 +236,9 @@ def test_server_smoke():
         t = threading.Thread(target=srv.serve_forever, daemon=True)
         t.start()
         base = "http://127.0.0.1:8765"
-        st, b = _get(base + "/health")
+        st, b, headers = _get_with_headers(base + "/health")
         assert st == 200 and b["status"] == "ok"
+        assert headers["cache-control"] == "no-store"
         assert b["contract_version"] == "2026-08-18"
         assert b["git_sha"] == "abc123"
         assert b["git_branch"] == "main"
@@ -231,8 +246,12 @@ def test_server_smoke():
         assert b["rag"]["artifact_available"] is True
         assert b["rag"]["count"] == 3000
 
-        st, b = _post(base + "/recognize", {"image_url": "data:image/png;base64,AAAA"})
+        st, b, headers = _post_with_headers(
+            base + "/recognize",
+            {"image_url": "data:image/png;base64,AAAA"},
+        )
         assert st == 200 and b["category"] in [c for c in ("上装", "下装", "连衣裙", "外套", "鞋", "包", "帽子", "围巾")]
+        assert headers["cache-control"] == "no-store"
         assert "needs_review" in b and "photo_type" in b
 
         import stylee.service.server as server_service

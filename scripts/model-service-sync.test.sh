@@ -69,7 +69,8 @@ create_canonical_fixture() {
     "$canonical/.github/workflows" \
     "$canonical/stylee/providers" \
     "$canonical/scripts" \
-    "$canonical/data/garments2look"
+    "$canonical/data/garments2look" \
+    "$canonical/fixtures/release-smoke"
 
   printf '%s\n' 'VALUE = "canonical"' >"$canonical/stylee/core.py"
   printf '%s\n' 'PROVIDER = "canonical"' >"$canonical/stylee/providers/base.py"
@@ -82,6 +83,10 @@ create_canonical_fixture() {
     >"$canonical/data/garments2look/manifest.json"
   printf '\000\001\002fixture-rag\377' \
     >"$canonical/data/garments2look/index.vecs"
+  printf '\211PNG\r\n\032\nfixture-garment' \
+    >"$canonical/fixtures/release-smoke/garment.png"
+  printf '\377\330\377fixture-person\377\331' \
+    >"$canonical/fixtures/release-smoke/person.jpg"
   printf '%s\n' 'name: Canonical model CI fixture' \
     >"$canonical/.github/workflows/model-service-ci.yml"
   printf '%s\n' 'name: Canonical deploy fixture' \
@@ -113,6 +118,8 @@ seed_matching_vendor() {
   cp -R "$canonical/.github/workflows" "$vendor/.github/workflows"
   mkdir -p "$vendor/data"
   cp -R "$canonical/data/garments2look" "$vendor/data/garments2look"
+  mkdir -p "$vendor/fixtures"
+  cp -R "$canonical/fixtures/release-smoke" "$vendor/fixtures/release-smoke"
 
   local path
   for path in "${deployment_files[@]}" "${test_files[@]}"; do
@@ -142,6 +149,13 @@ canonical_sha=$(git -C "$canonical" rev-parse HEAD)
 printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
 expect_success 'matching fixtures' \
   bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+
+rm -rf "$vendor/fixtures/release-smoke"
+expect_success 'sync creates a missing governed fixture directory' \
+  bash "$app_scripts/sync-model-service.sh" "$canonical"
+cmp "$canonical/fixtures/release-smoke/garment.png" \
+  "$vendor/fixtures/release-smoke/garment.png" >/dev/null \
+  || fail 'sync did not create the missing release smoke fixture directory'
 
 printf '%s\n' 'IGNORED = "must not be mirrored"' >"$canonical/stylee/ignored.py"
 expect_success 'sync ignores non-HEAD governed bytes' \
@@ -249,6 +263,13 @@ expect_failure 'changed RAG manifest' \
 seed_matching_vendor
 printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
 
+printf '%s\n' 'drifted release smoke garment' \
+  >"$vendor/fixtures/release-smoke/garment.png"
+expect_failure 'changed release smoke fixture' \
+  bash "$app_scripts/check-model-service-sync.sh" "$canonical"
+seed_matching_vendor
+printf '%s\n' "$canonical_sha" >"$vendor/UPSTREAM_COMMIT"
+
 printf '%s\n' 'EXTRA = True' >"$vendor/stylee/extra.py"
 expect_failure 'extra governed source file' \
   bash "$app_scripts/check-model-service-sync.sh" "$canonical"
@@ -271,6 +292,9 @@ printf '%s\n' 'VALUE = "stale"' >"$vendor/stylee/core.py"
 printf '\000stale-rag\377' >"$vendor/data/garments2look/index.vecs"
 printf '%s\n' '{"artifact":"stale"}' \
   >"$vendor/data/garments2look/manifest.json"
+printf '%s\n' 'stale garment' >"$vendor/fixtures/release-smoke/garment.png"
+rm "$vendor/fixtures/release-smoke/person.jpg"
+printf '%s\n' 'stale fixture' >"$vendor/fixtures/release-smoke/stale.txt"
 upstream_doc_before=$(<"$vendor/UPSTREAM.md")
 readme_before=$(<"$vendor/README.md")
 
@@ -285,6 +309,14 @@ cmp "$canonical/.github/workflows/model-service-ci.yml" \
 cmp "$canonical/data/garments2look/index.vecs" \
   "$vendor/data/garments2look/index.vecs" >/dev/null \
   || fail 'sync did not copy RAG binary byte-for-byte'
+cmp "$canonical/fixtures/release-smoke/garment.png" \
+  "$vendor/fixtures/release-smoke/garment.png" >/dev/null \
+  || fail 'sync did not copy the release smoke garment byte-for-byte'
+cmp "$canonical/fixtures/release-smoke/person.jpg" \
+  "$vendor/fixtures/release-smoke/person.jpg" >/dev/null \
+  || fail 'sync did not copy the release smoke person byte-for-byte'
+[[ ! -e "$vendor/fixtures/release-smoke/stale.txt" ]] \
+  || fail 'sync preserved a stale release smoke fixture'
 [[ "$(<"$vendor/UPSTREAM.md")" == "$upstream_doc_before" ]] \
   || fail 'sync overwrote UPSTREAM.md'
 [[ "$(<"$vendor/README.md")" == "$readme_before" ]] \
