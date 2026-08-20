@@ -5,6 +5,7 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
+    # The GitHub Action is the only automated production trigger.
     autoDeployTrigger: off
     envVars:
       - key: STYLEE_PROVIDER

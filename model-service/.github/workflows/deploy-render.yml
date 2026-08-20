@@ -1,0 +1,202 @@
+name: Deploy Model Service to Render
+
+on:
+  workflow_run:
+    workflows: ["Model Service CI"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: stylee-model-service-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Coordinate current tested main
+        id: coordinate
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COORDINATOR_TIMEOUT_SECONDS: "600"
+          COORDINATOR_POLL_SECONDS: "10"
+        run: |
+          set +x
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import time
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ["GH_TOKEN"]
+          repository = os.environ["REPOSITORY"]
+          deadline = time.monotonic() + float(os.environ["COORDINATOR_TIMEOUT_SECONDS"])
+          poll_seconds = float(os.environ["COORDINATOR_POLL_SECONDS"])
+          repository_path = urllib.parse.quote(repository, safe="/")
+
+          class CoordinatorError(RuntimeError):
+              pass
+
+          def api_json(path, query=None):
+              remaining = deadline - time.monotonic()
+              if remaining <= 0:
+                  raise CoordinatorError("coordinator_timeout")
+              url = f"https://api.github.com/repos/{repository_path}{path}"
+              if query:
+                  url += "?" + urllib.parse.urlencode(query)
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=min(20, remaining)) as response:
+                      body = response.read(2 * 1024 * 1024 + 1)
+              except Exception as error:
+                  raise CoordinatorError(type(error).__name__) from None
+              if len(body) > 2 * 1024 * 1024:
+                  raise CoordinatorError("oversized_response")
+              try:
+                  payload = json.loads(body)
+              except (UnicodeDecodeError, json.JSONDecodeError):
+                  raise CoordinatorError("invalid_json") from None
+              if not isinstance(payload, dict):
+                  raise CoordinatorError("invalid_response")
+              return payload
+
+          def current_main_sha():
+              payload = api_json("/git/ref/heads/main")
+              sha = payload.get("object", {}).get("sha")
+              if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+                  raise CoordinatorError("invalid_main_sha")
+              return sha
+
+          def ci_state(sha):
+              payload = api_json(
+                  "/actions/workflows/model-service-ci.yml/runs",
+                  {"branch": "main", "event": "push", "per_page": 100},
+              )
+              runs = payload.get("workflow_runs")
+              if not isinstance(runs, list):
+                  raise CoordinatorError("invalid_workflow_runs")
+              matching = [
+                  run for run in runs
+                  if isinstance(run, dict)
+                  and run.get("name") == "Model Service CI"
+                  and run.get("head_sha") == sha
+                  and run.get("head_branch") == "main"
+                  and run.get("event") == "push"
+                  and isinstance(run.get("head_repository"), dict)
+                  and run["head_repository"].get("full_name") == repository
+              ]
+              if any(
+                  run.get("status") == "completed" and run.get("conclusion") == "success"
+                  for run in matching
+              ):
+                  return "success"
+              if any(run.get("status") != "completed" for run in matching) or not matching:
+                  return "pending"
+              return "failure"
+
+          try:
+              while True:
+                  current_sha = current_main_sha()
+                  state = ci_state(current_sha)
+                  print(f"Release coordinator: sha={current_sha[:12]} ci={state}")
+                  if state == "failure":
+                      raise CoordinatorError("current_main_ci_failed")
+                  if state == "success" and current_main_sha() == current_sha:
+                      with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+                          output.write(f"sha={current_sha}\n")
+                      print(f"Release coordinator selected: sha={current_sha[:12]} ci=success")
+                      break
+                  remaining = deadline - time.monotonic()
+                  if remaining <= 0:
+                      raise CoordinatorError("coordinator_timeout")
+                  time.sleep(min(poll_seconds, remaining))
+          except CoordinatorError as error:
+              print(f"Release coordinator failed: {error}", file=sys.stderr)
+              raise SystemExit(1)
+          PY
+      - name: Trigger exact commit deployment
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          DEPLOY_SHA: ${{ steps.coordinate.outputs.sha }}
+        run: |
+          set +x
+          python - <<'PY'
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          hook_url = os.environ.get("RENDER_DEPLOY_HOOK_URL")
+          deploy_sha = os.environ["DEPLOY_SHA"]
+          if not hook_url:
+              raise SystemExit("RENDER_DEPLOY_HOOK_URL is not configured")
+
+          parsed = urllib.parse.urlsplit(hook_url)
+          query = [(key, value) for key, value in urllib.parse.parse_qsl(
+              parsed.query, keep_blank_values=True
+          ) if key != "ref"]
+          query.append(("ref", deploy_sha))
+          deploy_url = urllib.parse.urlunsplit(parsed._replace(
+              query=urllib.parse.urlencode(query)
+          ))
+          try:
+              request = urllib.request.Request(deploy_url, method="POST")
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  status = response.status
+          except Exception as error:
+              print(f"Render deploy request failed: {type(error).__name__}", file=sys.stderr)
+              raise SystemExit(1)
+          if not 200 <= status < 300:
+              print(f"Render deploy request failed: status={status}", file=sys.stderr)
+              raise SystemExit(1)
+          print(f"Render deploy accepted: status={status} ref={deploy_sha[:12]}")
+          PY
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ steps.coordinate.outputs.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt
+      - name: Wait for exact production release
+        env:
+          RELEASE_SHA: ${{ steps.coordinate.outputs.sha }}
+        run: >-
+          python scripts/wait_for_release.py
+          --url https://stylee-model-service.onrender.com/health
+          --expected-sha "$RELEASE_SHA"
+          --timeout-seconds 900
+      - name: Authenticated provider smoke
+        env:
+          STYLEE_SMOKE_SUPABASE_URL: ${{ secrets.STYLEE_SMOKE_SUPABASE_URL }}
+          STYLEE_SMOKE_SUPABASE_ANON_KEY: ${{ secrets.STYLEE_SMOKE_SUPABASE_ANON_KEY }}
+          STYLEE_SMOKE_EMAIL: ${{ secrets.STYLEE_SMOKE_EMAIL }}
+          STYLEE_SMOKE_PASSWORD: ${{ secrets.STYLEE_SMOKE_PASSWORD }}
+        run: >-
+          python scripts/release_smoke.py
+          --service-url https://stylee-model-service.onrender.com
+          --garment-fixture fixtures/release-smoke/garment.png
+          --person-fixture fixtures/release-smoke/person.jpg
+          --timeout-seconds 600

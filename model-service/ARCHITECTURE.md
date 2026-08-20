@@ -236,20 +236,33 @@ choice, not an application dependency.
 contracts, provider adapters, deployment files and shared tests. The App repo
 vendors the same files so local App/model integration works from one checkout.
 
-Change procedure:
+Canonical-first change procedure:
 
-1. Implement or mirror the change in both repositories in the same work item.
-2. Run all offline Python tests in both copies.
-3. From the App repo run
+1. Edit model behavior only in canonical `fitzw/style-model` and add or update
+   its canonical tests.
+2. Run canonical offline tests, the RAG manifest check, and the canonical CI
+   Docker build before generating a mirror sync. This Mac does not have Docker;
+   the canonical GitHub CI Docker-build job is therefore mandatory production
+   image verification.
+3. Generate the Stylee mirror from the tested canonical revision; never
+   independently edit the mirror's model behavior, tests, deployment files, or
+   governed RAG data.
+4. Run all offline Python tests in both copies. From the App repo run
    `./scripts/check-model-service-sync.sh /path/to/style-model`.
-4. Open linked PRs in both repositories and merge the canonical model PR first.
-5. Re-run the sync check after rebasing either PR.
+5. Open linked PRs in both repositories and merge the canonical model PR first.
+6. Re-run the sync check after rebasing either PR.
 
-The App copy intentionally adds generated Garments2Look index files. Canonical
-`style-model` does not commit large generated data; it falls back to keyword RAG
-until an index is built or fetched from controlled artifact storage. README text
-may be repository-specific, but this architecture file and executable service
-surface must remain identical.
+The deploy workflow uses the GitHub secret `RENDER_DEPLOY_HOOK_URL`; its value
+is configured only in GitHub and is never committed or printed. Optional
+automated authenticated smoke coverage may use dedicated
+`STYLEE_SMOKE_ACCOUNT_EMAIL` and `STYLEE_SMOKE_ACCOUNT_PASSWORD` GitHub
+secrets, also by name only.
+
+The governed 3000-entry Garments2Look index artifact and its manifest are
+versioned in canonical `style-model`; the raw source corpus remains excluded.
+Keyword RAG fallback is runtime safety only: release validation requires the
+governed artifact to be available. README text may be repository-specific, but
+this architecture file and executable service surface must remain identical.
 
 ## 8. Rotation and incident response
 
@@ -272,6 +285,8 @@ Before merge or deployment:
 - Vendored sync check passes.
 - Built client assets contain no provider/service-role key names or values.
 - Production `/health` passes over HTTPS.
+- Production `/health` reports the exact CI-tested `main` SHA, the expected
+  contract version, and an available RAG artifact before the App release moves.
 - Authenticated recognition, standardization and recommendation smoke tests pass
   with newly rotated provider keys.
 - Provider dashboards show expected model, token cap and request volume.

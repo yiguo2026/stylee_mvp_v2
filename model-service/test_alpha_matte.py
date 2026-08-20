@@ -204,6 +204,32 @@ def test_allowed_provider_url_pins_the_validated_public_connection_target():
     assert result == raw
     assert calls == [(provider_url, "93.184.216.34", 7)]
 
+def test_current_dashscope_shanghai_provider_url_is_allowed():
+    raw = fixture_png()
+    provider_url = "https://dashscope-7c2c.oss-cn-shanghai.aliyuncs.com/out.png"
+
+    result = matte.read_provider_image_ref(
+        provider_url,
+        allowed_hosts=(),
+        resolver=lambda host, port: ["93.184.216.34"],
+        transport=lambda url, connect_ip, timeout: _provider_response(
+            200, {"Content-Length": str(len(raw))}, raw,
+        ),
+    )
+
+    assert result == raw
+
+def test_dashscope_host_allowlist_does_not_trust_arbitrary_oss_buckets():
+    for host in (
+        "attacker.oss-cn-shanghai.aliyuncs.com",
+        "dashscope-7c2c.oss-cn-shanghai.aliyuncs.com.evil.example",
+    ):
+        _assert_provider_ref_rejected(
+            f"https://{host}/out.png",
+            ["93.184.216.34"],
+            (),
+        )
+
 def test_provider_remote_read_preserves_input_size_bound():
     try:
         matte.read_provider_image_ref(
@@ -233,6 +259,8 @@ def main():
     test_provider_redirect_to_private_target_is_rejected()
     test_provider_url_rejects_mixed_public_private_dns_answers()
     test_allowed_provider_url_pins_the_validated_public_connection_target()
+    test_current_dashscope_shanghai_provider_url_is_allowed()
+    test_dashscope_host_allowlist_does_not_trust_arbitrary_oss_buckets()
     test_provider_remote_read_preserves_input_size_bound()
     print("ok")
 
