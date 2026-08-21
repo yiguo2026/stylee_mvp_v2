@@ -9,6 +9,15 @@ if (!fs.existsSync(htmlPath)) {
 
 let html = fs.readFileSync(htmlPath, 'utf8');
 
+// baseUrl 与 Expo 保持一致（experiments.baseUrl）。用于子路径部署（GitHub Project Pages）
+// 下，为脚本自行注入的静态资源（字体）补齐前缀，避免 404。未配置时为空串，行为不变。
+let baseUrl = '';
+try {
+  const appJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
+  baseUrl = (appJson.expo && appJson.expo.experiments && appJson.expo.experiments.baseUrl) || '';
+} catch { /* 读取失败则回退为无前缀 */ }
+baseUrl = baseUrl.replace(/\/$/, '');
+
 // ── 1. Generate @font-face rules from dist font files ──
 const fontsBase = path.join(__dirname, '..', 'dist', 'assets', 'node_modules', '@expo-google-fonts');
 
@@ -32,7 +41,7 @@ for (const { family, dir } of fontMap) {
     const files = fs.readdirSync(fullDir);
     const ttf = files.find(f => f.endsWith('.ttf'));
     if (ttf) {
-      const src = `/assets/node_modules/@expo-google-fonts/${dir}/${ttf}`;
+      const src = `${baseUrl}/assets/node_modules/@expo-google-fonts/${dir}/${ttf}`;
       fontFaceCSS += `@font-face{font-family:"${family}";src:url("${src}") format("truetype");font-display:swap;}\n`;
     }
   }
