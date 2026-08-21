@@ -54,6 +54,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      const normalizedUsername = username.trim();
       // 不再前置查 users 表（大小写敏感 + 可能与 auth 不同步会误杀已注册账号）。
       // 直接交给 Supabase Auth 判定账号/密码。
       // Try new encoded email first, fall back to legacy lowercase for old accounts.
@@ -83,6 +84,19 @@ export default function LoginScreen() {
         if (!session) {
           // 触发限流：启动 30s 冷却，避免用户狂点把账号越锁越久
           if (isRateLimited) cooldown.start(30);
+          // 凭证类错误：额外查 users 表区分「账号不存在」与「密码错误」。
+          // 仅在查询成功且返回 0 行时改判为账号不存在；查询报错/超时/RLS 异常时不改判。
+          if (isCredErr && !isRateLimited && !isNetworkErr) {
+            let accountExists = true;
+            try {
+              const res = await withTimeout(
+                supabase.from('users').select('user_id').eq('username', normalizedUsername).limit(1),
+                6000, 'user-exists',
+              );
+              if (!res.error) accountExists = Array.isArray(res.data) && res.data.length > 0;
+            } catch { /* 查询失败则保守处理，不改判 */ }
+            if (!accountExists) { setError('账号不存在'); return; }
+          }
           setError(translateLoginError(primary.error.message));
           return;
         }

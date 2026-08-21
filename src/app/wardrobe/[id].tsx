@@ -9,10 +9,11 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ItemOutfits } from '@/components/ItemOutfits';
+import { ItemAttributes } from '@/components/ItemAttributes';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { StyleeGarmentMedia } from '@/design-system';
-import { WardrobeItem, RecommendedItem, OCCASION_TAGS } from '@/types';
+import { WardrobeItem, RecommendedItem } from '@/types';
 
 // Unified add-source labels for display
 function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
@@ -32,11 +33,9 @@ function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
   return '快速添加';
 }
 
-const SEASON_LABELS: Record<string, string> = { spring: '春', summer: '夏', autumn: '秋', winter: '冬', all_season: '四季' };
-
 export default function ItemDetailScreen() {
   const { id, itemData: itemDataParam } = useLocalSearchParams<{ id: string; itemData?: string }>();
-  const { items, deleteItem } = useWardrobeStore();
+  const { items, deleteItem, updateItem } = useWardrobeStore();
   const [item, setItem] = useState<WardrobeItem | undefined>();
   const [recommendedItem, setRecommendedItem] = useState<RecommendedItem | undefined>();
   const [deleting, setDeleting] = useState(false);
@@ -131,25 +130,6 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const ATTR_LABELS = [
-    { label: '分类', value: item!.category },
-    { label: '颜色', value: item!.color },
-    item!.material && { label: '材质', value: item!.material },
-    item!.brand && { label: '品牌', value: item!.brand },
-    item!.price != null && { label: '价格', value: `¥${item!.price}` },
-    item!.fit_type && { label: '版型', value: item!.fit_type },
-    item!.sleeve_length && { label: '袖长', value: item!.sleeve_length },
-    item!.season && item!.season.length > 0 && { label: '季节', value: item!.season.map(s => SEASON_LABELS[s] || s).join('/') },
-    item!.purchase_date && { label: '购入', value: new Date(item!.purchase_date).toLocaleDateString('zh-CN') },
-    item!.occasion_tags && item!.occasion_tags.length > 0 && {
-      label: '场合',
-      value: item!.occasion_tags.map(t => {
-        const found = OCCASION_TAGS.find(ot => ot.id === t);
-        return found ? found.label : t;
-      }).join('、'),
-    },
-  ].filter(Boolean) as { label: string; value: string }[];
-
   const wearCountText = item!.wear_count ? `穿过${item!.wear_count}次` : '0 次穿着';
   const lastWornText = item!.last_worn_at ? `最近${timeAgo(item!.last_worn_at)}` : '';
 
@@ -186,39 +166,8 @@ export default function ItemDetailScreen() {
           <Text style={styles.metaText}>{item!.category} · {wearCountText}{lastWornText ? ` · 最近${lastWornText}` : ''}</Text>
         </View>
 
-        {/* 基础属性 */}
-        <View style={styles.attrsCard}>
-          {ATTR_LABELS.map((attr, i) => (
-            <View key={attr.label} style={[styles.attrRow, i < ATTR_LABELS.length - 1 && styles.attrRowBorder]}>
-              <Text style={styles.attrLabel}>{attr.label}</Text>
-              <Text style={styles.attrValue}>{attr.value}</Text>
-            </View>
-          ))}
-          {(!item!.fit_type) && (
-            <View style={[styles.attrRow, styles.attrRowBorder]}>
-              <Text style={styles.attrLabel}>版型</Text>
-              <Text style={styles.attrUnset}>—</Text>
-            </View>
-          )}
-          {(!item!.season || item!.season.length === 0) && (
-            <View style={[styles.attrRow, styles.attrRowBorder]}>
-              <Text style={styles.attrLabel}>季节</Text>
-              <Text style={styles.attrUnset}>—</Text>
-            </View>
-          )}
-          {(!item!.occasion_tags || item!.occasion_tags.length === 0) && (
-            <View style={[styles.attrRow, styles.attrRowBorder]}>
-              <Text style={styles.attrLabel}>场合</Text>
-              <Text style={styles.attrUnset}>—</Text>
-            </View>
-          )}
-          {(!item!.purchase_date) && (
-            <View style={styles.attrRow}>
-              <Text style={styles.attrLabel}>购入</Text>
-              <Text style={styles.attrUnset}>—</Text>
-            </View>
-          )}
-        </View>
+        {/* 基础属性 —— 默认仅展示 AI 识别的材质/版型，其余按需添加 */}
+        <ItemAttributes item={item!} onUpdate={(updates) => updateItem(item!.item_id, updates)} />
 
         {/* 穿着记录 */}
         <View style={styles.wearSection}>
@@ -272,7 +221,7 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.three },
 
   imageWrap: {
-    minHeight: 240, maxHeight: 400, borderRadius: Radius.lg, overflow: 'hidden',
+    aspectRatio: 3 / 4, minHeight: 360, maxHeight: 560, borderRadius: Radius.lg, overflow: 'hidden',
     backgroundColor: Colors.paperCard, ...Shadow.two,
   },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
