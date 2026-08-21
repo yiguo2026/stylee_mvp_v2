@@ -2,6 +2,8 @@
 // Stylee MVP v2 — Type Definitions
 // ─────────────────────────────────────────────────────────
 
+import { withBase } from '@/lib/withBase';
+
 // ── Enums ──────────────────────────────────────────────
 export type Gender = 'female' | 'male' | 'other' | 'private';
 
@@ -396,7 +398,7 @@ export interface PresetWardrobeItem {
   for_gender?: ('male' | 'female')[];   // 新增：缺省 = 中性/不限；只写一个 = 该性别专属
 }
 
-export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
+export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = ([
   // ── 中性（原有） ─────────────────────────────
   // 上装
   { name: '白色T恤', category: '上装', color: '白色', material: '纯棉', image_url: '/preset-items/white-tshirt.png', desc: '百搭必备·四季' },
@@ -438,7 +440,10 @@ export const PRESET_BASIC_ITEMS: PresetWardrobeItem[] = [
   { name: '工装长裤', category: '下装', color: '黑色', material: '灯芯绒', image_url: '/preset-items/cargo-trousers.png', desc: '直筒街头·春秋' },
   { name: '帆布鞋', category: '鞋履', color: '白色', material: '帆布', image_url: '/preset-items/canvas-shoes.png', desc: '校园休闲·春秋' },
   { name: '棒球帽', category: '帽巾', color: '白色', material: '棉', image_url: '/preset-items/baseball-cap.png', desc: '街头日常·四季' },
-];
+] as PresetWardrobeItem[])
+  // baseUrl 感知：为预置单品的站点根绝对图片路径补齐部署前缀，
+  // 使其在根部署(/)与子路径部署(/stylee_mvp_v2/)下都能正确加载。
+  .map(item => ({ ...item, image_url: withBase(item.image_url) }));
 
 // ── Category options for pickers ────────────────────────
 

@@ -1,10 +1,13 @@
 import { InspirationCard, InspirationItem } from '@/types';
+import { withBase } from '@/lib/withBase';
 
 // ─── 编辑精选灵感（穿搭灵感单一数据源）────────────────────────────
 // DB inspiration_cards 表不含 items 明细字段，真实单品缩略图
 // (/inspirations/items/*.png) 只在这里定义。首页与灵感详情页共用同一份
 // 数据，避免"图标占位 vs 真实图片"两处数据不一致。非测试用 mock。
-export const FALLBACK_INSPIRATIONS: InspirationCard[] = [
+// 图片路径以站点根绝对路径书写；导出前统一经 withBase() 补齐部署前缀，
+// 使其在根部署(/)与子路径部署(/stylee_mvp_v2/)下都能正确加载。
+const RAW_FALLBACK_INSPIRATIONS: InspirationCard[] = [
   {
     card_id: 'insp-1',
     title: '法式复古街头',
@@ -92,6 +95,13 @@ export const FALLBACK_INSPIRATIONS: InspirationCard[] = [
     ],
   },
 ];
+
+// baseUrl 感知：为灵感卡主图与其单品缩略图的站点根绝对路径统一补齐部署前缀。
+export const FALLBACK_INSPIRATIONS: InspirationCard[] = RAW_FALLBACK_INSPIRATIONS.map(card => ({
+  ...card,
+  image_url: withBase(card.image_url),
+  items: card.items?.map(item => ({ ...item, image_url: withBase(item.image_url) })),
+}));
 
 /**
  * 单一数据源辅助：按 card_id 取回编辑精选灵感卡。
