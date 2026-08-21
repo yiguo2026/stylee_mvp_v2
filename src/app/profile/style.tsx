@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  previewRow: { flexDirection: 'row', gap: Spacing.one },
+  previewRow: { flexDirection: 'row', gap: Spacing.one, alignItems: 'baseline' },
   previewLabel: { ...T.formLabel },
   previewValue: { ...T.bodyText, fontSize: 13, flex: 1 },
 });
