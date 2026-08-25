@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { Colors, Spacing, Radius, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AIResultBanner } from '@/components/AIResultBanner';
+import { TryOnDisclaimer } from '@/components/TryOnDisclaimer';
 import { Toast } from '@/components/Toast';
 import { useTryOnStore } from '@/stores/tryonStore';
 import { trimWhitespace } from '@/lib/trimImage';
@@ -150,6 +151,9 @@ export default function TryOnResultScreen() {
             />
           </View>
         ) : null}
+
+        {/* AI 生成免责声明 */}
+        <TryOnDisclaimer variant="full" />
 
         {/* 场景 + 搭配信息 */}
         <View style={styles.infoRow}>

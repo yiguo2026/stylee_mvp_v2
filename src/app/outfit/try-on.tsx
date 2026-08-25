@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AILoading } from '@/components/AILoading';
+import { TryOnDisclaimer } from '@/components/TryOnDisclaimer';
 import { showToast } from '@/components/Toast';
 import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion } from '@/lib/ai';
 import { gammaTryOn } from '@/lib/gammaService';
@@ -426,6 +427,9 @@ export default function TryOnScreen() {
         {quota ? (
           <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
         ) : null}
+
+        {/* AI 生成免责声明 */}
+        <TryOnDisclaimer variant="inline" />
 
       </ScrollView>
 
