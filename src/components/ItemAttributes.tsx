@@ -10,7 +10,7 @@ import {
   WardrobeItem, OCCASION_TAGS, STYLE_TAGS, CLOTHING_CATEGORIES,
 } from '@/types';
 
-type EditorKind = 'text' | 'single' | 'multi';
+type EditorKind = 'text' | 'single' | 'multi' | 'date';
 
 interface AttrDef {
   key: string;
@@ -36,7 +36,7 @@ const ATTR_DEFS: AttrDef[] = [
   { key: 'occasion', label: '场合', kind: 'multi', options: OCCASION_TAGS.map(t => t.label) },
   { key: 'tags', label: '标签', kind: 'multi', options: STYLE_TAGS.map(t => t.label) },
   { key: 'wash_care', label: '洗涤维护', kind: 'text', placeholder: '如：机洗 / 手洗 / 干洗' },
-  { key: 'purchase_date', label: '购入日期', kind: 'text', placeholder: '如：2025-06' },
+  { key: 'purchase_date', label: '购入日期', kind: 'date', placeholder: '如：2025-06' },
 ];
 
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
@@ -55,10 +55,22 @@ function readValue(item: WardrobeItem, key: string): string {
     case 'occasion': return (item.occasion_tags ?? [])
       .map(id => OCCASION_TAGS.find(t => t.id === id)?.label ?? id).join('、');
     case 'tags': return (item.tags ?? []).join('、');
-    case 'purchase_date': return item.purchase_date
-      ? new Date(item.purchase_date).toLocaleDateString('zh-CN') : '';
+    case 'purchase_date': {
+      if (!item.purchase_date) return '';
+      const d = new Date(item.purchase_date);
+      return isNaN(d.getTime())
+        ? String(item.purchase_date)
+        : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
     default: return '';
   }
+}
+
+// 从任意日期字符串里解析出「年 / 月」，用于日期选择器回填
+function parseYearMonth(s: string): { y: number | null; mo: number | null } {
+  const m = (s ?? '').match(/(\d{4})\D+(\d{1,2})/);
+  if (m) return { y: Number(m[1]), mo: Number(m[2]) };
+  return { y: null, mo: null };
 }
 
 // 把编辑结果映射回 WardrobeItem 字段（尺码/洗涤维护无对应列，仅本地展示）
@@ -375,6 +387,10 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
   const [multi, setMulti] = useState<string[]>(
     initial ? initial.split('、').filter(Boolean) : [],
   );
+  // 日期选择器（购入日期）：按年 / 月选择
+  const initYM = parseYearMonth(initial);
+  const [dateYear, setDateYear] = useState<number | null>(initYM.y);
+  const [dateMonth, setDateMonth] = useState<number | null>(initYM.mo);
 
   const toggleMulti = (opt: string) => {
     setMulti(prev => {
@@ -414,6 +430,67 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
           onPress={submit}
         >
           <Text style={styles.primaryBtnText}>保存</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (def.kind === 'date') {
+    const nowYear = new Date().getFullYear();
+    const years = Array.from({ length: 12 }, (_, i) => nowYear - i);
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    const canSave = dateYear !== null && dateMonth !== null;
+    const submit = () => {
+      if (!canSave) return;
+      onTextSaved(`${dateYear}-${String(dateMonth).padStart(2, '0')}`);
+    };
+    return (
+      <View style={{ gap: Spacing.three }}>
+        <Text style={styles.inlineHint}>年份</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.editChipsRow}>
+            {years.map(y => {
+              const active = dateYear === y;
+              return (
+                <TouchableOpacity
+                  key={y}
+                  style={[styles.editChip, active && styles.editChipActive]}
+                  activeOpacity={0.7}
+                  onPress={() => setDateYear(y)}
+                >
+                  <Text style={[styles.editChipText, active && styles.editChipTextActive]}>{y}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        <Text style={styles.inlineHint}>月份</Text>
+        <View style={styles.editChips}>
+          {months.map(mo => {
+            const active = dateMonth === mo;
+            return (
+              <TouchableOpacity
+                key={mo}
+                style={[styles.editChip, active && styles.editChipActive]}
+                activeOpacity={0.7}
+                onPress={() => setDateMonth(mo)}
+              >
+                <Text style={[styles.editChipText, active && styles.editChipTextActive]}>{mo} 月</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, !canSave && styles.primaryBtnDisabled]}
+          activeOpacity={0.8}
+          disabled={!canSave}
+          onPress={submit}
+        >
+          <Text style={styles.primaryBtnText}>
+            {canSave ? `保存（${dateYear}-${String(dateMonth).padStart(2, '0')}）` : '请选择年份和月份'}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -542,6 +619,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2, color: Colors.ink,
   },
   editChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  editChipsRow: { flexDirection: 'row', gap: Spacing.two, paddingRight: Spacing.two },
   editChip: {
     borderWidth: 1, borderColor: Colors.lineStrong, borderRadius: 20,
     paddingHorizontal: Spacing.three, paddingVertical: 7, backgroundColor: Colors.paper,
