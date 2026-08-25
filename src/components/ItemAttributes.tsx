@@ -167,8 +167,9 @@ export function useItemAttributes(
   };
 
   const afterCommitFlow = () => {
-    if (sheetOrigin === 'add') backToPick();
-    else closeSheet();
+    // 设置完一个属性的值后直接收起整个弹层（不再停留在「添加属性」列表）。
+    // 若需继续补充，再次点「+ 添加属性」即可；编辑中想换一个属性可用头部「返回」。
+    closeSheet();
   };
 
   const handleSinglePicked = (key: string, value: string) => {
