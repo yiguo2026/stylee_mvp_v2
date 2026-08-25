@@ -26,11 +26,17 @@ function legacyUsernameToEmail(username: string) {
 
 function translateLoginError(msg: string): string {
   const m = msg.toLowerCase();
-  if (m.includes('invalid login credentials') || m.includes('invalid password')) return '账号或密码错误';
+  if (m.includes('invalid login credentials') || m.includes('invalid password') || m.includes('invalid credentials')) return '账号或密码错误';
   if (m.includes('email not confirmed')) return '账号未验证';
   if (m.includes('too many requests') || m.includes('rate limit')) return '尝试次数过多，请稍后再试';
-  if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络';
-  return '账号或密码错误，请重试';
+  // 后端密钥停用 / 未配置 / 鉴权失败（如 Supabase「Legacy API keys are disabled」401）：
+  // 如实提示「服务暂不可用」，避免把服务端错误误判成「账号或密码错误」。
+  if (m.includes('legacy api key') || m.includes('api key') || m.includes('apikey')
+    || m.includes('unauthorized') || m.includes('401') || m.includes('not configured')
+    || m.includes('service') && m.includes('disabled')) return '登录服务暂不可用，请稍后再试';
+  if (m.includes('network') || m.includes('fetch') || m.includes('timeout')) return '网络连接失败，请检查网络';
+  // 兜底不再默认成「账号或密码错误」——未知错误不应误导为凭证错误。
+  return '登录失败，请稍后再试';
 }
 
 export default function LoginScreen() {
