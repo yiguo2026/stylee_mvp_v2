@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   sheet: {
     backgroundColor: Colors.paperCard,
     borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl,
-    maxHeight: 560, overflow: 'hidden',
+    overflow: 'hidden',
     borderTopWidth: 1, borderColor: Colors.lineSoft,
     ...Shadow.three,
   },
@@ -501,7 +501,8 @@ const styles = StyleSheet.create({
   sheetBackText: { ...T.micro, color: Colors.walnut2 },
   sheetTitle: { ...T.formLabel, flex: 1, textAlign: 'center' },
   sheetCloseText: { ...T.micro, color: Colors.terracotta },
-  sheetScroll: { flexGrow: 0 },
+  // 弹层高度随内容自适应：内容少则贴合内容，超过 maxHeight 才在内部滚动
+  sheetScroll: { flexGrow: 0, maxHeight: 420 },
   sheetBody: { padding: Spacing.three },
 
   pickerHint: { ...T.micro, color: Colors.walnut2 },
