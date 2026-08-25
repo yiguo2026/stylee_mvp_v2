@@ -55,6 +55,8 @@ function readValue(item: WardrobeItem, key: string): string {
     case 'occasion': return (item.occasion_tags ?? [])
       .map(id => OCCASION_TAGS.find(t => t.id === id)?.label ?? id).join('、');
     case 'tags': return (item.tags ?? []).join('、');
+    case 'size': return (item.ai_recognized_attrs?.size as string) ?? '';
+    case 'wash_care': return (item.ai_recognized_attrs?.wash_care as string) ?? '';
     case 'purchase_date': {
       if (!item.purchase_date) return '';
       const d = new Date(item.purchase_date);
@@ -88,7 +90,8 @@ function toUpdate(key: string, value: string): Partial<WardrobeItem> | null {
       occasion_tags: arr.map(l => OCCASION_TAGS.find(t => t.label === l)?.id ?? l),
     };
     case 'tags': return { tags: arr as unknown as WardrobeItem['tags'] };
-    default: return null; // size / wash_care / purchase_date 仅本地
+    case 'purchase_date': return { purchase_date: value };
+    default: return null; // size / wash_care 存入 ai_recognized_attrs（见 commit）
   }
 }
 
@@ -132,11 +135,20 @@ export function useItemAttributes(
   item: WardrobeItem,
   onUpdate: (updates: Partial<WardrobeItem>) => void,
 ): AttributesModel {
-  const [values, setValues] = useState<Record<string, string>>(() => ({
-    material: readValue(item, 'material'),
-    fit_type: readValue(item, 'fit_type'),
-  }));
-  const [extras, setExtras] = useState<string[]>([]);
+  // 从单品已有数据里回填所有属性值 —— 保证「离开再进来」时，之前补充过的属性
+  // 依然显示（此前仅回填了核心两项，导致非核心属性看起来「消失」了）。
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    ATTR_DEFS.forEach(d => {
+      const v = readValue(item, d.key);
+      if (v || CORE_KEYS.includes(d.key)) seed[d.key] = v;
+    });
+    return seed;
+  });
+  // extras：所有「有值的非核心属性」都要作为已添加的行展示。
+  const [extras, setExtras] = useState<string[]>(() =>
+    ATTR_DEFS.filter(d => !d.aiCore && !!readValue(item, d.key)).map(d => d.key),
+  );
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<SheetMode>('edit');
@@ -160,9 +172,13 @@ export function useItemAttributes(
       manual_fields?: string[];
     } = item.ai_recognized_attrs ?? {};
     const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
+    // size / wash_care 没有独立数据库列，持久化到已存在的 ai_recognized_attrs JSON 列，
+    // 保证离开详情页再进来时仍能读回（配合 store 的乐观更新）。
+    const localExtra: Record<string, unknown> = {};
+    if (key === 'size' || key === 'wash_care') localExtra[key] = value;
     onUpdate({
       ...(upd ?? {}),
-      ai_recognized_attrs: { ...existing, manual_fields },
+      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields },
     });
   };
 

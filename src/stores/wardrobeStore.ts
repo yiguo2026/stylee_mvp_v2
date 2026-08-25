@@ -125,17 +125,23 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   updateItem: async (itemId, updates) => {
+    // 先做乐观本地更新：保证即使云端（Supabase）鉴权异常/离线，
+    // 用户在单品详情页的编辑也能即时生效并在本次会话内保留，
+    // 避免「加完属性、离开再进来就没了」。
+    const prev = get().items.find(i => i.item_id === itemId);
+    set(state => ({
+      items: state.items.map(i => i.item_id === itemId ? { ...i, ...updates } : i),
+    }));
     try {
       const { error } = await supabase
         .from('wardrobe_items')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('item_id', itemId);
       if (error) throw error;
-      set(state => ({
-        items: state.items.map(i => i.item_id === itemId ? { ...i, ...updates } : i),
-      }));
     } catch (e: any) {
+      // 云端写入失败不回滚本地更改（demo 环境云端可能不可用），仅记录错误
       set({ error: e.message });
+      if (prev) { /* 保留本地乐观更新，不还原 */ }
     }
   },
 
