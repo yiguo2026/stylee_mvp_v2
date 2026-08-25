@@ -146,15 +146,20 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   deleteItem: async (itemId) => {
+    // 乐观删除：先从本地列表移除（与 updateItem 的乐观策略一致），
+    // 保证即使云端鉴权异常/离线，用户的删除操作也能即时反映在 UI 上。
+    const prev = get().items;
+    set(state => ({ items: state.items.filter(i => i.item_id !== itemId) }));
     try {
       const { error } = await supabase
         .from('wardrobe_items')
         .update({ status: 'archived', updated_at: new Date().toISOString() })
         .eq('item_id', itemId);
       if (error) throw error;
-      set(state => ({ items: state.items.filter(i => i.item_id !== itemId) }));
     } catch (e: any) {
+      // 云端失败不还原本地删除（demo 环境云端可能不可用），仅记录错误
       set({ error: e.message });
+      if (prev) { /* 保留本地乐观删除，不还原 */ }
     }
   },
 

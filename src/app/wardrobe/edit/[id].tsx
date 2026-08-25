@@ -12,7 +12,6 @@ import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
 import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
 import { CategoryIcon } from '@/components/CategoryIcon';
-import { ConfirmModal } from '@/components/ConfirmModal';
 import { Toast } from '@/components/Toast';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType } from '@/types';
 
@@ -41,7 +40,7 @@ const CATEGORIES = CLOTHING_CATEGORIES_WITH_ALL.filter(c => c !== '全部') as C
 
 export default function EditItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { items, updateItem, deleteItem } = useWardrobeStore();
+  const { items, updateItem } = useWardrobeStore();
   const [item, setItem] = useState(items.find(i => i.item_id === id));
 
   const [name, setName] = useState(item?.name ?? '');
@@ -59,22 +58,26 @@ export default function EditItemScreen() {
   const [standardizing, setStandardizing] = useState(false);
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   const reqTokenRef = useRef(0);
+  const bgTokenRef = useRef(0); // 后台换图任务令牌：连续换图时只认最新一次
+  const mountedRef = useRef(true);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string) => {
+    if (!mountedRef.current) return;
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(''), 2200);
   }, []);
 
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
 
   useEffect(() => {
     const found = items.find(i => i.item_id === id);
@@ -135,15 +138,18 @@ export default function EditItemScreen() {
 
     // 换图立即生效：先展示并落地原图，用户可马上继续编辑或直接离开，
     // 抠图 / 标准化 / 重新识别在后台异步进行，完成后自动替换为透明主图。
+    const token = ++bgTokenRef.current; // 标记本次换图，后台任务只在仍是最新时生效
     setImageUri(localUri);
     updateItem(item.item_id, { image_url: localUri });
     setStandardizing(true);
-    void standardizeInBackground(localUri);
+    void standardizeInBackground(localUri, token);
   };
 
   // 后台异步处理：标准化抠图去背景 + 上传 + 重新识别（不阻塞用户操作）
-  const standardizeInBackground = async (localUri: string) => {
+  const standardizeInBackground = async (localUri: string, token: number) => {
     if (!item) return;
+    // 仍是最新一次换图、且组件未卸载时才继续
+    const stillCurrent = () => mountedRef.current && bgTokenRef.current === token;
     try {
       const standardizationResult = await aiStandardizeGarment(localUri, category, 'flatlay', {
         color,
@@ -158,6 +164,7 @@ export default function EditItemScreen() {
           meta: { source: 'model-service/error', durationMs: 0, ok: false, requestId: undefined, failedStage: undefined },
         };
       });
+      if (!stillCurrent()) return; // 期间又换了新图或已离开，丢弃旧结果
 
       const persistedImage = await persistGarmentMaster({
         sourceUri: localUri,
@@ -166,6 +173,7 @@ export default function EditItemScreen() {
         acceptance: standardizationResult.acceptance,
         diagnostics: standardizationResult.meta,
       });
+      if (!stillCurrent()) return;
       if (!persistedImage.ok) {
         showToast('背景处理失败，已保留原图');
         return;
@@ -180,6 +188,7 @@ export default function EditItemScreen() {
           ...persistedImage.metadata,
         },
       });
+      if (!stillCurrent()) return;
       showToast(
         persistedImage.status === 'transparent_master'
           ? '已完成背景处理'
@@ -188,9 +197,9 @@ export default function EditItemScreen() {
       if (persistedImage.status === 'transparent_master') void runRecognition(finalUrl);
     } catch (e) {
       console.warn('[EditItem] standardizeInBackground error:', e);
-      showToast('背景处理失败，已保留原图');
+      if (stillCurrent()) showToast('背景处理失败，已保留原图');
     } finally {
-      setStandardizing(false);
+      if (stillCurrent()) setStandardizing(false);
     }
   };
 
@@ -225,14 +234,6 @@ export default function EditItemScreen() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const confirmDelete = async () => {
-    setShowDeleteConfirm(false);
-    if (!item) return;
-    setDeleting(true);
-    await deleteItem(item.item_id);
-    router.back();
   };
 
   if (!item) {
@@ -422,17 +423,6 @@ export default function EditItemScreen() {
 
         {/* Delete button removed — already available on detail page header */}
       </ScrollView>
-
-      <ConfirmModal
-        visible={showDeleteConfirm}
-        title="删除衣物"
-        message={`确认删除"${item.name}"吗？`}
-        confirmText="删除"
-        confirmStyle="destructive"
-        onConfirm={confirmDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        loading={deleting}
-      />
 
       <Toast visible={!!toast} message={toast} />
     </SafeAreaView>

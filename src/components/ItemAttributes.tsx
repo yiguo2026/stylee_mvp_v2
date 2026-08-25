@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   TextInput, Pressable, ScrollView,
@@ -170,6 +170,19 @@ export function useItemAttributes(
   const [sheetMode, setSheetMode] = useState<SheetMode>('edit');
   const [sheetKey, setSheetKey] = useState<string | null>(null);
   const [sheetOrigin, setSheetOrigin] = useState<SheetOrigin>('row');
+
+  // 当 item 身份或云端数据变化时（例如详情页先用路由简略数据、随后异步补全 Supabase 记录），
+  // 惰性初始化的 useState 不会自动更新，这里主动重新回填，避免属性显示与真实数据不同步。
+  useEffect(() => {
+    const seed: Record<string, string> = {};
+    ATTR_DEFS.forEach(d => {
+      const v = readValue(item, d.key);
+      if (v || CORE_KEYS.includes(d.key)) seed[d.key] = v;
+    });
+    setValues(seed);
+    setExtras(ATTR_DEFS.filter(d => !d.aiCore && !!readValue(item, d.key)).map(d => d.key));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.item_id, item.updated_at]);
 
   const addableDefs = useMemo(
     () => ATTR_DEFS.filter(d => !d.aiCore && !extras.includes(d.key)),
