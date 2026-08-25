@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity,
+  View, Text, TouchableOpacity, Image,
   StyleSheet, ScrollView, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -13,7 +13,42 @@ import { ItemAttributes } from '@/components/ItemAttributes';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { StyleeGarmentMedia } from '@/design-system';
+import type { GarmentMediaTone } from '@/design-system';
 import { WardrobeItem, RecommendedItem } from '@/types';
+
+// 详情页主图：以 contain 完整展示单品（不裁切），容器高度按图片真实长宽比自适应，
+// 并限制在合理的最小/最大高度区间内，保证鞋/上装/连衣裙等不同比例都能完整居中显示。
+function HeroMedia({ imageUri, tone, category }: {
+  imageUri?: string | null;
+  tone: GarmentMediaTone;
+  category: string;
+}) {
+  const [ratio, setRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!imageUri) { setRatio(null); return; }
+    let active = true;
+    Image.getSize(
+      imageUri,
+      (w, h) => {
+        if (!active || !w || !h) return;
+        // 夹在 0.62(偏瘦长) ~ 1.2(偏宽) 之间，避免极端比例导致容器过高/过扁
+        setRatio(Math.min(1.2, Math.max(0.62, w / h)));
+      },
+      () => { /* 读取失败保持默认 3/4 */ },
+    );
+    return () => { active = false; };
+  }, [imageUri]);
+
+  return (
+    <View style={[styles.imageWrap, ratio ? { aspectRatio: ratio } : null]}>
+      {imageUri
+        ? <StyleeGarmentMedia imageUri={imageUri} tone={tone} />
+        : <View style={styles.imagePlaceholder}><CategoryIcon category={category} size={80} color={Colors.walnut2} /></View>}
+    </View>
+  );
+}
+
 
 // Unified add-source labels for display
 function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
@@ -89,12 +124,7 @@ export default function ItemDetailScreen() {
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.imageWrap}>
-            {rec.image_url
-              ? <StyleeGarmentMedia imageUri={rec.image_url} tone="recommended" />
-              : <View style={styles.imagePlaceholder}><CategoryIcon category={rec.category} size={80} color={Colors.walnut2} /></View>
-            }
-          </View>
+          <HeroMedia imageUri={rec.image_url} tone="recommended" category={rec.category} />
           <Text style={styles.itemName}>{rec.name}</Text>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryBadgeText}>{rec.category}</Text>
@@ -151,12 +181,7 @@ export default function ItemDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Hero Image */}
-        <View style={styles.imageWrap}>
-          {item!.image_url
-                ? <StyleeGarmentMedia imageUri={item!.image_url} tone="owned" />
-            : <View style={styles.imagePlaceholder}><CategoryIcon category={item!.category} size={80} color={Colors.walnut2} /></View>
-          }
-        </View>
+        <HeroMedia imageUri={item!.image_url} tone="owned" category={item!.category} />
 
         {/* Name */}
         <Text style={styles.itemName}>{item!.name}</Text>

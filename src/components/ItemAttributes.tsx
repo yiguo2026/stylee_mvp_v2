@@ -1,15 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, Platform, Modal,
+  TextInput, Modal,
 } from 'react-native';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { showToast } from '@/components/Toast';
 import {
   WardrobeItem, OCCASION_TAGS, STYLE_TAGS, CLOTHING_CATEGORIES,
 } from '@/types';
-
-const isWeb = Platform.OS === 'web';
 
 type EditorKind = 'text' | 'single' | 'multi';
 
@@ -216,10 +214,15 @@ function AttrRow({ def, value, showBorder, onPress, onRemove }: {
           {def.aiCore ? <View style={styles.aiBadge}><Text style={styles.aiBadgeText}>AI 识别</Text></View> : null}
         </View>
         <View style={styles.rowValueWrap}>
-          {value
-            ? <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
-            : <Text style={styles.rowUnset}>{def.aiCore ? '待识别 · 点击补充' : '点击填写'}</Text>}
-          <Text style={styles.rowChevron}>{def.aiCore ? '修正' : '›'}</Text>
+          {value ? (
+            <>
+              <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
+              <Text style={styles.rowChevron}>{def.aiCore ? '修正' : '›'}</Text>
+            </>
+          ) : (
+            // 空值时只保留单一补充入口，整行可点击进入编辑，不再额外出现「修正」
+            <Text style={styles.rowUnset}>{def.aiCore ? '待识别 · 点击补充' : '点击填写'}</Text>
+          )}
         </View>
       </TouchableOpacity>
       {onRemove ? (
@@ -248,27 +251,32 @@ function AttrEditor({ def, initial, onCancel, onSave }: {
   const result = def.kind === 'multi' ? multi.join('、') : text.trim();
   const canSave = def.kind === 'multi' ? true : result.length > 0;
 
-  const body = (
-    <View style={styles.overlay}>
-      <View style={styles.dialog}>
-        <Text style={styles.dialogTitle}>
-          {def.aiCore ? `修正${def.label}` : `填写${def.label}`}
-        </Text>
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.overlay}>
+        <View style={styles.dialog}>
+          <Text style={styles.dialogTitle}>
+            {def.aiCore ? `修正${def.label}` : `填写${def.label}`}
+          </Text>
 
-        {def.kind === 'text' && (
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder={def.placeholder}
-            placeholderTextColor={Colors.walnut2}
-            autoFocus
-          />
-        )}
+          {/* 内容区可滚动，避免 chips 过多时把底部按钮顶出可视区域 */}
+          <ScrollView
+            style={styles.dialogBody}
+            contentContainerStyle={def.kind === 'text' ? undefined : styles.editChips}
+            keyboardShouldPersistTaps="handled"
+          >
+            {def.kind === 'text' && (
+              <TextInput
+                style={styles.input}
+                value={text}
+                onChangeText={setText}
+                placeholder={def.placeholder}
+                placeholderTextColor={Colors.walnut2}
+                autoFocus
+              />
+            )}
 
-        {(def.kind === 'single' || def.kind === 'multi') && (
-          <ScrollView style={{ maxHeight: 240 }} contentContainerStyle={styles.editChips}>
-            {(def.options ?? []).map(opt => {
+            {(def.kind === 'single' || def.kind === 'multi') && (def.options ?? []).map(opt => {
               const active = def.kind === 'single' ? text === opt : multi.includes(opt);
               return (
                 <TouchableOpacity
@@ -282,27 +290,25 @@ function AttrEditor({ def, initial, onCancel, onSave }: {
               );
             })}
           </ScrollView>
-        )}
 
-        <View style={styles.dialogBtns}>
-          <TouchableOpacity style={[styles.dBtn, styles.dCancel]} onPress={onCancel} activeOpacity={0.7}>
-            <Text style={styles.dCancelText}>取消</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.dBtn, styles.dConfirm, !canSave && styles.dDisabled]}
-            disabled={!canSave}
-            onPress={() => onSave(result)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.dConfirmText}>保存</Text>
-          </TouchableOpacity>
+          {/* 底部操作按钮始终固定可见 */}
+          <View style={styles.dialogBtns}>
+            <TouchableOpacity style={[styles.dBtn, styles.dCancel]} onPress={onCancel} activeOpacity={0.7}>
+              <Text style={styles.dCancelText}>取消</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dBtn, styles.dConfirm, !canSave && styles.dDisabled]}
+              disabled={!canSave}
+              onPress={() => onSave(result)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dConfirmText}>保存</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </Modal>
   );
-
-  if (isWeb) return <View style={styles.webLayer}>{body}</View>;
-  return <Modal visible transparent animationType="fade" onRequestClose={onCancel}>{body}</Modal>;
 }
 
 const styles = StyleSheet.create({
@@ -354,13 +360,13 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.terracotta },
 
   // editor
-  webLayer: { ...StyleSheet.absoluteFillObject, zIndex: 300 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: Spacing.four },
   dialog: {
-    width: '86%', maxWidth: 380, backgroundColor: Colors.paper,
+    width: '86%', maxWidth: 380, maxHeight: '85%', backgroundColor: Colors.paper,
     borderRadius: Radius.lg, padding: Spacing.four, gap: Spacing.three,
   },
   dialogTitle: { ...T.sectionTitle, textAlign: 'center' },
+  dialogBody: { flexGrow: 0, flexShrink: 1 },
   input: {
     ...T.inputText, backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
     borderRadius: Radius.md, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2, color: Colors.ink,
