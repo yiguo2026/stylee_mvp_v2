@@ -138,6 +138,10 @@ export function useItemAttributes(
 
   const commit = (key: string, value: string) => {
     setValues(v => ({ ...v, [key]: value }));
+    // 仅在真正写入有效值时，才把非核心属性加入列表；空值不落地、不新增空行
+    if (value && !CORE_KEYS.includes(key)) {
+      setExtras(e => (e.includes(key) ? e : [...e, key]));
+    }
     const upd = toUpdate(key, value);
     const existing: Record<string, unknown> & {
       recognized_fields?: string[];
@@ -162,7 +166,8 @@ export function useItemAttributes(
   const pickAttrToAdd = (key: string) => {
     const existing = readValue(item, key);
     if (existing) setValues(v => ({ ...v, [key]: existing }));
-    setExtras(e => (e.includes(key) ? e : [...e, key]));
+    // 不在此处加入 extras：只有真正保存了有效值后（commit）才落地为属性行，
+    // 避免用户点开却未填写就留下空行，产生「没填也提交成功」的错觉。
     setSheetMode('edit'); setSheetKey(key);
   };
 
@@ -380,19 +385,34 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
   };
 
   if (def.kind === 'text') {
+    const trimmed = text.trim();
+    const isPrice = def.key === 'price';
+    // 价格需为有效的非负数字；其余文本非空即可
+    const priceInvalid = isPrice && trimmed.length > 0 && !(Number(trimmed) >= 0);
+    const canSave = trimmed.length > 0 && !priceInvalid;
+    const submit = () => { if (canSave) onTextSaved(trimmed); };
     return (
-      <View style={{ gap: Spacing.three }}>
+      <View style={{ gap: Spacing.two }}>
         <TextInput
           style={styles.input}
           value={text}
           onChangeText={setText}
-          onSubmitEditing={() => onTextSaved(text.trim())}
+          onSubmitEditing={submit}
           returnKeyType="done"
+          keyboardType={isPrice ? 'numeric' : 'default'}
           placeholder={def.placeholder}
           placeholderTextColor={Colors.walnut2}
           autoFocus
         />
-        <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.8} onPress={() => onTextSaved(text.trim())}>
+        <Text style={styles.inlineHint}>
+          {priceInvalid ? '请输入有效的价格数字' : `请输入${def.label}后保存`}
+        </Text>
+        <TouchableOpacity
+          style={[styles.primaryBtn, !canSave && styles.primaryBtnDisabled]}
+          activeOpacity={0.8}
+          disabled={!canSave}
+          onPress={submit}
+        >
           <Text style={styles.primaryBtnText}>保存</Text>
         </TouchableOpacity>
       </View>
@@ -534,5 +554,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, borderRadius: Radius.md,
     paddingVertical: Spacing.two + 4, alignItems: 'center',
   },
+  primaryBtnDisabled: { opacity: 0.4 },
   primaryBtnText: { ...T.buttonSecondary, color: Colors.paper },
 });
