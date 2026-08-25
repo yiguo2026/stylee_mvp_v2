@@ -583,6 +583,10 @@ export default function OutfitResultScreen() {
                     loading={addingRecIdx === idx}
                     imageUri={rec.image_url}
                     mediaTone="recommended"
+                    onPress={adjustMode ? undefined : () => router.push({
+                      pathname: '/wardrobe/[id]',
+                      params: { id: `rec_${rec.name}`, itemData: JSON.stringify(rec) },
+                    })}
                     media={<CategoryIcon category={rec.category} size={26} color={ds.color.semantic.text.tertiary} />}
                     actions={
                       <>

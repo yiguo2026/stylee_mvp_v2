@@ -6,6 +6,8 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { useWishlistStore } from '@/stores/wishlistStore';
+import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ItemOutfits } from '@/components/ItemOutfits';
@@ -79,6 +81,7 @@ export default function ItemDetailScreen() {
   const { items, deleteItem, updateItem } = useWardrobeStore();
   const [item, setItem] = useState<WardrobeItem | undefined>();
   const [recommendedItem, setRecommendedItem] = useState<RecommendedItem | undefined>();
+  const [notFound, setNotFound] = useState(false);
 
   const isRecommended = id.startsWith('rec_');
 
@@ -88,8 +91,8 @@ export default function ItemDetailScreen() {
       return;
     }
     const found = items.find(i => i.item_id === id);
-    if (found) { setItem(found); return; }
-    // Not in store (e.g. navigated from an outfit detail page) — fetch directly.
+    if (found) { setItem(found); setNotFound(false); return; }
+    // Not in store (e.g. navigated from an outfit / record page) — fetch directly.
     let active = true;
     (async () => {
       const { data } = await supabase
@@ -97,10 +100,29 @@ export default function ItemDetailScreen() {
         .select('*')
         .eq('item_id', id)
         .maybeSingle();
-      if (active && data) setItem(data as WardrobeItem);
+      if (!active) return;
+      if (data) setItem(data as WardrobeItem);
+      else setNotFound(true); // 查不到就给明确空态，避免无限转圈
     })();
     return () => { active = false; };
   }, [id, itemDataParam, items, isRecommended]);
+
+  // 从记录/推荐页进入但单品已被删除或云端不可用时，给出可返回的空态
+  if (notFound && !item && !recommendedItem) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.back}>← 返回</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle}>没有找到这件单品</Text>
+          <Text style={styles.emptyHint}>它可能已被删除，或暂时无法加载</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!item && !recommendedItem) {
     return (
@@ -113,43 +135,132 @@ export default function ItemDetailScreen() {
   }
 
   if (recommendedItem) {
-    const rec = recommendedItem;
-    const recAttrs = [
-      { label: '分类', value: rec.category },
-      { label: '颜色', value: rec.color },
-      rec.description && { label: '描述', value: rec.description },
-    ].filter(Boolean) as { label: string; value: string }[];
-
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>← 返回</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={styles.content}>
-          <HeroMedia imageUri={rec.image_url} tone="recommended" category={rec.category} />
-          <Text style={styles.itemName}>{rec.name}</Text>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{rec.category}</Text>
-          </View>
-          <View style={styles.attrsCard}>
-            {recAttrs.map((attr, i) => (
-              <View key={attr.label} style={[styles.attrRow, i < recAttrs.length - 1 && styles.attrRowBorder]}>
-                <Text style={styles.attrLabel}>{attr.label}</Text>
-                <Text style={styles.attrValue}>{attr.value}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.recHint}>
-            <Text style={styles.recHintText}>这是推荐单品，尚未加入衣橱</Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
+    return <RecommendedItemDetail rec={recommendedItem} />;
   }
 
   return <OwnedItemDetail item={item!} updateItem={updateItem} deleteItem={deleteItem} />;
+}
+
+// 推荐态单品详情：来自灵感页 / 推荐结果页的「尚未加入衣橱」单品。
+// 只读展示 + 提供「加入衣橱 / 加入心愿单」两个行动点，避免成为死胡同。
+function RecommendedItemDetail({ rec }: { rec: RecommendedItem }) {
+  const { user } = useUserStore();
+  const addToWardrobe = useWardrobeStore(s => s.addItem);
+  const addToWishlist = useWishlistStore(s => s.addItem);
+  const [adding, setAdding] = useState(false);
+  const [wishing, setWishing] = useState(false);
+  const [added, setAdded] = useState(false);
+  const [wished, setWished] = useState(false);
+
+  const recAttrs = [
+    { label: '分类', value: rec.category },
+    { label: '颜色', value: rec.color },
+    rec.description && { label: '描述', value: rec.description },
+  ].filter(Boolean) as { label: string; value: string }[];
+
+  const handleAddWardrobe = async () => {
+    if (added || adding) return;
+    if (!user?.id) { showToast('请先登录后再添加'); return; }
+    setAdding(true);
+    try {
+      const saved = await addToWardrobe({
+        user_id: user.id,
+        name: rec.name,
+        category: rec.category,
+        color: rec.color || '',
+        source_type: 'manual',
+        source_label: '灵感推荐添加',
+        status: 'active',
+        image_url: rec.image_url || undefined,
+      });
+      if (!saved) {
+        const err = useWardrobeStore.getState().error;
+        showToast(err ? `添加失败：${err}` : '添加失败，请稍后重试', 'error');
+        return;
+      }
+      setAdded(true);
+      showToast(`「${rec.name}」已加入衣橱`, 'success');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleAddWishlist = async () => {
+    if (wished || wishing) return;
+    if (!user?.id) { showToast('请先登录后再添加'); return; }
+    setWishing(true);
+    try {
+      const saved = await addToWishlist({
+        user_id: user.id,
+        name: rec.name,
+        category: rec.category,
+        color: rec.color || '',
+        image_url: rec.image_url,
+        source: 'ai_recommended',
+      });
+      if (!saved) {
+        const err = useWishlistStore.getState().error;
+        showToast(err ? `加入心愿单失败：${err}` : '加入心愿单失败，请稍后重试', 'error');
+        return;
+      }
+      setWished(true);
+      showToast('已加入心愿单', 'success');
+    } finally {
+      setWishing(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.back}>← 返回</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <HeroMedia imageUri={rec.image_url} tone="recommended" category={rec.category} />
+        <Text style={styles.itemName}>{rec.name}</Text>
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryBadgeText}>{rec.category}</Text>
+        </View>
+        <View style={styles.attrsCard}>
+          {recAttrs.map((attr, i) => (
+            <View key={attr.label} style={[styles.attrRow, i < recAttrs.length - 1 && styles.attrRowBorder]}>
+              <Text style={styles.attrLabel}>{attr.label}</Text>
+              <Text style={styles.attrValue}>{attr.value}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.recHint}>
+          <Text style={styles.recHintText}>这是推荐单品，尚未加入衣橱</Text>
+        </View>
+      </ScrollView>
+
+      {/* 底部行动条：把只读推荐页变成可操作——加入衣橱后即可像自有单品一样编辑 */}
+      <View style={styles.recActionBar}>
+        <TouchableOpacity
+          style={[styles.recActionSecondary, (wished || wishing) && styles.recActionDisabled]}
+          activeOpacity={0.85}
+          disabled={wished || wishing}
+          onPress={handleAddWishlist}
+        >
+          <Text style={styles.recActionSecondaryText}>
+            {wished ? '已在心愿单' : wishing ? '添加中…' : '加入心愿单'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.recActionPrimary, (added || adding) && styles.recActionDisabled]}
+          activeOpacity={0.85}
+          disabled={added || adding}
+          onPress={handleAddWardrobe}
+        >
+          <Text style={styles.recActionPrimaryText}>
+            {added ? '已加入衣橱' : adding ? '添加中…' : '加入衣橱'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 }
 
 function OwnedItemDetail({ item, updateItem, deleteItem }: {
@@ -362,4 +473,24 @@ const styles = StyleSheet.create({
 
   recHint: { backgroundColor: Colors.signalSoft, borderRadius: Radius.md, padding: Spacing.three, alignItems: 'center' },
   recHintText: { ...T.itemDesc, color: Colors.walnut2 },
+
+  emptyTitle: { ...T.sectionTitle, fontSize: 18, color: Colors.ink, marginBottom: Spacing.one },
+  emptyHint: { ...T.itemDesc, color: Colors.walnut2 },
+
+  recActionBar: {
+    flexDirection: 'row', gap: Spacing.two,
+    paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three,
+    borderTopWidth: 1, borderTopColor: Colors.line, backgroundColor: Colors.paper,
+  },
+  recActionSecondary: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.three,
+    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.lineStrong, backgroundColor: Colors.paperCard,
+  },
+  recActionSecondaryText: { ...T.buttonSecondary, color: Colors.walnut },
+  recActionPrimary: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.three,
+    borderRadius: Radius.md, backgroundColor: Colors.terracotta,
+  },
+  recActionPrimaryText: { ...T.buttonSecondary, color: '#fff' },
+  recActionDisabled: { opacity: 0.55 },
 });
