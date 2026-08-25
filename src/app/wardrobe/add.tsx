@@ -210,12 +210,18 @@ export default function AddWardrobeItem() {
     if (item.season?.length) setSeasons(item.season);
     if (item.occasion_tags?.length) setOccasionTags(item.occasion_tags);
     setPhotoType(detectedPhotoType);
+    // 记录「确由 AI 识别产出且非空」的字段 key（与 ItemAttributes 的属性 key 对齐）。
+    // 仅 AI 实际返回非空的字段才计入；AI 未识别/留空的字段不加。
+    const recognizedFields: string[] = [];
+    if (item.material) recognizedFields.push('material');
+    if (item.fit_type) recognizedFields.push('fit_type');
     setRecognizedAttrs({
       style: item.style || null,
       photo_type: detectedPhotoType,
       needs_review: item.needs_review ?? false,
       confidence: item.confidence ?? null,
       detection_index: item.index,
+      recognized_fields: recognizedFields,
     });
     return detectedPhotoType;
   };

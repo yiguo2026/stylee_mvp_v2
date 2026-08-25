@@ -120,8 +120,12 @@ export interface WardrobeItem {
   season?: Season[];      // v2: 多选季节
   purchase_date?: string;  // v2
   occasion_tags?: string[]; // v2: 场合标签
-  // 兼容既有图片处理元数据；manual_fields 记录被用户手动校准过的属性 key（非破坏性可选增补）
-  ai_recognized_attrs?: Record<string, unknown> & { manual_fields?: string[] };
+  // 兼容既有图片处理元数据；
+  // recognized_fields 记录「由 AI 首次识别产出的属性 key 集合」，manual_fields 记录被用户手动校准过的属性 key（均为非破坏性可选增补）
+  ai_recognized_attrs?: Record<string, unknown> & {
+    recognized_fields?: string[];
+    manual_fields?: string[];
+  };
   status: ItemStatus;
   tags?: StyleTag[];
   wear_count?: number;    // v2: 穿搭次数（含此单品的搭配数，计算字段）

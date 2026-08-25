@@ -102,9 +102,12 @@ export function ItemAttributes({ item, onUpdate }: Props) {
   const commit = (key: string, value: string) => {
     setValues(v => ({ ...v, [key]: value }));
     const upd = toUpdate(key, value);
-    // 用户手动校准该属性：把 key 合并进 ai_recognized_attrs.manual_fields（浅合并保留既有元数据，去重）
-    const existing: Record<string, unknown> & { manual_fields?: string[] } =
-      item.ai_recognized_attrs ?? {};
+    // 用户手动校准该属性：把 key 合并进 ai_recognized_attrs.manual_fields
+    //（浅合并 ...existing 保留 Trace 元数据与 recognized_fields，manual_fields 去重）
+    const existing: Record<string, unknown> & {
+      recognized_fields?: string[];
+      manual_fields?: string[];
+    } = item.ai_recognized_attrs ?? {};
     const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
     onUpdate({
       ...(upd ?? {}),
@@ -146,9 +149,15 @@ export function ItemAttributes({ item, onUpdate }: Props) {
   // 渲染一行 + 其就地展开的编辑区（accordion）
   const renderRow = (key: string, showBorder: boolean, canRemove: boolean) => {
     const isEditing = editing === key;
-    // 「AI 识别」标签：核心属性且未被用户手动校准过时才显示
+    // 「AI 识别」标签：仅当该字段「确由 AI 首次识别打上（记录在 recognized_fields）」、
+    // 「未被用户手动校准过（不在 manual_fields）」且「当前有值」时才显示。
+    // 不再以硬编码的 def.aiCore 决定标签显示——预置/快速添加/手动录入的值不会带标签。
     const manualFields = item.ai_recognized_attrs?.manual_fields ?? [];
-    const showAiBadge = !!DEF_MAP[key].aiCore && !manualFields.includes(key);
+    const recognizedFields = item.ai_recognized_attrs?.recognized_fields ?? [];
+    const hasValue = !!(values[key] ?? '');
+    const showAiBadge = recognizedFields.includes(key)
+      && !manualFields.includes(key)
+      && hasValue;
     return (
       <React.Fragment key={key}>
         <AttrRow

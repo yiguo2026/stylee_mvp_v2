@@ -393,6 +393,9 @@ async function handleFinalize(taskId: string, ownerUserId: string) {
 
       // Save to wardrobe. The primary image is the standardized/bg-removed image when available.
       const { addItem } = useWardrobeStore.getState();
+      // 仅将 AI 实际识别出且非空、且真正写入 item 的字段计入 recognized_fields（此路径仅落库 material）
+      const recognizedFields: string[] = [];
+      if (item.material) recognizedFields.push('material');
       const saved = await addItem({
         user_id: ownerUserId,
         name: itemName,
@@ -404,6 +407,7 @@ async function handleFinalize(taskId: string, ownerUserId: string) {
           async_import: true,
           detection_index: item.index,
           ...persistedImage.metadata,
+          recognized_fields: recognizedFields,
         },
         source_type: 'album_ai',
         source_label: '相册导入',

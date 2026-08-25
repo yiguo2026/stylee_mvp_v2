@@ -59,6 +59,10 @@ export default function GammaImportScreen() {
       if (!imageUrl) { showToast('图片保存失败，请稍后重试', 'error'); return; }
 
       const seasons = (item.season ?? []).map(x => seasonMap[x]).filter(Boolean) as Season[];
+      // 仅将 AI（Gamma）实际识别出且非空的字段 key 记入 recognized_fields（与 ItemAttributes 属性 key 对齐）
+      const recognizedFields: string[] = [];
+      if (item.material) recognizedFields.push('material');
+      if (item.fit_type) recognizedFields.push('fit_type');
       const saved = await addItem({
         user_id: user.id,
         name: item.name.trim(),
@@ -71,7 +75,7 @@ export default function GammaImportScreen() {
         season: seasons.length ? seasons : undefined,
         occasion_tags: item.occasion_tags?.length ? item.occasion_tags : undefined,
         image_url: imageUrl,
-        ai_recognized_attrs: { engine: 'gamma', style: item.style, photo_type: item.photo_type, trace: result?.trace },
+        ai_recognized_attrs: { engine: 'gamma', style: item.style, photo_type: item.photo_type, trace: result?.trace, recognized_fields: recognizedFields },
         source_type: 'photo_ai', source_label: 'Gamma 导入', status: 'active',
       });
       if (!saved) { showToast('衣橱保存失败', 'error'); return; }
