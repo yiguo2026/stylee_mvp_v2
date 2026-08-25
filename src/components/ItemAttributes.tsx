@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Pressable, ScrollView,
+  TextInput, Pressable, ScrollView,
 } from 'react-native';
-import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors, Spacing, Radius, Shadow, MaxContentWidth, T } from '@/constants/theme';
 import { showToast } from '@/components/Toast';
 import {
   WardrobeItem, OCCASION_TAGS, STYLE_TAGS, CLOTHING_CATEGORIES,
@@ -39,6 +40,7 @@ const ATTR_DEFS: AttrDef[] = [
 ];
 
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
+const CORE_KEYS = ['material', 'fit_type'];
 
 // 把 WardrobeItem 现有值读成 string（用于回填）
 function readValue(item: WardrobeItem, key: string): string {
@@ -78,26 +80,52 @@ function toUpdate(key: string, value: string): Partial<WardrobeItem> | null {
   }
 }
 
-interface Props {
-  item: WardrobeItem;
-  onUpdate: (updates: Partial<WardrobeItem>) => void;
-}
-
 // Bottom Sheet 的内部视图：pick=选择要补充的属性；edit=编辑某个属性
 type SheetMode = 'pick' | 'edit';
-// 打开来源：row=行内「修正」（编辑完直接关闭）；add=「+添加属性」（编辑完回到选择列表，支持连续添加）
+// 打开来源：row=行内「修正」（编辑完直接关闭）；add=「+添加属性」（编辑完回到列表，支持连续添加）
 type SheetOrigin = 'row' | 'add';
 
-export function ItemAttributes({ item, onUpdate }: Props) {
-  // 本地展示值：核心两项 + 用户已添加的属性
+export interface AttributesModel {
+  item: WardrobeItem;
+  values: Record<string, string>;
+  extras: string[];
+  addableDefs: AttrDef[];
+  coreKeys: string[];
+  // 行/入口
+  openRowEditor: (key: string) => void;
+  openAddPicker: () => void;
+  handleRemove: (key: string) => void;
+  aiBadgeVisible: (key: string) => boolean;
+  // sheet 状态
+  sheetOpen: boolean;
+  sheetMode: SheetMode;
+  sheetKey: string | null;
+  sheetOrigin: SheetOrigin;
+  closeSheet: () => void;
+  backToPick: () => void;
+  pickAttrToAdd: (key: string) => void;
+  handleSinglePicked: (key: string, value: string) => void;
+  handleTextSaved: (key: string, value: string) => void;
+  handleMultiToggled: (key: string, value: string) => void;
+  handleMultiDone: () => void;
+}
+
+/**
+ * 属性编辑的共享状态与逻辑。
+ * 列表（ItemAttributesCard）在滚动内容里渲染，编辑弹层（ItemAttributesSheet）在
+ * 屏幕根部渲染以充满「手机容器」，两者共享同一个 model，避免弹层用 RN Modal
+ * 逃逸到 document.body 造成「超出手机容器」。
+ */
+export function useItemAttributes(
+  item: WardrobeItem,
+  onUpdate: (updates: Partial<WardrobeItem>) => void,
+): AttributesModel {
   const [values, setValues] = useState<Record<string, string>>(() => ({
     material: readValue(item, 'material'),
     fit_type: readValue(item, 'fit_type'),
   }));
-  // 已加入列表的「其他属性」key（核心两项始终展示，不在此列）
   const [extras, setExtras] = useState<string[]>([]);
 
-  // ---- Bottom Sheet 状态 ----
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<SheetMode>('edit');
   const [sheetKey, setSheetKey] = useState<string | null>(null);
@@ -111,8 +139,6 @@ export function ItemAttributes({ item, onUpdate }: Props) {
   const commit = (key: string, value: string) => {
     setValues(v => ({ ...v, [key]: value }));
     const upd = toUpdate(key, value);
-    // 用户手动校准该属性：把 key 合并进 ai_recognized_attrs.manual_fields
-    //（浅合并 ...existing 保留 Trace 元数据与 recognized_fields，manual_fields 去重）
     const existing: Record<string, unknown> & {
       recognized_fields?: string[];
       manual_fields?: string[];
@@ -124,183 +150,155 @@ export function ItemAttributes({ item, onUpdate }: Props) {
     });
   };
 
-  const closeSheet = () => {
-    setSheetOpen(false);
-    setSheetKey(null);
-  };
+  const closeSheet = () => { setSheetOpen(false); setSheetKey(null); };
+  const backToPick = () => { setSheetMode('pick'); setSheetKey(null); };
 
-  // 行内「修正 / 补充」：直接进入编辑该属性，编辑完关闭
   const openRowEditor = (key: string) => {
-    setSheetOrigin('row');
-    setSheetMode('edit');
-    setSheetKey(key);
-    setSheetOpen(true);
+    setSheetOrigin('row'); setSheetMode('edit'); setSheetKey(key); setSheetOpen(true);
   };
-
-  // 「+ 添加属性」：进入属性选择列表，选完编辑，编辑完回到列表可继续添加
   const openAddPicker = () => {
-    setSheetOrigin('add');
-    setSheetMode('pick');
-    setSheetKey(null);
-    setSheetOpen(true);
+    setSheetOrigin('add'); setSheetMode('pick'); setSheetKey(null); setSheetOpen(true);
   };
-
-  // 在选择列表里点某个属性 → 加入列表并进入编辑
   const pickAttrToAdd = (key: string) => {
     const existing = readValue(item, key);
     if (existing) setValues(v => ({ ...v, [key]: existing }));
     setExtras(e => (e.includes(key) ? e : [...e, key]));
-    setSheetMode('edit');
-    setSheetKey(key);
+    setSheetMode('edit'); setSheetKey(key);
   };
 
-  // 单选点选即写入：来源=row 直接收起；来源=add 回到列表继续添加
+  const afterCommitFlow = () => {
+    if (sheetOrigin === 'add') backToPick();
+    else closeSheet();
+  };
+
   const handleSinglePicked = (key: string, value: string) => {
     commit(key, value);
-    const def = DEF_MAP[key];
-    if (value) showToast(`已更新${def.label}`, 'success');
-    if (sheetOrigin === 'add') {
-      setSheetMode('pick');
-      setSheetKey(null);
-    } else {
-      closeSheet();
-    }
+    if (value) showToast(`已更新${DEF_MAP[key].label}`, 'success');
+    afterCommitFlow();
   };
-
-  // 文本保存：同单选的收起/回列表逻辑
   const handleTextSaved = (key: string, value: string) => {
     commit(key, value);
-    const def = DEF_MAP[key];
-    if (value) showToast(`已更新${def.label}`, 'success');
-    if (sheetOrigin === 'add') {
-      setSheetMode('pick');
-      setSheetKey(null);
-    } else {
-      closeSheet();
-    }
+    if (value) showToast(`已更新${DEF_MAP[key].label}`, 'success');
+    afterCommitFlow();
   };
-
-  // 多选逐次切换即时生效（保持展开，不自动收起）
-  const handleMultiToggled = (key: string, value: string) => {
-    commit(key, value);
-  };
-
-  // 多选「完成」：来源=row 收起；来源=add 回列表
-  const handleMultiDone = () => {
-    if (sheetOrigin === 'add') {
-      setSheetMode('pick');
-      setSheetKey(null);
-    } else {
-      closeSheet();
-    }
-  };
+  const handleMultiToggled = (key: string, value: string) => { commit(key, value); };
+  const handleMultiDone = () => { afterCommitFlow(); };
 
   const handleRemove = (key: string) => {
     setExtras(e => e.filter(k => k !== key));
+    if (sheetKey === key) closeSheet();
   };
 
-  const coreKeys = ['material', 'fit_type'];
-
-  const renderRow = (key: string, showBorder: boolean, canRemove: boolean) => {
-    // 「AI 识别」标签：仅当该字段「确由 AI 首次识别打上（recognized_fields）」、
-    // 「未被用户手动校准过（不在 manual_fields）」且「当前有值」时才显示。
+  const aiBadgeVisible = (key: string) => {
     const manualFields = item.ai_recognized_attrs?.manual_fields ?? [];
     const recognizedFields = item.ai_recognized_attrs?.recognized_fields ?? [];
     const hasValue = !!(values[key] ?? '');
-    const showAiBadge = recognizedFields.includes(key)
-      && !manualFields.includes(key)
-      && hasValue;
-    return (
-      <AttrRow
-        key={key}
-        def={DEF_MAP[key]}
-        value={values[key] ?? ''}
-        showBorder={showBorder}
-        showAiBadge={showAiBadge}
-        onPress={() => openRowEditor(key)}
-        onRemove={canRemove ? () => handleRemove(key) : undefined}
-      />
-    );
+    return recognizedFields.includes(key) && !manualFields.includes(key) && hasValue;
   };
 
-  const sheetDef = sheetKey ? DEF_MAP[sheetKey] : null;
+  return {
+    item, values, extras, addableDefs, coreKeys: CORE_KEYS,
+    openRowEditor, openAddPicker, handleRemove, aiBadgeVisible,
+    sheetOpen, sheetMode, sheetKey, sheetOrigin,
+    closeSheet, backToPick, pickAttrToAdd,
+    handleSinglePicked, handleTextSaved, handleMultiToggled, handleMultiDone,
+  };
+}
+
+// ============ 列表卡片（放在滚动内容里）============
+export function ItemAttributesCard({ model }: { model: AttributesModel }) {
+  const { values, extras, addableDefs, coreKeys, openRowEditor, openAddPicker, handleRemove, aiBadgeVisible } = model;
+
+  const renderRow = (key: string, showBorder: boolean, canRemove: boolean) => (
+    <AttrRow
+      key={key}
+      def={DEF_MAP[key]}
+      value={values[key] ?? ''}
+      showBorder={showBorder}
+      showAiBadge={aiBadgeVisible(key)}
+      onPress={() => openRowEditor(key)}
+      onRemove={canRemove ? () => handleRemove(key) : undefined}
+    />
+  );
 
   return (
     <View style={{ gap: Spacing.three }}>
-      {/* 属性卡片 */}
       <View style={styles.card}>
-        {coreKeys.map((key, i) =>
-          renderRow(key, i < coreKeys.length - 1 || extras.length > 0, false),
-        )}
-        {extras.map((key, i) =>
-          renderRow(key, i < extras.length - 1, true),
-        )}
+        {coreKeys.map((key, i) => renderRow(key, i < coreKeys.length - 1 || extras.length > 0, false))}
+        {extras.map((key, i) => renderRow(key, i < extras.length - 1, true))}
       </View>
 
-      {/* 添加属性入口 */}
       {addableDefs.length > 0 ? (
         <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={openAddPicker}>
           <Text style={styles.addBtnPlus}>＋</Text>
           <Text style={styles.addBtnText}>添加属性</Text>
         </TouchableOpacity>
       ) : null}
+    </View>
+  );
+}
 
-      {/* Bottom Sheet：选择属性 / 编辑属性 */}
-      <Modal
-        visible={sheetOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={closeSheet}
-      >
-        <Pressable style={styles.backdrop} onPress={closeSheet}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHandle} />
+// ============ 底部编辑弹层（放在屏幕根部，充满手机容器）============
+export function ItemAttributesSheet({ model }: { model: AttributesModel }) {
+  const insets = useSafeAreaInsets();
+  const {
+    item, values, addableDefs, sheetOpen, sheetMode, sheetKey, sheetOrigin,
+    closeSheet, backToPick, pickAttrToAdd,
+    handleSinglePicked, handleTextSaved, handleMultiToggled, handleMultiDone,
+  } = model;
 
-            {/* 头部：标题 + 关闭 */}
-            <View style={styles.sheetHeader}>
-              {sheetMode === 'edit' && sheetOrigin === 'add' ? (
-                <TouchableOpacity
-                  style={styles.sheetBack}
-                  onPress={() => { setSheetMode('pick'); setSheetKey(null); }}
-                >
-                  <Text style={styles.sheetBackText}>‹ 返回</Text>
-                </TouchableOpacity>
-              ) : <View style={styles.sheetBack} />}
-              <Text style={styles.sheetTitle}>
-                {sheetMode === 'pick'
-                  ? '添加属性'
-                  : `${sheetDef?.aiCore ? '修正' : '编辑'}${sheetDef?.label ?? ''}`}
-              </Text>
-              <TouchableOpacity style={styles.sheetClose} onPress={closeSheet}>
-                <Text style={styles.sheetCloseText}>完成</Text>
+  if (!sheetOpen) return null;
+  const sheetDef = sheetKey ? DEF_MAP[sheetKey] : null;
+
+  return (
+    <View style={styles.portal}>
+      <View style={styles.frame}>
+        <Pressable style={styles.backdrop} onPress={closeSheet} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.three) }]}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            {sheetMode === 'edit' && sheetOrigin === 'add' ? (
+              <TouchableOpacity style={styles.sheetSide} onPress={backToPick}>
+                <Text style={styles.sheetBackText}>‹ 返回</Text>
               </TouchableOpacity>
-            </View>
+            ) : <View style={styles.sheetSide} />}
+            <Text style={styles.sheetTitle} numberOfLines={1}>
+              {sheetMode === 'pick'
+                ? '添加属性'
+                : `${sheetDef?.aiCore ? '修正' : '编辑'}${sheetDef?.label ?? ''}`}
+            </Text>
+            <TouchableOpacity style={[styles.sheetSide, styles.sheetSideRight]} onPress={closeSheet}>
+              <Text style={styles.sheetCloseText}>完成</Text>
+            </TouchableOpacity>
+          </View>
 
-            <ScrollView
-              style={{ maxHeight: 380 }}
-              contentContainerStyle={styles.sheetBody}
-              keyboardShouldPersistTaps="handled"
-            >
-              {sheetMode === 'pick' ? (
-                <PickPanel
-                  defs={addableDefs}
-                  hasValue={(k) => !!readValue(item, k)}
-                  onPick={pickAttrToAdd}
-                />
-              ) : sheetDef ? (
-                <SheetEditor
-                  def={sheetDef}
-                  initial={values[sheetKey!] ?? readValue(item, sheetKey!)}
-                  onSinglePicked={(val) => handleSinglePicked(sheetKey!, val)}
-                  onTextSaved={(val) => handleTextSaved(sheetKey!, val)}
-                  onMultiToggled={(val) => handleMultiToggled(sheetKey!, val)}
-                  onMultiDone={handleMultiDone}
-                />
-              ) : null}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetBody}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {sheetMode === 'pick' ? (
+              <PickPanel
+                defs={addableDefs}
+                hasValue={(k) => !!readValue(item, k)}
+                onPick={pickAttrToAdd}
+              />
+            ) : sheetDef ? (
+              <SheetEditor
+                key={sheetKey!}
+                def={sheetDef}
+                initial={values[sheetKey!] ?? readValue(item, sheetKey!)}
+                onSinglePicked={(val) => handleSinglePicked(sheetKey!, val)}
+                onTextSaved={(val) => handleTextSaved(sheetKey!, val)}
+                onMultiToggled={(val) => handleMultiToggled(sheetKey!, val)}
+                onMultiDone={handleMultiDone}
+              />
+            ) : null}
+          </ScrollView>
+        </View>
+      </View>
     </View>
   );
 }
@@ -359,7 +357,7 @@ function PickPanel({ defs, hasValue, onPick }: {
   );
 }
 
-// ---------- Bottom Sheet 内的属性编辑区 ----------
+// ---------- 弹层内的属性编辑区 ----------
 function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled, onMultiDone }: {
   def: AttrDef; initial: string;
   onSinglePicked: (value: string) => void;
@@ -400,7 +398,6 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
     );
   }
 
-  // single / multi 均用 Chips
   return (
     <View style={{ gap: Spacing.three }}>
       <View style={styles.editChips}>
@@ -470,14 +467,25 @@ const styles = StyleSheet.create({
   addBtnPlus: { ...T.itemName, color: Colors.terracotta, fontSize: 18 },
   addBtnText: { ...T.buttonSecondary, color: Colors.walnut },
 
-  // Bottom Sheet
+  // Bottom Sheet — 在手机容器内绝对定位，不用 RN Modal（避免逃逸到 document.body）
+  portal: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 240,
+  },
+  frame: {
+    flex: 1, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center',
+    justifyContent: 'flex-end',
+  },
   backdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10,10,10,0.32)',
   },
   sheet: {
     backgroundColor: Colors.paperCard,
     borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl,
-    paddingBottom: Spacing.five, ...Shadow.three,
+    maxHeight: 560, overflow: 'hidden',
+    borderTopWidth: 1, borderColor: Colors.lineSoft,
+    ...Shadow.three,
   },
   sheetHandle: {
     alignSelf: 'center', width: 40, height: 4, borderRadius: 2,
@@ -488,11 +496,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
     borderBottomWidth: 1, borderBottomColor: Colors.lineSoft,
   },
-  sheetBack: { minWidth: 56 },
+  sheetSide: { minWidth: 56 },
+  sheetSideRight: { alignItems: 'flex-end' },
   sheetBackText: { ...T.micro, color: Colors.walnut2 },
-  sheetTitle: { ...T.formLabel, textAlign: 'center' },
-  sheetClose: { minWidth: 56, alignItems: 'flex-end' },
+  sheetTitle: { ...T.formLabel, flex: 1, textAlign: 'center' },
   sheetCloseText: { ...T.micro, color: Colors.terracotta },
+  sheetScroll: { flexGrow: 0 },
   sheetBody: { padding: Spacing.three },
 
   pickerHint: { ...T.micro, color: Colors.walnut2 },

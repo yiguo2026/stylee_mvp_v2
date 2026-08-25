@@ -1,0 +1,99 @@
+﻿【Top1 清单】每条 query 仅展示模型第一推荐搭配（provider=mock，每槽候选上限=10）
+
+编号,题目query,场景,风格,季节,温度,Top1所选单品(类目:名称(id)),补买建议,加权分
+q01,周一要上班了，想穿得极简干净一点,通勤/工作,简约极简,秋,10-18℃,连衣裙:onepiece increment 20260824 0485 Monday (JD21buIvwowD34xuNiMcdF1Enfh) + 鞋:070 Jeffrey Campbell 凉拖(WpVSbQwKhoaW5kxHtPUcA7DhnQb),,0.955
+q02,明天有个挺重要的面试，想稳重正式点，天冷得穿件外套,面试正式商务,优雅正式,冬,-5~8℃,上装:上装单品(GSdbbqVoNogo0uxIvgocEumMnpe) + 下装:下装单品(KRxlb3bkrobz62xoIrDcAfevnsO) + 鞋:extra 018 Gordon Rush(Zt7Jb2JkPoZUbzxTCy0ca3Arn3d) + 外套:gap100 fifth 20260824 033 Dark in Love 外(IHiCb0BKLooDDzxCbdYcBaFrncb),,0.77
+q03,要去海边度假拍照，想穿得飘逸仙一点，天好热,旅行度假/海边,波西米亚度假,夏,28-35℃,连衣裙:onepiece increment 20260824 0335 Sunsets(Tf9GbgYf7oOTCaxPW26cnzwknvf) + 鞋:c2s1 062 Charles David 高跟鞋 女(KUJIbOcRboDtINxSWd9c2uBCnTp),,0.955
+q04,周末想去跑步，来套运动风的，颜色扎眼点也行，跑一身汗,运动户外,运动机能,夏,28-35℃,连衣裙:onepiece increment 20260824 0439 MICAS(RENQbJvN5oDhSpx0TTLcuPRCnUf) + 鞋:鞋单品(SpYvbPD82oBXqdxKuYtcb8Zfngb),,0.94
+q05,晚上有个派对，想穿得低调又有档次，老钱风那种,派对/夜晚,静奢老钱风,秋,10-18℃,上装:上装单品(AcUSbMOShonfHAxPNbOc6d4Jn5g) + 下装:下装单品(MecgbtAjSoVwPsxnw5tcleNynNe) + 鞋:c2s1 047 Soludos 凉拖 女(JYqBbHhq9oZsHhxqZz4c2jFunOe),,0.97
+q06,去参加朋友婚礼当观礼嘉宾，想优雅得体点,婚礼宴会观礼,优雅正式,春,10-20℃,上装:上装单品(O4SybYZsaotqvmxcsEocR43GnPS) + 下装:下装单品(SbOsbo58joG2Uqx3R3ncM8PDnke) + 鞋:c2s1 030 Sanuk 凉拖 男(U4afbBLTOozeSOxkMTScITTZntg),,0.97
+q07,在家办公，想穿得舒服简单点，屋里有空调不冷不热,居家,简约极简,空调房室内外温差,26℃(空调房),连衣裙:additional 20260824 0098 连衣裙 Dark in Lov(RC74bKZe7oKfGRxPOHJcMwyGnFe) + 鞋:mens220 reebok angel reese 1 basketball (HAmDbNUzUoDVWzxdzvNc7qGnn3f),,0.942
+q08,周末想去逛街买点东西，穿得甜一点可爱点,逛街,甜美,秋,10-18℃,上装:上装单品(Itt1bGff4opLkPxqbg9cmtCMnpg) + 下装:gap100 second 20260824 011 Reebok bottom(DT4Mbw09goW6u9x08SqcOLYqnod) + 鞋:鞋单品(L2pgbGSiooWOKhxCGi1ctoUAnHd),,0.965
+q09,去看音乐节，想潮一点街头感，天挺热,音乐节/演出,街头,夏,28-35℃,连衣裙:连衣裙单品(JF8CbWiPIokSiYxS9D0cm7yWnjc) + 鞋:top20 14 new rock m 8401s c1(UNQSb7oehoR9MBxj6zPcfNnUnKc),,0.942
+q10,第一次去见对象爸妈，想显得知性得体不轻浮,见家长,通勤知性,秋,10-18℃,连衣裙:replacement 20260824 0206 连衣裙 A P C(FpkJbCBGto6vsfxtjghcZy0znif) + 鞋:鞋单品(Enj1bQTc3ocf5hxYc8uc9ILAnph) + 外套:primary fleece jacket(RKiNbrDZuoCYPIxUUTEcopwynyf),,0.947
+q11,平时上班穿的，想要知性通勤风，最近早晚温差有点大不好穿,通勤/工作,通勤知性,换季早晚温差大,8-22℃,连衣裙:onepiece increment 20260824 0325 Sunsets(YytZbm0HpoLE7yxNAuVcijMPnBe) + 鞋:鞋单品(PIokb09tuo79uQxFQYlclEs5n1d),,0.827
+q12,上班穿，想要那种低调的老钱风，天挺冷,通勤/工作,静奢老钱风,冬,-5~8℃,上装:上装单品(HDoEb7LFMo8bBPxwHCgcMzT1n9e) + 下装:下装 男 2 in 1 Pace Shorts 5(P42zb3XAQo6XByxWe9pc550wn7b) + 鞋:鞋单品(WyqebJMHQoRA68xQTtocokVCn1b) + 外套:外套单品(KwX8bl0l7oZvtyxKO1gcVTtvnHw),,0.955
+q13,去面试，想商务正式点，显得稳重,面试正式商务,通勤知性,秋,10-18℃,上装:上装单品(GHwubqcDNoAAQPxHEWVctrhhnAf) + 下装:044(M1YsbvBQvoyBdvxcGPecYrfknPd) + 鞋:c2s1 054 YRU 靴 女(BB6hbtsUOoUaGXx2x9EcwsL9nqe),,0.755
+q14,约会想穿一身白，极简一点，中性点,约会,简约极简,春,10-20℃,上装:top20 16 gelato extra 9159044137175 4545(HcuebkX4ToIZecxVK6ncx4Hyn1e) + 下装:下装单品(AnG0bY9TwopkP5x1SQtcgSDRnob) + 鞋:鞋单品(OF3vbGUPtohE8Axx447cPnrgnXg),,0.843
+q15,跟同学聚会，想要学院风那种感觉,朋友聚会/日常休闲,学院,秋,10-18℃,连衣裙:onepiece increment 20260824 0422 Monday (X74obGnSpolns7xcz4Dcv9fjnUl) + 鞋:top20 14 new rock m power014 c12(El8lbNa1ho3p3uxx8QmciiWvnhj),,0.843
+q16,想去海岛玩，度假风，天气好热,旅行度假/海边,波西米亚度假,夏,28-35℃,连衣裙:spocc r2 item hayden girls floral contra(Bb86bw8kQofxQxxLK2FcqRMinre) + 鞋:c2s1 062 Charles David 高跟鞋 女(KUJIbOcRboDtINxSWd9c2uBCnTp),,0.955
+q17,早上想去徒步，机能风耐造点，早晚有点凉,运动户外,运动机能,换季早晚温差大,8-22℃,上装:上装单品(I1p9bnTcnoJW4hxCt78cuSbrnLb) + 下装:下装单品(KtfrbmGH6oAfmNx3KxAcsCAJnnb) + 鞋:鞋单品(P8fLbRKVIoqYmNxY0FFcT6mXn3e),,0.95
+q18,朋友生日派对，晚上去，想穿得帅气中性一点，天冷,派对/夜晚,中性帅气,冬,-5~8℃,上装:上装单品(LoHjbELMQofSLoxwYrucQvzonme) + 下装:spocc item silverts women s petite open (Adtzbom1Yoy7olxTm6IcOU32nNh) + 鞋:053 Jeffrey Campbell 高跟鞋(Cw6AbLOGeo9JQLxQFcTcVzmVnth) + 外套:外套单品(OCGubhvgro9jlKxvBUocVsCanUh),,0.948
+q19,去参加个户外婚礼，得穿得正式得体，但天真的很热,婚礼宴会观礼,优雅正式,夏,28-35℃,连衣裙:onepiece increment 20260824 0494 Monday (Ng6wbBqo9oi4O6xSfSgcb6u4n2b) + 鞋:鞋单品(VVFebXF98oPzmNxVaxec0O0enVb),,0.77
+q20,在家做做瑜伽，穿得舒服能动就行，屋里有空调,居家,运动机能,空调房室内外温差,26℃(空调房),连衣裙:f21ai 034 连衣裙 女 cable knit laceup ribbon(C7QMbuyFNoESTwxFGJrcsJxHn4d) + 鞋:鞋单品(TfHrbVyeAonUZ5xsSTHcCMNunle),,0.958
+q21,去音乐节，想穿得张扬抢眼一点,音乐节/演出,波西米亚度假,夏,28-35℃,连衣裙:replacement 20260824 0511 连衣裙 A P C(PnhBbyx5dozZSuxquSHckPQvnPd) + 鞋:鞋单品(BcNWbYXLIoemWGx9TOOcyBSYnIb),,0.942
+q22,去见家长吃饭，想优雅得体一点，天冷,见家长,优雅正式,冬,-5~8℃,上装:上装单品(Oxxrbf19ooQBC5xAZFHcB244nDg) + 下装:age c2 s2 20260825 0320 14 18 colorful s(L47Cb69NBoyoGaxuztwcxas2nag) + 鞋:鞋单品(YKdFbpVntopuCPx31vKcbR6Rnth) + 外套:c9s2 age item colored organics idris cor(X3nobuQRNoQn26xs6Z2czeHfnOe),,0.97
+q23,上班，想中性帅气点，我特别怕热,通勤/工作,中性帅气,夏,28-35℃,连衣裙:additional 20260824 0115 连衣裙 Dark in Lov(Bv9jbJ0YSoY7rixTmKmcuIR3n3f) + 鞋:053(Dr44beGkyoElxwxlf4ycmtxinZb),,0.927
+q24,想去滑雪，要机能防护那种，超级冷,运动户外,运动机能,冬,-5~8℃,上装:上装单品(G4E8bBVpqoWSSKx8ZxNcegL8nxd) + 下装:下装单品(AnG0bY9TwopkP5x1SQtcgSDRnob) + 鞋:鞋单品(LsakbxT4NoVS8dx6xRdc7eCknTg) + 外套:gap100 fifth 20260824 030 Dark in Love 外(ZAzobt7M5osPxox5URXcSxi8ndd),,0.948
+q25,我有件黑色皮夹克，帮我搭套约会造型，街头点,约会,街头,秋,10-18℃,连衣裙:replacement 20260824 0197 连衣裙 A P C(JDxubUIkPoDYGpxOWNZcCMZCn26) + 鞋:069 Jeffrey Campbell 凉拖(NE1ubCnamofIFVxCVxicsKJOnHc),,0.884
+q26,我有条蓝白条纹T恤，帮我配套朋友聚会的休闲look，甜一点,朋友聚会/日常休闲,甜美,夏,28-35℃,连衣裙:onepiece increment 20260824 0396 MICAS(ZFPRbDeehoFy8WxQUWZcvkZBnfg) + 鞋:extra 001 Taft(CG1HbAuYqo0tS8xTbYlcs1Rcnbe),,0.843
+q27,想穿我那件米色风衣去逛街，法式复古感，帮我配齐,逛街,法式复古,春,10-20℃,上装:上装单品(KnNmb1UfmovPVZxidQMcEbY3nog) + 下装:c8s2 age item tea collection cargo pocke(ILOObdm1Lotiq3xL1Ckco0WSnWd) + 鞋:鞋单品(ATzEbxILjoRVzRxs324c6fninEf),,0.97
+q28,随便帮我搭个好看的，平时出门穿,朋友聚会/日常休闲,,春,10-20℃,连衣裙:onepiece increment 20260824 0473 MICAS(GVSubuXsjo2rWLxaEg4cHHDdn9g) + 鞋:069 Jeffrey Campbell 凉拖(NE1ubCnamofIFVxCVxicsKJOnHc),,0.955
+q29,晚上要出门，帮我搭个好看的,约会,,秋,10-18℃,上装:f21 057 上装 女 venice beach distressed gra(MoQFbpjdtohCzFx5Jrpcq0L7nKe) + 下装:下装 男 Flower Pace Shorts 5(YUNSbPzDCoA79NxJbXVcR6S0nhg) + 鞋:056 Jeffrey Campbell 高跟鞋(PQdubJ9TAobxQQxfK0Scz8WinCh),,0.955
+q30,不知道穿啥，帮我推荐一套逛街的,逛街,,换季早晚温差大,8-22℃,连衣裙:onepiece increment 20260824 0361 Summers(ES4IbiCVcoXDasx6t85cVx3enEg) + 鞋:鞋单品(MvHKbNfdOo2D9xxBNONc9LSlnmg),,0.955
+q31,上一套太素了，通勤那套帮我换个亮一点的,通勤/工作,简约极简,秋,10-18℃,连衣裙:onepiece increment 20260824 0321 Monday (SdA2bc4gIow23sxXyKrcL8JSnDd) + 鞋:鞋单品(Ome9bcxu3oxkfwxhXVqc1NgLnof),,0.843
+q32,这套太普通了，约会想要更亮眼有设计感的,约会,甜美,春,10-20℃,上装:上装单品(BKbUbrhbooRp9Mxgf9jcnVeonBf) + 下装:下装单品(ECgYbyPhZoUjmCxHM8CcO7ocnsh) + 鞋:鞋单品(KZMybWLMEoLt6JxfgBIcTY6vnnb),,0.852
+q33,刚那套不够酷，来个更街头的，聚会穿,朋友聚会/日常休闲,街头,夏,28-35℃,连衣裙:additional 20260824 0109 连衣裙 Dark in Lov(YfEEblrKZoRgU3xU8amc1atin9e) + 鞋:鞋单品(BxJdbmEDboim5gxYJBycjB7PnLh),,0.884
+q34,上班穿的通勤知性风，我下半身比较胖，想显瘦遮一下胯,通勤/工作,通勤知性,秋,10-18℃,连衣裙:spocc r2 item hayden girls ribbon detail(GWWcb3dJ2o2rc8xZvkqc8gyln3f) + 鞋:鞋单品(YWRubWaNholcM6xbFNFcuhLcnZd),,0.843
+q35,约会穿，想要法式复古那种感觉，我个子不高想显高点,约会,法式复古,春,10-20℃,上装:上装单品(VvZQbcXPLoBUmQxAcFncTV3qnic) + 下装:下装单品(ZphRbeLE8odhmAxlDG1cLXWnnIe) + 鞋:鞋单品(UBe2bMrJ8okOUCxLX9AcTj2Jn6F),,0.843
+q36,去参加婚礼观礼，想优雅得体，我腰腹肉比较多想遮一下,婚礼宴会观礼,优雅正式,秋,10-18℃,上装:上装单品(QhXubHIkgowo1Cxhp0ycgqMDnVh) + 下装:下装单品(XCnnb5ppoozXFoxVnt1c6nuynNh) + 鞋:c2s1 018 Hari Mari 凉拖 男(NdttbfeOpolGpJxTMMWcWd7EnQc),,0.95
+q37a,约会，帮我搭一套好看的,约会,,春,10-20℃,上装:top20 16 gelato extra 9324255477975 4746(An2zbyNpAoxhqFx5haZctwp1nPc) + 下装:c2s5 ciele athletics ATShort 4 brief RS(EubxbzEn3oJMyaxFDu0cf02Hnxg) + 鞋:c2s1 023 Hari Mari 凉拖 女(Vc9EbVSiaoa8bmx0uo1cM2bdnEf),,0.843
+q37b,约会，帮我搭一套好看的,约会,,春,10-20℃,上装:top20 16 gelato extra 9324255477975 4746(An2zbyNpAoxhqFx5haZctwp1nPc) + 下装:c2s5 ciele athletics ATShort 4 brief RS(EubxbzEn3oJMyaxFDu0cf02Hnxg) + 鞋:c2s1 023 Hari Mari 凉拖 女(Vc9EbVSiaoa8bmx0uo1cM2bdnEf),,0.857
+q38a,上班，给我一套得体的通勤搭配,通勤/工作,,秋,10-18℃,连衣裙:onepiece increment 20260824 0322 MICAS(BXbwbnRwGoDmGaxuXGecl2oZn5f) + 鞋:鞋单品(L78ObI0OHoyVXaxT7WKc0tP0nVb),,0.827
+q38b,上班，给我一套得体的通勤搭配,通勤/工作,,秋,10-18℃,连衣裙:onepiece increment 20260824 0322 MICAS(BXbwbnRwGoDmGaxuXGecl2oZn5f) + 鞋:鞋单品(L78ObI0OHoyVXaxT7WKc0tP0nVb),,0.843
+q39a,晚上朋友聚会，来一套，天有点冷,派对/夜晚,,冬,-5~8℃,上装:上装单品(IkztbEas6o0yKlxtEPzcmu0fnQf) + 下装:049(Mxhub7ysHokJD9x1DGDcM3qDngb) + 鞋:top20 14 demonia cult v creeper 502sbis(QsLmbmAZvobJbTxC5JYcYJ8GnZM) + 外套:外套单品(AN60bLxkvoHXLoxP2Y5clZaWnZd),,0.835
+q39b,晚上朋友聚会，来一套，天有点冷,派对/夜晚,,冬,-5~8℃,上装:上装单品(IkztbEas6o0yKlxtEPzcmu0fnQf) + 下装:049(Mxhub7ysHokJD9x1DGDcM3qDngb) + 鞋:top20 14 demonia cult v creeper 502sbis(QsLmbmAZvobJbTxC5JYcYJ8GnZM) + 外套:外套单品(AN60bLxkvoHXLoxP2Y5clZaWnZd),,0.846
+q40a,出去旅行度假，帮我搭一套，天热,旅行度假/海边,,夏,28-35℃,连衣裙:f21ai 034 连衣裙 女 cable knit laceup ribbon(C7QMbuyFNoESTwxFGJrcsJxHn4d) + 鞋:c2s1 029 Sanuk 凉拖 男(TkEJbIcM4oLFQRxrFl6caSENnjh),,0.958
+q40b,出去旅行度假，帮我搭一套，天热,旅行度假/海边,,夏,28-35℃,连衣裙:f21ai 034 连衣裙 女 cable knit laceup ribbon(C7QMbuyFNoESTwxFGJrcsJxHn4d) + 鞋:c2s1 029 Sanuk 凉拖 男(TkEJbIcM4oLFQRxrFl6caSENnjh),,0.927
+q41a,逛街，给我一套日常的,逛街,,换季早晚温差大,8-22℃,上装:f21 023 上装 男 f21 men be happy graphic te(AWLsbPI2koVqC9xckCycHbaln5c) + 下装:下装单品(L2PtbVsCuowhoRxfdDGcPLhMnh0) + 鞋:鞋单品(PoEWbtkjyo9QgYxsJ3Jc91UQn5e),,0.965
+q41b,逛街，给我一套日常的,逛街,,换季早晚温差大,8-22℃,上装:f21 023 上装 男 f21 men be happy graphic te(AWLsbPI2koVqC9xckCycHbaln5c) + 下装:下装单品(L2PtbVsCuowhoRxfdDGcPLhMnh0) + 鞋:鞋单品(PoEWbtkjyo9QgYxsJ3Jc91UQn5e),,0.95
+q42,天特别冷想穿暖和点，但又不想显得臃肿，还想显瘦，上班穿,通勤/工作,简约极简,冬,-5~8℃,上装:上装单品(GJbcbfdDqoBXAQxlBMAcSxUlnyg) + 下装:c8s3 toteme kick trousers navy 4e4ec21c(EcOHbrNsKoFWgnxS4mHcuF2tnnG) + 鞋:c2s1 046 Soludos 凉拖 男(RElbb1KYJoCQwcxl4KfcEk8An0e) + 外套:外套单品(Aogob5UU6ojs19x7xPjc4D9dn2g),,0.948
+q43,天太热想穿得清凉透气，但又想遮肉、不想露太多，逛街穿,逛街,,夏,28-35℃,连衣裙:onepiece increment 20260824 0331 Monday (WavPbqeXSo4qIaxOY1qcDKmSnTh) + 鞋:鞋单品(HXCgbYehCorURlxtbFqcjE7BnFb),,0.955
+q44,要参加一整天的活动得正式得体，但也想舒服、能久站不累脚,婚礼宴会观礼,优雅正式,换季早晚温差大,8-22℃,上装:sport5 Ciele Athletics NSPTShirt - HVC(IXrgbtQ6Uo1hmuxI3tScdF7rnff) + 下装:primary cotton twill loose fit drawstrin(H2wKbUNsXozDNUxpmvMcyMB4nXd) + 鞋:c2s1 030 Sanuk 凉拖 男(U4afbBLTOozeSOxkMTScITTZntg),,0.77
+q45,想显高但又想穿得宽松慵懒不费劲，约会穿,约会,,秋,10-18℃,上装:c2s5 saysky Combat T shirt(RaUpb6gi5op34Fx851acoZ5Gn8g) + 下装:sport5 Ten Thousand Midweight Tech Short(CVpjblN3mopKqgx0JwHcUtj4nNA) + 鞋:鞋单品(DdyIbrqbaognLpxyLRmcl8V3nZe),,0.843
+q46,下雨天上班，鞋和裤子别淋湿溅脏那种,通勤/工作,,秋,10-18℃,上装:c1s3 ai BeggxCo Abbie(WrIzb0a15oa0gHxP21jc2ycGnig) + 下装:c8s3 Norse Projects Vesterskov Broken Tw(AKhQbKt5Hosvlpx0f4jcQN6lnKc) + 鞋:鞋单品(Tsg3bFh5Cor8Q1xGk9gcpbnJnjb),,0.955
+q47,大风天想去户外，要防风保暖，不然一下就被吹透,运动户外,运动机能,冬,-5~8℃,上装:上装单品(YjAgbi3qyooPJaxYSpjc6Xwrnrc) + 下装:c2s5 satisfy running HeatCrush 8 Desert (XYbzbi1JHo1NXtxSUZvcv3L3n9f) + 鞋:c8s1 vc heel 05 noreta pump(D1tkbWsisoxWwZxvlGicTw7gnIg) + 外套:外套单品(XjTUbTNWyoxVJ1xGwazcy6GjnKg),,0.955
+q48,下雪天出门逛街，得防滑保暖，别冻脚,逛街,,冬,-5~8℃,上装:Tea kids 上装 072 native(Ak4jb5uU4o3rCpxjZwGcKlWwn2e) + 下装:下装单品(LzTtbvZ7SoGKqTx85gbcs2Nfn3b) + 鞋:鞋单品(MaXsb7fIfonTK7xCdOOc9CeqnUb) + 外套:top20 16 snidel us 9134421115137 4868125(PPoVbuNHroiRIgxVR4ocxlrCnnf),,0.959
+q49,第一次约会，想显得干净利落有品位，老钱风那种,约会,静奢老钱风,秋,10-18℃,上装:上装单品(BCctb2CH9ow1GuxggL1ctXw8nmd) + 下装:replacement 20260824 0071 下装 Reebok(GdwabhW93oqj7JxM3qucLkREnWd) + 鞋:鞋单品(Gft3bC2nDowkxUxEVXmcWIEfnwe),,0.837
+q50,去参加朋友婚礼当宾客，想正式得体点，别抢新人风头,婚礼宴会观礼,优雅正式,春,10-20℃,连衣裙:additional 20260824 0095 连衣裙 Dark in Lov(FlsbbEoPsoHDdqxOPaYcbXrGnEg) + 鞋:鞋单品(Y14ybDxHAokP8dx4yDScOjDpn6g),,0.799
+q51a,出去旅行度假，帮我搭一套，天热,旅行度假/海边,,夏,28-35℃,连衣裙:f21ai 034 连衣裙 女 cable knit laceup ribbon(C7QMbuyFNoESTwxFGJrcsJxHn4d) + 鞋:c2s1 029 Sanuk 凉拖 男(TkEJbIcM4oLFQRxrFl6caSENnjh),,0.927
+q51b,出去旅行度假，帮我搭一套，天热,旅行度假/海边,,夏,28-35℃,连衣裙:f21ai 034 连衣裙 女 cable knit laceup ribbon(C7QMbuyFNoESTwxFGJrcsJxHn4d) + 鞋:c2s1 029 Sanuk 凉拖 男(TkEJbIcM4oLFQRxrFl6caSENnjh),,0.942
+q52,过年走亲戚，想要新中式国风有点仪式感，喜庆一点，天冷,朋友聚会/日常休闲,新中式国风,冬,-5~8℃,上装:top20 16 gelato pique us 9166781645015 4(XdCdbGNFKosQEExE45gc870Kngf) + 下装:NOBULL c8s5 nobull 20 Women s NOBULL Dri(JrZcbRzxZojC39xWosRcClp1n4d) + 鞋:c2s1 085 Thursday Boot Co 靴 女(XyLzbFYdEoP5c7xLi9rcbhHrnHQ) + 外套:c1s4 gothic dark in love punk sleeveless(SVMlbRly2oFicTxKqqGc06WFn6c),,0.97
+q53,想要韩系温柔通勤风，上班穿,通勤/工作,韩系,春,10-20℃,上装:Tea kids 上装 081 native(BZdObHiYPo6CFdxpCT3cUxy4n85) + 下装:下装单品(BMnSbSNIPobz7KxAFHgcFDzkn7e) + 鞋:083 Hari Mari 凉拖(HiKJbUEBOo8hFEx2W6zcH77xnvd),,0.837
+q54,想走日系森系文艺那种感觉去逛街,逛街,日系,秋,10-18℃,连衣裙:replacement 20260824 0209 连衣裙 A P C(S5mHbyrT5oNbalxH6xtcPjpBnyf) + 鞋:top20 14 new rock m power016 c16(YTnQbOaGToCagnxLlAKcytUMnEg),,0.955
+q55,想要工装风，帮我搭一套,,工装,换季早晚温差大,8-22℃,连衣裙:onepiece increment 20260824 0378 MICAS(CG3tbDpE5owYwcxmBGLcnAVUnoc) + 鞋:鞋单品(K6kFboNyWoMGwexbQRqcH7TOnVh),,0.94
+q56,来个Y2K辣妹风，帮我搭一套,,Y2K,夏,28-35℃,连衣裙:onepiece increment 20260824 0374 Monday (SDLdb21bPogAO1xosgucz32Ynub) + 鞋:鞋单品(UBDqb3idqo3HOpxvCA9cbjFpnne),,0.94
+q57,约会想要那种同色系的高级感，全身一个色调深浅叠着穿,约会,,秋,10-18℃,上装:上装单品(RZyfbh3iyoSqNNxsvAAcjPNcnqh) + 下装:下装单品(X3VFb1jDioTyT3xy8kpcRVFRnye) + 鞋:鞋单品(PbVsb8W9soohUZxJDFUcZkHMnqc),,0.857
+q58,参加聚会，我是微胖女生，想显瘦又有气质,朋友聚会/日常休闲,,秋,10-18℃,上装:f21 045 上装 男 dont be shady graphic tee(E6o9bkqVdom7f0xX9UwcIOcrn7g) + 下装:Primary kids 下装 000 native(Lnh8b1REhoOi42xEZVTcsPAZnQc) + 鞋:鞋单品(T3TkblhIfoeo6XxUSJLc5jrLnEd),,0.837
+q59,怀孕了肚子大了，想穿得舒服又好看去逛街,逛街,,春,10-20℃,上装:sport5 Ten Thousand Output Muscle Tee(OYaBbLCo3orY94xQcWqcOarAnEg) + 下装:下装单品(Ttgab3jyaoWct0xxTTwcz2Z8n7H) + 鞋:鞋单品(GrqZbQQUioBskNxv3xucOVEjnDg),,0.95
+q60,周末跟哥们出去玩，想穿得有型点，街头感,朋友聚会/日常休闲,街头,秋,10-18℃,连衣裙:additional 20260824 0100 连衣裙 Dark in Lov(N6BAbJNOwo7SbpxUG3zcnMCSnSg) + 鞋:052(WCUcbXNsYohKy6x8zUzcIjcGneb),,0.955
+q61,上班穿，想极简中性点，最近早晚温差大,通勤/工作,简约极简,换季早晚温差大,8-22℃,上装:sport5 LNDR AIR-TECH Tee Black(JWGebzvZCoEJCtxYiIzcYYn3n9d) + 下装:下装单品(J9hrbnKqdoSVIBxyvX8c587bnFe) + 鞋:055 Jeffrey Campbell 高跟鞋(UZ3TbpjgMonNBOxhaAxc8wGOn7d),,0.955
+q62,我有件白衬衫，帮我搭一套上班通勤能穿的,通勤/工作,通勤知性,秋,10-18℃,连衣裙:onepiece increment 20260824 0477 MICAS(LsmhbLTxToqlyvxFUBzcQQiGnpb) + 鞋:extra 009 Taft(TXW3bcQXmodiEWx8QarcjTzantd),,0.843
+q63,我有条阔腿牛仔裤，周末想穿去逛街，帮我搭套休闲的,逛街,,春,10-20℃,上装:上装单品(I1p9bnTcnoJW4hxCt78cuSbrnLb) + 下装:Primary kids 下装 032 native(Jhweb6xs4o6CGbxrUeocnGUHnQb) + 鞋:c8s1 vc heel 05 noreta pump(D1tkbWsisoxWwZxvlGicTw7gnIg),,0.965
+q64,新买了双小白鞋，帮我搭套日常出门穿的,朋友聚会/日常休闲,,春,10-20℃,上装:上装单品(ATN0b1jzJo9DDUxfblccESEknhf) + 下装:下装单品(N0cQbJrxzolt8sxdZl2cXjJyn3f) + 鞋:鞋单品(NlLzbeEfWoHHRXx3vKPcV1jhnif),,0.95
+q65,想背那个黑色托特包去上班，帮我配一身,通勤/工作,通勤知性,秋,10-18℃,连衣裙:onepiece increment 20260824 0470 Monday (KjYob1lKgot4sqxLCzTcwqasnnh) + 鞋:070(FnJcbJq1joRX7yxbEGLckhe3nmb),,0.955
+q66,我有条碎花连衣裙，想配个外搭和鞋去朋友聚会,朋友聚会/日常休闲,甜美,春,10-20℃,上装:上装单品(KrNEbyxCto76oqxxQuqcSD3rnBc) + 下装:下装单品(QvVpb4maOouXo3xhevUcB5aZnjb) + 鞋:c2s1 029 Sanuk 凉拖 男(TkEJbIcM4oLFQRxrFl6caSENnjh),,0.857
+q67,我有件牛仔外套，帮我搭套约会能穿的,约会,街头,秋,10-18℃,上装:Tea kids 上装 072 native(Ak4jb5uU4o3rCpxjZwGcKlWwn2e) + 下装:下装单品(UDVPbpEAQoCkOcxynA2cUbNinve) + 鞋:鞋单品(QgWIbtWFpotZXbx6T5LcQgCYnAf),,0.837
+q68,这套里鞋不太搭，别的先不动，帮我换双鞋,约会,,秋,10-18℃,连衣裙:onepiece increment 20260824 0476 Monday (IjUebZCcbojdt7xlc4tccKYjnMf) + 鞋:083 Hari Mari 凉拖(HiKJbUEBOo8hFEx2W6zcH77xnvd),,0.955
+q69,这套太成熟了，帮我换个年轻一点的风格,朋友聚会/日常休闲,,春,10-20℃,上装:上装单品(U2IxbfktsoMDwhxpjjuccBAlneC) + 下装:c1s3 ai GiulivaHeritage Felice Trousers (TuScbqExLoeulgxmbYxcinwpnsh) + 鞋:053 Jeffrey Campbell 高跟鞋(Cw6AbLOGeo9JQLxQFcTcVzmVnth),,0.95
+q70,临时要出席一个正式场合，想要一身正式的西装套装，衣橱里不一定有，尽量帮我凑一套,面试正式商务,优雅正式,秋,10-18℃,连衣裙:onepiece increment 20260824 0407 Monday (ONi0bUVYZoefj5xihMWcBe7kn8e) + 鞋:鞋单品(XQDrb51a8omuW8x4w92cnsPsn7E),,0.755
+q71,晚上要去个正式晚宴，想要精致有质感，最好帮我配上包和首饰,派对/夜晚,优雅正式,秋,10-18℃,上装:top20 16 gelato extra 8882886279383 4330(APcYbDiB9oUOL0xtR3xccMl0n1d) + 下装:gap100 second 20260824 028 Reebok bottom(HP2CbPiM3odatKxrpHDcoql7n7c) + 鞋:top20 14 new rock m mili083cct c132(JM8MbkliSoLtGox5MjSc4A9unSe),,0.77
+q72,下周一有个重要的商务谈判，想穿身正装显得专业稳重，天有点冷,面试正式商务,优雅正式,冬,-5~8℃,上装:top20 16 gelato pique us 7958160441559 4(T5VRbMSCMohoANxUJALcLRcOn8d) + 下装:c8s3 Norse Projects Nordmarka Broken Twi(LdU6bVO0YorSOUxBpeQchsEAnld) + 鞋:鞋单品(LL2YbRAPLodLU6xwIricuJKcntb) + 外套:外套单品(AN60bLxkvoHXLoxP2Y5clZaWnZd),,0.755
+q73,第一次跟她见面吃饭，想穿得干净有品又不刻意,约会,简约极简,秋,10-18℃,上装:Primary kids 上装 010 native(FPN7bn5NLop6BIx2FBXcOKf9nzg) + 下装:replacement 20260824 0088 下装(VCY0bHDv2ogRE0xV8jccjz27naf) + 鞋:鞋单品(QvLpbExdzol5QuxDxGfcDq0JnFh),,0.95
+q74,周末就想穿得舒服随意点出去晃悠,朋友聚会/日常休闲,日系,春,10-20℃,上装:top20 16 gelato extra 9305492291799 4740(QByRbvAAaoWjZsxnJXcci0Z8nDb) + 下装:NOBULL c8s5 nobull 27 Men s NOBULL Drive(UD6lbXKqfo6k6OxKGNPcCIkfnKd) + 鞋:鞋单品(I93obpsx2oAkUQxpGr5cE2xlnqh),,0.955
+q75,去健身房撸铁，想要贴身透气好活动的一套,运动户外,运动机能,空调房室内外温差,26℃(空调房),连衣裙:onepiece increment 20260824 0391 Os ree(EeIzbS1DOoq32UxRYhvcNF6Dnkb) + 鞋:鞋单品(ItRObu25zooBmcxJXVycUTwSn99),,0.94
+q76,想走那种城市机能风，防风耐脏能应付各种天气,运动户外,运动机能,换季早晚温差大,8-22℃,连衣裙:additional 20260824 0089 连衣裙 Dark in Lov(K1aqb2wwno8WoZxzpDNctG6ZnUq) + 鞋:062 Jeffrey Campbell 高跟鞋(IYeFbHeHloWkaExlkrycpz9pn3g) + 外套:外套单品(XR4lb5Cpjo7W0AxrwaCcU6zVnDh),,0.947
+q77,参加大学同学婚礼当伴郎，想正式体面又不过火，天挺热,婚礼宴会观礼,优雅正式,夏,28-35℃,连衣裙:014(XdDxbbfZkoEeIBxhDRgcpHWVnjc) + 鞋:top20 14 new rock m mili231 c2(XQbRbw6MboUPNyxVpXMckhiWndd),,0.755
+q78,想要那种低调有质感的老钱风，周末喝个下午茶穿,朋友聚会/日常休闲,静奢老钱风,秋,10-18℃,上装:f21 005 上装 女 cowgirl era graphic tee(E6UGbgeJnoolJJxUsmicVyx5nYd) + 下装:下装单品(KuQUbbazPoU1NtxoDRzcH3Uknzf) + 鞋:鞋单品(Rj58bB9eYopYVCxSv6xck9SUnyg),,0.95
+q79,想穿得潮一点街头感十足，出去跟朋友拍照,逛街,街头,夏,28-35℃,连衣裙:onepiece increment 20260824 0404 Monday (Kb6Wbiv2vopmztxwHZ4ceLKPnog) + 鞋:鞋单品(WzZabpkSlokm0TxTgXDcwlaln7g),,0.94
+q80,去东南亚海岛玩几天，想穿得清爽有度假感，超级热,旅行度假/海边,波西米亚度假,夏,28-35℃,连衣裙:replacement 20260824 0202 连衣裙 A P C(WYINbQGJSosFqJxe7UuctuOWn9c) + 鞋:c2s1 039 Sanuk 凉拖 女(PGT7bme4io3LuXxly1Ocz4pznSd),,0.942
+q81,明天去面试互联网公司，想稳重又不老气，别太正式,面试正式商务,通勤知性,春,10-20℃,连衣裙:onepiece increment 20260824 0409 Os ree(G2iHb5JIpomfU5xtf8ic5KMVnlb) + 鞋:鞋单品(IoUWb8AmhoCe9BxStgXcHqxnnGf),,0.755
+q82,周末去山里露营，要保暖耐造还能凹造型，早晚很凉,运动户外,工装,换季早晚温差大,8-22℃,上装:上装单品(Dl7sbfEMGosRafx50REcEmKcnLP) + 下装:f21 029 下装 女 plus size glitteraccent wid(E4p8b6RW2oNReNxdNItcrQYsnUg) + 鞋:c2s1 009 Thursday Boot Co 靴 女(B2QsbKhFjomwqwxCkZtc906zneh),,0.955
+q83,约了哥们打篮球，想要一身清爽好动的球场look,运动户外,运动机能,夏,28-35℃,连衣裙:0954 Amanda Uprichard fae-romper(CsHobCK16oHobAxofnmcLZJKndh) + 鞋:鞋单品(EGlMbN2PpoEFgExr3RwceBuin62),,0.94
+q84,晚上去酒吧蹦迪，想穿得酷一点有存在感,派对/夜晚,街头,秋,10-18℃,上装:上装单品(EMsIb4V7QoY5AexTlwocVFYonNg) + 下装:041(UInsblg4zoAr4OxwYrfcce5Gnjg) + 鞋:鞋单品(FmX2bGDOZolHccxADYBcNqfHnwf),,0.95
+q85,过年回家走亲戚，想要新中式的感觉，稳重又喜庆，天冷,朋友聚会/日常休闲,新中式国风,冬,-5~8℃,上装:上装单品(ObEabTGweo9uAzxGPzycNU8Fnud) + 下装:下装单品(R50JbAnorokBMqxzJe1ciRvrnhf) + 鞋:鞋单品(D8Y2bm2LDoQr0RxCom0cgtianYe) + 外套:外套单品(Vfpzbl62QoS39Qx3CA3cctU0nKc),,0.955
+q86,想要韩系那种干净温柔的男生穿搭，约会穿,约会,韩系,春,10-20℃,上装:上装单品(KNRsbAbDroPgIoxTuLUcHAOrnqd) + 下装:下装单品(ECgYbyPhZoUjmCxHM8CcO7ocnsh) + 鞋:鞋单品(AvVWby5CKoMJRGxXeXlcXnx7nMd),,0.843
+q87,我有件卡其色机能夹克，帮我搭套周末出门穿的,朋友聚会/日常休闲,运动机能,秋,10-18℃,上装:top20 16 gelato extra 9305492291799 4740(QByRbvAAaoWjZsxnJXcci0Z8nDb) + 下装:c8s3 Norse Projects Nordmarka Broken Twi(UK7ObZfktoiHrAxD6AEcYe03nyd) + 鞋:c8s1 vc heel 01 hamden buckle slingback(UXh0b6MnIoe5jkxejZFc68vrnOA),,0.955
+q88,上一套太板正了，通勤的帮我换个休闲点的,通勤/工作,通勤知性,秋,10-18℃,上装:f21 025 上装 女 sequin oneshoulder top(XEXAblVg3oMq1axz5Xvc4OlcnLh) + 下装:c1s3 ai GiulivaHeritage Felice Trousers (TuScbqExLoeulgxmbYxcinwpnsh) + 鞋:057 Jeffrey Campbell 高跟鞋(G8X6bqNGVoaydExWs1Zc9NVwnff),,0.843
+q89,天冷想穿暖和点，但又不想显臃肿显矮，约会穿,约会,简约极简,冬,-5~8℃,上装:c2s5 saysky Combat T shirt(RaUpb6gi5op34Fx851acoZ5Gn8g) + 下装:spocc r2 item ingrid isabel contour bike(K7YDb2ZbroW7yux1kEgcShtDnte) + 鞋:鞋单品(QCAYb2y4kooBzXx5V5cc6tuEnaf) + 外套:c6s5 reebok men s patch logo crewneck sw(VHTAbLBwDorXDaxM4sqcmADCnGc),,0.835
+q90,上班穿的商务休闲，最近早晚温差大不好穿,通勤/工作,通勤知性,换季早晚温差大,8-22℃,上装:上装单品(LoW2bXj5woTCrGxVPdcctNVinJe) + 下装:下装单品(Tll1bVsVKonOkxx6d4gcWyAenTg) + 鞋:鞋单品(OjzVbnDpEo5DIZxVCWCc2AlCnTb),,0.75

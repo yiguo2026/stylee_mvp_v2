@@ -9,7 +9,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ItemOutfits } from '@/components/ItemOutfits';
-import { ItemAttributes } from '@/components/ItemAttributes';
+import { useItemAttributes, ItemAttributesCard, ItemAttributesSheet } from '@/components/ItemAttributes';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { StyleeGarmentMedia } from '@/design-system';
@@ -73,8 +73,6 @@ export default function ItemDetailScreen() {
   const { items, deleteItem, updateItem } = useWardrobeStore();
   const [item, setItem] = useState<WardrobeItem | undefined>();
   const [recommendedItem, setRecommendedItem] = useState<RecommendedItem | undefined>();
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isRecommended = id.startsWith('rec_');
 
@@ -145,11 +143,22 @@ export default function ItemDetailScreen() {
     );
   }
 
+  return <OwnedItemDetail item={item!} updateItem={updateItem} deleteItem={deleteItem} />;
+}
+
+function OwnedItemDetail({ item, updateItem, deleteItem }: {
+  item: WardrobeItem;
+  updateItem: (id: string, updates: Partial<WardrobeItem>) => void;
+  deleteItem: (id: string) => Promise<void>;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const attrModel = useItemAttributes(item, (updates) => updateItem(item.item_id, updates));
+
   const handleDelete = () => setShowDeleteConfirm(true);
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
-    if (!item) return;
     setDeleting(true);
     try {
       await deleteItem(item.item_id);
@@ -160,8 +169,8 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const wearCountText = item!.wear_count ? `穿过${item!.wear_count}次` : '0 次穿着';
-  const lastWornText = item!.last_worn_at ? `最近${timeAgo(item!.last_worn_at)}` : '';
+  const wearCountText = item.wear_count ? `穿过${item.wear_count}次` : '0 次穿着';
+  const lastWornText = item.last_worn_at ? `最近${timeAgo(item.last_worn_at)}` : '';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -173,7 +182,7 @@ export default function ItemDetailScreen() {
           <TouchableOpacity onPress={handleDelete}>
             <Text style={styles.deleteBtn}>删除</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push(`/wardrobe/edit/${item!.item_id}`)}>
+          <TouchableOpacity onPress={() => router.push(`/wardrobe/edit/${item.item_id}`)}>
             <Text style={styles.editBtn}>编辑</Text>
           </TouchableOpacity>
         </View>
@@ -181,37 +190,40 @@ export default function ItemDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Hero Image */}
-        <HeroMedia imageUri={item!.image_url} tone="owned" category={item!.category} />
+        <HeroMedia imageUri={item.image_url} tone="owned" category={item.category} />
 
         {/* Name */}
-        <Text style={styles.itemName}>{item!.name}</Text>
+        <Text style={styles.itemName}>{item.name}</Text>
 
         {/* Metadata row */}
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{item!.category} · {wearCountText}{lastWornText ? ` · 最近${lastWornText}` : ''}</Text>
+          <Text style={styles.metaText}>{item.category} · {wearCountText}{lastWornText ? ` · 最近${lastWornText}` : ''}</Text>
         </View>
 
         {/* 基础属性 —— 默认仅展示 AI 识别的材质/版型，其余按需添加 */}
-        <ItemAttributes item={item!} onUpdate={(updates) => updateItem(item!.item_id, updates)} />
+        <ItemAttributesCard model={attrModel} />
 
         {/* 穿着记录 */}
         <View style={styles.wearSection}>
           <Text style={styles.wearTitle}>穿着记录</Text>
           <Text style={styles.wearCount}>{wearCountText}</Text>
-          <ItemOutfits itemId={item!.item_id} />
+          <ItemOutfits itemId={item.item_id} />
         </View>
 
         {/* Source — unified labels: 相册导入 / 心愿单添加 / 快速添加 */}
         <Text style={styles.meta}>
-          添加于 {new Date(item!.created_at).toLocaleDateString('zh-CN')}
-          {` · ${getAddSourceLabel(item!)}`}
+          添加于 {new Date(item.created_at).toLocaleDateString('zh-CN')}
+          {` · ${getAddSourceLabel(item)}`}
         </Text>
       </ScrollView>
+
+      {/* 属性编辑底部弹层：渲染在屏幕根部，充满手机容器（不用 RN Modal 逃逸） */}
+      <ItemAttributesSheet model={attrModel} />
 
       <ConfirmModal
         visible={showDeleteConfirm}
         title="删除衣物"
-        message={`确认删除"${item!.name}"吗？`}
+        message={`确认删除"${item.name}"吗？`}
         confirmText="删除"
         confirmStyle="destructive"
         onConfirm={confirmDelete}

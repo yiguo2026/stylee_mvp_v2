@@ -1,0 +1,10 @@
+﻿【个性化对比说明】同一 query 文本、不同用户画像，左右并排。
+只对『两套搭配的差异化是否明显、且各自贴合对应画像』打分：5=差异显著且各自贴合；3=有一定差异；1=几乎相同/千人一面。
+
+对比组,query文本,场景,季节/温度,画像A,A的搭配,画像B,B的搭配,差异化是否明显(1-5),评审备注
+q37,约会，帮我搭一套好看的,约会,春 / 10-20℃,偏好简约极简,上装:白色long袖衬衫(top_white_shirt) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 鞋:黑色乐福鞋(shoes_black_loafer),偏好法式复古,上装:白色long袖衬衫(top_white_shirt) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 鞋:黑色乐福鞋(shoes_black_loafer),,
+q38,上班，给我一套得体的通勤搭配,通勤/工作,秋 / 10-18℃,偏好静奢老钱风,上装:白色long袖衬衫(top_white_shirt) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 鞋:黑色乐福鞋(shoes_black_loafer),偏好街头潮流,上装:白色long袖衬衫(top_white_shirt) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 鞋:黑色乐福鞋(shoes_black_loafer),,
+q39,晚上朋友聚会，来一套，天有点冷,派对/夜晚,冬 / -5~8℃,偏好中性帅气,上装:米白针织衫(top_beige_knit) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 外套:黑色西装外套(outer_black_blazer) | 鞋:黑色乐福鞋(shoes_black_loafer),偏好甜美少女,上装:米白针织衫(top_beige_knit) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 外套:黑色西装外套(outer_black_blazer) | 鞋:黑色乐福鞋(shoes_black_loafer),,
+q40,出去旅行度假，帮我搭一套，天热,旅行度假/海边,夏 / 28-35℃,偏好波西米亚度假,上装:黑色纯棉T恤(top_black_tee) | 下装:黑色运动裤(bottom_sport_pants) | 鞋:小白鞋(shoes_white_sneaker),偏好运动机能,上装:黑色纯棉T恤(top_black_tee) | 下装:黑色运动裤(bottom_sport_pants) | 鞋:小白鞋(shoes_white_sneaker),,
+q41,逛街，给我一套日常的,逛街,换季早晚温差大 / 8-22℃,偏好莫兰迪低饱和,上装:白色long袖衬衫(top_white_shirt) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 外套:牛仔外套(outer_denim_jacket) | 鞋:黑色乐福鞋(shoes_black_loafer),偏好暖色调大地色,上装:白色long袖衬衫(top_white_shirt) | 下装:蓝色直筒牛仔裤(bottom_blue_jeans) | 外套:牛仔外套(outer_denim_jacket) | 鞋:黑色乐福鞋(shoes_black_loafer),,
+q51,出去旅行度假，帮我搭一套，天热,旅行度假/海边,夏 / 28-35℃,偏好运动机能,上装:黑色纯棉T恤(top_black_tee) | 下装:黑色运动裤(bottom_sport_pants) | 鞋:小白鞋(shoes_white_sneaker),偏好街头潮流,上装:黑色纯棉T恤(top_black_tee) | 下装:黑色运动裤(bottom_sport_pants) | 鞋:小白鞋(shoes_white_sneaker),,
