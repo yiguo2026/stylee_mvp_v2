@@ -437,7 +437,7 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
           autoFocus
         />
         <Text style={styles.inlineHint}>
-          {priceInvalid ? '请输入有效的价格数字' : `请输入${def.label}后保存`}
+          {priceInvalid ? '请输入有效的价格数字' : `请输入${def.label}，完成后点下方按钮`}
         </Text>
         <TouchableOpacity
           style={[styles.primaryBtn, !canSave && styles.primaryBtnDisabled]}
@@ -445,7 +445,7 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
           disabled={!canSave}
           onPress={submit}
         >
-          <Text style={styles.primaryBtnText}>保存</Text>
+          <Text style={styles.primaryBtnText}>完成</Text>
         </TouchableOpacity>
       </View>
     );
@@ -505,7 +505,7 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
           onPress={submit}
         >
           <Text style={styles.primaryBtnText}>
-            {canSave ? `保存（${dateYear}-${String(dateMonth).padStart(2, '0')}）` : '请选择年份和月份'}
+            {canSave ? `完成（${dateYear}-${String(dateMonth).padStart(2, '0')}）` : '请选择年份和月份'}
           </Text>
         </TouchableOpacity>
       </View>
