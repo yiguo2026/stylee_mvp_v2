@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadow, MaxContentWidth, T } from '@/constants/theme';
 import { showToast } from '@/components/Toast';
 import {
-  WardrobeItem, OCCASION_TAGS, STYLE_TAGS, CLOTHING_CATEGORIES,
+  WardrobeItem, OCCASION_TAGS, STYLE_TAGS, CLOTHING_CATEGORIES, MATERIAL_OPTIONS,
 } from '@/types';
 
 type EditorKind = 'text' | 'single' | 'multi' | 'date';
@@ -23,18 +23,19 @@ interface AttrDef {
 
 // 属性定义 —— 核心两项默认展示，其余按需添加
 const ATTR_DEFS: AttrDef[] = [
-  { key: 'material', label: '材质', kind: 'single', aiCore: true, placeholder: '如：牛仔布',
-    options: ['棉', '亚麻', '牛仔布', '羊毛', '针织', '雪纺', '皮革', '涤纶', '丝绸', '灯芯绒'] },
-  { key: 'fit_type', label: '版型', kind: 'single', aiCore: true, placeholder: '如：直筒',
-    options: ['修身', '合身', '直筒', '宽松', 'Oversize', 'A 型', 'H 型', 'X 型'] },
+  { key: 'material', label: '材质', kind: 'single', aiCore: true, placeholder: '如：牛仔',
+    options: [...MATERIAL_OPTIONS] },
+  { key: 'fit_type', label: '版型', kind: 'single', aiCore: true, placeholder: '如：常规合身',
+    options: ['超紧身', '修身', '常规合身', '宽松', '廓形'] },
   { key: 'brand', label: '品牌', kind: 'text', placeholder: '请输入品牌' },
   { key: 'price', label: '价格', kind: 'text', placeholder: '请输入价格（元）' },
-  { key: 'color', label: '颜色', kind: 'text', placeholder: '如：蓝色' },
+  { key: 'color', label: '颜色', kind: 'single',
+    options: ['白色', '黑色', '灰色', '米色', '驼色', '棕色', '卡其', '藏青', '蓝色', '绿色', '红色', '粉色', '紫色', '黄色', '橙色', '花色/图案'] },
   { key: 'category', label: '分类', kind: 'single', options: [...CLOTHING_CATEGORIES] },
   { key: 'size', label: '尺码', kind: 'single', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '均码'] },
   { key: 'season', label: '季节', kind: 'multi', options: ['春', '夏', '秋', '冬', '四季'] },
   { key: 'occasion', label: '场合', kind: 'multi', options: OCCASION_TAGS.map(t => t.label) },
-  { key: 'tags', label: '标签', kind: 'multi', options: STYLE_TAGS.map(t => t.label) },
+  { key: 'tags', label: '风格', kind: 'multi', options: STYLE_TAGS.map(t => t.label) },
   { key: 'wash_care', label: '洗涤维护', kind: 'text', placeholder: '如：机洗 / 手洗 / 干洗' },
   { key: 'purchase_date', label: '购入日期', kind: 'date', placeholder: '如：2025-06' },
 ];

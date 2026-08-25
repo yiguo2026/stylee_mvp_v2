@@ -132,11 +132,18 @@ export default function EditItemScreen() {
 
     const localUri = result.assets[0].uri;
     if (!shouldPersistReplacementImage(localUri)) return;
-    setImageUri(localUri); // 立即预览
-    setStandardizing(true);
 
-    let finalUrl = item.image_url ?? '';
-    let shouldRecognizeReplacement = false;
+    // 换图立即生效：先展示并落地原图，用户可马上继续编辑或直接离开，
+    // 抠图 / 标准化 / 重新识别在后台异步进行，完成后自动替换为透明主图。
+    setImageUri(localUri);
+    updateItem(item.item_id, { image_url: localUri });
+    setStandardizing(true);
+    void standardizeInBackground(localUri);
+  };
+
+  // 后台异步处理：标准化抠图去背景 + 上传 + 重新识别（不阻塞用户操作）
+  const standardizeInBackground = async (localUri: string) => {
+    if (!item) return;
     try {
       const standardizationResult = await aiStandardizeGarment(localUri, category, 'flatlay', {
         color,
@@ -148,13 +155,7 @@ export default function EditItemScreen() {
           url: null,
           skipped: false as const,
           acceptance: { ok: false as const, reason: 'missing' as const },
-          meta: {
-            source: 'model-service/error',
-            durationMs: 0,
-            ok: false,
-            requestId: undefined,
-            failedStage: undefined,
-          },
+          meta: { source: 'model-service/error', durationMs: 0, ok: false, requestId: undefined, failedStage: undefined },
         };
       });
 
@@ -166,11 +167,11 @@ export default function EditItemScreen() {
         diagnostics: standardizationResult.meta,
       });
       if (!persistedImage.ok) {
-        setImageUri(finalUrl);
-        showToast('图片上传失败，请检查网络后重试');
+        showToast('背景处理失败，已保留原图');
         return;
       }
-      finalUrl = persistedImage.imageUrl;
+
+      const finalUrl = persistedImage.imageUrl;
       setImageUri(finalUrl);
       await updateItem(item.item_id, {
         image_url: finalUrl,
@@ -179,29 +180,17 @@ export default function EditItemScreen() {
           ...persistedImage.metadata,
         },
       });
-
-      const committedItem = useWardrobeStore.getState().items.find(
-        (candidate) => candidate.item_id === item.item_id,
-      );
-      if (committedItem?.image_url !== finalUrl) {
-        setImageUri(item.image_url ?? '');
-        showToast('图片保存失败，请重试');
-        return;
-      }
-
-      shouldRecognizeReplacement = true;
       showToast(
         persistedImage.status === 'transparent_master'
-          ? '已更新为透明主图'
-          : '透明主图生成失败，已保留原图',
+          ? '已完成背景处理'
+          : '背景处理失败，已保留原图',
       );
+      if (persistedImage.status === 'transparent_master') void runRecognition(finalUrl);
     } catch (e) {
-      console.warn('[EditItem] pickMainImage error:', e);
-      setImageUri(item.image_url ?? '');
-      showToast('图片保存失败，请重试');
+      console.warn('[EditItem] standardizeInBackground error:', e);
+      showToast('背景处理失败，已保留原图');
     } finally {
       setStandardizing(false);
-      if (shouldRecognizeReplacement) void runRecognition(finalUrl);
     }
   };
 
@@ -298,7 +287,7 @@ export default function EditItemScreen() {
               <Feather name="camera" size={15} color={Colors.paper} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.photoHint}>换图后将自动扣背景、标准化，可继续编辑其它信息</Text>
+          <Text style={styles.photoHint}>换图立即生效，抠图 / 标准化将在后台完成，其间可继续编辑或离开</Text>
         </View>
 
         {/* Form */}
