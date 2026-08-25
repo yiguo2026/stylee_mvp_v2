@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  TextInput,
+  TextInput, Modal, Pressable, ScrollView,
 } from 'react-native';
 import { Colors, Spacing, Radius, Shadow, T } from '@/constants/theme';
 import { showToast } from '@/components/Toast';
@@ -83,6 +83,11 @@ interface Props {
   onUpdate: (updates: Partial<WardrobeItem>) => void;
 }
 
+// Bottom Sheet 的内部视图：pick=选择要补充的属性；edit=编辑某个属性
+type SheetMode = 'pick' | 'edit';
+// 打开来源：row=行内「修正」（编辑完直接关闭）；add=「+添加属性」（编辑完回到选择列表，支持连续添加）
+type SheetOrigin = 'row' | 'add';
+
 export function ItemAttributes({ item, onUpdate }: Props) {
   // 本地展示值：核心两项 + 用户已添加的属性
   const [values, setValues] = useState<Record<string, string>>(() => ({
@@ -91,8 +96,12 @@ export function ItemAttributes({ item, onUpdate }: Props) {
   }));
   // 已加入列表的「其他属性」key（核心两项始终展示，不在此列）
   const [extras, setExtras] = useState<string[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null); // 正在编辑的 attr key
+
+  // ---- Bottom Sheet 状态 ----
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<SheetMode>('edit');
+  const [sheetKey, setSheetKey] = useState<string | null>(null);
+  const [sheetOrigin, setSheetOrigin] = useState<SheetOrigin>('row');
 
   const addableDefs = useMemo(
     () => ATTR_DEFS.filter(d => !d.aiCore && !extras.includes(d.key)),
@@ -115,43 +124,86 @@ export function ItemAttributes({ item, onUpdate }: Props) {
     });
   };
 
-  const handleAddAttr = (key: string) => {
-    // 统一流程：加入列表 → 就地展开编辑区（有值回填、空值待填）
-    const existing = readValue(item, key);
-    setValues(v => (existing ? { ...v, [key]: existing } : v));
-    setExtras(e => (e.includes(key) ? e : [...e, key]));
-    setPickerOpen(false);
-    setEditing(key);
+  const closeSheet = () => {
+    setSheetOpen(false);
+    setSheetKey(null);
   };
 
-  // 即点即选 / 即时输入的即时写入（无「保存」按钮）
-  const handleCommit = (key: string, value: string) => {
+  // 行内「修正 / 补充」：直接进入编辑该属性，编辑完关闭
+  const openRowEditor = (key: string) => {
+    setSheetOrigin('row');
+    setSheetMode('edit');
+    setSheetKey(key);
+    setSheetOpen(true);
+  };
+
+  // 「+ 添加属性」：进入属性选择列表，选完编辑，编辑完回到列表可继续添加
+  const openAddPicker = () => {
+    setSheetOrigin('add');
+    setSheetMode('pick');
+    setSheetKey(null);
+    setSheetOpen(true);
+  };
+
+  // 在选择列表里点某个属性 → 加入列表并进入编辑
+  const pickAttrToAdd = (key: string) => {
+    const existing = readValue(item, key);
+    if (existing) setValues(v => ({ ...v, [key]: existing }));
+    setExtras(e => (e.includes(key) ? e : [...e, key]));
+    setSheetMode('edit');
+    setSheetKey(key);
+  };
+
+  // 单选点选即写入：来源=row 直接收起；来源=add 回到列表继续添加
+  const handleSinglePicked = (key: string, value: string) => {
     commit(key, value);
     const def = DEF_MAP[key];
-    // 单选/文本类给一次轻提示；多选逐次切换不打扰
-    if (def.kind !== 'multi' && value) {
-      showToast(`已更新${def.label}`, 'success');
+    if (value) showToast(`已更新${def.label}`, 'success');
+    if (sheetOrigin === 'add') {
+      setSheetMode('pick');
+      setSheetKey(null);
+    } else {
+      closeSheet();
     }
   };
 
-  const toggleEditing = (key: string) => {
-    // 同一时间只展开一个属性的编辑区
-    setEditing(prev => (prev === key ? null : key));
+  // 文本保存：同单选的收起/回列表逻辑
+  const handleTextSaved = (key: string, value: string) => {
+    commit(key, value);
+    const def = DEF_MAP[key];
+    if (value) showToast(`已更新${def.label}`, 'success');
+    if (sheetOrigin === 'add') {
+      setSheetMode('pick');
+      setSheetKey(null);
+    } else {
+      closeSheet();
+    }
+  };
+
+  // 多选逐次切换即时生效（保持展开，不自动收起）
+  const handleMultiToggled = (key: string, value: string) => {
+    commit(key, value);
+  };
+
+  // 多选「完成」：来源=row 收起；来源=add 回列表
+  const handleMultiDone = () => {
+    if (sheetOrigin === 'add') {
+      setSheetMode('pick');
+      setSheetKey(null);
+    } else {
+      closeSheet();
+    }
   };
 
   const handleRemove = (key: string) => {
     setExtras(e => e.filter(k => k !== key));
-    setEditing(prev => (prev === key ? null : prev));
   };
 
   const coreKeys = ['material', 'fit_type'];
 
-  // 渲染一行 + 其就地展开的编辑区（accordion）
   const renderRow = (key: string, showBorder: boolean, canRemove: boolean) => {
-    const isEditing = editing === key;
-    // 「AI 识别」标签：仅当该字段「确由 AI 首次识别打上（记录在 recognized_fields）」、
+    // 「AI 识别」标签：仅当该字段「确由 AI 首次识别打上（recognized_fields）」、
     // 「未被用户手动校准过（不在 manual_fields）」且「当前有值」时才显示。
-    // 不再以硬编码的 def.aiCore 决定标签显示——预置/快速添加/手动录入的值不会带标签。
     const manualFields = item.ai_recognized_attrs?.manual_fields ?? [];
     const recognizedFields = item.ai_recognized_attrs?.recognized_fields ?? [];
     const hasValue = !!(values[key] ?? '');
@@ -159,28 +211,19 @@ export function ItemAttributes({ item, onUpdate }: Props) {
       && !manualFields.includes(key)
       && hasValue;
     return (
-      <React.Fragment key={key}>
-        <AttrRow
-          def={DEF_MAP[key]}
-          value={values[key] ?? ''}
-          showBorder={isEditing ? false : showBorder}
-          active={isEditing}
-          showAiBadge={showAiBadge}
-          onPress={() => toggleEditing(key)}
-          onRemove={canRemove ? () => handleRemove(key) : undefined}
-        />
-        {isEditing ? (
-          <AttrInlineEditor
-            def={DEF_MAP[key]}
-            initial={values[key] ?? readValue(item, key)}
-            showBorder={showBorder}
-            onCommit={(val) => handleCommit(key, val)}
-            onClose={() => setEditing(null)}
-          />
-        ) : null}
-      </React.Fragment>
+      <AttrRow
+        key={key}
+        def={DEF_MAP[key]}
+        value={values[key] ?? ''}
+        showBorder={showBorder}
+        showAiBadge={showAiBadge}
+        onPress={() => openRowEditor(key)}
+        onRemove={canRemove ? () => handleRemove(key) : undefined}
+      />
     );
   };
+
+  const sheetDef = sheetKey ? DEF_MAP[sheetKey] : null;
 
   return (
     <View style={{ gap: Spacing.three }}>
@@ -196,47 +239,79 @@ export function ItemAttributes({ item, onUpdate }: Props) {
 
       {/* 添加属性入口 */}
       {addableDefs.length > 0 ? (
-        <TouchableOpacity
-          style={styles.addBtn}
-          activeOpacity={0.7}
-          onPress={() => setPickerOpen(o => !o)}
-        >
+        <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={openAddPicker}>
           <Text style={styles.addBtnPlus}>＋</Text>
           <Text style={styles.addBtnText}>添加属性</Text>
         </TouchableOpacity>
       ) : null}
 
-      {/* 可添加属性选择面板 */}
-      {pickerOpen && addableDefs.length > 0 ? (
-        <View style={styles.pickerPanel}>
-          <Text style={styles.pickerHint}>选择要补充的信息，标记 ● 的已由 AI 识别</Text>
-          <View style={styles.chipsWrap}>
-            {addableDefs.map(d => {
-              const hasVal = !!readValue(item, d.key);
-              return (
+      {/* Bottom Sheet：选择属性 / 编辑属性 */}
+      <Modal
+        visible={sheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={closeSheet}
+      >
+        <Pressable style={styles.backdrop} onPress={closeSheet}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+
+            {/* 头部：标题 + 关闭 */}
+            <View style={styles.sheetHeader}>
+              {sheetMode === 'edit' && sheetOrigin === 'add' ? (
                 <TouchableOpacity
-                  key={d.key} style={styles.pickChip} activeOpacity={0.7}
-                  onPress={() => handleAddAttr(d.key)}
+                  style={styles.sheetBack}
+                  onPress={() => { setSheetMode('pick'); setSheetKey(null); }}
                 >
-                  {hasVal ? <View style={styles.dot} /> : null}
-                  <Text style={styles.pickChipText}>{d.label}</Text>
+                  <Text style={styles.sheetBackText}>‹ 返回</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
+              ) : <View style={styles.sheetBack} />}
+              <Text style={styles.sheetTitle}>
+                {sheetMode === 'pick'
+                  ? '添加属性'
+                  : `${sheetDef?.aiCore ? '修正' : '编辑'}${sheetDef?.label ?? ''}`}
+              </Text>
+              <TouchableOpacity style={styles.sheetClose} onPress={closeSheet}>
+                <Text style={styles.sheetCloseText}>完成</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ maxHeight: 380 }}
+              contentContainerStyle={styles.sheetBody}
+              keyboardShouldPersistTaps="handled"
+            >
+              {sheetMode === 'pick' ? (
+                <PickPanel
+                  defs={addableDefs}
+                  hasValue={(k) => !!readValue(item, k)}
+                  onPick={pickAttrToAdd}
+                />
+              ) : sheetDef ? (
+                <SheetEditor
+                  def={sheetDef}
+                  initial={values[sheetKey!] ?? readValue(item, sheetKey!)}
+                  onSinglePicked={(val) => handleSinglePicked(sheetKey!, val)}
+                  onTextSaved={(val) => handleTextSaved(sheetKey!, val)}
+                  onMultiToggled={(val) => handleMultiToggled(sheetKey!, val)}
+                  onMultiDone={handleMultiDone}
+                />
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
 // ---------- 单行 ----------
-function AttrRow({ def, value, showBorder, active, showAiBadge, onPress, onRemove }: {
-  def: AttrDef; value: string; showBorder: boolean; active?: boolean; showAiBadge?: boolean;
+function AttrRow({ def, value, showBorder, showAiBadge, onPress, onRemove }: {
+  def: AttrDef; value: string; showBorder: boolean; showAiBadge?: boolean;
   onPress: () => void; onRemove?: () => void;
 }) {
   return (
-    <View style={[styles.row, showBorder && styles.rowBorder, active && styles.rowActive]}>
+    <View style={[styles.row, showBorder && styles.rowBorder]}>
       <TouchableOpacity style={styles.rowMain} activeOpacity={0.6} onPress={onPress}>
         <View style={styles.rowLabelWrap}>
           <Text style={styles.rowLabel}>{def.label}</Text>
@@ -246,15 +321,10 @@ function AttrRow({ def, value, showBorder, active, showAiBadge, onPress, onRemov
           {value ? (
             <>
               <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
-              <Text style={[styles.rowChevron, active && styles.rowChevronActive]}>
-                {active ? '收起' : (def.aiCore ? '修正' : '›')}
-              </Text>
+              <Text style={styles.rowChevron}>{def.aiCore ? '修正' : '›'}</Text>
             </>
           ) : (
-            // 空值时只保留单一补充入口，整行可点击进入编辑，不再额外出现「修正」
-            <Text style={styles.rowUnset}>
-              {active ? '选择或填写…' : (def.aiCore ? '待识别 · 点击补充' : '点击填写')}
-            </Text>
+            <Text style={styles.rowUnset}>{def.aiCore ? '待识别 · 点击补充' : '点击填写'}</Text>
           )}
         </View>
       </TouchableOpacity>
@@ -267,75 +337,101 @@ function AttrRow({ def, value, showBorder, active, showAiBadge, onPress, onRemov
   );
 }
 
-// ---------- 就地展开编辑区（accordion，无「取消/保存」按钮） ----------
-function AttrInlineEditor({ def, initial, showBorder, onCommit, onClose }: {
-  def: AttrDef; initial: string; showBorder: boolean;
-  onCommit: (value: string) => void; onClose: () => void;
+// ---------- 选择要补充的属性 ----------
+function PickPanel({ defs, hasValue, onPick }: {
+  defs: AttrDef[]; hasValue: (k: string) => boolean; onPick: (key: string) => void;
+}) {
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <Text style={styles.pickerHint}>选择要补充的信息，标记 ● 的已有内容</Text>
+      <View style={styles.chipsWrap}>
+        {defs.map(d => (
+          <TouchableOpacity
+            key={d.key} style={styles.pickChip} activeOpacity={0.7}
+            onPress={() => onPick(d.key)}
+          >
+            {hasValue(d.key) ? <View style={styles.dot} /> : null}
+            <Text style={styles.pickChipText}>{d.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ---------- Bottom Sheet 内的属性编辑区 ----------
+function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled, onMultiDone }: {
+  def: AttrDef; initial: string;
+  onSinglePicked: (value: string) => void;
+  onTextSaved: (value: string) => void;
+  onMultiToggled: (value: string) => void;
+  onMultiDone: () => void;
 }) {
   const [text, setText] = useState(initial);
   const [multi, setMulti] = useState<string[]>(
     initial ? initial.split('、').filter(Boolean) : [],
   );
 
-  // 自由文本/数值：失焦或提交即保存并收起
-  const submitText = () => {
-    onCommit(text.trim());
-    onClose();
-  };
-
-  // 多选：逐次切换即时生效，保持展开以便继续增删
   const toggleMulti = (opt: string) => {
     setMulti(prev => {
       const next = prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt];
-      onCommit(next.join('、'));
+      onMultiToggled(next.join('、'));
       return next;
     });
   };
 
-  // 单选：点一下即写入并自动收起
-  const pickSingle = (opt: string) => {
-    setText(opt);
-    onCommit(opt);
-    onClose();
-  };
-
-  return (
-    <View style={[styles.inlineEditor, showBorder && styles.rowBorder]}>
-      {def.kind === 'text' && (
+  if (def.kind === 'text') {
+    return (
+      <View style={{ gap: Spacing.three }}>
         <TextInput
           style={styles.input}
           value={text}
           onChangeText={setText}
-          onBlur={submitText}
-          onSubmitEditing={submitText}
+          onSubmitEditing={() => onTextSaved(text.trim())}
           returnKeyType="done"
           placeholder={def.placeholder}
           placeholderTextColor={Colors.walnut2}
           autoFocus
         />
-      )}
+        <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.8} onPress={() => onTextSaved(text.trim())}>
+          <Text style={styles.primaryBtnText}>保存</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-      {(def.kind === 'single' || def.kind === 'multi') && (
-        <View style={styles.editChips}>
-          {(def.options ?? []).map(opt => {
-            const activeChip = def.kind === 'single' ? text === opt : multi.includes(opt);
-            return (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.editChip, activeChip && styles.editChipActive]}
-                activeOpacity={0.7}
-                onPress={() => def.kind === 'single' ? pickSingle(opt) : toggleMulti(opt)}
-              >
-                <Text style={[styles.editChipText, activeChip && styles.editChipTextActive]}>{opt}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+  // single / multi 均用 Chips
+  return (
+    <View style={{ gap: Spacing.three }}>
+      <View style={styles.editChips}>
+        {(def.options ?? []).map(opt => {
+          const activeChip = def.kind === 'single' ? text === opt : multi.includes(opt);
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.editChip, activeChip && styles.editChipActive]}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (def.kind === 'single') { setText(opt); onSinglePicked(opt); }
+                else { toggleMulti(opt); }
+              }}
+            >
+              <Text style={[styles.editChipText, activeChip && styles.editChipTextActive]}>{opt}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {def.kind === 'multi' ? (
-        <Text style={styles.inlineHint}>可多选，点选即生效；点上方「收起」关闭</Text>
-      ) : null}
+        <>
+          <Text style={styles.inlineHint}>可多选，点选即生效</Text>
+          <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.8} onPress={onMultiDone}>
+            <Text style={styles.primaryBtnText}>完成{multi.length ? `（已选 ${multi.length}）` : ''}</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <Text style={styles.inlineHint}>点选即生效并自动收起</Text>
+      )}
     </View>
   );
 }
@@ -347,7 +443,6 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center' },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.lineSoft },
-  rowActive: { backgroundColor: Colors.paper },
   rowMain: {
     flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 4,
@@ -363,7 +458,6 @@ const styles = StyleSheet.create({
   rowValue: { ...T.itemName, flexShrink: 1 },
   rowUnset: { ...T.itemName, color: Colors.walnut2 },
   rowChevron: { ...T.micro, color: Colors.terracotta },
-  rowChevronActive: { color: Colors.walnut2 },
   removeBtn: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   removeText: { ...T.micro, color: Colors.walnut2, fontSize: 14 },
 
@@ -376,10 +470,31 @@ const styles = StyleSheet.create({
   addBtnPlus: { ...T.itemName, color: Colors.terracotta, fontSize: 18 },
   addBtnText: { ...T.buttonSecondary, color: Colors.walnut },
 
-  pickerPanel: {
-    backgroundColor: Colors.paperCard, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.line, padding: Spacing.three, gap: Spacing.two,
+  // Bottom Sheet
+  backdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end',
   },
+  sheet: {
+    backgroundColor: Colors.paperCard,
+    borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl,
+    paddingBottom: Spacing.five, ...Shadow.three,
+  },
+  sheetHandle: {
+    alignSelf: 'center', width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.lineStrong, marginTop: Spacing.two, marginBottom: Spacing.one,
+  },
+  sheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two,
+    borderBottomWidth: 1, borderBottomColor: Colors.lineSoft,
+  },
+  sheetBack: { minWidth: 56 },
+  sheetBackText: { ...T.micro, color: Colors.walnut2 },
+  sheetTitle: { ...T.formLabel, textAlign: 'center' },
+  sheetClose: { minWidth: 56, alignItems: 'flex-end' },
+  sheetCloseText: { ...T.micro, color: Colors.terracotta },
+  sheetBody: { padding: Spacing.three },
+
   pickerHint: { ...T.micro, color: Colors.walnut2 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   pickChip: {
@@ -390,17 +505,9 @@ const styles = StyleSheet.create({
   pickChipText: { ...T.tag, color: Colors.ink },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.terracotta },
 
-  // inline editor（就地展开编辑区）
-  inlineEditor: {
-    backgroundColor: Colors.paper,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.three,
-    gap: Spacing.two,
-  },
   inlineHint: { ...T.micro, color: Colors.walnut2 },
   input: {
-    ...T.inputText, backgroundColor: Colors.paperCard, borderWidth: 1, borderColor: Colors.line,
+    ...T.inputText, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.line,
     borderRadius: Radius.md, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2, color: Colors.ink,
   },
   editChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
@@ -411,4 +518,10 @@ const styles = StyleSheet.create({
   editChipActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   editChipText: { ...T.tag, color: Colors.ink },
   editChipTextActive: { color: Colors.paper },
+
+  primaryBtn: {
+    backgroundColor: Colors.ink, borderRadius: Radius.md,
+    paddingVertical: Spacing.two + 4, alignItems: 'center',
+  },
+  primaryBtnText: { ...T.buttonSecondary, color: Colors.paper },
 });
