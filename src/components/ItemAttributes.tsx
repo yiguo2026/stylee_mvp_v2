@@ -302,8 +302,8 @@ export function ItemAttributesSheet({ model }: { model: AttributesModel }) {
                 ? '添加属性'
                 : `${sheetDef?.aiCore ? '修正' : '编辑'}${sheetDef?.label ?? ''}`}
             </Text>
-            <TouchableOpacity style={[styles.sheetSide, styles.sheetSideRight]} onPress={closeSheet}>
-              <Text style={styles.sheetCloseText}>完成</Text>
+            <TouchableOpacity style={[styles.sheetSide, styles.sheetSideRight]} onPress={closeSheet} accessibilityLabel="关闭">
+              <Text style={styles.sheetCloseText}>✕</Text>
             </TouchableOpacity>
           </View>
 
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   sheetSideRight: { alignItems: 'flex-end' },
   sheetBackText: { ...T.micro, color: Colors.walnut2 },
   sheetTitle: { ...T.formLabel, flex: 1, textAlign: 'center' },
-  sheetCloseText: { ...T.micro, color: Colors.terracotta },
+  sheetCloseText: { ...T.micro, color: Colors.walnut2, fontSize: 16 },
   // 弹层高度随内容自适应：内容少则贴合内容，超过 maxHeight 才在内部滚动
   sheetScroll: { flexGrow: 0, maxHeight: 420 },
   sheetBody: { padding: Spacing.three },
