@@ -43,6 +43,21 @@ const ATTR_DEFS: AttrDef[] = [
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
 const CORE_KEYS = ['material', 'fit_type'];
 
+// 尺码选项随分类切换：鞋履用鞋码、包袋用容量档位，其余用通用衣服尺码
+const DEFAULT_SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '均码'];
+const SIZE_OPTIONS_BY_CATEGORY: Record<string, string[]> = {
+  鞋履: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
+  包袋: ['迷你', '小号', '中号', '大号'],
+};
+function sizeOptionsFor(category?: string): string[] {
+  return (category && SIZE_OPTIONS_BY_CATEGORY[category]) || DEFAULT_SIZE_OPTIONS;
+}
+// 依据单品实际情况解析属性定义（目前仅尺码随分类变化）
+function resolveDef(base: AttrDef, item: WardrobeItem): AttrDef {
+  if (base.key === 'size') return { ...base, options: sizeOptionsFor(item.category) };
+  return base;
+}
+
 // 把 WardrobeItem 现有值读成 string（用于回填）
 function readValue(item: WardrobeItem, key: string): string {
   switch (key) {
@@ -283,7 +298,7 @@ export function ItemAttributesSheet({ model }: { model: AttributesModel }) {
   } = model;
 
   if (!sheetOpen) return null;
-  const sheetDef = sheetKey ? DEF_MAP[sheetKey] : null;
+  const sheetDef = sheetKey ? resolveDef(DEF_MAP[sheetKey], item) : null;
 
   return (
     <View style={styles.portal}>
@@ -411,7 +426,12 @@ function SheetEditor({ def, initial, onSinglePicked, onTextSaved, onMultiToggled
 
   const toggleMulti = (opt: string) => {
     setMulti(prev => {
-      const next = prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt];
+      let next = prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt];
+      // 季节：「四季」与「春夏秋冬」互斥——选四季则清空其余；选具体季节则去掉四季
+      if (def.key === 'season') {
+        if (opt === '四季' && next.includes('四季')) next = ['四季'];
+        else if (opt !== '四季') next = next.filter(x => x !== '四季');
+      }
       onMultiToggled(next.join('、'));
       return next;
     });
