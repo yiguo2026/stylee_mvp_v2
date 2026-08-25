@@ -320,7 +320,7 @@ function AttrRow({ def, value, showBorder, showAiBadge, onPress, onRemove }: {
           {value ? (
             <>
               <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
-              <Text style={styles.rowChevron}>{def.aiCore ? '修正' : '›'}</Text>
+              <Text style={styles.rowChevron}>›</Text>
             </>
           ) : (
             <Text style={styles.rowUnset}>{def.aiCore ? '待识别 · 点击补充' : '点击填写'}</Text>
