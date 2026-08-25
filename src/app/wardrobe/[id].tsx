@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, Image,
-  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView,
+  StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius, Shadow, T } from '@/constants/theme';
@@ -18,10 +18,11 @@ import { WardrobeItem, RecommendedItem } from '@/types';
 
 // 详情页主图：以 contain 完整展示单品（不裁切），容器高度按图片真实长宽比自适应，
 // 并限制在合理的最小/最大高度区间内，保证鞋/上装/连衣裙等不同比例都能完整居中显示。
-function HeroMedia({ imageUri, tone, category }: {
+function HeroMedia({ imageUri, tone, category, onReplace }: {
   imageUri?: string | null;
   tone: GarmentMediaTone;
   category: string;
+  onReplace?: () => void;
 }) {
   const [ratio, setRatio] = useState<number | null>(null);
 
@@ -45,6 +46,11 @@ function HeroMedia({ imageUri, tone, category }: {
       {imageUri
         ? <StyleeGarmentMedia imageUri={imageUri} tone={tone} />
         : <View style={styles.imagePlaceholder}><CategoryIcon category={category} size={80} color={Colors.walnut2} /></View>}
+      {onReplace ? (
+        <TouchableOpacity style={styles.replaceBtn} activeOpacity={0.85} onPress={onReplace}>
+          <Text style={styles.replaceBtnText}>换图</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -153,9 +159,19 @@ function OwnedItemDetail({ item, updateItem, deleteItem }: {
 }) {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(item.name);
   const attrModel = useItemAttributes(item, (updates) => updateItem(item.item_id, updates));
 
   const handleDelete = () => setShowDeleteConfirm(true);
+
+  const saveName = () => {
+    const next = nameDraft.trim();
+    setEditingName(false);
+    if (!next || next === item.name) { setNameDraft(item.name); return; }
+    updateItem(item.item_id, { name: next });
+    showToast('已更新名称', 'success');
+  };
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
@@ -169,8 +185,8 @@ function OwnedItemDetail({ item, updateItem, deleteItem }: {
     }
   };
 
-  const wearCountText = item.wear_count ? `穿过${item.wear_count}次` : '0 次穿着';
-  const lastWornText = item.last_worn_at ? `最近${timeAgo(item.last_worn_at)}` : '';
+  const wearCountText = item.wear_count ? `穿过 ${item.wear_count} 次` : '还没穿过';
+  const lastWornText = item.last_worn_at ? `最近${timeAgo(item.last_worn_at)}穿过` : '';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -182,31 +198,59 @@ function OwnedItemDetail({ item, updateItem, deleteItem }: {
           <TouchableOpacity onPress={handleDelete}>
             <Text style={styles.deleteBtn}>删除</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push(`/wardrobe/edit/${item.item_id}`)}>
-            <Text style={styles.editBtn}>编辑</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Hero Image */}
-        <HeroMedia imageUri={item.image_url} tone="owned" category={item.category} />
+        {/* Hero Image —— 右下角「换图」进入图片替换（含重新 AI 识别） */}
+        <HeroMedia
+          imageUri={item.image_url}
+          tone="owned"
+          category={item.category}
+          onReplace={() => router.push(`/wardrobe/edit/${item.item_id}`)}
+        />
 
-        {/* Name */}
-        <Text style={styles.itemName}>{item.name}</Text>
+        {/* Name —— 点击标题即可内联改名，无需另开编辑页 */}
+        {editingName ? (
+          <View style={styles.nameEditRow}>
+            <TextInput
+              style={styles.nameInput}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              onSubmitEditing={saveName}
+              onBlur={saveName}
+              returnKeyType="done"
+              placeholder="给这件单品起个名字"
+              placeholderTextColor={Colors.walnut2}
+              autoFocus
+              maxLength={20}
+            />
+            <TouchableOpacity onPress={saveName}><Text style={styles.nameSaveText}>完成</Text></TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.nameRow}
+            activeOpacity={0.6}
+            onPress={() => { setNameDraft(item.name); setEditingName(true); }}
+          >
+            <Text style={styles.itemName}>{item.name}</Text>
+            <Text style={styles.nameEditHint}>✎</Text>
+          </TouchableOpacity>
+        )}
 
-        {/* Metadata row */}
+        {/* Metadata row —— 分类 + 穿着概览（避免与穿着记录区重复计数） */}
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{item.category} · {wearCountText}{lastWornText ? ` · 最近${lastWornText}` : ''}</Text>
+          <Text style={styles.metaText}>
+            {item.category} · {wearCountText}{lastWornText ? ` · ${lastWornText}` : ''}
+          </Text>
         </View>
 
         {/* 基础属性 —— 默认仅展示 AI 识别的材质/版型，其余按需添加 */}
         <ItemAttributesCard model={attrModel} />
 
-        {/* 穿着记录 */}
+        {/* 穿着记录 —— 展示包含此单品的搭配（计数已在上方概览，不再重复） */}
         <View style={styles.wearSection}>
           <Text style={styles.wearTitle}>穿着记录</Text>
-          <Text style={styles.wearCount}>{wearCountText}</Text>
           <ItemOutfits itemId={item.item_id} />
         </View>
 
@@ -262,6 +306,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paperCard, ...Shadow.two,
   },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
+  replaceBtn: {
+    position: 'absolute', right: Spacing.two, bottom: Spacing.two,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 16,
+    paddingHorizontal: Spacing.three, paddingVertical: 6,
+  },
+  replaceBtnText: { ...T.micro, color: '#fff' },
+
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  nameEditHint: { ...T.micro, color: Colors.walnut2, fontSize: 15 },
+  nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  nameInput: {
+    flex: 1, ...T.sectionTitle, fontSize: 22, color: Colors.ink,
+    borderBottomWidth: 1, borderBottomColor: Colors.lineStrong, paddingVertical: 2,
+  },
+  nameSaveText: { ...T.buttonSecondary, color: Colors.terracotta },
 
   itemName: { ...T.sectionTitle, fontSize: 22 },
 
