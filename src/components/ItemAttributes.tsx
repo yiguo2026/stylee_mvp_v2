@@ -102,7 +102,14 @@ export function ItemAttributes({ item, onUpdate }: Props) {
   const commit = (key: string, value: string) => {
     setValues(v => ({ ...v, [key]: value }));
     const upd = toUpdate(key, value);
-    if (upd) onUpdate(upd);
+    // 用户手动校准该属性：把 key 合并进 ai_recognized_attrs.manual_fields（浅合并保留既有元数据，去重）
+    const existing: Record<string, unknown> & { manual_fields?: string[] } =
+      item.ai_recognized_attrs ?? {};
+    const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
+    onUpdate({
+      ...(upd ?? {}),
+      ai_recognized_attrs: { ...existing, manual_fields },
+    });
   };
 
   const handleAddAttr = (key: string) => {
@@ -139,6 +146,9 @@ export function ItemAttributes({ item, onUpdate }: Props) {
   // 渲染一行 + 其就地展开的编辑区（accordion）
   const renderRow = (key: string, showBorder: boolean, canRemove: boolean) => {
     const isEditing = editing === key;
+    // 「AI 识别」标签：核心属性且未被用户手动校准过时才显示
+    const manualFields = item.ai_recognized_attrs?.manual_fields ?? [];
+    const showAiBadge = !!DEF_MAP[key].aiCore && !manualFields.includes(key);
     return (
       <React.Fragment key={key}>
         <AttrRow
@@ -146,6 +156,7 @@ export function ItemAttributes({ item, onUpdate }: Props) {
           value={values[key] ?? ''}
           showBorder={isEditing ? false : showBorder}
           active={isEditing}
+          showAiBadge={showAiBadge}
           onPress={() => toggleEditing(key)}
           onRemove={canRemove ? () => handleRemove(key) : undefined}
         />
@@ -211,8 +222,8 @@ export function ItemAttributes({ item, onUpdate }: Props) {
 }
 
 // ---------- 单行 ----------
-function AttrRow({ def, value, showBorder, active, onPress, onRemove }: {
-  def: AttrDef; value: string; showBorder: boolean; active?: boolean;
+function AttrRow({ def, value, showBorder, active, showAiBadge, onPress, onRemove }: {
+  def: AttrDef; value: string; showBorder: boolean; active?: boolean; showAiBadge?: boolean;
   onPress: () => void; onRemove?: () => void;
 }) {
   return (
@@ -220,7 +231,7 @@ function AttrRow({ def, value, showBorder, active, onPress, onRemove }: {
       <TouchableOpacity style={styles.rowMain} activeOpacity={0.6} onPress={onPress}>
         <View style={styles.rowLabelWrap}>
           <Text style={styles.rowLabel}>{def.label}</Text>
-          {def.aiCore ? <View style={styles.aiBadge}><Text style={styles.aiBadgeText}>AI 识别</Text></View> : null}
+          {showAiBadge ? <View style={styles.aiBadge}><Text style={styles.aiBadgeText}>AI 识别</Text></View> : null}
         </View>
         <View style={styles.rowValueWrap}>
           {value ? (
