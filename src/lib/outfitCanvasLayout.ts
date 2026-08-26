@@ -11,6 +11,7 @@ export interface OutfitCanvasLayoutItem {
   layoutRole?: OutfitCanvasRole;
   imageUri?: string | null;
   imageSource?: unknown;
+  imageAspectRatio?: number | null;
   owned?: boolean;
 }
 
@@ -49,9 +50,12 @@ const ACCESSORY_SHAPES = {
 } as const satisfies Record<'hat' | 'scarf' | 'bag', PlacementShape>;
 
 const MICRO_SHAPES = [
-  { zone: 'micro', left: 5, top: 26, width: 12, height: 12, rotation: -2, zIndex: 8 },
-  { zone: 'micro', left: 5, top: 42, width: 12, height: 12, rotation: 2, zIndex: 9 },
-  { zone: 'micro', left: 5, top: 58, width: 12, height: 12, rotation: -1, zIndex: 10 },
+  { zone: 'micro', left: 5, top: 22, width: 12, height: 12, rotation: -2, zIndex: 8 },
+  { zone: 'micro', left: 5, top: 38, width: 12, height: 12, rotation: 2, zIndex: 9 },
+  { zone: 'micro', left: 5, top: 54, width: 12, height: 12, rotation: -1, zIndex: 10 },
+  { zone: 'micro', left: 83, top: 22, width: 12, height: 12, rotation: 2, zIndex: 11 },
+  { zone: 'micro', left: 83, top: 38, width: 12, height: 12, rotation: -2, zIndex: 12 },
+  { zone: 'micro', left: 83, top: 54, width: 12, height: 12, rotation: 1, zIndex: 13 },
 ] as const satisfies readonly PlacementShape[];
 
 const IMAGE_SCALE: Record<OutfitCanvasRole, number> = {
@@ -61,14 +65,16 @@ const IMAGE_SCALE: Record<OutfitCanvasRole, number> = {
   dress: 1.50,
   bottom: 1.58,
   shoes: 1.55,
-  bag: 1.09,
-  hat: 1.00,
-  scarf: 1.15,
+  bag: 1.31,
+  hat: 1.12,
+  scarf: 1.36,
   accessory: 1.00,
 };
 
 const DRESSING_GAP = 3;
 const FOOT_GAP = 6;
+export const OUTFIT_CANVAS_ASPECT_RATIO = 0.8;
+export const OUTFIT_CANVAS_MIN_HEIGHT = 360;
 
 const includesAny = (value: string, keywords: string[]) => keywords.some((keyword) => value.includes(keyword));
 
@@ -118,18 +124,38 @@ function mirrorHorizontally(shape: PlacementShape): PlacementShape {
   };
 }
 
+function centeredHorizontally(shape: PlacementShape): PlacementShape {
+  return {
+    ...shape,
+    left: (100 - shape.width) / 2,
+    rotation: 0,
+  };
+}
+
+function peripheralCandidates(primary: PlacementShape): PlacementShape[] {
+  const secondaryTop = primary.top + primary.height + 4;
+  const secondary = { ...primary, top: secondaryTop };
+  return [
+    primary,
+    mirrorHorizontally(primary),
+    centeredHorizontally(primary),
+    secondary,
+    mirrorHorizontally(secondary),
+    centeredHorizontally(secondary),
+  ];
+}
+
 function placePeripheralRole(
   role: 'hat' | 'scarf' | 'bag',
   entries: LayoutEntry[],
   result: OutfitCanvasPlacement[],
 ) {
+  const candidates = peripheralCandidates(ACCESSORY_SHAPES[role]);
   entries.forEach((entry, index) => {
-    const primary = ACCESSORY_SHAPES[role];
-    const candidate = index % 2 === 0 ? primary : mirrorHorizontally(primary);
     const occupied = result.filter((value) => value.zone !== 'core' && value.zone !== 'foot');
-    const shape = occupied.some((value) => overlaps(candidate, value))
-      ? mirrorHorizontally(candidate)
-      : candidate;
+    const shape = candidates.find((candidate) => (
+      !occupied.some((value) => overlaps(candidate, value))
+    )) ?? candidates[index % candidates.length];
     result.push(placement(entry.item, role, {
       ...shape,
       zIndex: shape.zIndex + index,
@@ -139,10 +165,12 @@ function placePeripheralRole(
 
 function placeMicroEntries(entries: LayoutEntry[], result: OutfitCanvasPlacement[]) {
   entries.forEach((entry, index) => {
-    const shape = MICRO_SHAPES[Math.min(index, MICRO_SHAPES.length - 1)];
+    const occupied = result.filter((value) => value.zone !== 'core' && value.zone !== 'foot');
+    const shape = MICRO_SHAPES.find((candidate) => (
+      !occupied.some((value) => overlaps(candidate, value))
+    )) ?? MICRO_SHAPES[index % MICRO_SHAPES.length];
     result.push(placement(entry.item, 'accessory', {
       ...shape,
-      left: shape.left + Math.max(0, index - MICRO_SHAPES.length + 1) * 2,
       zIndex: shape.zIndex + index,
     }));
   });
@@ -163,28 +191,133 @@ export function placementBounds(placements: OutfitCanvasPlacement[]) {
   };
 }
 
+function renderedRect(entry: OutfitCanvasPlacement) {
+  const frameLeft = entry.left;
+  const frameTop = entry.top / OUTFIT_CANVAS_ASPECT_RATIO;
+  const frameWidth = entry.width;
+  const frameHeight = entry.height / OUTFIT_CANVAS_ASPECT_RATIO;
+  const frameCenterX = frameLeft + frameWidth / 2;
+  const frameCenterY = frameTop + frameHeight / 2;
+  const hasImage = Boolean(entry.item.imageUri || entry.item.imageSource);
+  const sourceAspectRatio = typeof entry.item.imageAspectRatio === 'number'
+    && Number.isFinite(entry.item.imageAspectRatio)
+    && entry.item.imageAspectRatio > 0
+    ? entry.item.imageAspectRatio
+    : 1;
+
+  let renderedWidth = frameWidth;
+  let renderedHeight = frameHeight;
+  let imageOffsetY = 0;
+  if (hasImage) {
+    if (frameWidth > 0 && frameHeight > 0) {
+      const frameAspectRatio = frameWidth / frameHeight;
+      const containedWidth = sourceAspectRatio > frameAspectRatio
+        ? frameWidth
+        : frameHeight * sourceAspectRatio;
+      const containedHeight = sourceAspectRatio > frameAspectRatio
+        ? frameWidth / sourceAspectRatio
+        : frameHeight;
+      renderedWidth = containedWidth * garmentImageScale(entry.role);
+      renderedHeight = containedHeight * garmentImageScale(entry.role);
+    } else {
+      renderedWidth = 0;
+      renderedHeight = 0;
+    }
+    imageOffsetY = (
+      garmentImageOffsetY(entry.role) / OUTFIT_CANVAS_MIN_HEIGHT * 100
+    ) / OUTFIT_CANVAS_ASPECT_RATIO;
+  }
+
+  const imageCenterX = frameCenterX;
+  const imageCenterY = frameCenterY + imageOffsetY;
+  const radians = entry.rotation * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const corners = [
+    [-renderedWidth / 2, -renderedHeight / 2],
+    [renderedWidth / 2, -renderedHeight / 2],
+    [renderedWidth / 2, renderedHeight / 2],
+    [-renderedWidth / 2, renderedHeight / 2],
+  ].map(([offsetX, offsetY]) => {
+    const x = imageCenterX + offsetX;
+    const y = imageCenterY + offsetY;
+    const relativeX = x - frameCenterX;
+    const relativeY = y - frameCenterY;
+    return {
+      x: frameCenterX + relativeX * cosine - relativeY * sine,
+      y: frameCenterY + relativeX * sine + relativeY * cosine,
+    };
+  });
+
+  return {
+    left: Math.min(...corners.map((corner) => corner.x)),
+    right: Math.max(...corners.map((corner) => corner.x)),
+    top: Math.min(...corners.map((corner) => corner.y)) * OUTFIT_CANVAS_ASPECT_RATIO,
+    bottom: Math.max(...corners.map((corner) => corner.y)) * OUTFIT_CANVAS_ASPECT_RATIO,
+  };
+}
+
+function renderedPlacementBounds(placements: OutfitCanvasPlacement[]) {
+  const rectangles = placements.map(renderedRect);
+  const left = Math.min(...rectangles.map((entry) => entry.left));
+  const right = Math.max(...rectangles.map((entry) => entry.right));
+  const top = Math.min(...rectangles.map((entry) => entry.top));
+  const bottom = Math.max(...rectangles.map((entry) => entry.bottom));
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    centerX: (left + right) / 2,
+    centerY: (top + bottom) / 2,
+  };
+}
+
+function scalePlacementFrames(
+  placements: OutfitCanvasPlacement[],
+  scale: number,
+): OutfitCanvasPlacement[] {
+  return placements.map((entry) => ({
+    ...entry,
+    left: entry.left * scale,
+    top: entry.top * scale,
+    width: entry.width * scale,
+    height: entry.height * scale,
+  }));
+}
+
 export function fitAndCenterPlacements(
   placements: OutfitCanvasPlacement[],
   safeInset = 2,
 ): OutfitCanvasPlacement[] {
   if (placements.length === 0) return placements;
-  const bounds = placementBounds(placements);
   const available = 100 - (safeInset * 2);
-  const scale = Math.min(
-    1,
-    available / (bounds.right - bounds.left),
-    available / (bounds.bottom - bounds.top),
-  );
-  const scaledWidth = (bounds.right - bounds.left) * scale;
-  const scaledHeight = (bounds.bottom - bounds.top) * scale;
-  const offsetX = 50 - scaledWidth / 2 - bounds.left * scale;
-  const offsetY = 50 - scaledHeight / 2 - bounds.top * scale;
-  return placements.map((entry) => ({
+  const fits = (scale: number) => {
+    const bounds = renderedPlacementBounds(scalePlacementFrames(placements, scale));
+    return bounds.right - bounds.left <= available
+      && bounds.bottom - bounds.top <= available;
+  };
+
+  let scale = 1;
+  if (!fits(scale)) {
+    let lower = 0;
+    let upper = 1;
+    for (let iteration = 0; iteration < 64; iteration += 1) {
+      const candidate = (lower + upper) / 2;
+      if (fits(candidate)) lower = candidate;
+      else upper = candidate;
+    }
+    scale = lower;
+  }
+
+  const scaled = scalePlacementFrames(placements, scale);
+  const bounds = renderedPlacementBounds(scaled);
+  const offsetX = 50 - bounds.centerX;
+  const offsetY = 50 - bounds.centerY;
+  return scaled.map((entry) => ({
     ...entry,
-    left: entry.left * scale + offsetX,
-    top: entry.top * scale + offsetY,
-    width: entry.width * scale,
-    height: entry.height * scale,
+    left: entry.left + offsetX,
+    top: entry.top + offsetY,
   }));
 }
 

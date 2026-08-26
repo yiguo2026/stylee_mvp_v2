@@ -145,3 +145,42 @@ test('malformed layout entries do not interrupt outfit mapping', () => {
   assert.equal(outfit.items?.length, 1);
   assert.equal(outfit.items?.[0].role, 'base');
 });
+
+test('unknown owned role permanently invalidates a later valid duplicate target', () => {
+  const wardrobe = [item({ item_id: 't1', category: '上装' })];
+  const [outfit] = outfitsRespToApp([{
+    name: '兼容',
+    owned_item_ids: ['t1'],
+    recommended_items: [],
+    comment: '',
+    layout_items: [
+      { source: 'owned', item_id: 't1', layout_role: 'unknown' as never },
+      { source: 'owned', item_id: 't1', layout_role: 'base' },
+    ],
+  }], wardrobe, 'u1', 's1');
+
+  assert.equal(outfit.items?.length, 1);
+  assert.equal(outfit.items?.[0].role, undefined);
+});
+
+test('duplicate and unknown recommended targets cannot regain a trusted role', () => {
+  const [outfit] = outfitsRespToApp([{
+    name: '兼容',
+    owned_item_ids: [],
+    recommended_items: [
+      { name: '丝巾', category: '帽巾', color: '米色' },
+      { name: '珍珠耳饰', category: '配饰', color: '白色' },
+    ],
+    comment: '',
+    layout_items: [
+      { source: 'recommended', recommended_index: 0, layout_role: 'scarf' },
+      { source: 'recommended', recommended_index: 0, layout_role: 'accessory' },
+      { source: 'recommended', recommended_index: 1, layout_role: 'unknown' as never },
+      { source: 'recommended', recommended_index: 1, layout_role: 'accessory' },
+    ],
+  }], [], 'u1', 's1');
+
+  assert.equal(outfit.recommended_items?.length, 2);
+  assert.equal(outfit.recommended_items?.[0].role, undefined);
+  assert.equal(outfit.recommended_items?.[1].role, undefined);
+});

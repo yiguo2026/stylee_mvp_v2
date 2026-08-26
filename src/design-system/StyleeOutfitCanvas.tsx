@@ -13,6 +13,8 @@ import {
   buildOutfitCanvasLayout,
   garmentImageOffsetY,
   garmentImageScale,
+  OUTFIT_CANVAS_ASPECT_RATIO,
+  OUTFIT_CANVAS_MIN_HEIGHT,
   type OutfitCanvasLayoutItem,
 } from '@/lib/outfitCanvasLayout';
 import { ds } from './tokens';
@@ -100,9 +102,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     maxWidth: ds.layout.contentMaxMobile,
-    minHeight: 360,
+    minHeight: OUTFIT_CANVAS_MIN_HEIGHT,
     maxHeight: 480,
-    aspectRatio: 0.8,
+    aspectRatio: OUTFIT_CANVAS_ASPECT_RATIO,
     alignSelf: 'center',
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,

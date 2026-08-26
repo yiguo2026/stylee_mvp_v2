@@ -85,21 +85,25 @@ function indexLayoutItems(outfit: RecommendRespOutfit) {
 
   for (const entry of Array.isArray(outfit.layout_items) ? outfit.layout_items : []) {
     if (!entry || typeof entry !== 'object') continue;
-    if (!OUTFIT_LAYOUT_ROLES.has(entry.layout_role)) continue;
     if (entry.source === 'owned' && typeof entry.item_id === 'string'
         && ownedItemIds.includes(entry.item_id)) {
-      if (owned.has(entry.item_id) || invalidOwned.has(entry.item_id)) {
+      if (!OUTFIT_LAYOUT_ROLES.has(entry.layout_role)
+          || owned.has(entry.item_id)
+          || invalidOwned.has(entry.item_id)) {
         owned.delete(entry.item_id);
         invalidOwned.add(entry.item_id);
       } else {
         owned.set(entry.item_id, entry.layout_role);
       }
+      continue;
     }
     if (entry.source === 'recommended' && Number.isInteger(entry.recommended_index)
         && entry.recommended_index! >= 0
         && entry.recommended_index! < recommendedItems.length) {
       const index = entry.recommended_index!;
-      if (recommended.has(index) || invalidRecommended.has(index)) {
+      if (!OUTFIT_LAYOUT_ROLES.has(entry.layout_role)
+          || recommended.has(index)
+          || invalidRecommended.has(index)) {
         recommended.delete(index);
         invalidRecommended.add(index);
       } else {

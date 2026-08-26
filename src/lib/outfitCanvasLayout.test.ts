@@ -3,6 +3,8 @@ import assert from 'node:assert';
 import {
   buildOutfitCanvasLayout,
   classifyOutfitCanvasRole,
+  fitAndCenterPlacements,
+  garmentImageOffsetY,
   garmentImageScale,
   placementBounds,
   type OutfitCanvasLayoutItem,
@@ -58,6 +60,98 @@ const baseSeparates = [
 ];
 
 const CANVAS_ASPECT_RATIO = 0.8;
+const MIN_CANVAS_HEIGHT = 360;
+
+function renderedBounds(layout: OutfitCanvasPlacement[]) {
+  const rects = layout.map((entry) => {
+    const frameLeft = entry.left;
+    const frameTop = entry.top / CANVAS_ASPECT_RATIO;
+    const frameWidth = entry.width;
+    const frameHeight = entry.height / CANVAS_ASPECT_RATIO;
+    const frameCenterX = frameLeft + frameWidth / 2;
+    const frameCenterY = frameTop + frameHeight / 2;
+    const hasImage = Boolean(entry.item.imageUri || entry.item.imageSource);
+    const sourceAspect = (
+      entry.item as OutfitCanvasLayoutItem & { imageAspectRatio?: number | null }
+    ).imageAspectRatio;
+    const safeSourceAspect = typeof sourceAspect === 'number'
+      && Number.isFinite(sourceAspect)
+      && sourceAspect > 0
+      ? sourceAspect
+      : 1;
+    const frameAspect = frameWidth / frameHeight;
+    const containedWidth = safeSourceAspect > frameAspect
+      ? frameWidth
+      : frameHeight * safeSourceAspect;
+    const containedHeight = safeSourceAspect > frameAspect
+      ? frameWidth / safeSourceAspect
+      : frameHeight;
+    const renderedWidth = hasImage
+      ? containedWidth * garmentImageScale(entry.role)
+      : frameWidth;
+    const renderedHeight = hasImage
+      ? containedHeight * garmentImageScale(entry.role)
+      : frameHeight;
+    const imageOffset = hasImage
+      ? (garmentImageOffsetY(entry.role) / MIN_CANVAS_HEIGHT * 100) / CANVAS_ASPECT_RATIO
+      : 0;
+    const radians = entry.rotation * Math.PI / 180;
+    const cosine = Math.cos(radians);
+    const sine = Math.sin(radians);
+    const imageCenterX = frameCenterX;
+    const imageCenterY = frameCenterY + imageOffset;
+    const corners = [
+      [-renderedWidth / 2, -renderedHeight / 2],
+      [renderedWidth / 2, -renderedHeight / 2],
+      [renderedWidth / 2, renderedHeight / 2],
+      [-renderedWidth / 2, renderedHeight / 2],
+    ].map(([offsetX, offsetY]) => {
+      const x = imageCenterX + offsetX;
+      const y = imageCenterY + offsetY;
+      const relativeX = x - frameCenterX;
+      const relativeY = y - frameCenterY;
+      return {
+        x: frameCenterX + relativeX * cosine - relativeY * sine,
+        y: frameCenterY + relativeX * sine + relativeY * cosine,
+      };
+    });
+    return {
+      left: Math.min(...corners.map((corner) => corner.x)),
+      right: Math.max(...corners.map((corner) => corner.x)),
+      top: Math.min(...corners.map((corner) => corner.y)) * CANVAS_ASPECT_RATIO,
+      bottom: Math.max(...corners.map((corner) => corner.y)) * CANVAS_ASPECT_RATIO,
+    };
+  });
+  const left = Math.min(...rects.map((rect) => rect.left));
+  const right = Math.max(...rects.map((rect) => rect.right));
+  const top = Math.min(...rects.map((rect) => rect.top));
+  const bottom = Math.max(...rects.map((rect) => rect.bottom));
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    centerX: (left + right) / 2,
+    centerY: (top + bottom) / 2,
+  };
+}
+
+function assertSafeAndCentered(bounds: ReturnType<typeof renderedBounds>) {
+  assert.ok(bounds.left >= 2 - 1e-6, `left ${bounds.left}`);
+  assert.ok(bounds.right <= 98 + 1e-6, `right ${bounds.right}`);
+  assert.ok(bounds.top >= 2 - 1e-6, `top ${bounds.top}`);
+  assert.ok(bounds.bottom <= 98 + 1e-6, `bottom ${bounds.bottom}`);
+  assert.ok(Math.abs(bounds.centerX - 50) <= 1e-6, `centerX ${bounds.centerX}`);
+  assert.ok(Math.abs(bounds.centerY - 50) <= 1e-6, `centerY ${bounds.centerY}`);
+}
+
+function assertPairwiseNonOverlapping(entries: OutfitCanvasPlacement[]) {
+  entries.forEach((entry, index) => {
+    for (const other of entries.slice(index + 1)) {
+      assert.equal(overlaps(entry, other), false, `${entry.item.id} overlaps ${other.item.id}`);
+    }
+  });
+}
 
 function visibleSizeTolerance(role: OutfitCanvasRole) {
   return role === 'bag' ? 0.5 : 0;
@@ -73,11 +167,12 @@ function visibleSizeFor(
     name: role,
     category: role,
     layoutRole: role,
+    imageUri: `${role}.png`,
   } satisfies OutfitCanvasLayoutItem;
   const core = [
-    { id: 'base', name: 'T恤', category: '上装', layoutRole: 'base' as const },
-    { id: 'bottom', name: '长裤', category: '下装', layoutRole: 'bottom' as const },
-    { id: 'core-shoes', name: '鞋', category: '鞋履', layoutRole: 'shoes' as const },
+    { id: 'base', name: 'T恤', category: '上装', layoutRole: 'base' as const, imageUri: 'base.png' },
+    { id: 'bottom', name: '长裤', category: '下装', layoutRole: 'bottom' as const, imageUri: 'bottom.png' },
+    { id: 'core-shoes', name: '鞋', category: '鞋履', layoutRole: 'shoes' as const, imageUri: 'shoes.png' },
   ];
   const items = role === 'shoes' ? core : [...core, accessory];
   const targetId = role === 'shoes' ? 'core-shoes' : role;
@@ -91,6 +186,7 @@ function visibleSizeFor(
     ? entry.width / sourceAspectRatio
     : frameHeightInCanvasWidth;
   return {
+    frameWidth: entry.width,
     frameHeightInCanvasWidth,
     containedWidth,
     containedHeight,
@@ -218,12 +314,7 @@ test('fixture alpha ratios land in approved visible size ranges', () => {
 test('square fixture contain geometry models the production canvas aspect ratio', () => {
   for (const role of ['bag', 'hat', 'scarf', 'shoes'] as const) {
     const size = visibleSizeFor(role, { width: 1, height: 1 });
-    const frame = placement(buildOutfitCanvasLayout([
-      ...baseSeparates,
-      ...(role === 'shoes' ? [] : [roleItem(role, role)]),
-    ]), role === 'shoes' ? 'shoes' : role);
-    assert.equal(size.frameHeightInCanvasWidth, frame.height / CANVAS_ASPECT_RATIO);
-    const containedSide = Math.min(frame.width, frame.height / CANVAS_ASPECT_RATIO);
+    const containedSide = Math.min(size.frameWidth, size.frameHeightInCanvasWidth);
     assert.equal(size.containedWidth, containedSide);
     assert.equal(size.containedHeight, containedSide);
   }
@@ -236,6 +327,40 @@ test('only backpack visible-size assertions receive the 0.5 point tolerance', ()
   }
   const backpack = visibleSizeFor('bag', { width: 0.623, height: 0.847 });
   assert.ok(backpack.width < 18 && backpack.width >= 17.5);
+});
+
+test('opaque square outerwear rendered with contain stays inside the safe inset', () => {
+  const opaqueOuter = {
+    ...roleItem('opaque-outer', 'outer'),
+    imageUri: 'opaque-square.png',
+  } satisfies OutfitCanvasLayoutItem;
+  const layout = buildOutfitCanvasLayout([
+    opaqueOuter,
+    ...baseSeparates,
+  ]);
+
+  assertSafeAndCentered(renderedBounds(layout));
+});
+
+test('fit accounts for known source aspect, rotation, and shoe image offset', () => {
+  const wideShoe = {
+    ...roleItem('wide-shoe', 'shoes'),
+    imageUri: 'wide-shoe.png',
+    imageAspectRatio: 2.4,
+  } as OutfitCanvasLayoutItem & { imageAspectRatio: number };
+  const fitted = fitAndCenterPlacements([{
+    item: wideShoe,
+    role: 'shoes',
+    zone: 'foot',
+    left: 68,
+    top: 82,
+    width: 29,
+    height: 18,
+    rotation: -14,
+    zIndex: 9,
+  }]);
+
+  assertSafeAndCentered(renderedBounds(fitted));
 });
 
 test('malformed dress with separates preserves every item and anchors shoes below all core garments', () => {
@@ -262,18 +387,35 @@ test('malformed dress with separates preserves every item and anchors shoes belo
   assert.ok(core.every((entry) => !overlaps(entry, shoes)));
 });
 
-test('generic accessories use micro zones and preserve every input exactly once', () => {
+test('three scarves use distinct non-overlapping neck placements', () => {
+  const items = [
+    ...baseSeparates,
+    roleItem('scarf-one', 'scarf'),
+    roleItem('scarf-two', 'scarf'),
+    roleItem('scarf-three', 'scarf'),
+  ];
+  const layout = buildOutfitCanvasLayout(items);
+  const scarves = ['scarf-one', 'scarf-two', 'scarf-three']
+    .map((id) => placement(layout, id));
+
+  assert.ok(scarves.every((entry) => entry.zone === 'neck'));
+  assertPairwiseNonOverlapping(scarves);
+});
+
+test('five generic accessories use distinct micro placements and preserve every input once', () => {
   const items = [
     ...baseSeparates,
     roleItem('watch', 'accessory'),
     roleItem('belt', 'accessory'),
     roleItem('jewelry', 'accessory'),
     roleItem('gloves', 'accessory'),
+    roleItem('brooch', 'accessory'),
   ];
   const layout = buildOutfitCanvasLayout(items);
   assert.equal(layout.length, items.length);
   assert.equal(new Set(layout.map((entry) => entry.item.id)).size, items.length);
-  for (const id of ['watch', 'belt', 'jewelry', 'gloves']) {
-    assert.equal(placement(layout, id).zone, 'micro');
-  }
+  const accessories = ['watch', 'belt', 'jewelry', 'gloves', 'brooch']
+    .map((id) => placement(layout, id));
+  assert.ok(accessories.every((entry) => entry.zone === 'micro'));
+  assertPairwiseNonOverlapping(accessories);
 });
