@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {
   buildOutfitCanvasLayout,
+  garmentImageOffsetY,
   garmentImageScale,
   type OutfitCanvasLayoutItem,
 } from '@/lib/outfitCanvasLayout';
@@ -47,6 +48,7 @@ export function StyleeOutfitCanvas({
             ? { uri: entry.item.imageUri }
             : undefined;
         const selected = selectedItemId === entry.item.id;
+        const imageOffsetY = garmentImageOffsetY(entry.role);
         return (
           <Pressable
             key={entry.item.id}
@@ -74,7 +76,10 @@ export function StyleeOutfitCanvas({
                 source={source}
                 style={[
                   styles.image,
-                  { transform: [{ scale: garmentImageScale(entry.role) }] },
+                  {
+                    top: imageOffsetY,
+                    transform: [{ scale: garmentImageScale(entry.role) }],
+                  },
                 ]}
                 resizeMode="contain"
               />

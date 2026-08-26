@@ -11,7 +11,10 @@ test('editorial canvas composes transparent sources without per-item cards', () 
   );
   assert.match(source, /buildOutfitCanvasLayout\(items\)/);
   assert.match(source, /garmentImageScale\(entry\.role\)/);
+  assert.match(source, /garmentImageOffsetY\(entry\.role\)/);
   assert.match(source, /resizeMode="contain"/);
+  assert.doesNotMatch(source, /\.filter\(/);
+  assert.doesNotMatch(source, /accessory-band/);
   assert.doesNotMatch(source, /StyleeGarmentMedia/);
   assert.match(source, /ds\.color\.semantic\.surface\.input/);
 });

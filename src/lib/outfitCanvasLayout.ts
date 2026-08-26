@@ -91,6 +91,10 @@ export function garmentImageScale(role: OutfitCanvasRole): number {
   return IMAGE_SCALE[role];
 }
 
+export function garmentImageOffsetY(role: OutfitCanvasRole): number {
+  return role === 'shoes' ? 10 : 0;
+}
+
 function placement(
   item: OutfitCanvasLayoutItem,
   role: OutfitCanvasRole,
