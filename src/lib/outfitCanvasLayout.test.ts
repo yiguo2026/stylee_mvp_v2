@@ -57,7 +57,11 @@ const baseSeparates = [
   { id: 'shoes', name: '鞋', category: '鞋履', layoutRole: 'shoes' as const },
 ];
 
-const VISIBLE_SIZE_TOLERANCE = 0.5;
+const CANVAS_ASPECT_RATIO = 0.8;
+
+function visibleSizeTolerance(role: OutfitCanvasRole) {
+  return role === 'bag' ? 0.5 : 0;
+}
 
 function visibleSizeFor(
   role: OutfitCanvasRole,
@@ -78,14 +82,16 @@ function visibleSizeFor(
   const items = role === 'shoes' ? core : [...core, accessory];
   const targetId = role === 'shoes' ? 'core-shoes' : role;
   const entry = placement(buildOutfitCanvasLayout(items), targetId);
-  const frameAspectRatio = entry.width / entry.height;
+  const frameHeightInCanvasWidth = entry.height / CANVAS_ASPECT_RATIO;
+  const frameAspectRatio = entry.width / frameHeightInCanvasWidth;
   const containedWidth = sourceAspectRatio > frameAspectRatio
     ? entry.width
-    : entry.height * sourceAspectRatio;
+    : frameHeightInCanvasWidth * sourceAspectRatio;
   const containedHeight = sourceAspectRatio > frameAspectRatio
     ? entry.width / sourceAspectRatio
-    : entry.height;
+    : frameHeightInCanvasWidth;
   return {
+    frameHeightInCanvasWidth,
     containedWidth,
     containedHeight,
     width: containedWidth * garmentImageScale(role) * alpha.width,
@@ -102,14 +108,13 @@ function assertVisibleRange(
   maxHeight: number,
 ) {
   const size = visibleSizeFor(role, alpha);
+  const tolerance = visibleSizeTolerance(role);
   assert.ok(
-    size.width >= minWidth - VISIBLE_SIZE_TOLERANCE
-      && size.width <= maxWidth + VISIBLE_SIZE_TOLERANCE,
+    size.width >= minWidth - tolerance && size.width <= maxWidth + tolerance,
     `${role} width ${size.width}`,
   );
   assert.ok(
-    size.height >= minHeight - VISIBLE_SIZE_TOLERANCE
-      && size.height <= maxHeight + VISIBLE_SIZE_TOLERANCE,
+    size.height >= minHeight - tolerance && size.height <= maxHeight + tolerance,
     `${role} height ${size.height}`,
   );
 }
@@ -121,9 +126,9 @@ function assertVisibleWidthRange(
   maxWidth: number,
 ) {
   const size = visibleSizeFor(role, alpha);
+  const tolerance = visibleSizeTolerance(role);
   assert.ok(
-    size.width >= minWidth - VISIBLE_SIZE_TOLERANCE
-      && size.width <= maxWidth + VISIBLE_SIZE_TOLERANCE,
+    size.width >= minWidth - tolerance && size.width <= maxWidth + tolerance,
     `${role} width ${size.width}`,
   );
 }
@@ -210,16 +215,27 @@ test('fixture alpha ratios land in approved visible size ranges', () => {
   assertVisibleWidthRange('shoes', alpha.shoes, 20, 25);
 });
 
-test('square fixture contain geometry uses the shorter frame edge before image scale', () => {
+test('square fixture contain geometry models the production canvas aspect ratio', () => {
   for (const role of ['bag', 'hat', 'scarf', 'shoes'] as const) {
     const size = visibleSizeFor(role, { width: 1, height: 1 });
     const frame = placement(buildOutfitCanvasLayout([
       ...baseSeparates,
       ...(role === 'shoes' ? [] : [roleItem(role, role)]),
     ]), role === 'shoes' ? 'shoes' : role);
-    assert.equal(size.containedWidth, Math.min(frame.width, frame.height));
-    assert.equal(size.containedHeight, Math.min(frame.width, frame.height));
+    assert.equal(size.frameHeightInCanvasWidth, frame.height / CANVAS_ASPECT_RATIO);
+    const containedSide = Math.min(frame.width, frame.height / CANVAS_ASPECT_RATIO);
+    assert.equal(size.containedWidth, containedSide);
+    assert.equal(size.containedHeight, containedSide);
   }
+});
+
+test('only backpack visible-size assertions receive the 0.5 point tolerance', () => {
+  assert.equal(visibleSizeTolerance('bag'), 0.5);
+  for (const role of ['hat', 'scarf', 'shoes', 'accessory'] as const) {
+    assert.equal(visibleSizeTolerance(role), 0);
+  }
+  const backpack = visibleSizeFor('bag', { width: 0.623, height: 0.847 });
+  assert.ok(backpack.width < 18 && backpack.width >= 17.5);
 });
 
 test('malformed dress with separates preserves every item and anchors shoes below all core garments', () => {
@@ -233,10 +249,13 @@ test('malformed dress with separates preserves every item and anchors shoes belo
   const layout = buildOutfitCanvasLayout(items);
   assert.equal(layout.length, items.length);
   assert.deepEqual(new Set(layout.map((entry) => entry.item.id)), new Set(items.map((item) => item.id)));
-  const separates = ['base', 'mid', 'bottom'].map((id) => placement(layout, id));
-  assert.ok(separates.every((entry) => entry.zone === 'core'));
-  assert.ok(separates[0].left + separates[0].width <= separates[1].left);
-  assert.ok(separates[1].left + separates[1].width <= separates[2].left);
+  const fallbackRow = ['dress', 'base', 'mid', 'bottom'].map((id) => placement(layout, id));
+  assert.ok(fallbackRow.every((entry) => entry.zone === 'core'));
+  assert.equal(new Set(fallbackRow.map((entry) => entry.top)).size, 1);
+  assert.equal(new Set(fallbackRow.map((entry) => entry.height)).size, 1);
+  for (let index = 1; index < fallbackRow.length; index += 1) {
+    assert.ok(fallbackRow[index - 1].left + fallbackRow[index - 1].width <= fallbackRow[index].left);
+  }
   const shoes = placement(layout, 'shoes');
   const core = layout.filter((entry) => entry.zone === 'core');
   assert.ok(shoes.top >= Math.max(...core.map((entry) => entry.top + entry.height)));

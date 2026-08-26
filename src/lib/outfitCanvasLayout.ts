@@ -60,9 +60,9 @@ const IMAGE_SCALE: Record<OutfitCanvasRole, number> = {
   outer: 1.52,
   dress: 1.50,
   bottom: 1.58,
-  shoes: 1.60,
-  bag: 1.20,
-  hat: 1.12,
+  shoes: 1.55,
+  bag: 1.09,
+  hat: 1.00,
   scarf: 1.15,
   accessory: 1.00,
 };
@@ -220,6 +220,8 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   const midEntries = entriesFor('mid');
   const bottomEntries = entriesFor('bottom');
   const shoesEntries = entriesFor('shoes');
+  const conflictingSeparates = [...baseEntries, ...midEntries, ...bottomEntries];
+  const usesDressFallbackRow = dressEntries.length > 0 && conflictingSeparates.length > 0;
   const hasOuter = outerEntries.length > 0;
   const result: OutfitCanvasPlacement[] = [];
 
@@ -244,10 +246,10 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   let midPlacement: OutfitCanvasPlacement | undefined;
   let bottomPlacement: OutfitCanvasPlacement | undefined;
 
-  if (dressEntries.length > 0) {
+  if (dressEntries.length > 0 && !usesDressFallbackRow) {
     placeCoreEntries(dressEntries, dressShape, result);
     dressPlacement = result.find((entry) => entry.item === dressEntries[0].item);
-  } else if (baseEntries.length > 0) {
+  } else if (dressEntries.length === 0 && baseEntries.length > 0) {
     placeCoreEntries(baseEntries, baseShape, result);
     basePlacement = result.find((entry) => entry.item === baseEntries[0].item);
   }
@@ -276,35 +278,33 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
     bottomPlacement = result.find((entry) => entry.item === bottomEntries[0].item);
   }
 
-  if (dressEntries.length > 0) {
-    const conflictingSeparates = [...baseEntries, ...midEntries, ...bottomEntries];
-    if (conflictingSeparates.length > 0) {
-      const currentCoreBottom = Math.max(
-        ...result
-          .filter((entry) => entry.zone === 'core')
-          .map((entry) => entry.top + entry.height),
-      );
-      const gap = 3;
-      const fallbackWidth = Math.max(
-        8,
-        Math.min(28, (92 - gap * (conflictingSeparates.length - 1)) / conflictingSeparates.length),
-      );
-      conflictingSeparates.forEach((entry, index) => {
-        const fallbackPlacement = placement(entry.item, entry.role, {
-          zone: 'core',
-          left: 4 + index * (fallbackWidth + gap),
-          top: currentCoreBottom + DRESSING_GAP,
-          width: fallbackWidth,
-          height: 22,
-          rotation: entry.role === 'mid' ? -1 : 0,
-          zIndex: entry.role === 'base' ? 5 : 4,
-        });
-        result.push(fallbackPlacement);
-        if (entry.role === 'base' && !basePlacement) basePlacement = fallbackPlacement;
-        if (entry.role === 'mid' && !midPlacement) midPlacement = fallbackPlacement;
-        if (entry.role === 'bottom' && !bottomPlacement) bottomPlacement = fallbackPlacement;
+  if (usesDressFallbackRow) {
+    const fallbackEntries = [...dressEntries, ...conflictingSeparates];
+    const existingCore = result.filter((entry) => entry.zone === 'core');
+    const fallbackTop = existingCore.length > 0
+      ? Math.max(...existingCore.map((entry) => entry.top + entry.height)) + DRESSING_GAP
+      : 5;
+    const gap = 3;
+    const fallbackWidth = Math.max(
+      8,
+      Math.min(28, (92 - gap * (fallbackEntries.length - 1)) / fallbackEntries.length),
+    );
+    fallbackEntries.forEach((entry, index) => {
+      const fallbackPlacement = placement(entry.item, entry.role, {
+        zone: 'core',
+        left: 4 + index * (fallbackWidth + gap),
+        top: fallbackTop,
+        width: fallbackWidth,
+        height: 22,
+        rotation: entry.role === 'mid' ? -1 : 0,
+        zIndex: entry.role === 'base' ? 5 : 4,
       });
-    }
+      result.push(fallbackPlacement);
+      if (entry.role === 'dress' && !dressPlacement) dressPlacement = fallbackPlacement;
+      if (entry.role === 'base' && !basePlacement) basePlacement = fallbackPlacement;
+      if (entry.role === 'mid' && !midPlacement) midPlacement = fallbackPlacement;
+      if (entry.role === 'bottom' && !bottomPlacement) bottomPlacement = fallbackPlacement;
+    });
   }
 
   const corePlacements = result.filter((entry) => entry.zone === 'core');
