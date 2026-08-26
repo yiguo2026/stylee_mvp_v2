@@ -1,4 +1,4 @@
-import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory, FitType, SleeveLength, PhotoType, DetectedItem } from '@/types';
+import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory, FitType, SleeveLength, PhotoType, DetectedItem, OutfitLayoutRole } from '@/types';
 
 export interface RecognizeResp {
   category: string; color: string; material: string; style: string;
@@ -38,7 +38,7 @@ export interface ModelServiceTrace {
 }
 export interface RecommendReqItem {
   item_id: string; name: string; category: string; color: string;
-  material?: string; sleeve_length?: string; fit?: string; season?: string[]; occasion_tags?: string[];
+  material?: string; sleeve_length?: string; fit?: string; season?: string[]; occasion_tags?: string[]; style_tags?: string[];
 }
 export interface RecommendReq {
   input_mode: 'nl'; query: string; n: number;
@@ -51,6 +51,13 @@ export interface RecommendRespOutfit {
   name: string; owned_item_ids: string[];
   recommended_items: { name: string; category: string; color: string; description?: string }[];
   comment: string;
+  layout_items?: RecommendLayoutItem[];
+}
+export interface RecommendLayoutItem {
+  source: 'owned' | 'recommended';
+  item_id?: string;
+  recommended_index?: number;
+  layout_role: OutfitLayoutRole;
 }
 export interface RecommendResp {
   outfits: RecommendRespOutfit[];
@@ -62,6 +69,46 @@ export interface RecommendResp {
 export type RecommendContext = {
   weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string;
 };
+
+const OUTFIT_LAYOUT_ROLES = new Set<OutfitLayoutRole>([
+  'base', 'mid', 'outer', 'dress', 'bottom', 'shoes',
+  'bag', 'hat', 'scarf', 'accessory',
+]);
+
+function indexLayoutItems(outfit: RecommendRespOutfit) {
+  const owned = new Map<string, OutfitLayoutRole>();
+  const recommended = new Map<number, OutfitLayoutRole>();
+  const invalidOwned = new Set<string>();
+  const invalidRecommended = new Set<number>();
+  const ownedItemIds = Array.isArray(outfit.owned_item_ids) ? outfit.owned_item_ids : [];
+  const recommendedItems = Array.isArray(outfit.recommended_items) ? outfit.recommended_items : [];
+
+  for (const entry of Array.isArray(outfit.layout_items) ? outfit.layout_items : []) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (!OUTFIT_LAYOUT_ROLES.has(entry.layout_role)) continue;
+    if (entry.source === 'owned' && typeof entry.item_id === 'string'
+        && ownedItemIds.includes(entry.item_id)) {
+      if (owned.has(entry.item_id) || invalidOwned.has(entry.item_id)) {
+        owned.delete(entry.item_id);
+        invalidOwned.add(entry.item_id);
+      } else {
+        owned.set(entry.item_id, entry.layout_role);
+      }
+    }
+    if (entry.source === 'recommended' && Number.isInteger(entry.recommended_index)
+        && entry.recommended_index! >= 0
+        && entry.recommended_index! < recommendedItems.length) {
+      const index = entry.recommended_index!;
+      if (recommended.has(index) || invalidRecommended.has(index)) {
+        recommended.delete(index);
+        invalidRecommended.add(index);
+      } else {
+        recommended.set(index, entry.layout_role);
+      }
+    }
+  }
+  return { owned, recommended };
+}
 
 /** Normalize legacy/client aliases to the model-service PhotoType contract. */
 export function normalizePhotoType(value?: string | null): PhotoType {
@@ -165,6 +212,9 @@ export function toRecommendRequest(items: WardrobeItem[], context?: RecommendCon
       fit: i.fit_type || undefined,
       season: i.season && i.season.length ? i.season : undefined,
       occasion_tags: i.occasion_tags && i.occasion_tags.length ? i.occasion_tags : undefined,
+      style_tags: i.tags
+        ?.filter(tag => tag.tag_type === 'style')
+        .map(tag => tag.tag_name),
     })),
   };
 }
@@ -176,19 +226,21 @@ export function outfitsRespToApp(
   const result: Outfit[] = [];
   for (const o of outfits || []) {
     const outfit_id = `ai_outfit_${result.length}_${Date.now()}`;
+    const layout = indexLayoutItems(o);
     const outfitItems: OutfitItem[] = [];
     let order = 0;
     for (const id of Array.isArray(o.owned_item_ids) ? o.owned_item_ids : []) {
       const it = itemMap.get(id);
       if (!it) continue;
-      outfitItems.push({ item_id: id, outfit_id, display_order: order++, item: it });
+      outfitItems.push({ item_id: id, outfit_id, display_order: order++, item: it, role: layout.owned.get(id) });
     }
     const recommended: RecommendedItem[] = Array.isArray(o.recommended_items)
-      ? o.recommended_items.map(r => ({
+      ? o.recommended_items.map((r, index) => ({
           name: compactRecommendedName(String(r.name || ''), String(r.category || '配饰')),
           category: String(r.category || '配饰') as ClothingCategory,
           color: String(r.color || ''),
           description: r.description ? String(r.description) : undefined,
+          role: layout.recommended.get(index),
         }))
       : [];
     if (outfitItems.length === 0 && recommended.length === 0) continue;

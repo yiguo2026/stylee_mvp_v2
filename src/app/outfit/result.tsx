@@ -471,11 +471,11 @@ export default function OutfitResultScreen() {
     ? [
         ...(currentOutfit.items ?? []).map(oi => ({
           id: oi.item_id, name: oi.item?.name ?? oi.item?.category ?? '',
-          category: oi.item?.category ?? '', imageUri: oi.item?.image_url, owned: true,
+          category: oi.item?.category ?? '', imageUri: oi.item?.image_url, owned: true, layoutRole: oi.role,
         })),
         ...(currentOutfit.recommended_items ?? []).map((rec, idx) => ({
           id: `rec_${idx}`, name: rec.name, category: rec.category,
-          imageUri: rec.image_url, owned: false,
+          imageUri: rec.image_url, owned: false, layoutRole: rec.role,
         })),
       ]
     : [];
