@@ -60,9 +60,9 @@ const IMAGE_SCALE: Record<OutfitCanvasRole, number> = {
   outer: 1.52,
   dress: 1.50,
   bottom: 1.58,
-  shoes: 1.18,
-  bag: 1.18,
-  hat: 1.00,
+  shoes: 1.60,
+  bag: 1.20,
+  hat: 1.12,
   scarf: 1.15,
   accessory: 1.00,
 };
@@ -277,23 +277,47 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   }
 
   if (dressEntries.length > 0) {
-    placeCoreEntries(baseEntries, baseShape, result);
-    placeCoreEntries(midEntries, midShape, result);
-    const fallbackBottomTop = dressPlacement
-      ? dressPlacement.top + dressPlacement.height + DRESSING_GAP
-      : 42;
-    placeCoreEntries(bottomEntries, {
-      zone: 'core', left: hasOuter ? 38 : 20, top: fallbackBottomTop,
-      width: hasOuter ? 44 : 46, height: 35, rotation: 0, zIndex: 4,
-    }, result);
+    const conflictingSeparates = [...baseEntries, ...midEntries, ...bottomEntries];
+    if (conflictingSeparates.length > 0) {
+      const currentCoreBottom = Math.max(
+        ...result
+          .filter((entry) => entry.zone === 'core')
+          .map((entry) => entry.top + entry.height),
+      );
+      const gap = 3;
+      const fallbackWidth = Math.max(
+        8,
+        Math.min(28, (92 - gap * (conflictingSeparates.length - 1)) / conflictingSeparates.length),
+      );
+      conflictingSeparates.forEach((entry, index) => {
+        const fallbackPlacement = placement(entry.item, entry.role, {
+          zone: 'core',
+          left: 4 + index * (fallbackWidth + gap),
+          top: currentCoreBottom + DRESSING_GAP,
+          width: fallbackWidth,
+          height: 22,
+          rotation: entry.role === 'mid' ? -1 : 0,
+          zIndex: entry.role === 'base' ? 5 : 4,
+        });
+        result.push(fallbackPlacement);
+        if (entry.role === 'base' && !basePlacement) basePlacement = fallbackPlacement;
+        if (entry.role === 'mid' && !midPlacement) midPlacement = fallbackPlacement;
+        if (entry.role === 'bottom' && !bottomPlacement) bottomPlacement = fallbackPlacement;
+      });
+    }
   }
 
+  const corePlacements = result.filter((entry) => entry.zone === 'core');
+  const lowestCoreBottom = corePlacements.length > 0
+    ? Math.max(...corePlacements.map((entry) => entry.top + entry.height))
+    : undefined;
   const footAnchor = bottomPlacement ?? dressPlacement ?? basePlacement ?? midPlacement;
   const shoesShape: PlacementShape = footAnchor
     ? {
         zone: 'foot',
         left: footAnchor.left + footAnchor.width / 2 - 14.5,
-        top: footAnchor.top + footAnchor.height + (dressPlacement ? 7 : FOOT_GAP),
+        top: (lowestCoreBottom ?? footAnchor.top + footAnchor.height)
+          + (dressPlacement ? 7 : FOOT_GAP),
         width: 29,
         height: 18,
         rotation: hasOuter ? 4 : -4,

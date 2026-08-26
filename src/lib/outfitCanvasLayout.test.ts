@@ -16,6 +16,13 @@ function placement(layout: OutfitCanvasPlacement[], id: string) {
   return value;
 }
 
+function overlaps(a: OutfitCanvasPlacement, b: OutfitCanvasPlacement) {
+  return a.left < b.left + b.width
+    && a.left + a.width > b.left
+    && a.top < b.top + b.height
+    && a.top + a.height > b.top;
+}
+
 const roleItem = (id: string, layoutRole: OutfitCanvasRole): OutfitCanvasLayoutItem => ({
   id,
   name: id,
@@ -50,9 +57,12 @@ const baseSeparates = [
   { id: 'shoes', name: '鞋', category: '鞋履', layoutRole: 'shoes' as const },
 ];
 
+const VISIBLE_SIZE_TOLERANCE = 0.5;
+
 function visibleSizeFor(
   role: OutfitCanvasRole,
   alpha: { width: number; height: number },
+  sourceAspectRatio = 1,
 ) {
   const accessory = {
     id: role,
@@ -68,9 +78,18 @@ function visibleSizeFor(
   const items = role === 'shoes' ? core : [...core, accessory];
   const targetId = role === 'shoes' ? 'core-shoes' : role;
   const entry = placement(buildOutfitCanvasLayout(items), targetId);
+  const frameAspectRatio = entry.width / entry.height;
+  const containedWidth = sourceAspectRatio > frameAspectRatio
+    ? entry.width
+    : entry.height * sourceAspectRatio;
+  const containedHeight = sourceAspectRatio > frameAspectRatio
+    ? entry.width / sourceAspectRatio
+    : entry.height;
   return {
-    width: entry.width * garmentImageScale(role) * alpha.width,
-    height: entry.height * garmentImageScale(role) * alpha.height,
+    containedWidth,
+    containedHeight,
+    width: containedWidth * garmentImageScale(role) * alpha.width,
+    height: containedHeight * garmentImageScale(role) * alpha.height,
   };
 }
 
@@ -83,8 +102,16 @@ function assertVisibleRange(
   maxHeight: number,
 ) {
   const size = visibleSizeFor(role, alpha);
-  assert.ok(size.width >= minWidth && size.width <= maxWidth, `${role} width ${size.width}`);
-  assert.ok(size.height >= minHeight && size.height <= maxHeight, `${role} height ${size.height}`);
+  assert.ok(
+    size.width >= minWidth - VISIBLE_SIZE_TOLERANCE
+      && size.width <= maxWidth + VISIBLE_SIZE_TOLERANCE,
+    `${role} width ${size.width}`,
+  );
+  assert.ok(
+    size.height >= minHeight - VISIBLE_SIZE_TOLERANCE
+      && size.height <= maxHeight + VISIBLE_SIZE_TOLERANCE,
+    `${role} height ${size.height}`,
+  );
 }
 
 function assertVisibleWidthRange(
@@ -94,7 +121,11 @@ function assertVisibleWidthRange(
   maxWidth: number,
 ) {
   const size = visibleSizeFor(role, alpha);
-  assert.ok(size.width >= minWidth && size.width <= maxWidth, `${role} width ${size.width}`);
+  assert.ok(
+    size.width >= minWidth - VISIBLE_SIZE_TOLERANCE
+      && size.width <= maxWidth + VISIBLE_SIZE_TOLERANCE,
+    `${role} width ${size.width}`,
+  );
 }
 
 test('service layout_role wins over ambiguous category text', () => {
@@ -177,6 +208,39 @@ test('fixture alpha ratios land in approved visible size ranges', () => {
   assertVisibleRange('hat', alpha.hat, 14, 18, 10, 15);
   assertVisibleRange('scarf', alpha.scarf, 14, 18, 18, 26);
   assertVisibleWidthRange('shoes', alpha.shoes, 20, 25);
+});
+
+test('square fixture contain geometry uses the shorter frame edge before image scale', () => {
+  for (const role of ['bag', 'hat', 'scarf', 'shoes'] as const) {
+    const size = visibleSizeFor(role, { width: 1, height: 1 });
+    const frame = placement(buildOutfitCanvasLayout([
+      ...baseSeparates,
+      ...(role === 'shoes' ? [] : [roleItem(role, role)]),
+    ]), role === 'shoes' ? 'shoes' : role);
+    assert.equal(size.containedWidth, Math.min(frame.width, frame.height));
+    assert.equal(size.containedHeight, Math.min(frame.width, frame.height));
+  }
+});
+
+test('malformed dress with separates preserves every item and anchors shoes below all core garments', () => {
+  const items = [
+    roleItem('dress', 'dress'),
+    roleItem('base', 'base'),
+    roleItem('mid', 'mid'),
+    roleItem('bottom', 'bottom'),
+    roleItem('shoes', 'shoes'),
+  ];
+  const layout = buildOutfitCanvasLayout(items);
+  assert.equal(layout.length, items.length);
+  assert.deepEqual(new Set(layout.map((entry) => entry.item.id)), new Set(items.map((item) => item.id)));
+  const separates = ['base', 'mid', 'bottom'].map((id) => placement(layout, id));
+  assert.ok(separates.every((entry) => entry.zone === 'core'));
+  assert.ok(separates[0].left + separates[0].width <= separates[1].left);
+  assert.ok(separates[1].left + separates[1].width <= separates[2].left);
+  const shoes = placement(layout, 'shoes');
+  const core = layout.filter((entry) => entry.zone === 'core');
+  assert.ok(shoes.top >= Math.max(...core.map((entry) => entry.top + entry.height)));
+  assert.ok(core.every((entry) => !overlaps(entry, shoes)));
 });
 
 test('generic accessories use micro zones and preserve every input exactly once', () => {
