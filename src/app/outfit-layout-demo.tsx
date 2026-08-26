@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Image,
-  type ImageSourcePropType,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -18,66 +17,50 @@ import {
   StyleeOutfitCanvas,
 } from '@/design-system';
 import type { OutfitCanvasLayoutItem } from '@/lib/outfitCanvasLayout';
+import { outfitLayoutDemoFixtures, outfitLayoutDemoWardrobe } from '@/data/outfitLayoutDemoFixtures';
+import { outfitsRespToApp } from '@/lib/styleeMapping';
 
-type ScenarioId = 'base' | 'layered' | 'accessories';
-type DemoRole = 'outer' | 'top' | 'bottom' | 'shoes' | 'scarf' | 'hat';
-type DemoItem = OutfitCanvasLayoutItem & { imageSource: ImageSourcePropType; meta: string };
+const scenarios = outfitLayoutDemoFixtures.map(fixture => {
+  const [outfit] = outfitsRespToApp(
+    [fixture.outfit], outfitLayoutDemoWardrobe, 'layout-demo', fixture.id,
+  );
+  const items: OutfitCanvasLayoutItem[] = [
+    ...(outfit.items ?? []).map(entry => ({
+      id: entry.item_id,
+      name: entry.item?.name ?? '',
+      category: entry.item?.category ?? '',
+      imageUri: entry.item?.image_url,
+      owned: true,
+      layoutRole: entry.role,
+    })),
+    ...(outfit.recommended_items ?? []).map((entry, index) => ({
+      id: `rec_${index}`,
+      name: entry.name,
+      category: entry.category,
+      imageUri: entry.image_url,
+      owned: false,
+      layoutRole: entry.role,
+    })),
+  ];
+  return { ...fixture, items };
+});
 
-const demoItems: Record<DemoRole, DemoItem> = {
-  outer: {
-    id: 'outer', name: '卡其色风衣', category: '外套', meta: '卡其色 · 外套',
-    imageSource: require('../../public/preset-items/khaki-trench.png'),
-  },
-  top: {
-    id: 'top', name: '黑色高领内搭', category: '上装', meta: '黑色 · 上装',
-    imageSource: require('../../public/inspirations/items/look1_02_black_turtleneck.png'),
-  },
-  bottom: {
-    id: 'bottom', name: '黑色直筒裤', category: '下装', meta: '黑色 · 下装',
-    imageSource: require('../../public/preset-items/black-trousers.png'),
-  },
-  shoes: {
-    id: 'shoes', name: '白色乐福鞋', category: '鞋履', meta: '白色 · 鞋履',
-    imageSource: require('../../public/preset-items/womens-loafers.png'),
-  },
-  scarf: {
-    id: 'scarf', name: '米色针织围巾', category: '帽巾', meta: '米色 · 围巾',
-    imageSource: require('../../public/preset-items/beige-scarf.png'),
-  },
-  hat: {
-    id: 'hat', name: '白色棒球帽', category: '帽巾', meta: '白色 · 帽子',
-    imageSource: require('../../public/preset-items/baseball-cap.png'),
-  },
-};
+type ScenarioId = typeof scenarios[number]['id'];
 
-const scenarios: Record<ScenarioId, { label: string; roles: DemoRole[]; note: string }> = {
-  base: {
-    label: '3件基础',
-    roles: ['top', 'bottom', 'shoes'],
-    note: '鞋子缩小后沿裤装轴线放在正下方，并与裤腿留出间距；没有配饰时不保留空位。',
-  },
-  layered: {
-    label: '4件叠穿',
-    roles: ['outer', 'top', 'bottom', 'shoes'],
-    note: '外套后置，内搭、下装与鞋子保持连续穿着轴线，彼此不遮挡。',
-  },
-  accessories: {
-    label: '6件配饰',
-    roles: ['outer', 'top', 'bottom', 'shoes', 'scarf', 'hat'],
-    note: '帽子和围巾利用右侧自然留白环绕，不压缩或遮挡核心服装。',
-  },
-};
+const scenarioNote = (kind: typeof scenarios[number]['kind']) => kind === 'structural-stress'
+  ? '这是明确三层与丰富配饰的结构压力测试，不是日常合法响应的上限。'
+  : '固定合法响应 fixture 通过正式映射和推荐结果页同一套生产画布渲染。';
 
 export default function OutfitLayoutDemoScreen() {
-  const [scenarioId, setScenarioId] = useState<ScenarioId>('base');
-  const [selectedItemId, setSelectedItemId] = useState('top');
-  const current = scenarios[scenarioId];
-  const items = useMemo(() => current.roles.map((role) => demoItems[role]), [current.roles]);
+  const [scenarioId, setScenarioId] = useState<ScenarioId>('base-3');
+  const [selectedItemId, setSelectedItemId] = useState('base');
+  const current = scenarios.find((scenario) => scenario.id === scenarioId) ?? scenarios[0];
+  const items = current.items;
 
   const selectScenario = (next: ScenarioId) => {
     setScenarioId(next);
-    const nextRoles = scenarios[next].roles;
-    if (!nextRoles.includes(selectedItemId as DemoRole)) setSelectedItemId(nextRoles[0]);
+    const nextItems = scenarios.find((scenario) => scenario.id === next)?.items ?? [];
+    if (!nextItems.some((item) => item.id === selectedItemId)) setSelectedItemId(nextItems[0]?.id ?? '');
   };
 
   return (
@@ -94,13 +77,13 @@ export default function OutfitLayoutDemoScreen() {
         </View>
 
         <View accessibilityRole="tablist" style={styles.switcher}>
-          {(Object.keys(scenarios) as ScenarioId[]).map((id) => (
+          {scenarios.map((scenario) => (
             <StyleeChoiceChip
-              key={id}
-              label={scenarios[id].label}
-              selected={scenarioId === id}
+              key={scenario.id}
+              label={scenario.label}
+              selected={scenarioId === scenario.id}
               selectionMode="single"
-              onPress={() => selectScenario(id)}
+              onPress={() => selectScenario(scenario.id)}
             />
           ))}
         </View>
@@ -114,7 +97,7 @@ export default function OutfitLayoutDemoScreen() {
 
         <View style={styles.note}>
           <Feather name="info" size={ds.size.icon.sm} color={ds.color.semantic.text.positive} />
-          <Text style={styles.noteText}>{current.note}</Text>
+          <Text style={styles.noteText}>{scenarioNote(current.kind)}</Text>
         </View>
 
         <View style={styles.itemsSection}>
@@ -132,11 +115,11 @@ export default function OutfitLayoutDemoScreen() {
                   style={[styles.itemRow, index > 0 && styles.itemDivider, selected && styles.itemSelected]}
                 >
                   <View style={styles.thumbnail}>
-                    <Image source={item.imageSource} style={styles.thumbnailImage} resizeMode="contain" />
+                    {item.imageUri ? <Image source={{ uri: item.imageUri }} style={styles.thumbnailImage} resizeMode="contain" /> : null}
                   </View>
                   <View style={styles.itemCopy}>
                     <Text numberOfLines={1} style={styles.itemName}>{item.name}</Text>
-                    <Text numberOfLines={1} style={styles.itemMeta}>{item.meta}</Text>
+                    <Text numberOfLines={1} style={styles.itemMeta}>{item.category}</Text>
                   </View>
                   <Feather
                     name={selected ? 'check' : 'chevron-right'}
