@@ -113,6 +113,35 @@ def test_legacy_non_hat_accessory_maps_to_accessory_role() -> None:
     ]
 
 
+def test_recommended_hat_category_uses_description_for_layout_role() -> None:
+    ctx = RequestContext(input_mode=InputMode.NL, wardrobe=[])
+    outfit = Outfit(items=[
+        OutfitItemRef(
+            Slot.ACCESSORY,
+            owned=False,
+            suggest=GapSuggestion(Category.HAT, "羊毛针织帽", "保暖"),
+        ),
+        OutfitItemRef(
+            Slot.ACCESSORY,
+            owned=False,
+            suggest=GapSuggestion(Category.HAT, "珍珠耳饰", "点睛"),
+        ),
+    ])
+
+    body = outfits_to_app(RecommendationResult(outfits=[outfit]), ctx)
+    value = body["outfits"][0]
+
+    assert len(value["recommended_items"]) == 2
+    assert value["layout_items"] == [
+        {"source": "recommended", "recommended_index": 0, "layout_role": "hat"},
+        {"source": "recommended", "recommended_index": 1, "layout_role": "accessory"},
+    ]
+    assert len({
+        (entry["source"], entry["recommended_index"])
+        for entry in value["layout_items"]
+    }) == len(value["recommended_items"])
+
+
 def test_duplicate_owned_layout_key_omits_layout_mapping() -> None:
     ctx = _context_with_items()
     outfit = Outfit(items=[
@@ -143,6 +172,7 @@ def main() -> None:
     test_incomplete_layout_mapping_keeps_old_fields_and_omits_new_field()
     test_missing_single_top_layer_role_defaults_to_base()
     test_legacy_non_hat_accessory_maps_to_accessory_role()
+    test_recommended_hat_category_uses_description_for_layout_role()
     test_duplicate_owned_layout_key_omits_layout_mapping()
     test_release_smoke_fixture_has_unique_items_and_name_aware_hat_scarf()
     print("ok")

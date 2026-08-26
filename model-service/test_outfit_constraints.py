@@ -22,6 +22,7 @@ from stylee.contracts import (
     Weather,
 )
 from stylee.outfit_policy import (
+    accessory_is_coherent,
     ClosureMode,
     GarmentKind,
     ThicknessBand,
@@ -183,6 +184,56 @@ def test_cold_weather_scarf_has_a_functional_positive_signal() -> None:
     )
 
 
+def test_known_formality_conflict_rejects_functional_scarf_gap() -> None:
+    wardrobe = [
+        _item("formal-top", Category.TOP, "黑色西装上衣", styles=["通勤职场"]),
+        _item("formal-bottom", Category.BOTTOM, "黑色西装长裤", styles=["通勤职场"]),
+        _item("formal-shoes", Category.SHOES, "黑色正装皮鞋", occasions=["正式"]),
+        _item("formal-outer", Category.OUTERWEAR, "黑色西装外套", styles=["通勤职场"]),
+    ]
+    outfit = Outfit(items=[
+        _owned(Slot.TORSO, "formal-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "formal-bottom"),
+        _owned(Slot.FEET, "formal-shoes"),
+        _owned(Slot.OUTER, "formal-outer", LayerRole.OUTER),
+        _gap(Slot.ACCESSORY, Category.SCARF, "运动围巾"),
+    ])
+    ctx = RequestContext(
+        input_mode=InputMode.NL,
+        wardrobe=wardrobe,
+        weather=Weather(temp_c=8.0),
+        query_text="正式典礼",
+        n=1,
+    )
+    scene = SceneSpec(
+        occasions=["正式"],
+        formality=Formality.FORMAL,
+        style_keywords=["通勤职场"],
+    )
+    result = validate_outfit_result(
+        outfit,
+        ctx,
+        scene,
+        {item.id: item for item in wardrobe},
+        policy=build_constraint_policy(ctx, scene),
+    )
+
+    assert "D_ACCESSORY_COHERENCE" in result.error_codes
+
+
+def test_scene_style_exclusion_beats_accessory_style_match() -> None:
+    core = [_item("preppy-top", Category.TOP, "白色T恤", styles=["学院风"])]
+    accessory = _item("preppy-hat", Category.HAT, "学院风贝雷帽", styles=["学院风"])
+    formal_scene = SceneSpec(occasions=["正式"], formality=Formality.FORMAL)
+
+    assert accessory_is_coherent(
+        accessory,
+        core,
+        formal_scene,
+        Weather(temp_c=22.0),
+    ) is False
+
+
 def test_body_coverage_and_dress_exclusivity_are_enforced() -> None:
     missing_bottom = Outfit(items=[
         _owned(Slot.TORSO, "top-1", LayerRole.BASE),
@@ -252,6 +303,47 @@ def test_unknown_or_conflicting_second_top_is_rejected() -> None:
     assert "D_LAYER_COMPAT" not in _codes(
         outfit, query="高领配衬衫，衬衫敞开穿", wardrobe=wardrobe,
     )
+
+
+def test_legacy_single_top_and_outer_without_layer_roles_remain_valid() -> None:
+    outfit = Outfit(items=[
+        _owned(Slot.TORSO, "top-1"),
+        _owned(Slot.OUTER, "outer-1"),
+        _owned(Slot.BOTTOM, "bottom-1"),
+        _owned(Slot.FEET, "shoe-1"),
+    ])
+
+    codes = _codes(outfit)
+    assert "H_LAYER_ROLE_STRUCTURE" not in codes
+    assert "D_LAYER_COMPAT" not in codes
+
+
+def test_gap_top_description_participates_in_layer_compatibility() -> None:
+    compatible_gap = Outfit(items=[
+        _owned(Slot.TORSO, "top-3", LayerRole.BASE),
+        OutfitItemRef(
+            role=Slot.TORSO,
+            owned=False,
+            suggest=GapSuggestion(Category.TOP, "牛仔衬衫外套", "补充中间层"),
+            layer_role=LayerRole.MID,
+        ),
+        _owned(Slot.BOTTOM, "bottom-1"),
+        _owned(Slot.FEET, "shoe-1"),
+    ])
+    unknown_gap = Outfit(items=[
+        _owned(Slot.TORSO, "top-3", LayerRole.BASE),
+        OutfitItemRef(
+            role=Slot.TORSO,
+            owned=False,
+            suggest=GapSuggestion(Category.TOP, "神秘上装", "补充中间层"),
+            layer_role=LayerRole.MID,
+        ),
+        _owned(Slot.BOTTOM, "bottom-1"),
+        _owned(Slot.FEET, "shoe-1"),
+    ])
+
+    assert "D_LAYER_COMPAT" not in _codes(compatible_gap)
+    assert "D_LAYER_COMPAT" in _codes(unknown_gap)
 
 
 def test_non_owned_item_requires_an_explicit_gap() -> None:
@@ -357,16 +449,49 @@ def test_layer_facts_are_conservative_and_directional() -> None:
     assert layer_pair_compatible(turtleneck, shirt) is False
 
 
-def test_only_explicit_queries_override_new_default_rules() -> None:
+def test_only_affirmative_explicit_queries_override_new_default_rules() -> None:
     ordinary_ctx, scene, _ = _context("日常通勤")
     ordinary = build_constraint_policy(ordinary_ctx, scene)
     assert ordinary.enforces("D_UPPER_LAYER_MAX_TWO")
+    assert ordinary.enforces("D_LAYER_COMPAT")
     assert ordinary.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+    assert ordinary.enforces("D_ACCESSORY_COHERENCE")
 
-    explicit_ctx, scene, _ = _context("我要三层叠穿和丰富配饰")
-    explicit = build_constraint_policy(explicit_ctx, scene)
-    assert not explicit.enforces("D_UPPER_LAYER_MAX_TWO")
-    assert not explicit.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+    three_layers_ctx, scene, _ = _context("我要三层叠穿")
+    three_layers = build_constraint_policy(three_layers_ctx, scene)
+    assert not three_layers.enforces("D_UPPER_LAYER_MAX_TWO")
+    assert three_layers.enforces("D_LAYER_COMPAT")
+
+    open_shirt_ctx, scene, _ = _context("高领配衬衫，衬衫敞开穿")
+    open_shirt = build_constraint_policy(open_shirt_ctx, scene)
+    assert open_shirt.enforces("D_UPPER_LAYER_MAX_TWO")
+    assert not open_shirt.enforces("D_LAYER_COMPAT")
+
+    rich_ctx, scene, _ = _context("我要丰富配饰")
+    rich = build_constraint_policy(rich_ctx, scene)
+    assert not rich.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+    assert rich.enforces("D_ACCESSORY_COHERENCE")
+
+    named_ctx, scene, _ = _context("戴这顶帽子")
+    named = build_constraint_policy(named_ctx, scene)
+    assert named.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+    assert not named.enforces("D_ACCESSORY_COHERENCE")
+
+
+def test_negated_or_ambiguous_queries_keep_new_default_rules_enabled() -> None:
+    cases = (
+        ("不要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("不想三层穿搭", "D_UPPER_LAYER_MAX_TWO"),
+        ("只要多层叠穿的感觉", "D_UPPER_LAYER_MAX_TWO"),
+        ("不要衬衫敞开", "D_LAYER_COMPAT"),
+        ("高领配衬衫", "D_LAYER_COMPAT"),
+        ("不要丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("不要戴这顶帽子", "D_ACCESSORY_COHERENCE"),
+        ("不要加围巾", "D_ACCESSORY_COHERENCE"),
+    )
+    for query, code in cases:
+        ctx, scene, _ = _context(query)
+        assert build_constraint_policy(ctx, scene).enforces(code), (query, code)
 
 
 def test_item_facts_preserves_legacy_positional_constructor_order() -> None:
@@ -412,17 +537,22 @@ def main() -> None:
     test_accessories_are_optional_and_default_to_at_most_two()
     test_baseball_cap_does_not_pass_formal_outfit_by_color_alone()
     test_cold_weather_scarf_has_a_functional_positive_signal()
+    test_known_formality_conflict_rejects_functional_scarf_gap()
+    test_scene_style_exclusion_beats_accessory_style_match()
     test_body_coverage_and_dress_exclusivity_are_enforced()
     test_three_layers_require_explicit_query_and_four_always_fail()
     test_layer_role_structure_is_absolute()
     test_unknown_or_conflicting_second_top_is_rejected()
+    test_legacy_single_top_and_outer_without_layer_roles_remain_valid()
+    test_gap_top_description_participates_in_layer_compatibility()
     test_non_owned_item_requires_an_explicit_gap()
     test_color_complexity_and_fluorescent_defaults_are_query_overridable()
     test_formality_span_is_query_overridable()
     test_scene_style_pool_and_conflict_pair_require_explicit_query_evidence()
     test_weather_default_is_disabled_only_by_explicit_query()
     test_layer_facts_are_conservative_and_directional()
-    test_only_explicit_queries_override_new_default_rules()
+    test_only_affirmative_explicit_queries_override_new_default_rules()
+    test_negated_or_ambiguous_queries_keep_new_default_rules_enabled()
     test_item_facts_preserves_legacy_positional_constructor_order()
     test_unknown_default_facts_warn_instead_of_rejecting()
     print("ok")

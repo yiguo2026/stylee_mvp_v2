@@ -9,7 +9,7 @@ import re
 
 from ..contracts import (
     BodyShape, Category, FilterTags, Fit, InputMode, RequestContext,
-    LayerRole, Season, Sleeve, UserProfile, WardrobeItem, Weather,
+    ItemSource, LayerRole, Season, Sleeve, UserProfile, WardrobeItem, Weather,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
     StandardizedImage,
 )
@@ -201,9 +201,17 @@ def layout_role_for_ref(
         role = ref.layer_role or LayerRole.BASE
         return role.value if role in {LayerRole.BASE, LayerRole.MID} else None
     if category is Category.HAT:
-        if not ref.owned:
-            return "hat"
-        return "hat" if build_item_facts(item_index[ref.ref]).definite_hat is True else "accessory"
+        accessory = (
+            item_index[ref.ref]
+            if ref.owned and ref.ref in item_index
+            else WardrobeItem(
+                id="",
+                category=Category.HAT,
+                subcategory=ref.suggest.desc if ref.suggest else "",
+                source=ItemSource.AI_SUGGEST,
+            )
+        )
+        return "hat" if build_item_facts(accessory).definite_hat is True else "accessory"
     return _LAYOUT_ROLE_BY_CATEGORY.get(category)
 
 

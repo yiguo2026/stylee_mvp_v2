@@ -252,6 +252,33 @@ def layer_pair_compatible(base: ItemFacts, mid: ItemFacts) -> bool:
     return mid.garment_kind in allowed.get(base.garment_kind, set())
 
 
+_NEGATED_REQUEST_PREFIXES = (
+    "不想要",
+    "不希望",
+    "不需要",
+    "不要",
+    "不想",
+    "无需",
+    "避免",
+    "拒绝",
+    "禁止",
+    "别",
+    "不",
+)
+
+
+def _has_affirmative_request_term(text: str, terms: tuple[str, ...]) -> bool:
+    """Return true only when at least one exact request term is not negated."""
+    for term in terms:
+        offset = 0
+        while (index := text.find(term, offset)) >= 0:
+            prefix = text[max(0, index - 5):index].rstrip()
+            if not any(prefix.endswith(value) for value in _NEGATED_REQUEST_PREFIXES):
+                return True
+            offset = index + len(term)
+    return False
+
+
 def build_constraint_policy(ctx: RequestContext, scene: SceneSpec) -> ConstraintPolicy:
     """从用户明确文本中提取规则级 override，不接受模型自报的全局放宽。"""
     text = (ctx.query_text or "").lower()
@@ -283,17 +310,17 @@ def build_constraint_policy(ctx: RequestContext, scene: SceneSpec) -> Constraint
     if ignore_weather:
         overridden.add("D_WEATHER_COMPAT")
 
-    three_layer_terms = ("三层叠穿", "三层穿搭", "三件叠穿", "多层叠穿")
-    special_layer_terms = ("衬衫敞开", "敞穿衬衫", "高领配衬衫")
+    three_layer_terms = ("三层叠穿", "三层穿搭", "三件叠穿")
+    special_layer_terms = ("衬衫敞开", "敞穿衬衫")
     rich_accessory_terms = ("丰富配饰", "多配饰", "配饰叠搭", "多件配饰")
     explicit_accessory_terms = ("戴这顶帽", "加围巾", "搭这个包", "用这件配饰")
-    if any(term in text for term in three_layer_terms):
+    if _has_affirmative_request_term(text, three_layer_terms):
         overridden.add("D_UPPER_LAYER_MAX_TWO")
-    if any(term in text for term in special_layer_terms):
+    if _has_affirmative_request_term(text, special_layer_terms):
         overridden.add("D_LAYER_COMPAT")
-    if any(term in text for term in rich_accessory_terms):
+    if _has_affirmative_request_term(text, rich_accessory_terms):
         overridden.add("D_ACCESSORY_COUNT_MAX_TWO")
-    if any(term in text for term in explicit_accessory_terms):
+    if _has_affirmative_request_term(text, explicit_accessory_terms):
         overridden.add("D_ACCESSORY_COHERENCE")
 
     return ConstraintPolicy(
@@ -368,19 +395,30 @@ def accessory_is_coherent(
     ):
         return False
 
+    allowed_scene_styles = allowed_styles_for_scene(scene)
+    if (
+        accessory_facts.styles
+        and allowed_scene_styles is not None
+        and not accessory_facts.styles & allowed_scene_styles
+    ):
+        return False
+
     style_match = bool(accessory_facts.styles & known_styles)
     core_levels = [
         facts.formality_level for facts in core_facts
         if facts.formality_level is not None
     ]
-    formality_match = (
-        accessory_facts.formality_level is not None
-        and bool(core_levels)
-        and min(
+    formality_distances = (
+        tuple(
             abs(accessory_facts.formality_level - level)
             for level in core_levels
-        ) <= 1
+        )
+        if accessory_facts.formality_level is not None and core_levels
+        else ()
     )
+    if any(distance > 1 for distance in formality_distances):
+        return False
+    formality_match = bool(formality_distances)
     functional_match = accessory.category is Category.SCARF and weather.temp_c < 18
     seasonal_match = bool(set(accessory.seasons) & {current_season(weather)})
     return style_match or formality_match or functional_match or seasonal_match
