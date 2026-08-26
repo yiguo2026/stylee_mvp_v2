@@ -68,6 +68,8 @@ def wardrobe() -> list[WardrobeItem]:
     return [
         WardrobeItem("t1", Category.TOP, "白色T恤", ["白色"], seasons=all_seasons),
         WardrobeItem("t2", Category.TOP, "白色针织", ["白色"], seasons=all_seasons),
+        WardrobeItem("turtle", Category.TOP, "厚高领毛衣", ["黑色"], seasons=all_seasons),
+        WardrobeItem("shirt", Category.TOP, "普通白衬衫", ["白色"], seasons=all_seasons),
         WardrobeItem("b1", Category.BOTTOM, "黑色长裤", ["黑色"], seasons=all_seasons),
         WardrobeItem("b2", Category.BOTTOM, "黑色半裙", ["黑色"], seasons=all_seasons),
         WardrobeItem("s1", Category.SHOES, "白色球鞋", ["白色"], seasons=all_seasons),
@@ -99,6 +101,15 @@ def invalid_missing_shoe() -> Outfit:
     return Outfit(items=[
         OutfitItemRef(Slot.TORSO, "t1", layer_role=LayerRole.BASE),
         OutfitItemRef(Slot.BOTTOM, "b1"),
+    ])
+
+
+def invalid_layer_pair() -> Outfit:
+    return Outfit(items=[
+        OutfitItemRef(Slot.TORSO, "turtle", layer_role=LayerRole.BASE),
+        OutfitItemRef(Slot.TORSO, "shirt", layer_role=LayerRole.MID),
+        OutfitItemRef(Slot.BOTTOM, "b1"),
+        OutfitItemRef(Slot.FEET, "s1"),
     ])
 
 
@@ -137,6 +148,20 @@ def test_one_valid_first_pass_returns_without_retry():
     assert result.trace["retry_candidate_count"] == 0
 
 
+def test_layer_conflict_triggers_one_targeted_retry() -> None:
+    provider = SequentialProvider(
+        [invalid_layer_pair() for _ in range(6)],
+        [valid()],
+    )
+    result = recommend(context(), provider, retriever=FixedRetriever())
+
+    assert provider.retry_calls == 1
+    assert provider.retry_violations == ["D_LAYER_COMPAT"]
+    assert result.trace["first_pass_valid"] == 0
+    assert len(result.outfits) == 1
+    assert len(result.outfits[0].items) == 3
+
+
 def test_repeated_invalid_output_uses_absolute_valid_fallback():
     provider = SequentialProvider(
         [invalid_missing_shoe() for _ in range(6)],
@@ -158,7 +183,9 @@ def test_repeated_invalid_output_uses_absolute_valid_fallback():
     assert result.trace["fallback_type"] == "deterministic"
     assert result.trace["rejected_by_rule"] == {"H_FEET_EXACTLY_ONE": 10}
     assert all(
-        (not item.owned) or _item_index(ctx.wardrobe)[item.ref].category not in {Category.BAG, Category.HAT}
+        (not item.owned) or _item_index(ctx.wardrobe)[item.ref].category not in {
+            Category.BAG, Category.HAT, Category.SCARF,
+        }
         for item in fallback.items
     )
 
@@ -196,6 +223,7 @@ def test_mock_provider_stays_legal_under_the_production_policy():
 def main():
     test_zero_first_pass_retries_four_without_repeating_intent()
     test_one_valid_first_pass_returns_without_retry()
+    test_layer_conflict_triggers_one_targeted_retry()
     test_repeated_invalid_output_uses_absolute_valid_fallback()
     test_empty_wardrobe_fallback_uses_only_required_gaps()
     test_mock_provider_stays_legal_under_the_production_policy()

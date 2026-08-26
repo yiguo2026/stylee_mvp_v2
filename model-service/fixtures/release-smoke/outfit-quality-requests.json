@@ -1,0 +1,26 @@
+{
+  "base": {
+    "input_mode": "nl",
+    "n": 3,
+    "profile": {"style_prefs": ["通勤职场", "极简"]},
+    "weather": {"temp_c": 15, "condition": "晴", "city": "测试城市", "time_of_day": "day"},
+    "wardrobe": [
+      {"item_id": "tee", "name": "白色T恤", "category": "上装", "color": "白色", "material": "纯棉", "style_tags": ["极简"]},
+      {"item_id": "cardigan", "name": "灰色开衫", "category": "上装", "color": "灰色", "material": "羊毛", "style_tags": ["通勤职场"]},
+      {"item_id": "turtle", "name": "厚高领毛衣", "category": "上装", "color": "黑色", "material": "羊毛", "style_tags": ["通勤职场"]},
+      {"item_id": "shirt", "name": "普通白衬衫", "category": "上装", "color": "白色", "material": "纯棉", "style_tags": ["通勤职场"]},
+      {"item_id": "trench", "name": "卡其色风衣", "category": "外套", "color": "卡其", "material": "棉混纺", "style_tags": ["通勤职场"]},
+      {"item_id": "bottom", "name": "黑色西装长裤", "category": "下装", "color": "黑色", "material": "毛混纺", "style_tags": ["通勤职场"]},
+      {"item_id": "shoes", "name": "白色乐福鞋", "category": "鞋履", "color": "白色", "material": "皮革", "occasion_tags": ["通勤"]},
+      {"item_id": "bag", "name": "黑色托特包", "category": "包袋", "color": "黑色", "material": "皮革", "style_tags": ["通勤职场"]},
+      {"item_id": "hat", "name": "白色棒球帽", "category": "帽巾", "color": "白色", "material": "纯棉", "style_tags": ["街头潮流"]},
+      {"item_id": "scarf", "name": "米色羊绒围巾", "category": "帽巾", "color": "米色", "material": "羊绒", "style_tags": ["通勤职场"]}
+    ]
+  },
+  "queries": [
+    {"id": "daily", "query": "日常通勤，简洁可靠"},
+    {"id": "three_layers", "query": "我要三层叠穿，确保层级合理"},
+    {"id": "ordinary_accessories", "query": "日常通勤，可有合适配饰"},
+    {"id": "rich_accessories", "query": "我要丰富配饰和多配饰叠搭，戴这顶帽子"}
+  ]
+}

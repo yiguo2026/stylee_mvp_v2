@@ -14,21 +14,26 @@ from dataclasses import dataclass, field
 from .contracts import (
     CATEGORY_SLOT,
     Category,
+    ItemSource,
+    LayerRole,
     Outfit,
+    OutfitItemRef,
     RequestContext,
     SceneSpec,
     Season,
     Sleeve,
     Slot,
     WardrobeItem,
-    Weather,
 )
 from .outfit_policy import (
     ConstraintPolicy,
     allowed_styles_for_scene,
+    accessory_is_coherent,
     build_constraint_policy,
     build_item_facts,
+    current_season,
     has_style_conflict,
+    layer_pair_compatible,
     normalize_style,
 )
 
@@ -56,18 +61,6 @@ def warmth_band(temp_c: float) -> WarmthBand:
     if temp_c >= 5:
         return WarmthBand(2, 4, outer_required=True, allow_short_sleeve=False)
     return WarmthBand(3, 4, outer_required=True, allow_short_sleeve=False)
-
-
-def current_season(weather: Weather) -> Season:
-    """没有日历就用温度近似季节(够 demo 用;真实可换成月份+地域)。"""
-    t = weather.temp_c
-    if t >= 24:
-        return Season.SUMMER
-    if t >= 15:
-        return Season.AUTUMN if weather.time_of_day == "evening" else Season.SPRING
-    if t >= 8:
-        return Season.AUTUMN
-    return Season.WINTER
 
 
 def covers_bottom(item: WardrobeItem) -> bool:
@@ -169,6 +162,23 @@ class ValidationResult:
         return [issue.code for issue in self.errors]
 
 
+def authoritative_item_or_gap(
+    ref: OutfitItemRef,
+    category: Category,
+    item_index: dict[str, WardrobeItem],
+) -> WardrobeItem:
+    """Return wardrobe truth or a gap-only item suitable for fact derivation."""
+    if ref.owned and ref.ref in item_index:
+        return item_index[ref.ref]
+    description = ref.suggest.desc if ref.suggest else ""
+    return WardrobeItem(
+        id="",
+        category=category,
+        subcategory=description,
+        source=ItemSource.AI_SUGGEST,
+    )
+
+
 def validate_outfit_result(
     outfit: Outfit,
     ctx: RequestContext,
@@ -190,7 +200,7 @@ def validate_outfit_result(
             result.warnings.append(code)
 
     owned_refs: list[str] = []
-    categories: list[tuple[object, Category]] = []
+    categories: list[tuple[OutfitItemRef, Category]] = []
     for ref in outfit.items:
         if ref.owned:
             if ref.suggest is not None:
@@ -248,11 +258,94 @@ def validate_outfit_result(
     if definite_hats > 1:
         add("H_HAT_AT_MOST_ONE", f"帽至多 1 顶,实为 {definite_hats}")
 
-    upper_layers = n_top + n_dress + n_outer
+    accessory_categories = {Category.BAG, Category.HAT, Category.SCARF}
+    accessory_refs = [
+        (ref, category) for ref, category in categories
+        if category in accessory_categories
+    ]
+    core_items = [
+        authoritative_item_or_gap(ref, category, item_index)
+        for ref, category in categories
+        if category not in accessory_categories
+    ]
+    if len(accessory_refs) > 2 and policy.enforces("D_ACCESSORY_COUNT_MAX_TWO"):
+        add("D_ACCESSORY_COUNT_MAX_TWO", "普通推荐配饰最多 2 件")
+    if policy.enforces("D_ACCESSORY_COHERENCE"):
+        for ref, category in accessory_refs:
+            accessory = authoritative_item_or_gap(ref, category, item_index)
+            if not accessory_is_coherent(accessory, core_items, scene, ctx.weather):
+                add("D_ACCESSORY_COHERENCE", f"{category.value}缺少可靠协调依据")
+
+    upper = [
+        (ref, category)
+        for ref, category in categories
+        if category in {Category.TOP, Category.DRESS, Category.OUTERWEAR}
+    ]
+    top_refs = [ref for ref, category in upper if category is Category.TOP]
+    effective_roles: list[tuple[OutfitItemRef, Category, LayerRole]] = []
+    layer_structure_errors: list[str] = []
+
+    for ref, category in upper:
+        if category is Category.TOP:
+            role = ref.layer_role
+            if role is None and len(top_refs) == 1:
+                role = LayerRole.BASE
+            if role not in {LayerRole.BASE, LayerRole.MID}:
+                layer_structure_errors.append("上装必须是唯一可判定的 base 或 mid")
+                continue
+            effective_roles.append((ref, category, role))
+        elif category is Category.DRESS:
+            if ref.layer_role not in {None, LayerRole.BASE}:
+                layer_structure_errors.append("连体装只能承担 base")
+                continue
+            effective_roles.append((ref, category, LayerRole.BASE))
+        else:
+            if ref.layer_role not in {None, LayerRole.OUTER}:
+                layer_structure_errors.append("外套只能承担 outer")
+                continue
+            effective_roles.append((ref, category, LayerRole.OUTER))
+
+    role_values = [role for _, _, role in effective_roles]
+    if len(role_values) != len(set(role_values)):
+        layer_structure_errors.append("base、mid、outer 每层至多一件")
+    if LayerRole.MID in role_values and LayerRole.BASE not in role_values:
+        layer_structure_errors.append("mid 必须依附 base")
+    for ref, category in categories:
+        if (
+            category not in {Category.TOP, Category.DRESS, Category.OUTERWEAR}
+            and ref.layer_role is not None
+        ):
+            layer_structure_errors.append(f"{category.value}不能声明上身层级")
+    if layer_structure_errors:
+        add("H_LAYER_ROLE_STRUCTURE", "；".join(dict.fromkeys(layer_structure_errors)))
+
+    upper_layers = len(upper)
     if not 1 <= upper_layers <= 3:
         add("H_UPPER_LAYER_RANGE", f"上身叠穿应为 1-3 层,实为 {upper_layers}")
+    if upper_layers > 2 and policy.enforces("D_UPPER_LAYER_MAX_TWO"):
+        add("D_UPPER_LAYER_MAX_TWO", "普通推荐上身最多 2 层")
     if n_outer > 1:
         add("H_OUTER_AT_MOST_ONE", f"外套(OUTER)至多 1 件,实为 {n_outer}")
+
+    base_ref = next(
+        (
+            ref for ref, category, role in effective_roles
+            if category is Category.TOP and role is LayerRole.BASE
+        ),
+        None,
+    )
+    mid_ref = next(
+        (
+            ref for ref, category, role in effective_roles
+            if category is Category.TOP and role is LayerRole.MID
+        ),
+        None,
+    )
+    if base_ref and mid_ref and policy.enforces("D_LAYER_COMPAT"):
+        base_top = authoritative_item_or_gap(base_ref, Category.TOP, item_index)
+        mid_top = authoritative_item_or_gap(mid_ref, Category.TOP, item_index)
+        if not layer_pair_compatible(build_item_facts(base_top), build_item_facts(mid_top)):
+            add("D_LAYER_COMPAT", "基础层与中间层缺少可靠叠穿关系")
 
     if policy.enforce_weather and policy.enforces("D_WEATHER_COMPAT"):
         if band.outer_required and n_outer == 0:

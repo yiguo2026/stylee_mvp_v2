@@ -21,7 +21,15 @@ from stylee.contracts import (
     WardrobeItem,
     Weather,
 )
-from stylee.outfit_policy import build_constraint_policy
+from stylee.outfit_policy import (
+    ClosureMode,
+    GarmentKind,
+    ThicknessBand,
+    ItemFacts,
+    build_constraint_policy,
+    build_item_facts,
+    layer_pair_compatible,
+)
 
 
 def _item(item_id: str, category: Category, name: str, color: str = "黑色",
@@ -141,6 +149,40 @@ def test_shoe_bag_and_hat_counts_use_authoritative_categories() -> None:
     assert "H_HAT_AT_MOST_ONE" not in _codes(legacy_accessory)
 
 
+def test_accessories_are_optional_and_default_to_at_most_two() -> None:
+    assert "D_ACCESSORY_COUNT_MAX_TWO" not in _codes(_base_outfit())
+    three = _base_outfit()
+    three.items.extend([
+        _owned(Slot.ACCESSORY, "bag-1"),
+        _owned(Slot.ACCESSORY, "hat-1"),
+        _owned(Slot.ACCESSORY, "legacy-accessory"),
+    ])
+    assert "D_ACCESSORY_COUNT_MAX_TWO" in _codes(three)
+    assert "D_ACCESSORY_COUNT_MAX_TWO" not in _codes(
+        three, query="我要丰富配饰和多配饰叠搭",
+    )
+
+
+def test_baseball_cap_does_not_pass_formal_outfit_by_color_alone() -> None:
+    outfit = _base_outfit()
+    outfit.items.append(_owned(Slot.ACCESSORY, "hat-1"))
+    assert "D_ACCESSORY_COHERENCE" in _codes(outfit)
+    assert "D_ACCESSORY_COHERENCE" not in _codes(
+        outfit, query="戴这顶帽子，做明确混搭",
+    )
+
+
+def test_cold_weather_scarf_has_a_functional_positive_signal() -> None:
+    wardrobe = _wardrobe() + [
+        _item("scarf-1", Category.SCARF, "羊绒围巾", "米色", styles=["法式慵懒"]),
+    ]
+    outfit = _base_outfit()
+    outfit.items.append(_owned(Slot.ACCESSORY, "scarf-1"))
+    assert "D_ACCESSORY_COHERENCE" not in _codes(
+        outfit, temp_c=8.0, wardrobe=wardrobe,
+    )
+
+
 def test_body_coverage_and_dress_exclusivity_are_enforced() -> None:
     missing_bottom = Outfit(items=[
         _owned(Slot.TORSO, "top-1", LayerRole.BASE),
@@ -156,20 +198,22 @@ def test_body_coverage_and_dress_exclusivity_are_enforced() -> None:
     assert "H_DRESS_BOTTOM_EXCLUSIVE" in _codes(dress_and_bottom)
 
 
-def test_three_upper_layers_pass_and_four_fail() -> None:
-    legal = Outfit(items=[
+def test_three_layers_require_explicit_query_and_four_always_fail() -> None:
+    three = Outfit(items=[
         _owned(Slot.TORSO, "top-1", LayerRole.BASE),
         _owned(Slot.TORSO, "top-2", LayerRole.MID),
         _owned(Slot.OUTER, "outer-1", LayerRole.OUTER),
         _owned(Slot.BOTTOM, "bottom-1"),
         _owned(Slot.FEET, "shoe-1"),
     ], style_tags=["法式慵懒"])
-    assert "H_UPPER_LAYER_RANGE" not in _codes(legal)
+    assert "D_UPPER_LAYER_MAX_TWO" in _codes(three)
+    assert "D_UPPER_LAYER_MAX_TWO" not in _codes(three, query="我要三层叠穿")
+    assert "H_UPPER_LAYER_RANGE" not in _codes(three, query="我要三层叠穿")
 
-    illegal = Outfit(items=legal.items + [
+    four = Outfit(items=three.items + [
         _owned(Slot.TORSO, "top-3", LayerRole.MID),
     ], style_tags=["法式慵懒"])
-    assert "H_UPPER_LAYER_RANGE" in _codes(illegal)
+    assert "H_UPPER_LAYER_RANGE" in _codes(four, query="我要多层叠穿")
 
     two_outers = Outfit(items=[
         _owned(Slot.TORSO, "top-1", LayerRole.BASE),
@@ -179,6 +223,35 @@ def test_three_upper_layers_pass_and_four_fail() -> None:
         _owned(Slot.FEET, "shoe-1"),
     ])
     assert "H_OUTER_AT_MOST_ONE" in _codes(two_outers)
+
+
+def test_layer_role_structure_is_absolute() -> None:
+    duplicate_base = Outfit(items=[
+        _owned(Slot.TORSO, "top-1", LayerRole.BASE),
+        _owned(Slot.TORSO, "top-2", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "bottom-1"),
+        _owned(Slot.FEET, "shoe-1"),
+    ])
+    assert "H_LAYER_ROLE_STRUCTURE" in _codes(duplicate_base, query="我要特殊叠穿")
+
+
+def test_unknown_or_conflicting_second_top_is_rejected() -> None:
+    wardrobe = [
+        _item("turtle", Category.TOP, "厚高领毛衣"),
+        _item("shirt", Category.TOP, "普通白衬衫"),
+        _item("bottom", Category.BOTTOM, "黑色长裤"),
+        _item("shoe", Category.SHOES, "黑色乐福鞋"),
+    ]
+    outfit = Outfit(items=[
+        _owned(Slot.TORSO, "turtle", LayerRole.BASE),
+        _owned(Slot.TORSO, "shirt", LayerRole.MID),
+        _owned(Slot.BOTTOM, "bottom"),
+        _owned(Slot.FEET, "shoe"),
+    ])
+    assert "D_LAYER_COMPAT" in _codes(outfit, wardrobe=wardrobe)
+    assert "D_LAYER_COMPAT" not in _codes(
+        outfit, query="高领配衬衫，衬衫敞开穿", wardrobe=wardrobe,
+    )
 
 
 def test_non_owned_item_requires_an_explicit_gap() -> None:
@@ -268,6 +341,53 @@ def test_weather_default_is_disabled_only_by_explicit_query() -> None:
     )
 
 
+def test_layer_facts_are_conservative_and_directional() -> None:
+    tee = build_item_facts(_item("tee", Category.TOP, "白色T恤"))
+    shirt = build_item_facts(_item("shirt", Category.TOP, "白色衬衫"))
+    overshirt = build_item_facts(_item("overshirt", Category.TOP, "牛仔衬衫外套"))
+    cardigan = build_item_facts(_item("cardigan", Category.TOP, "羊毛开衫"))
+    turtleneck = build_item_facts(_item("turtle", Category.TOP, "厚高领毛衣"))
+
+    assert tee.garment_kind is GarmentKind.TEE
+    assert shirt.garment_kind is GarmentKind.SHIRT
+    assert overshirt.garment_kind is GarmentKind.OVERSHIRT
+    assert cardigan.closure_mode is ClosureMode.OPENABLE
+    assert turtleneck.thickness_band is ThicknessBand.THICK
+    assert layer_pair_compatible(tee, cardigan) is True
+    assert layer_pair_compatible(turtleneck, shirt) is False
+
+
+def test_only_explicit_queries_override_new_default_rules() -> None:
+    ordinary_ctx, scene, _ = _context("日常通勤")
+    ordinary = build_constraint_policy(ordinary_ctx, scene)
+    assert ordinary.enforces("D_UPPER_LAYER_MAX_TWO")
+    assert ordinary.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+
+    explicit_ctx, scene, _ = _context("我要三层叠穿和丰富配饰")
+    explicit = build_constraint_policy(explicit_ctx, scene)
+    assert not explicit.enforces("D_UPPER_LAYER_MAX_TWO")
+    assert not explicit.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+
+
+def test_item_facts_preserves_legacy_positional_constructor_order() -> None:
+    facts = ItemFacts(
+        frozenset({LayerRole.BASE}),
+        frozenset({"red"}),
+        frozenset({"black"}),
+        True,
+        2,
+        frozenset({"极简"}),
+        False,
+    )
+    assert facts.layer_capabilities == frozenset({LayerRole.BASE})
+    assert facts.color_families == frozenset({"red"})
+    assert facts.neutral_families == frozenset({"black"})
+    assert facts.fluorescent is True
+    assert facts.formality_level == 2
+    assert facts.styles == frozenset({"极简"})
+    assert facts.definite_hat is False
+
+
 def test_unknown_default_facts_warn_instead_of_rejecting() -> None:
     items = [
         _item("unknown-top", Category.TOP, "", ""),
@@ -289,13 +409,21 @@ def test_unknown_default_facts_warn_instead_of_rejecting() -> None:
 def main() -> None:
     test_unknown_and_duplicate_owned_refs_are_rejected()
     test_shoe_bag_and_hat_counts_use_authoritative_categories()
+    test_accessories_are_optional_and_default_to_at_most_two()
+    test_baseball_cap_does_not_pass_formal_outfit_by_color_alone()
+    test_cold_weather_scarf_has_a_functional_positive_signal()
     test_body_coverage_and_dress_exclusivity_are_enforced()
-    test_three_upper_layers_pass_and_four_fail()
+    test_three_layers_require_explicit_query_and_four_always_fail()
+    test_layer_role_structure_is_absolute()
+    test_unknown_or_conflicting_second_top_is_rejected()
     test_non_owned_item_requires_an_explicit_gap()
     test_color_complexity_and_fluorescent_defaults_are_query_overridable()
     test_formality_span_is_query_overridable()
     test_scene_style_pool_and_conflict_pair_require_explicit_query_evidence()
     test_weather_default_is_disabled_only_by_explicit_query()
+    test_layer_facts_are_conservative_and_directional()
+    test_only_explicit_queries_override_new_default_rules()
+    test_item_facts_preserves_legacy_positional_constructor_order()
     test_unknown_default_facts_warn_instead_of_rejecting()
     print("ok")
 

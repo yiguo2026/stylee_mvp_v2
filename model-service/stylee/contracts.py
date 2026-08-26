@@ -36,7 +36,7 @@ class Slot(str, Enum):
 
 
 class LayerRole(str, Enum):
-    """上身穿着顺序；只用于服务端生成与校验，不暴露给 App。"""
+    """上身穿着顺序；服务端生成与校验，并经 adapter 归一化为可选 App 布局角色。"""
     BASE = "base"
     MID = "mid"
     OUTER = "outer"

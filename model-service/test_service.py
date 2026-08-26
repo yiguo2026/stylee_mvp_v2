@@ -12,6 +12,7 @@ from stylee.service.adapter import (
     compact_recommended_name, outfits_to_app, ingest_to_app, std_to_app
 )
 from stylee.service.ai_features import normalize_multi_item
+from scripts.check_outfit_quality_live import validate_outfit as validate_live_outfit
 from stylee.contracts import (
     Category, InputMode, Sleeve, Fit, Season, BodyShape,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
@@ -136,6 +137,63 @@ def test_normalize_multi_item_contract():
     invalid = normalize_multi_item({"category": "?", "photo_type": "?"}, 2)
     assert invalid["category"] == "上装" and invalid["photo_type"] == "on_body"
     assert invalid["needs_review"] is True and invalid["confidence"] == 0.4
+
+
+def _assert_live_checker_rejects(outfit):
+    rejected = False
+    try:
+        validate_live_outfit("daily", outfit)
+    except AssertionError:
+        rejected = True
+    assert rejected, "live checker should reject malformed layout mapping"
+
+
+def test_live_checker_rejects_duplicate_owned_and_recommended_keys():
+    _assert_live_checker_rejects({
+        "owned_item_ids": ["top", "bottom", "shoes"],
+        "recommended_items": [],
+        "layout_items": [
+            {"source": "owned", "item_id": "top", "layout_role": "base"},
+            {"source": "owned", "item_id": "top", "layout_role": "bottom"},
+            {"source": "owned", "item_id": "shoes", "layout_role": "shoes"},
+        ],
+    })
+    _assert_live_checker_rejects({
+        "owned_item_ids": ["top", "bottom", "shoes"],
+        "recommended_items": [{}, {}],
+        "layout_items": [
+            {"source": "owned", "item_id": "top", "layout_role": "base"},
+            {"source": "owned", "item_id": "bottom", "layout_role": "bottom"},
+            {"source": "owned", "item_id": "shoes", "layout_role": "shoes"},
+            {"source": "recommended", "recommended_index": 0, "layout_role": "scarf"},
+            {"source": "recommended", "recommended_index": 0, "layout_role": "bag"},
+        ],
+    })
+
+
+def test_live_checker_rejects_missing_or_opposite_source_keys():
+    base = {
+        "owned_item_ids": ["top", "bottom", "shoes"],
+        "recommended_items": [{}],
+    }
+    malformed_entries = [
+        {"source": "owned", "layout_role": "base"},
+        {"source": "owned", "recommended_index": 0, "layout_role": "base"},
+        {"source": "owned", "item_id": "top", "recommended_index": 0, "layout_role": "base"},
+        {"source": "recommended", "layout_role": "scarf"},
+        {"source": "recommended", "item_id": "top", "layout_role": "scarf"},
+        {"source": "recommended", "item_id": "top", "recommended_index": 0, "layout_role": "scarf"},
+    ]
+    for malformed in malformed_entries:
+        _assert_live_checker_rejects({
+            **base,
+            "layout_items": [
+                malformed,
+                {"source": "owned", "item_id": "bottom", "layout_role": "bottom"},
+                {"source": "owned", "item_id": "shoes", "layout_role": "shoes"},
+                {"source": "recommended", "recommended_index": 0, "layout_role": "scarf"},
+            ],
+        })
 
 
 from stylee.providers import ProviderTimeoutError
@@ -298,6 +356,20 @@ def test_server_smoke():
         assert b["trace"]["first_pass_valid"] >= 0
         assert b["trace"]["retry_candidate_count"] >= 0
         assert b["trace"]["fallback_type"] in {"none", "deterministic", "failed"}
+        assert isinstance(b["trace"]["layout_items_emitted"], int)
+        assert isinstance(b["trace"]["layout_contract_build_error_count"], int)
+        for outfit in b["outfits"]:
+            assert {"name", "owned_item_ids", "recommended_items", "comment"} <= set(outfit)
+            if "layout_items" in outfit:
+                validate_live_outfit("daily", outfit)
+                assert len(outfit["layout_items"]) == (
+                    len(outfit["owned_item_ids"]) + len(outfit["recommended_items"])
+                )
+                assert all(
+                    item["source"] in {"owned", "recommended"}
+                    and isinstance(item["layout_role"], str)
+                    for item in outfit["layout_items"]
+                )
 
         original_recommend = server_service.recommend
         server_service.recommend = lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -399,6 +471,8 @@ def main():
     test_ingest_to_app()
     test_std_to_app()
     test_normalize_multi_item_contract()
+    test_live_checker_rejects_duplicate_owned_and_recommended_keys()
+    test_live_checker_rejects_missing_or_opposite_source_keys()
     test_standardize_request_normalizes_legacy_flat_lay_to_flatlay()
     test_server_smoke()
     print("ok")
