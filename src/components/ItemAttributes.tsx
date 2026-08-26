@@ -36,7 +36,6 @@ const ATTR_DEFS: AttrDef[] = [
   { key: 'season', label: '季节', kind: 'multi', options: ['春', '夏', '秋', '冬', '四季'] },
   { key: 'occasion', label: '场合', kind: 'multi', options: OCCASION_TAGS.map(t => t.label) },
   { key: 'tags', label: '风格', kind: 'multi', options: STYLE_TAGS.map(t => t.label) },
-  { key: 'wash_care', label: '洗涤维护', kind: 'text', placeholder: '如：机洗 / 手洗 / 干洗' },
   { key: 'purchase_date', label: '购入日期', kind: 'date', placeholder: '如：2025-06' },
 ];
 
@@ -72,7 +71,6 @@ function readValue(item: WardrobeItem, key: string): string {
       .map(id => OCCASION_TAGS.find(t => t.id === id)?.label ?? id).join('、');
     case 'tags': return (item.tags ?? []).join('、');
     case 'size': return (item.ai_recognized_attrs?.size as string) ?? '';
-    case 'wash_care': return (item.ai_recognized_attrs?.wash_care as string) ?? '';
     case 'purchase_date': {
       if (!item.purchase_date) return '';
       const d = new Date(item.purchase_date);
@@ -107,7 +105,7 @@ function toUpdate(key: string, value: string): Partial<WardrobeItem> | null {
     };
     case 'tags': return { tags: arr as unknown as WardrobeItem['tags'] };
     case 'purchase_date': return { purchase_date: value };
-    default: return null; // size / wash_care 存入 ai_recognized_attrs（见 commit）
+    default: return null; // size 存入 ai_recognized_attrs（见 commit）
   }
 }
 
@@ -201,10 +199,10 @@ export function useItemAttributes(
       manual_fields?: string[];
     } = item.ai_recognized_attrs ?? {};
     const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
-    // size / wash_care 没有独立数据库列，持久化到已存在的 ai_recognized_attrs JSON 列，
+    // size 没有独立数据库列，持久化到已存在的 ai_recognized_attrs JSON 列，
     // 保证离开详情页再进来时仍能读回（配合 store 的乐观更新）。
     const localExtra: Record<string, unknown> = {};
-    if (key === 'size' || key === 'wash_care') localExtra[key] = value;
+    if (key === 'size') localExtra[key] = value;
     onUpdate({
       ...(upd ?? {}),
       ai_recognized_attrs: { ...existing, ...localExtra, manual_fields },
