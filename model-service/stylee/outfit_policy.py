@@ -253,16 +253,25 @@ def layer_pair_compatible(base: ItemFacts, mid: ItemFacts) -> bool:
 
 
 _NEGATED_REQUEST_PREFIXES = (
+    "不愿意",
+    "不打算",
+    "不可以",
     "不想要",
     "不希望",
     "不需要",
+    "请勿",
+    "不能",
+    "不可",
     "不要",
     "不想",
+    "不愿",
     "无需",
     "避免",
     "拒绝",
     "禁止",
     "别",
+    "勿",
+    "莫",
     "不",
 )
 
@@ -399,7 +408,7 @@ def accessory_is_coherent(
     if (
         accessory_facts.styles
         and allowed_scene_styles is not None
-        and not accessory_facts.styles & allowed_scene_styles
+        and not accessory_facts.styles.issubset(allowed_scene_styles)
     ):
         return False
 

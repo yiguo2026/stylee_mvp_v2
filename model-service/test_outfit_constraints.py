@@ -222,8 +222,13 @@ def test_known_formality_conflict_rejects_functional_scarf_gap() -> None:
 
 
 def test_scene_style_exclusion_beats_accessory_style_match() -> None:
-    core = [_item("preppy-top", Category.TOP, "白色T恤", styles=["学院风"])]
-    accessory = _item("preppy-hat", Category.HAT, "学院风贝雷帽", styles=["学院风"])
+    core = [_item("minimal-top", Category.TOP, "白色T恤", styles=["极简"])]
+    accessory = _item(
+        "mixed-hat",
+        Category.HAT,
+        "极简学院风贝雷帽",
+        styles=["极简", "学院风"],
+    )
     formal_scene = SceneSpec(occasions=["正式"], formality=Formality.FORMAL)
 
     assert accessory_is_coherent(
@@ -482,12 +487,15 @@ def test_negated_or_ambiguous_queries_keep_new_default_rules_enabled() -> None:
     cases = (
         ("不要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
         ("不想三层穿搭", "D_UPPER_LAYER_MAX_TWO"),
+        ("请勿三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
         ("只要多层叠穿的感觉", "D_UPPER_LAYER_MAX_TWO"),
         ("不要衬衫敞开", "D_LAYER_COMPAT"),
+        ("不可以衬衫敞开", "D_LAYER_COMPAT"),
         ("高领配衬衫", "D_LAYER_COMPAT"),
         ("不要丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
         ("不要戴这顶帽子", "D_ACCESSORY_COHERENCE"),
         ("不要加围巾", "D_ACCESSORY_COHERENCE"),
+        ("勿加围巾", "D_ACCESSORY_COHERENCE"),
     )
     for query, code in cases:
         ctx, scene, _ = _context(query)
