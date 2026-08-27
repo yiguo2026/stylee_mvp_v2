@@ -69,6 +69,11 @@ def main() -> None:
     _check("普通推荐上身最多 2 层" in gen_msgs[0]["content"], "普通生成 prompt 限制上身两层")
     _check("配饰默认最多 2 件且可以为 0 件" in gen_msgs[0]["content"], "普通生成 prompt 限制配饰数量")
     _check("不要为了凑数量添加配饰" in gen_msgs[0]["content"], "普通生成 prompt 禁止凑配饰")
+    _check(
+        '"category":"上装|下装|连衣裙|外套|鞋|包|帽子|围巾|配饰"'
+        in gen_msgs[0]["content"],
+        "gap schema exposes the canonical generic accessory category",
+    )
     _check("视觉焦点" in gen_msgs[0]["content"] and "7:2:1" in gen_msgs[0]["content"],
            "生成 prompt 含当前不可硬判的软审美规则")
 
@@ -138,6 +143,18 @@ def main() -> None:
     ]}]}
     go = parse_outfits_json(gap)[0]
     _check(go.has_gap() and go.items[-1].suggest.desc == "小白鞋", "gap JSON → GapSuggestion")
+
+    generic_gap = parse_outfits_json({"outfits": [{"items": [
+        {"role": "accessory", "gap": {
+            "category": "配饰", "desc": "珍珠耳饰", "reason": "点睛",
+        }},
+    ]}]})[0].items[0]
+    _check(
+        generic_gap.suggest is not None
+        and generic_gap.suggest.category.value == "配饰"
+        and generic_gap.role is Slot.ACCESSORY,
+        "generic accessory gap parses one-to-one instead of falling back to TOP",
+    )
 
     # gap 的 role 不能由模型任意填写；两个下装即使其中一个伪装成 accessory，
     # 也必须按 category 归为 bottom 并被硬校验拒绝。

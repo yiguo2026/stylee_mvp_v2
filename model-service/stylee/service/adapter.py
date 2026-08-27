@@ -49,7 +49,7 @@ def model_category(value: str, name: str = "") -> Category:
             return Category.SCARF
         return Category.SCARF
     if value == "配饰":
-        return Category.HAT  # legacy umbrella; ItemFacts.definite_hat=None -> accessory
+        return Category.ACCESSORY
     aliases = {
         "连体装": Category.DRESS, "鞋履": Category.SHOES, "包袋": Category.BAG,
     }
@@ -65,6 +65,7 @@ def app_category(cat: Category) -> str:
     return {
         Category.DRESS: "连体装", Category.SHOES: "鞋履", Category.BAG: "包袋",
         Category.HAT: "帽巾", Category.SCARF: "帽巾",
+        Category.ACCESSORY: "配饰",
     }.get(cat, cat.value)
 
 
@@ -185,6 +186,7 @@ _LAYOUT_ROLE_BY_CATEGORY = {
     Category.SHOES: "shoes",
     Category.BAG: "bag",
     Category.SCARF: "scarf",
+    Category.ACCESSORY: "accessory",
 }
 
 

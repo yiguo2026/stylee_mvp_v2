@@ -9,7 +9,7 @@ from stylee.contracts import (
     RecommendationResult, RequestContext, Slot, WardrobeItem,
 )
 from stylee.outfit_policy import build_item_facts
-from stylee.service.adapter import outfits_to_app, wardrobe_item
+from stylee.service.adapter import app_category, outfits_to_app, wardrobe_item
 
 
 ROOT = Path(__file__).resolve().parent
@@ -61,8 +61,9 @@ def test_wardrobe_item_distinguishes_hat_scarf_and_legacy_accessory() -> None:
     legacy = wardrobe_item({"item_id": "a", "category": "配饰", "name": "珍珠耳饰"})
     assert hat.category is Category.HAT
     assert scarf.category is Category.SCARF
-    assert legacy.category is Category.HAT
-    assert build_item_facts(legacy).definite_hat is None
+    assert legacy.category is Category.ACCESSORY
+    assert app_category(legacy.category) == "配饰"
+    assert build_item_facts(legacy).definite_hat is False
 
 
 def test_wardrobe_item_classifies_null_name_without_crashing() -> None:
@@ -110,6 +111,40 @@ def test_legacy_non_hat_accessory_maps_to_accessory_role() -> None:
 
     assert body["outfits"][0]["layout_items"] == [
         {"source": "owned", "item_id": "earring", "layout_role": "accessory"},
+    ]
+
+
+def test_canonical_generic_accessory_round_trips_old_fields_and_layout_role() -> None:
+    ctx = RequestContext(
+        input_mode=InputMode.NL,
+        wardrobe=[WardrobeItem("earring", Category.ACCESSORY, "珍珠耳饰")],
+    )
+    outfit = Outfit(
+        items=[
+            OutfitItemRef(Slot.ACCESSORY, "earring"),
+            OutfitItemRef(
+                Slot.ACCESSORY,
+                owned=False,
+                suggest=GapSuggestion(Category.ACCESSORY, "银色手链", "点睛"),
+            ),
+        ],
+        reasoning="配饰呼应",
+    )
+
+    body = outfits_to_app(RecommendationResult(outfits=[outfit]), ctx)
+    value = body["outfits"][0]
+
+    assert value["owned_item_ids"] == ["earring"]
+    assert value["recommended_items"] == [{
+        "name": "银色手链",
+        "category": "配饰",
+        "color": "",
+        "description": "点睛",
+    }]
+    assert value["comment"] == "配饰呼应"
+    assert value["layout_items"] == [
+        {"source": "owned", "item_id": "earring", "layout_role": "accessory"},
+        {"source": "recommended", "recommended_index": 0, "layout_role": "accessory"},
     ]
 
 
@@ -163,6 +198,8 @@ def test_release_smoke_fixture_has_unique_items_and_name_aware_hat_scarf() -> No
     assert len(by_id) == len(items)
     assert by_id["hat"].category is Category.HAT
     assert by_id["scarf"].category is Category.SCARF
+    assert "jewelry" in by_id
+    assert by_id["jewelry"].category is Category.ACCESSORY
 
 
 def main() -> None:
@@ -172,6 +209,7 @@ def main() -> None:
     test_incomplete_layout_mapping_keeps_old_fields_and_omits_new_field()
     test_missing_single_top_layer_role_defaults_to_base()
     test_legacy_non_hat_accessory_maps_to_accessory_role()
+    test_canonical_generic_accessory_round_trips_old_fields_and_layout_role()
     test_recommended_hat_category_uses_description_for_layout_role()
     test_duplicate_owned_layout_key_omits_layout_mapping()
     test_release_smoke_fixture_has_unique_items_and_name_aware_hat_scarf()

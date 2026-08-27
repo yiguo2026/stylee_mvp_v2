@@ -24,6 +24,7 @@ class Category(str, Enum):
     BAG = "包"
     HAT = "帽子"
     SCARF = "围巾"
+    ACCESSORY = "配饰"
 
 
 class Slot(str, Enum):
@@ -32,7 +33,7 @@ class Slot(str, Enum):
     BOTTOM = "bottom"      # 下身:由 BOTTOM 占;DRESS 同时覆盖 TORSO+BOTTOM
     OUTER = "outer"        # 外层:OUTERWEAR
     FEET = "feet"          # 鞋
-    ACCESSORY = "accessory"  # 配饰:BAG/HAT/SCARF
+    ACCESSORY = "accessory"  # 配饰:BAG/HAT/SCARF/ACCESSORY
 
 
 class LayerRole(str, Enum):
@@ -52,6 +53,7 @@ CATEGORY_SLOT: dict[Category, Slot] = {
     Category.BAG: Slot.ACCESSORY,
     Category.HAT: Slot.ACCESSORY,
     Category.SCARF: Slot.ACCESSORY,
+    Category.ACCESSORY: Slot.ACCESSORY,
 }
 
 

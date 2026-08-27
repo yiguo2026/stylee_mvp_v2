@@ -14,7 +14,8 @@
       {"item_id": "shoes", "name": "白色乐福鞋", "category": "鞋履", "color": "白色", "material": "皮革", "occasion_tags": ["通勤"]},
       {"item_id": "bag", "name": "黑色托特包", "category": "包袋", "color": "黑色", "material": "皮革", "style_tags": ["通勤职场"]},
       {"item_id": "hat", "name": "白色棒球帽", "category": "帽巾", "color": "白色", "material": "纯棉", "style_tags": ["街头潮流"]},
-      {"item_id": "scarf", "name": "米色羊绒围巾", "category": "帽巾", "color": "米色", "material": "羊绒", "style_tags": ["通勤职场"]}
+      {"item_id": "scarf", "name": "米色羊绒围巾", "category": "帽巾", "color": "米色", "material": "羊绒", "style_tags": ["通勤职场"]},
+      {"item_id": "jewelry", "name": "极简银色耳饰", "category": "配饰", "color": "银色", "material": "银", "style_tags": ["极简"]}
     ]
   },
   "queries": [

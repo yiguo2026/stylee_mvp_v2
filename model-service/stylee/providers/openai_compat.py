@@ -163,8 +163,9 @@ _GEN_SCHEMA = (
     '{"outfits":[{"items":['
     '{"role":"torso|bottom|outer|feet|accessory",'
     '"layer_role":"base|mid|outer|null","id":"候选池里的真实id"},'
-    '{"role":"feet","layer_role":null,'
-    '"gap":{"category":"鞋","desc":"补买建议","reason":"理由"}}'
+    '{"role":"torso|bottom|outer|feet|accessory","layer_role":"base|mid|outer|null",'
+    '"gap":{"category":"上装|下装|连衣裙|外套|鞋|包|帽子|围巾|配饰",'
+    '"desc":"补买建议","reason":"理由"}}'
     '],"primary_style":"主风格","secondary_style":"辅风格或空",'
     '"style_tags":[],"occasion":"","reasoning":"一句话理由"}]}'
 )

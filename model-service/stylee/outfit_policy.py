@@ -252,13 +252,15 @@ def layer_pair_compatible(base: ItemFacts, mid: ItemFacts) -> bool:
     return mid.garment_kind in allowed.get(base.garment_kind, set())
 
 
-_NEGATED_REQUEST_PREFIXES = (
+_CLAUSE_WIDE_AVOIDANCE_INTENTS = (
     "不愿意",
     "不打算",
     "不可以",
     "不想要",
     "不希望",
     "不需要",
+    "不建议",
+    "不考虑",
     "请勿",
     "不能",
     "不可",
@@ -266,21 +268,19 @@ _NEGATED_REQUEST_PREFIXES = (
     "不想",
     "不愿",
     "无需",
+    "不用",
     "避免",
     "拒绝",
     "取消",
     "禁止",
-    "别",
+    "告别",
+    "算了",
     "勿",
     "莫",
-    "不",
 )
 _CLAUSE_DELIMITERS = frozenset("，,。.!！?？；;：:\n\r")
-_CLAUSE_WIDE_NEGATION_INTENTS = tuple(
-    intent for intent in _NEGATED_REQUEST_PREFIXES if intent != "别"
-)
 _NON_NEGATING_BIE_COMPOUNDS = (
-    "特别", "区别", "分别", "告别", "性别", "级别", "类别", "识别", "个别",
+    "特别", "区别", "分别", "性别", "级别", "类别", "识别", "个别",
     "差别", "辨别", "甄别", "永别", "道别", "派别", "鉴别", "判别",
 )
 _NON_NEGATING_BIE_FOLLOWERS = frozenset({
@@ -292,39 +292,50 @@ _NON_NEGATING_BIE_PHRASES = (
 )
 
 
-def _clause_prefix(text: str, index: int) -> str:
-    """Return the current punctuation-delimited clause before a request term."""
-    boundary = max((text.rfind(delimiter, 0, index) for delimiter in _CLAUSE_DELIMITERS), default=-1)
-    return text[boundary + 1:index]
+def _surrounding_clause(text: str, index: int, term_length: int) -> str:
+    """Return the full punctuation-delimited clause containing a request term."""
+    start = max(
+        (text.rfind(delimiter, 0, index) for delimiter in _CLAUSE_DELIMITERS),
+        default=-1,
+    ) + 1
+    end = min(
+        (
+            boundary
+            for delimiter in _CLAUSE_DELIMITERS
+            if (boundary := text.find(delimiter, index + term_length)) >= 0
+        ),
+        default=len(text),
+    )
+    return text[start:end]
 
 
-def _has_bie_negation(prefix: str) -> bool:
+def _has_bie_negation(clause: str) -> bool:
     """Treat independent ``别`` as negation, excluding known lexical words."""
-    for index, char in enumerate(prefix):
+    for index, char in enumerate(clause):
         if char != "别":
             continue
         if any(
             index >= len(word) - 1
-            and prefix[index - len(word) + 1:index + 1] == word
+            and clause[index - len(word) + 1:index + 1] == word
             for word in _NON_NEGATING_BIE_COMPOUNDS
         ):
             continue
         if any(
             index >= bie_offset
-            and prefix.startswith(phrase, index - bie_offset)
+            and clause.startswith(phrase, index - bie_offset)
             for phrase, bie_offset in _NON_NEGATING_BIE_PHRASES
         ):
             continue
-        if index + 1 < len(prefix) and prefix[index + 1] in _NON_NEGATING_BIE_FOLLOWERS:
+        if index + 1 < len(clause) and clause[index + 1] in _NON_NEGATING_BIE_FOLLOWERS:
             continue
         return True
     return False
 
 
-def _has_negation_intent(prefix: str) -> bool:
+def _has_negation_intent(clause: str) -> bool:
     return (
-        any(intent in prefix for intent in _CLAUSE_WIDE_NEGATION_INTENTS)
-        or _has_bie_negation(prefix)
+        any(intent in clause for intent in _CLAUSE_WIDE_AVOIDANCE_INTENTS)
+        or _has_bie_negation(clause)
     )
 
 
@@ -333,8 +344,8 @@ def _has_affirmative_request_term(text: str, terms: tuple[str, ...]) -> bool:
     for term in terms:
         offset = 0
         while (index := text.find(term, offset)) >= 0:
-            prefix = _clause_prefix(text, index)
-            if not _has_negation_intent(prefix):
+            clause = _surrounding_clause(text, index, len(term))
+            if not _has_negation_intent(clause):
                 return True
             offset = index + len(term)
     return False
@@ -391,6 +402,16 @@ def build_constraint_policy(ctx: RequestContext, scene: SceneSpec) -> Constraint
     )
 
 
+def _known_item_styles(item: WardrobeItem) -> frozenset[str]:
+    """Union explicit normalized tags with deterministic styles named by the item."""
+    explicit = {
+        normalized
+        for tag in item.style_tags
+        if (normalized := normalize_style(tag))
+    }
+    return frozenset(explicit) | styles_in_text(item.subcategory)
+
+
 def build_item_facts(item: WardrobeItem) -> ItemFacts:
     kind = _garment_kind(item)
     layers = _layer_capabilities(item.category, kind)
@@ -418,10 +439,7 @@ def build_item_facts(item: WardrobeItem) -> ItemFacts:
                 color_families.add(family)
                 recognized_color = True
 
-    styles = frozenset(
-        normalized for tag in item.style_tags
-        if (normalized := normalize_style(tag))
-    )
+    styles = _known_item_styles(item)
     formality = _formality_level(item, styles)
     fluorescent_fact: bool | None = fluorescent if recognized_color else None
 

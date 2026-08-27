@@ -260,7 +260,12 @@ def validate_outfit_result(
     if definite_hats > 1:
         add("H_HAT_AT_MOST_ONE", f"帽至多 1 顶,实为 {definite_hats}")
 
-    accessory_categories = {Category.BAG, Category.HAT, Category.SCARF}
+    accessory_categories = {
+        Category.BAG,
+        Category.HAT,
+        Category.SCARF,
+        Category.ACCESSORY,
+    }
     accessory_refs = [
         (ref, category) for ref, category in categories
         if category in accessory_categories

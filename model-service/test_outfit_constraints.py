@@ -6,7 +6,7 @@ Run directly with ``python3 test_outfit_constraints.py``.
 """
 from __future__ import annotations
 
-from stylee.constraints import validate_outfit_result
+from stylee.constraints import authoritative_item_or_gap, validate_outfit_result
 from stylee.contracts import (
     Category,
     Formality,
@@ -62,6 +62,9 @@ def _wardrobe() -> list[WardrobeItem]:
         _item("hat-1", Category.HAT, "黑色棒球帽", "黑色"),
         _item("hat-2", Category.HAT, "白色针织帽", "白色"),
         _item("legacy-accessory", Category.HAT, "珍珠耳饰", "白色"),
+        _item("accessory-1", Category.ACCESSORY, "法式珍珠耳饰", "白色", styles=["法式慵懒"]),
+        _item("accessory-2", Category.ACCESSORY, "法式细项链", "白色", styles=["法式慵懒"]),
+        _item("accessory-3", Category.ACCESSORY, "法式手链", "白色", styles=["法式慵懒"]),
         _item("dress-1", Category.DRESS, "蓝色连衣裙", "蓝色", styles=["法式慵懒"]),
     ]
 
@@ -148,6 +151,23 @@ def test_shoe_bag_and_hat_counts_use_authoritative_categories() -> None:
         _owned(Slot.ACCESSORY, "legacy-accessory"),
     ])
     assert "H_HAT_AT_MOST_ONE" not in _codes(legacy_accessory)
+
+    hat_and_jewelry = _base_outfit()
+    hat_and_jewelry.items.extend([
+        _owned(Slot.ACCESSORY, "hat-1"),
+        _owned(Slot.ACCESSORY, "accessory-1"),
+    ])
+    hat_and_jewelry_codes = _codes(hat_and_jewelry, query="戴这顶帽子")
+    assert "H_HAT_AT_MOST_ONE" not in hat_and_jewelry_codes
+    assert "D_ACCESSORY_COUNT_MAX_TWO" not in hat_and_jewelry_codes
+
+    three_generic = _base_outfit()
+    three_generic.items.extend([
+        _owned(Slot.ACCESSORY, "accessory-1"),
+        _owned(Slot.ACCESSORY, "accessory-2"),
+        _owned(Slot.ACCESSORY, "accessory-3"),
+    ])
+    assert "D_ACCESSORY_COUNT_MAX_TWO" in _codes(three_generic)
 
 
 def test_accessories_are_optional_and_default_to_at_most_two() -> None:
@@ -244,7 +264,7 @@ def test_gap_accessory_uses_description_style_facts_like_equivalent_owned_item()
         _item("minimal-top", Category.TOP, "白色极简衬衫", styles=["极简"]),
         _item("minimal-bottom", Category.BOTTOM, "黑色极简长裤", styles=["极简"]),
         _item("formal-shoes", Category.SHOES, "黑色乐福鞋"),
-        _item("preppy-beret", Category.HAT, "学院风贝雷帽", styles=["学院风"]),
+        _item("preppy-beret", Category.HAT, "学院风贝雷帽"),
     ]
     owned = Outfit(items=[
         _owned(Slot.TORSO, "minimal-top", LayerRole.BASE),
@@ -272,13 +292,22 @@ def test_gap_accessory_uses_description_style_facts_like_equivalent_owned_item()
     )
     policy = build_constraint_policy(ctx, scene)
     index = {item.id: item for item in wardrobe}
+    owned_facts = build_item_facts(index["preppy-beret"])
+    gap_facts = build_item_facts(authoritative_item_or_gap(
+        gap.items[-1], Category.HAT, index,
+    ))
+    assert owned_facts.styles == gap_facts.styles == frozenset({"学院风"})
 
-    assert "D_ACCESSORY_COHERENCE" in validate_outfit_result(
+    owned_codes = validate_outfit_result(
         owned, ctx, scene, index, policy=policy,
     ).error_codes
-    assert "D_ACCESSORY_COHERENCE" in validate_outfit_result(
+    gap_codes = validate_outfit_result(
         gap, ctx, scene, index, policy=policy,
     ).error_codes
+    assert ("D_ACCESSORY_COHERENCE" in owned_codes) is True
+    assert ("D_ACCESSORY_COHERENCE" in owned_codes) == (
+        "D_ACCESSORY_COHERENCE" in gap_codes
+    )
 
 
 def test_body_coverage_and_dress_exclusivity_are_enforced() -> None:
@@ -558,6 +587,18 @@ def test_each_exact_affirmative_term_overrides_only_its_rule() -> None:
         ), query
 
 
+def test_bare_exact_terms_remain_authorized() -> None:
+    cases = (
+        ("三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("衬衫敞开", "D_LAYER_COMPAT"),
+        ("丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("加围巾", "D_ACCESSORY_COHERENCE"),
+    )
+    for query, overridden_rule in cases:
+        ctx, scene, _ = _context(query)
+        assert not build_constraint_policy(ctx, scene).enforces(overridden_rule), query
+
+
 def test_negated_or_ambiguous_queries_keep_new_default_rules_enabled() -> None:
     cases = (
         ("不要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
@@ -582,6 +623,11 @@ def test_negated_or_ambiguous_queries_keep_new_default_rules_enabled() -> None:
         ("不要modern加围巾", "D_ACCESSORY_COHERENCE"),
         ("先别论三层叠穿是否好看", "D_UPPER_LAYER_MAX_TWO"),
         ("别扭头看三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("三层叠穿就不要了", "D_UPPER_LAYER_MAX_TWO"),
+        ("丰富配饰并不需要", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("加围巾就算了", "D_ACCESSORY_COHERENCE"),
+        ("衬衫敞开不要", "D_LAYER_COMPAT"),
+        ("我想告别三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
     )
     for query, code in cases:
         ctx, scene, _ = _context(query)
@@ -611,7 +657,6 @@ def test_non_negating_bie_words_preserve_affirmative_override() -> None:
         "我特别想要三层叠穿",
         "我想区别三层叠穿",
         "我想分别三层叠穿",
-        "我想告别三层叠穿",
         "我想填写性别三层叠穿",
         "我想填写级别三层叠穿",
         "我想填写类别三层叠穿",
@@ -722,6 +767,7 @@ def main() -> None:
     test_layer_facts_are_conservative_and_directional()
     test_only_affirmative_explicit_queries_override_new_default_rules()
     test_each_exact_affirmative_term_overrides_only_its_rule()
+    test_bare_exact_terms_remain_authorized()
     test_negated_or_ambiguous_queries_keep_new_default_rules_enabled()
     test_tebie_is_not_treated_as_the_negation_bie()
     test_independent_bie_in_clause_prefix_is_negation()
