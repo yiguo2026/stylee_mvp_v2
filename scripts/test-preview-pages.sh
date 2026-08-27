@@ -20,6 +20,7 @@ bash "$publisher" deploy "$dist_dir" "$pages_dir" "$preview_path"
 test "$(cat "$pages_dir/index.html")" = 'production-index'
 test "$(cat "$pages_dir/$preview_path/index.html")" = 'preview-index'
 test "$(cat "$pages_dir/$preview_path/_expo/app.js")" = 'preview-bundle'
+test "$(cat "$pages_dir/$preview_path/login/index.html")" = 'preview-index'
 
 if bash "$publisher" deploy "$dist_dir" "$pages_dir" '.'; then
   echo 'unsafe preview path was accepted' >&2

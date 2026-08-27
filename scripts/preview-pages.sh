@@ -40,6 +40,8 @@ if [ "$action" = 'deploy' ]; then
   rm -rf -- "$destination"
   mkdir -p "$destination"
   cp -R "$dist_dir/." "$destination/"
+  mkdir -p "$destination/login"
+  cp "$destination/index.html" "$destination/login/index.html"
   echo "deployed $preview_path"
 else
   rm -rf -- "$destination"

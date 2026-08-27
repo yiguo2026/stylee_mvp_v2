@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/deploy-outfit-preview.yml
       - .stylee-preview-action
+      - scripts/preview-pages.sh
+      - scripts/test-preview-pages.sh
 
 permissions:
   contents: read
