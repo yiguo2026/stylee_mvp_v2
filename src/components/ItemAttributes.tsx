@@ -42,6 +42,15 @@ const ATTR_DEFS: AttrDef[] = [
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
 const CORE_KEYS = ['material', 'fit_type'];
 
+// 非核心属性是否展示，只由用户明确添加过的 manual_fields 决定。
+// 不能再根据字段是否有值推断，否则 AI 识别出的颜色、分类等会未经添加就自动出现。
+function visibleExtraKeys(item: WardrobeItem): string[] {
+  const manualFields = item.ai_recognized_attrs?.manual_fields ?? [];
+  return ATTR_DEFS
+    .filter(d => !d.aiCore && manualFields.includes(d.key) && !!readValue(item, d.key))
+    .map(d => d.key);
+}
+
 // 尺码选项随分类切换：鞋履用鞋码、包袋用容量档位，其余用通用衣服尺码
 const DEFAULT_SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '均码'];
 const SIZE_OPTIONS_BY_CATEGORY: Record<string, string[]> = {
@@ -96,7 +105,7 @@ function toUpdate(key: string, value: string): Partial<WardrobeItem> | null {
     case 'material': return { material: value };
     case 'fit_type': return { fit_type: value };
     case 'brand': return { brand: value };
-    case 'price': { const n = parseFloat(value); return { price: isNaN(n) ? undefined : n }; }
+    case 'price': { const n = parseFloat(value); return { price: isNaN(n) ? null : n }; }
     case 'color': return { color: value };
     case 'category': return { category: value as WardrobeItem['category'] };
     case 'season': return { season: arr as WardrobeItem['season'] };
@@ -159,10 +168,8 @@ export function useItemAttributes(
     });
     return seed;
   });
-  // extras：所有「有值的非核心属性」都要作为已添加的行展示。
-  const [extras, setExtras] = useState<string[]>(() =>
-    ATTR_DEFS.filter(d => !d.aiCore && !!readValue(item, d.key)).map(d => d.key),
-  );
+  // extras：仅展示用户通过「添加属性」明确保存过、且当前仍有值的非核心属性。
+  const [extras, setExtras] = useState<string[]>(() => visibleExtraKeys(item));
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<SheetMode>('edit');
@@ -178,7 +185,7 @@ export function useItemAttributes(
       if (v || CORE_KEYS.includes(d.key)) seed[d.key] = v;
     });
     setValues(seed);
-    setExtras(ATTR_DEFS.filter(d => !d.aiCore && !!readValue(item, d.key)).map(d => d.key));
+    setExtras(visibleExtraKeys(item));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.item_id, item.updated_at]);
 

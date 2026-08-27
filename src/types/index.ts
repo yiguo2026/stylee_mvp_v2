@@ -110,7 +110,7 @@ export interface WardrobeItem {
   color: string;
   material?: string;
   brand?: string;
-  price?: number;
+  price?: number | null;
   images?: string[];      // v2: 多图
   image_url?: string;     // 保留兼容：主图
   source_type: SourceType;
