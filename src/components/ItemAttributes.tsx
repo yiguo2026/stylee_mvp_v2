@@ -247,7 +247,18 @@ export function useItemAttributes(
 
   const handleRemove = (key: string) => {
     setExtras(e => e.filter(k => k !== key));
+    setValues(v => { const n = { ...v }; delete n[key]; return n; });
     if (sheetKey === key) closeSheet();
+    // 真正清空底层值并持久化——否则下次进入 resync 会把仍有值的属性重新读回来展示。
+    const upd = toUpdate(key, '') ?? {};
+    const existing: Record<string, unknown> & {
+      recognized_fields?: string[];
+      manual_fields?: string[];
+    } = { ...(item.ai_recognized_attrs ?? {}) };
+    if (key === 'size') delete existing.size; // size 存在 JSON 列，需显式删除
+    existing.recognized_fields = (existing.recognized_fields ?? []).filter(k => k !== key);
+    existing.manual_fields = (existing.manual_fields ?? []).filter(k => k !== key);
+    onUpdate({ ...upd, ai_recognized_attrs: existing });
   };
 
   const aiBadgeVisible = (key: string) => {
