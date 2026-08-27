@@ -24,3 +24,17 @@ export function visibleBoundsFromAttrs(
 ): OutfitVisibleBounds | undefined {
   return parseOutfitVisibleBounds(attrs?.visible_bounds);
 }
+
+export function mergeReplacementImageAttrs(
+  existingAttrs: Record<string, unknown> | null | undefined,
+  replacementMetadata: object,
+): Record<string, unknown> {
+  const { visible_bounds: _existingVisibleBounds, ...existing } = existingAttrs ?? {};
+  const { visible_bounds: replacementVisibleBounds, ...replacement } = replacementMetadata as Record<string, unknown>;
+  const visibleBounds = parseOutfitVisibleBounds(replacementVisibleBounds);
+  return {
+    ...existing,
+    ...replacement,
+    ...(visibleBounds ? { visible_bounds: visibleBounds } : {}),
+  };
+}

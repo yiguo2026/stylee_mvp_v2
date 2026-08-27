@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
+import { mergeReplacementImageAttrs } from '@/lib/outfitImageMetrics';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
 import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
 import type { RecognitionResult, WardrobeItem } from '@/types';
@@ -144,10 +145,10 @@ export function useGarmentImageReplace(
       setImageUri(finalUrl);
       await updateItem(item.item_id, {
         image_url: finalUrl,
-        ai_recognized_attrs: {
-          ...(item.ai_recognized_attrs ?? {}),
-          ...persistedImage.metadata,
-        },
+        ai_recognized_attrs: mergeReplacementImageAttrs(
+          item.ai_recognized_attrs,
+          persistedImage.metadata,
+        ),
       });
       if (!stillCurrent()) return;
       toast(
