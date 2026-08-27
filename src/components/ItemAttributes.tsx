@@ -42,12 +42,12 @@ const ATTR_DEFS: AttrDef[] = [
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
 const CORE_KEYS = ['material', 'fit_type'];
 
-// 非核心属性是否展示，只由用户明确添加过的 manual_fields 决定。
-// 不能再根据字段是否有值推断，否则 AI 识别出的颜色、分类等会未经添加就自动出现。
+// 非核心属性是否展示，只由「添加属性」入口写入的 display_fields 决定。
+// manual_fields 还包含用户对 AI 属性的修正，不能用它判断用户是否主动添加过该行。
 function visibleExtraKeys(item: WardrobeItem): string[] {
-  const manualFields = item.ai_recognized_attrs?.manual_fields ?? [];
+  const displayFields = item.ai_recognized_attrs?.display_fields ?? [];
   return ATTR_DEFS
-    .filter(d => !d.aiCore && manualFields.includes(d.key) && !!readValue(item, d.key))
+    .filter(d => !d.aiCore && displayFields.includes(d.key) && !!readValue(item, d.key))
     .map(d => d.key);
 }
 
@@ -204,15 +204,19 @@ export function useItemAttributes(
     const existing: Record<string, unknown> & {
       recognized_fields?: string[];
       manual_fields?: string[];
+      display_fields?: string[];
     } = item.ai_recognized_attrs ?? {};
     const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
+    const display_fields = sheetOrigin === 'add' && !CORE_KEYS.includes(key)
+      ? Array.from(new Set([...(existing.display_fields ?? []), key]))
+      : existing.display_fields;
     // size 没有独立数据库列，持久化到已存在的 ai_recognized_attrs JSON 列，
     // 保证离开详情页再进来时仍能读回（配合 store 的乐观更新）。
     const localExtra: Record<string, unknown> = {};
     if (key === 'size') localExtra[key] = value;
     onUpdate({
       ...(upd ?? {}),
-      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields },
+      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields, display_fields },
     });
   };
 
@@ -261,10 +265,12 @@ export function useItemAttributes(
     const existing: Record<string, unknown> & {
       recognized_fields?: string[];
       manual_fields?: string[];
+      display_fields?: string[];
     } = { ...(item.ai_recognized_attrs ?? {}) };
     if (key === 'size') delete existing.size; // size 存在 JSON 列，需显式删除
     existing.recognized_fields = (existing.recognized_fields ?? []).filter(k => k !== key);
     existing.manual_fields = (existing.manual_fields ?? []).filter(k => k !== key);
+    existing.display_fields = (existing.display_fields ?? []).filter(k => k !== key);
     onUpdate({ ...upd, ai_recognized_attrs: existing });
   };
 
