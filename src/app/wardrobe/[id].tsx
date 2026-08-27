@@ -12,19 +12,21 @@ import { supabase } from '@/lib/supabase';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { ItemOutfits } from '@/components/ItemOutfits';
 import { useItemAttributes, ItemAttributesCard, ItemAttributesSheet } from '@/components/ItemAttributes';
+import { useGarmentImageReplace } from '@/hooks/useGarmentImageReplace';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { StyleeGarmentMedia } from '@/design-system';
 import type { GarmentMediaTone } from '@/design-system';
-import { WardrobeItem, RecommendedItem } from '@/types';
+import { WardrobeItem, RecommendedItem, RecognitionResult } from '@/types';
 
 // 详情页主图：以 contain 完整展示单品（不裁切），容器高度按图片真实长宽比自适应，
 // 并限制在合理的最小/最大高度区间内，保证鞋/上装/连衣裙等不同比例都能完整居中显示。
-function HeroMedia({ imageUri, tone, category, onReplace }: {
+function HeroMedia({ imageUri, tone, category, onReplace, processing }: {
   imageUri?: string | null;
   tone: GarmentMediaTone;
   category: string;
   onReplace?: () => void;
+  processing?: boolean;
 }) {
   const [ratio, setRatio] = useState<number | null>(null);
 
@@ -48,8 +50,20 @@ function HeroMedia({ imageUri, tone, category, onReplace }: {
       {imageUri
         ? <StyleeGarmentMedia imageUri={imageUri} tone={tone} />
         : <View style={styles.imagePlaceholder}><CategoryIcon category={category} size={80} color={Colors.walnut2} /></View>}
+      {/* 换图后台标准化的局部处理态浮层：不阻塞用户其它操作 */}
+      {processing ? (
+        <View style={styles.heroProcessing}>
+          <ActivityIndicator size="small" color="#fff" />
+          <Text style={styles.heroProcessingText}>标准化中…</Text>
+        </View>
+      ) : null}
       {onReplace ? (
-        <TouchableOpacity style={styles.replaceBtn} activeOpacity={0.85} onPress={onReplace}>
+        <TouchableOpacity
+          style={styles.replaceBtn}
+          activeOpacity={0.85}
+          onPress={onReplace}
+          disabled={processing}
+        >
           <Text style={styles.replaceBtnText}>换图</Text>
         </TouchableOpacity>
       ) : null}
@@ -274,6 +288,45 @@ function OwnedItemDetail({ item, updateItem, deleteItem }: {
   const [nameDraft, setNameDraft] = useState(item.name);
   const attrModel = useItemAttributes(item, (updates) => updateItem(item.item_id, updates));
 
+  // 重新识别时只回填「当前为空且非用户手动设置」的字段，绝不覆盖用户已编辑的属性，
+  // 并把新识别到的字段标记为 AI 识别（用于展示「AI 识别」角标）。
+  const handleRecognized = (result: RecognitionResult) => {
+    const cur = useWardrobeStore.getState().items.find(i => i.item_id === item.item_id) ?? item;
+    const manual = cur.ai_recognized_attrs?.manual_fields ?? [];
+    const updates: Partial<WardrobeItem> = {};
+    const newlyRecognized: string[] = [];
+    const fill = (key: string, hasValue: boolean, apply: () => void) => {
+      if (!hasValue && !manual.includes(key)) { apply(); newlyRecognized.push(key); }
+    };
+    if (result.color) fill('color', !!cur.color, () => { updates.color = result.color; });
+    if (result.material) fill('material', !!cur.material, () => { updates.material = result.material; });
+    if (result.brand) fill('brand', !!cur.brand, () => { updates.brand = result.brand; });
+    if (result.fit_type) fill('fit_type', !!cur.fit_type, () => { updates.fit_type = result.fit_type; });
+    if (result.season?.length) fill('season', !!cur.season?.length, () => { updates.season = result.season as WardrobeItem['season']; });
+    if (result.occasion_tags?.length) fill('occasion', !!cur.occasion_tags?.length, () => { updates.occasion_tags = result.occasion_tags; });
+
+    if (newlyRecognized.length === 0) return;
+    const existing = cur.ai_recognized_attrs ?? {};
+    const recognized_fields = Array.from(new Set([...(existing.recognized_fields ?? []), ...newlyRecognized]));
+    updateItem(item.item_id, { ...updates, ai_recognized_attrs: { ...existing, recognized_fields } });
+  };
+
+  // 换图：在详情页内直接调起系统相册就地替换（复用编辑页的稳健逻辑，含并发令牌 + mounted 守卫）
+  const imageReplace = useGarmentImageReplace({
+    item,
+    updateItem,
+    context: { category: item.category, color: item.color, material: item.material, description: item.name },
+    recognize: true,
+    onRecognized: handleRecognized,
+    onToast: (msg) => showToast(msg),
+  });
+
+  // store 中 item 变化（例如后台标准化换图完成写回）时，同步主图展示
+  useEffect(() => {
+    imageReplace.setImageUri(item.image_url ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.image_url]);
+
   const handleDelete = () => setShowDeleteConfirm(true);
 
   const saveName = () => {
@@ -313,12 +366,13 @@ function OwnedItemDetail({ item, updateItem, deleteItem }: {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Hero Image —— 右下角「换图」进入图片替换（含重新 AI 识别） */}
+        {/* Hero Image —— 右下角「换图」直接调起系统相册就地替换（含后台标准化 + 重新识别） */}
         <HeroMedia
-          imageUri={item.image_url}
+          imageUri={imageReplace.imageUri || item.image_url}
           tone="owned"
           category={item.category}
-          onReplace={() => router.push(`/wardrobe/edit/${item.item_id}`)}
+          onReplace={imageReplace.pickAndReplace}
+          processing={imageReplace.processing}
         />
 
         {/* Name —— 点击标题即可内联改名，无需另开编辑页 */}
@@ -423,6 +477,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three, paddingVertical: 6,
   },
   replaceBtnText: { ...T.micro, color: '#fff' },
+  // 换图后台标准化的局部处理态浮层
+  heroProcessing: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  heroProcessingText: { ...T.micro, color: '#fff', fontFamily: Fonts.uiSemiBold },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   nameEditHint: { ...T.micro, color: Colors.walnut2, fontSize: 15 },

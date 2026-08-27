@@ -7,6 +7,13 @@ interface WardrobeState {
   isLoading: boolean;
   error: string | null;
 
+  // —— 本次会话的本地乐观改动，用于在 focus 重新拉取云端数据（fetchItems）时把本地
+  // 视为可信来源覆盖回去：demo 环境云端可能鉴权失效/写入被丢弃（例如 price 清空时
+  // supabase.update({price: undefined}) 会在序列化时丢弃 undefined 字段，导致云端从未
+  // 真正清除），若直接用云端旧数据覆盖，就会出现「删除的属性再次进入详情页又出现」。
+  pendingEdits: Record<string, Partial<WardrobeItem>>;
+  deletedIds: string[];
+
   fetchItems: (userId: string) => Promise<void>;
   addItem: (item: Omit<WardrobeItem, 'item_id' | 'created_at' | 'updated_at'>) => Promise<WardrobeItem | null>;
   updateItem: (itemId: string, updates: Partial<WardrobeItem>) => Promise<void>;
@@ -61,6 +68,8 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   items: [],
   isLoading: false,
   error: null,
+  pendingEdits: {},
+  deletedIds: [],
 
   setItems: (items) => set({ items }),
 
@@ -76,17 +85,27 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       if (error) throw error;
       const rawItems = (data ?? []) as WardrobeItem[];
 
+      const { pendingEdits, deletedIds } = get();
+
       // 附加穿搭/收藏次数，但衣橱列表始终保持按最新创建时间倒序展示
-      let items = rawItems;
+      let items = rawItems.filter(it => !deletedIds.includes(it.item_id));
       try {
         const stats = await fetchItemUsageStats(userId);
-        items = rawItems.map(it => {
+        items = items.map(it => {
           const s = stats[it.item_id] ?? { wear: 0, favorite: 0 };
           return { ...it, wear_count: s.wear, favorite_count: s.favorite };
         });
       } catch (statErr) {
         console.warn('[wardrobeStore.fetchItems] usage stats failed:', statErr);
       }
+
+      // 用本次会话的本地乐观改动覆盖云端返回：demo 环境云端写可能失败/被丢弃，
+      // 本地才是这一次会话的可信来源，避免用旧数据把用户的删除/编辑回退掉。
+      items = items.map(it => {
+        const edit = pendingEdits[it.item_id];
+        return edit ? { ...it, ...edit } : it;
+      });
+
       items = sortWardrobeItemsNewestFirst(items);
 
       set({ items });
@@ -128,28 +147,36 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     // 先做乐观本地更新：保证即使云端（Supabase）鉴权异常/离线，
     // 用户在单品详情页的编辑也能即时生效并在本次会话内保留，
     // 避免「加完属性、离开再进来就没了」。
-    const prev = get().items.find(i => i.item_id === itemId);
+    // 同时把改动累加进 pendingEdits，并本地 bump updated_at，
+    // 使 focus 重新 fetchItems 时本地覆盖云端旧值、详情页 resync 也能感知变化。
+    const now = new Date().toISOString();
     set(state => ({
-      items: state.items.map(i => i.item_id === itemId ? { ...i, ...updates } : i),
+      items: state.items.map(i => i.item_id === itemId ? { ...i, ...updates, updated_at: now } : i),
+      pendingEdits: {
+        ...state.pendingEdits,
+        [itemId]: { ...(state.pendingEdits[itemId] ?? {}), ...updates, updated_at: now },
+      },
     }));
     try {
       const { error } = await supabase
         .from('wardrobe_items')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ ...updates, updated_at: now })
         .eq('item_id', itemId);
       if (error) throw error;
     } catch (e: any) {
       // 云端写入失败不回滚本地更改（demo 环境云端可能不可用），仅记录错误
       set({ error: e.message });
-      if (prev) { /* 保留本地乐观更新，不还原 */ }
     }
   },
 
   deleteItem: async (itemId) => {
     // 乐观删除：先从本地列表移除（与 updateItem 的乐观策略一致），
-    // 保证即使云端鉴权异常/离线，用户的删除操作也能即时反映在 UI 上。
-    const prev = get().items;
-    set(state => ({ items: state.items.filter(i => i.item_id !== itemId) }));
+    // 保证即使云端鉴权异常/离线，用户的删除操作也能即时反映在 UI 上，
+    // 并记入 deletedIds，避免 focus 重新 fetchItems 时被云端旧数据「复活」。
+    set(state => ({
+      items: state.items.filter(i => i.item_id !== itemId),
+      deletedIds: state.deletedIds.includes(itemId) ? state.deletedIds : [...state.deletedIds, itemId],
+    }));
     try {
       const { error } = await supabase
         .from('wardrobe_items')
@@ -159,7 +186,6 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     } catch (e: any) {
       // 云端失败不还原本地删除（demo 环境云端可能不可用），仅记录错误
       set({ error: e.message });
-      if (prev) { /* 保留本地乐观删除，不还原 */ }
     }
   },
 

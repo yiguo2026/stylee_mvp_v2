@@ -5,12 +5,9 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useLocalSearchParams, router } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { Colors, Fonts, Spacing, Radius, T } from '@/constants/theme';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
-import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
-import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
-import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
+import { useGarmentImageReplace } from '@/hooks/useGarmentImageReplace';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Toast } from '@/components/Toast';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType } from '@/types';
@@ -53,17 +50,12 @@ export default function EditItemScreen() {
   const [seasons, setSeasons] = useState<string[]>(item?.season ?? []);
   const [occasionTags, setOccasionTags] = useState<string[]>(item?.occasion_tags ?? []);
   const [purchaseDate, setPurchaseDate] = useState(item?.purchase_date ?? '');
-  const [imageUri, setImageUri] = useState(item?.image_url ?? '');
-  const [recognizing, setRecognizing] = useState(false);
-  const [standardizing, setStandardizing] = useState(false);
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
-  const reqTokenRef = useRef(0);
-  const bgTokenRef = useRef(0); // 后台换图任务令牌：连续换图时只认最新一次
   const mountedRef = useRef(true);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,6 +71,26 @@ export default function EditItemScreen() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
 
+  // 换图逻辑复用通用 hook：原图立即生效 + 后台标准化/识别，带并发令牌与 mounted 守卫
+  const imageReplace = useGarmentImageReplace({
+    item,
+    updateItem,
+    context: { category, color, material, description: name || item?.name },
+    recognize: true,
+    onRecognized: (result) => {
+      setCategory(result.category);
+      setColor(result.color);
+      if (result.material) setMaterial(result.material);
+      if (result.brand) setBrand(result.brand);
+      if (result.fit_type) setFitType(result.fit_type);
+      if (result.season?.length) setSeasons(result.season);
+      if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
+      setName((result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`).slice(0, 10));
+    },
+    onToast: showToast,
+  });
+  const { imageUri, standardizing, recognizing } = imageReplace;
+
   useEffect(() => {
     const found = items.find(i => i.item_id === id);
     if (found) {
@@ -93,115 +105,10 @@ export default function EditItemScreen() {
       setSeasons(found.season ?? []);
       setOccasionTags(found.occasion_tags ?? []);
       setPurchaseDate(found.purchase_date ?? '');
-      setImageUri(found.image_url ?? '');
+      imageReplace.setImageUri(found.image_url ?? '');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, items]);
-
-  // 主图识别：识别成功后回填属性；失败/降级不阻断，仅提示
-  const runRecognition = useCallback(async (uri: string) => {
-    const token = ++reqTokenRef.current;
-    setRecognizing(true);
-    try {
-      const { result, meta } = await aiRecognizeClothing(uri);
-      if (reqTokenRef.current !== token) return; // 被更新的图片取代，丢弃旧结果
-      if (!shouldApplyRecognition(meta.ok, 1)) {
-        showToast('照片识别失败，已保留原有信息');
-        return;
-      }
-      setCategory(result.category);
-      setColor(result.color);
-      if (result.material) setMaterial(result.material);
-      if (result.brand) setBrand(result.brand);
-      if (result.fit_type) setFitType(result.fit_type);
-      if (result.season?.length) setSeasons(result.season);
-      if (result.occasion_tags?.length) setOccasionTags(result.occasion_tags);
-      setName((result.style ? `${result.color}${result.category}·${result.style}` : `${result.color}${result.category}`).slice(0, 10));
-      showToast('已根据新照片更新商品信息');
-    } catch (e) {
-      // 兜底：保留原属性，仅提示，不阻断保存
-      if (reqTokenRef.current === token) showToast('照片识别失败，已保留原有信息');
-    } finally {
-      if (reqTokenRef.current === token) setRecognizing(false);
-    }
-  }, [showToast]);
-
-  // 更换主图 → 标准化 + 存图并触发 AI 识别
-  const pickMainImage = async () => {
-    if (!item) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], quality: 0.7, allowsEditing: true,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    const localUri = result.assets[0].uri;
-    if (!shouldPersistReplacementImage(localUri)) return;
-
-    // 换图立即生效：先展示并落地原图，用户可马上继续编辑或直接离开，
-    // 抠图 / 标准化 / 重新识别在后台异步进行，完成后自动替换为透明主图。
-    const token = ++bgTokenRef.current; // 标记本次换图，后台任务只在仍是最新时生效
-    setImageUri(localUri);
-    updateItem(item.item_id, { image_url: localUri });
-    setStandardizing(true);
-    void standardizeInBackground(localUri, token);
-  };
-
-  // 后台异步处理：标准化抠图去背景 + 上传 + 重新识别（不阻塞用户操作）
-  const standardizeInBackground = async (localUri: string, token: number) => {
-    if (!item) return;
-    // 仍是最新一次换图、且组件未卸载时才继续
-    const stillCurrent = () => mountedRef.current && bgTokenRef.current === token;
-    try {
-      const standardizationResult = await aiStandardizeGarment(localUri, category, 'flatlay', {
-        color,
-        material,
-        description: name || item.name,
-      }).catch((error) => {
-        console.warn('[EditItem] aiStandardizeGarment failed:', error);
-        return {
-          url: null,
-          skipped: false as const,
-          acceptance: { ok: false as const, reason: 'missing' as const },
-          meta: { source: 'model-service/error', durationMs: 0, ok: false, requestId: undefined, failedStage: undefined },
-        };
-      });
-      if (!stillCurrent()) return; // 期间又换了新图或已离开，丢弃旧结果
-
-      const persistedImage = await persistGarmentMaster({
-        sourceUri: localUri,
-        userId: item.user_id,
-        photoType: 'flatlay',
-        acceptance: standardizationResult.acceptance,
-        diagnostics: standardizationResult.meta,
-      });
-      if (!stillCurrent()) return;
-      if (!persistedImage.ok) {
-        showToast('背景处理失败，已保留原图');
-        return;
-      }
-
-      const finalUrl = persistedImage.imageUrl;
-      setImageUri(finalUrl);
-      await updateItem(item.item_id, {
-        image_url: finalUrl,
-        ai_recognized_attrs: {
-          ...(item.ai_recognized_attrs ?? {}),
-          ...persistedImage.metadata,
-        },
-      });
-      if (!stillCurrent()) return;
-      showToast(
-        persistedImage.status === 'transparent_master'
-          ? '已完成背景处理'
-          : '背景处理失败，已保留原图',
-      );
-      if (persistedImage.status === 'transparent_master') void runRecognition(finalUrl);
-    } catch (e) {
-      console.warn('[EditItem] standardizeInBackground error:', e);
-      if (stillCurrent()) showToast('背景处理失败，已保留原图');
-    } finally {
-      if (stillCurrent()) setStandardizing(false);
-    }
-  };
 
   const toggleSeason = (id: string) => {
     setSeasons(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
@@ -280,7 +187,7 @@ export default function EditItemScreen() {
             {/* 右下角换图按钮 */}
             <TouchableOpacity
               style={styles.changePhotoFab}
-              onPress={pickMainImage}
+              onPress={imageReplace.pickAndReplace}
               disabled={standardizing || recognizing}
               activeOpacity={0.85}
               hitSlop={8}
