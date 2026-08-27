@@ -115,7 +115,10 @@ export default function ItemDetailScreen() {
         .eq('item_id', id)
         .maybeSingle();
       if (!active) return;
-      if (data) setItem(data as WardrobeItem);
+      if (data) {
+        const pending = useWardrobeStore.getState().pendingEdits[id];
+        setItem({ ...(data as WardrobeItem), ...(pending ?? {}) });
+      }
       else setNotFound(true); // 查不到就给明确空态，避免无限转圈
     })();
     return () => { active = false; };
