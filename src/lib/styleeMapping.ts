@@ -1,4 +1,5 @@
 import type { WardrobeItem, Outfit, OutfitItem, RecommendedItem, RecognitionResult, ClothingCategory, FitType, SleeveLength, PhotoType, DetectedItem, OutfitLayoutRole } from '@/types';
+import type { OutfitVisibleBounds } from './outfitImageMetrics.ts';
 
 export interface RecognizeResp {
   category: string; color: string; material: string; style: string;
@@ -26,6 +27,7 @@ export interface StandardizeResp {
   background?: string;
   alpha_verified?: boolean;
   matte_provider?: string;
+  visible_bounds?: OutfitVisibleBounds;
   failure_stage?: string | null;
   provider?: string;
   trace?: ModelServiceTrace;
