@@ -27,6 +27,43 @@ export interface OutfitCanvasPlacement {
   zIndex: number;
 }
 
+export interface OutfitCanvasImageAspectMeasurement {
+  sourceKey: string;
+  aspectRatio: number;
+}
+
+export type OutfitCanvasImageAspectRegistry = Readonly<Record<
+  string,
+  OutfitCanvasImageAspectMeasurement
+>>;
+
+export function rememberOutfitCanvasImageAspect(
+  current: OutfitCanvasImageAspectRegistry,
+  itemId: string,
+  sourceKey: string,
+  width: number,
+  height: number,
+): OutfitCanvasImageAspectRegistry {
+  if (
+    !Number.isFinite(width)
+    || !Number.isFinite(height)
+    || width <= 0
+    || height <= 0
+  ) return current;
+
+  const aspectRatio = width / height;
+  const previous = current[itemId];
+  if (
+    previous?.sourceKey === sourceKey
+    && Math.abs(previous.aspectRatio - aspectRatio) <= 1e-6
+  ) return current;
+
+  return {
+    ...current,
+    [itemId]: { sourceKey, aspectRatio },
+  };
+}
+
 type PlacementShape = Omit<OutfitCanvasPlacement, 'item' | 'role'>;
 type LayoutEntry = { item: OutfitCanvasLayoutItem; role: OutfitCanvasRole };
 
@@ -249,20 +286,24 @@ function renderedRect(entry: OutfitCanvasPlacement) {
     && Number.isFinite(entry.item.imageAspectRatio)
     && entry.item.imageAspectRatio > 0
     ? entry.item.imageAspectRatio
-    : 1;
+    : null;
 
   let renderedWidth = frameWidth;
   let renderedHeight = frameHeight;
   let imageOffsetY = 0;
   if (hasImage) {
     if (frameWidth > 0 && frameHeight > 0) {
-      const frameAspectRatio = frameWidth / frameHeight;
-      const containedWidth = sourceAspectRatio > frameAspectRatio
-        ? frameWidth
-        : frameHeight * sourceAspectRatio;
-      const containedHeight = sourceAspectRatio > frameAspectRatio
-        ? frameWidth / sourceAspectRatio
-        : frameHeight;
+      let containedWidth = frameWidth;
+      let containedHeight = frameHeight;
+      if (sourceAspectRatio !== null) {
+        const frameAspectRatio = frameWidth / frameHeight;
+        containedWidth = sourceAspectRatio > frameAspectRatio
+          ? frameWidth
+          : frameHeight * sourceAspectRatio;
+        containedHeight = sourceAspectRatio > frameAspectRatio
+          ? frameWidth / sourceAspectRatio
+          : frameHeight;
+      }
       renderedWidth = containedWidth * garmentImageScale(entry.role);
       renderedHeight = containedHeight * garmentImageScale(entry.role);
     } else {

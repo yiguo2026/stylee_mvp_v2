@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Image,
   type ImageSourcePropType,
@@ -15,6 +15,8 @@ import {
   garmentImageScale,
   OUTFIT_CANVAS_ASPECT_RATIO,
   OUTFIT_CANVAS_MIN_HEIGHT,
+  rememberOutfitCanvasImageAspect,
+  type OutfitCanvasImageAspectRegistry,
   type OutfitCanvasLayoutItem,
 } from '@/lib/outfitCanvasLayout';
 import { ds } from './tokens';
@@ -30,6 +32,17 @@ export interface StyleeOutfitCanvasProps {
 
 const percent = (value: number) => `${value}%` as `${number}%`;
 
+const validAspectRatio = (value: unknown): value is number => (
+  typeof value === 'number' && Number.isFinite(value) && value > 0
+);
+
+type PreparedCanvasItem = {
+  layoutItem: OutfitCanvasLayoutItem;
+  originalItem: OutfitCanvasLayoutItem;
+  source: ImageSourcePropType | undefined;
+  sourceKey: string;
+};
+
 export function StyleeOutfitCanvas({
   items,
   selectedItemId,
@@ -38,17 +51,58 @@ export function StyleeOutfitCanvas({
   emptyLabel = '暂无搭配单品',
   style,
 }: StyleeOutfitCanvasProps) {
-  const layout = useMemo(() => buildOutfitCanvasLayout(items), [items]);
+  const [loadedImageAspects, setLoadedImageAspects] = useState<
+    OutfitCanvasImageAspectRegistry
+  >({});
+  const preparedItems = useMemo<PreparedCanvasItem[]>(() => items.map((item) => {
+    const source = item.imageSource
+      ? item.imageSource as ImageSourcePropType
+      : item.imageUri
+        ? { uri: item.imageUri }
+        : undefined;
+    let resolvedSource: ReturnType<typeof Image.resolveAssetSource> | undefined;
+    if (source) {
+      try {
+        resolvedSource = Image.resolveAssetSource(source) ?? undefined;
+      } catch {
+        resolvedSource = undefined;
+      }
+    }
+    const sourceKey = resolvedSource?.uri
+      ?? item.imageUri
+      ?? (typeof item.imageSource === 'number' ? `asset:${item.imageSource}` : `item:${item.id}`);
+    const synchronousAspect = validAspectRatio(resolvedSource?.width)
+      && validAspectRatio(resolvedSource?.height)
+      ? resolvedSource.width / resolvedSource.height
+      : null;
+    const loadedAspect = loadedImageAspects[item.id];
+    const matchingLoadedAspect = loadedAspect?.sourceKey === sourceKey
+      ? loadedAspect.aspectRatio
+      : null;
+    const imageAspectRatio = validAspectRatio(item.imageAspectRatio)
+      ? item.imageAspectRatio
+      : matchingLoadedAspect ?? synchronousAspect;
+    const layoutItem = imageAspectRatio === item.imageAspectRatio
+      ? item
+      : { ...item, imageAspectRatio };
+    return { layoutItem, originalItem: item, source, sourceKey };
+  }), [items, loadedImageAspects]);
+  const layoutItems = useMemo(
+    () => preparedItems.map((entry) => entry.layoutItem),
+    [preparedItems],
+  );
+  const preparedById = useMemo(
+    () => new Map(preparedItems.map((entry) => [entry.layoutItem.id, entry])),
+    [preparedItems],
+  );
+  const layout = useMemo(() => buildOutfitCanvasLayout(layoutItems), [layoutItems]);
 
   return (
     <View accessibilityLabel={accessibilityLabel} style={[styles.canvas, style]}>
       {layout.length === 0 ? <Text style={styles.empty}>{emptyLabel}</Text> : null}
       {layout.map((entry) => {
-        const source = entry.item.imageSource
-          ? entry.item.imageSource as ImageSourcePropType
-          : entry.item.imageUri
-            ? { uri: entry.item.imageUri }
-            : undefined;
+        const preparedItem = preparedById.get(entry.item.id);
+        const source = preparedItem?.source;
         const selected = selectedItemId === entry.item.id;
         const imageOffsetY = garmentImageOffsetY(entry.role);
         return (
@@ -59,7 +113,7 @@ export function StyleeOutfitCanvas({
             accessibilityState={{ selected }}
             disabled={!onItemPress}
             hitSlop={ds.space[2]}
-            onPress={() => onItemPress?.(entry.item)}
+            onPress={() => onItemPress?.(preparedItem?.originalItem ?? entry.item)}
             style={[
               styles.garment,
               {
@@ -76,6 +130,23 @@ export function StyleeOutfitCanvas({
               <Image
                 accessibilityElementsHidden
                 source={source}
+                onLoad={({ nativeEvent }) => {
+                  const width = nativeEvent.source?.width;
+                  const height = nativeEvent.source?.height;
+                  if (
+                    !preparedItem
+                    || !validAspectRatio(width)
+                    || !validAspectRatio(height)
+                    || Math.abs((entry.item.imageAspectRatio ?? 0) - (width / height)) <= 1e-6
+                  ) return;
+                  setLoadedImageAspects((current) => rememberOutfitCanvasImageAspect(
+                    current,
+                    entry.item.id,
+                    preparedItem.sourceKey,
+                    width,
+                    height,
+                  ));
+                }}
                 style={[
                   styles.image,
                   {

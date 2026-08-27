@@ -62,7 +62,10 @@ const baseSeparates = [
 const CANVAS_ASPECT_RATIO = 0.8;
 const MIN_CANVAS_HEIGHT = 360;
 
-function renderedBounds(layout: OutfitCanvasPlacement[]) {
+function renderedBounds(
+  layout: OutfitCanvasPlacement[],
+  loadedAspectRatios: Readonly<Record<string, number>> = {},
+) {
   const rects = layout.map((entry) => {
     const frameLeft = entry.left;
     const frameTop = entry.top / CANVAS_ASPECT_RATIO;
@@ -71,21 +74,27 @@ function renderedBounds(layout: OutfitCanvasPlacement[]) {
     const frameCenterX = frameLeft + frameWidth / 2;
     const frameCenterY = frameTop + frameHeight / 2;
     const hasImage = Boolean(entry.item.imageUri || entry.item.imageSource);
-    const sourceAspect = (
+    const declaredSourceAspect = (
       entry.item as OutfitCanvasLayoutItem & { imageAspectRatio?: number | null }
     ).imageAspectRatio;
-    const safeSourceAspect = typeof sourceAspect === 'number'
+    const loadedSourceAspect = loadedAspectRatios[entry.item.id];
+    const sourceAspect = typeof loadedSourceAspect === 'number'
+      ? loadedSourceAspect
+      : declaredSourceAspect;
+    const hasKnownSourceAspect = typeof sourceAspect === 'number'
       && Number.isFinite(sourceAspect)
-      && sourceAspect > 0
-      ? sourceAspect
-      : 1;
-    const frameAspect = frameWidth / frameHeight;
-    const containedWidth = safeSourceAspect > frameAspect
-      ? frameWidth
-      : frameHeight * safeSourceAspect;
-    const containedHeight = safeSourceAspect > frameAspect
-      ? frameWidth / safeSourceAspect
-      : frameHeight;
+      && sourceAspect > 0;
+    let containedWidth = frameWidth;
+    let containedHeight = frameHeight;
+    if (hasKnownSourceAspect) {
+      const frameAspect = frameWidth / frameHeight;
+      containedWidth = sourceAspect > frameAspect
+        ? frameWidth
+        : frameHeight * sourceAspect;
+      containedHeight = sourceAspect > frameAspect
+        ? frameWidth / sourceAspect
+        : frameHeight;
+    }
     const renderedWidth = hasImage
       ? containedWidth * garmentImageScale(entry.role)
       : frameWidth;
@@ -136,11 +145,15 @@ function renderedBounds(layout: OutfitCanvasPlacement[]) {
   };
 }
 
-function assertSafeAndCentered(bounds: ReturnType<typeof renderedBounds>) {
+function assertInsideSafeInset(bounds: ReturnType<typeof renderedBounds>) {
   assert.ok(bounds.left >= 2 - 1e-6, `left ${bounds.left}`);
   assert.ok(bounds.right <= 98 + 1e-6, `right ${bounds.right}`);
   assert.ok(bounds.top >= 2 - 1e-6, `top ${bounds.top}`);
   assert.ok(bounds.bottom <= 98 + 1e-6, `bottom ${bounds.bottom}`);
+}
+
+function assertSafeAndCentered(bounds: ReturnType<typeof renderedBounds>) {
+  assertInsideSafeInset(bounds);
   assert.ok(Math.abs(bounds.centerX - 50) <= 1e-6, `centerX ${bounds.centerX}`);
   assert.ok(Math.abs(bounds.centerY - 50) <= 1e-6, `centerY ${bounds.centerY}`);
 }
@@ -333,12 +346,67 @@ test('opaque square outerwear rendered with contain stays inside the safe inset'
   const opaqueOuter = {
     ...roleItem('opaque-outer', 'outer'),
     imageUri: 'opaque-square.png',
+    imageAspectRatio: 1,
   } satisfies OutfitCanvasLayoutItem;
   const layout = buildOutfitCanvasLayout([
     opaqueOuter,
     ...baseSeparates,
   ]);
 
+  assertSafeAndCentered(renderedBounds(layout));
+});
+
+test('unknown image ratios conservatively fit portrait garment and wide shoe envelopes', () => {
+  const items = [
+    {
+      ...roleItem('portrait-base', 'base'),
+      imageUri: 'portrait-base.png',
+    },
+    roleItem('portrait-bottom', 'bottom'),
+    {
+      ...roleItem('unknown-wide-shoe', 'shoes'),
+      imageUri: 'unknown-wide-shoe.png',
+    },
+  ];
+
+  const layout = buildOutfitCanvasLayout(items);
+
+  assert.equal(layout.length, items.length);
+  assertSafeAndCentered(renderedBounds(layout));
+  assertInsideSafeInset(renderedBounds(layout, {
+    'portrait-base': 0.5,
+    'unknown-wide-shoe': 2.8,
+  }));
+});
+
+test('loaded portrait and wide image ratios preserve gaps, safety, and center', () => {
+  const items = [
+    {
+      ...roleItem('loaded-portrait-base', 'base'),
+      imageUri: 'loaded-portrait-base.png',
+      imageAspectRatio: 0.5,
+    },
+    roleItem('loaded-bottom', 'bottom'),
+    {
+      ...roleItem('loaded-wide-shoe', 'shoes'),
+      imageUri: 'loaded-wide-shoe.png',
+      imageAspectRatio: 2.8,
+    },
+  ];
+
+  const layout = buildOutfitCanvasLayout(items);
+  const upper = placement(layout, 'loaded-portrait-base');
+  const bottom = placement(layout, 'loaded-bottom');
+  const shoes = placement(layout, 'loaded-wide-shoe');
+
+  assert.deepEqual(
+    new Set(layout.map((entry) => entry.item.id)),
+    new Set(items.map((item) => item.id)),
+  );
+  assert.ok(bottom.top - (upper.top + upper.height) >= 2);
+  assert.ok(bottom.top - (upper.top + upper.height) <= 4);
+  assert.ok(shoes.top - (bottom.top + bottom.height) >= 5);
+  assert.ok(shoes.top - (bottom.top + bottom.height) <= 8);
   assertSafeAndCentered(renderedBounds(layout));
 });
 

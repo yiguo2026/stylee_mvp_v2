@@ -431,7 +431,13 @@ export default function OutfitResultScreen() {
         if (i !== currentIndex) return o;
         const newItems = [
           ...(o.items ?? []),
-          { item_id: saved.item_id, outfit_id: o.outfit_id, display_order: (o.items ?? []).length, item: saved },
+          {
+            item_id: saved.item_id,
+            outfit_id: o.outfit_id,
+            role: rec.role,
+            display_order: (o.items ?? []).length,
+            item: saved,
+          },
         ];
         return { ...o, items: newItems, recommended_items: o.recommended_items?.filter((_, ri) => ri !== idx) };
       }));
