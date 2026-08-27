@@ -419,3 +419,64 @@ test('five generic accessories use distinct micro placements and preserve every 
   assert.ok(accessories.every((entry) => entry.zone === 'micro'));
   assertPairwiseNonOverlapping(accessories);
 });
+
+test('mixed semantic accessory roles share one non-overlapping occupancy map', () => {
+  const items = [
+    dress,
+    shoesRole,
+    roleItem('mixed-hat', 'hat'),
+    roleItem('mixed-scarf', 'scarf'),
+    roleItem('mixed-bag', 'bag'),
+    roleItem('mixed-watch', 'accessory'),
+    roleItem('mixed-brooch', 'accessory'),
+  ];
+  const layout = buildOutfitCanvasLayout(items);
+  const accessories = [
+    placement(layout, 'mixed-hat'),
+    placement(layout, 'mixed-scarf'),
+    placement(layout, 'mixed-bag'),
+    placement(layout, 'mixed-watch'),
+    placement(layout, 'mixed-brooch'),
+  ];
+
+  assert.deepEqual(
+    accessories.map((entry) => entry.zone),
+    ['head', 'neck', 'carry', 'micro', 'micro'],
+  );
+  assertPairwiseNonOverlapping(accessories);
+});
+
+test('candidate exhaustion reflows scarf and five generic accessories without reusing rectangles', () => {
+  const items = [
+    dress,
+    shoesRole,
+    roleItem('rich-scarf', 'scarf'),
+    roleItem('rich-watch', 'accessory'),
+    roleItem('rich-belt', 'accessory'),
+    roleItem('rich-jewelry', 'accessory'),
+    roleItem('rich-gloves', 'accessory'),
+    roleItem('rich-brooch', 'accessory'),
+  ];
+  const layout = buildOutfitCanvasLayout(items);
+
+  assert.equal(layout.length, 8);
+  assert.deepEqual(
+    new Set(layout.map((entry) => entry.item.id)),
+    new Set(items.map((item) => item.id)),
+  );
+  assert.equal(layout.filter((entry) => entry.zone === 'foot').length, 1);
+  assert.equal(placement(layout, 'shoes').zone, 'foot');
+  assert.equal(placement(layout, 'rich-scarf').zone, 'neck');
+  const genericAccessories = [
+    'rich-watch',
+    'rich-belt',
+    'rich-jewelry',
+    'rich-gloves',
+    'rich-brooch',
+  ].map((id) => placement(layout, id));
+  assert.ok(genericAccessories.every((entry) => entry.zone === 'micro'));
+  assertPairwiseNonOverlapping([
+    placement(layout, 'rich-scarf'),
+    ...genericAccessories,
+  ]);
+});

@@ -145,6 +145,58 @@ function peripheralCandidates(primary: PlacementShape): PlacementShape[] {
   ];
 }
 
+function accessoryPlacements(result: OutfitCanvasPlacement[]) {
+  return result.filter((value) => value.zone !== 'core' && value.zone !== 'foot');
+}
+
+function* generatedSideBandCandidates(
+  primary: PlacementShape,
+  predefined: readonly PlacementShape[],
+): Generator<PlacementShape> {
+  const inset = 4;
+  const gap = 4;
+  const verticalStep = primary.height + gap;
+  const lastTop = 100 - inset - primary.height;
+  const topPositions = primary.zone === 'micro'
+    ? Array.from(
+        { length: Math.floor((lastTop - inset) / verticalStep) + 1 },
+        (_, index) => inset + index * verticalStep,
+      )
+    : [...new Set(predefined.map((candidate) => candidate.top))];
+
+  for (let lane = 0; ; lane += 1) {
+    const laneOffset = lane * (primary.width + gap);
+    const leftPositions = lane === 0
+      ? [inset, 100 - inset - primary.width]
+      : [inset - laneOffset, 100 - inset - primary.width + laneOffset];
+    for (const left of leftPositions) {
+      for (const top of topPositions) {
+        yield {
+          ...primary,
+          left,
+          top,
+          rotation: left < 50 ? -Math.abs(primary.rotation) : Math.abs(primary.rotation),
+        };
+      }
+    }
+  }
+}
+
+function firstUnoccupiedAccessoryShape(
+  predefined: readonly PlacementShape[],
+  primary: PlacementShape,
+  result: OutfitCanvasPlacement[],
+) {
+  const occupied = accessoryPlacements(result);
+  for (const candidate of predefined) {
+    if (!occupied.some((value) => overlaps(candidate, value))) return candidate;
+  }
+  for (const candidate of generatedSideBandCandidates(primary, predefined)) {
+    if (!occupied.some((value) => overlaps(candidate, value))) return candidate;
+  }
+  throw new Error('unreachable accessory placement exhaustion');
+}
+
 function placePeripheralRole(
   role: 'hat' | 'scarf' | 'bag',
   entries: LayoutEntry[],
@@ -152,10 +204,7 @@ function placePeripheralRole(
 ) {
   const candidates = peripheralCandidates(ACCESSORY_SHAPES[role]);
   entries.forEach((entry, index) => {
-    const occupied = result.filter((value) => value.zone !== 'core' && value.zone !== 'foot');
-    const shape = candidates.find((candidate) => (
-      !occupied.some((value) => overlaps(candidate, value))
-    )) ?? candidates[index % candidates.length];
+    const shape = firstUnoccupiedAccessoryShape(candidates, ACCESSORY_SHAPES[role], result);
     result.push(placement(entry.item, role, {
       ...shape,
       zIndex: shape.zIndex + index,
@@ -165,10 +214,7 @@ function placePeripheralRole(
 
 function placeMicroEntries(entries: LayoutEntry[], result: OutfitCanvasPlacement[]) {
   entries.forEach((entry, index) => {
-    const occupied = result.filter((value) => value.zone !== 'core' && value.zone !== 'foot');
-    const shape = MICRO_SHAPES.find((candidate) => (
-      !occupied.some((value) => overlaps(candidate, value))
-    )) ?? MICRO_SHAPES[index % MICRO_SHAPES.length];
+    const shape = firstUnoccupiedAccessoryShape(MICRO_SHAPES, MICRO_SHAPES[0], result);
     result.push(placement(entry.item, 'accessory', {
       ...shape,
       zIndex: shape.zIndex + index,
