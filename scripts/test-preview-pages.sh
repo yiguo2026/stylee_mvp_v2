@@ -20,7 +20,15 @@ bash "$publisher" deploy "$dist_dir" "$pages_dir" "$preview_path"
 test "$(cat "$pages_dir/index.html")" = 'production-index'
 test "$(cat "$pages_dir/$preview_path/index.html")" = 'preview-index'
 test "$(cat "$pages_dir/$preview_path/_expo/app.js")" = 'preview-bundle'
-test "$(cat "$pages_dir/$preview_path/login/index.html")" = 'preview-index'
+login_html="$(cat "$pages_dir/$preview_path/login/index.html")"
+case "$login_html" in
+  *"location.replace('/preview/outfit-19/')"*) ;;
+  *)
+    echo 'login deep link does not redirect through the working preview root' >&2
+    exit 1
+    ;;
+esac
+test "$login_html" != 'preview-index'
 
 if bash "$publisher" deploy "$dist_dir" "$pages_dir" '.'; then
   echo 'unsafe preview path was accepted' >&2

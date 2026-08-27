@@ -41,7 +41,19 @@ if [ "$action" = 'deploy' ]; then
   mkdir -p "$destination"
   cp -R "$dist_dir/." "$destination/"
   mkdir -p "$destination/login"
-  cp "$destination/index.html" "$destination/login/index.html"
+  printf '%s\n' \
+    '<!doctype html>' \
+    '<html lang="zh">' \
+    '<head>' \
+    '<meta charset="utf-8">' \
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' \
+    "<meta http-equiv=\"refresh\" content=\"0;url=/$preview_path/\">" \
+    "<script>window.location.replace('/$preview_path/');</script>" \
+    '<title>Stylee Preview</title>' \
+    '</head>' \
+    '<body></body>' \
+    '</html>' \
+    > "$destination/login/index.html"
   echo "deployed $preview_path"
 else
   rm -rf -- "$destination"
