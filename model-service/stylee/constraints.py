@@ -35,6 +35,7 @@ from .outfit_policy import (
     has_style_conflict,
     layer_pair_compatible,
     normalize_style,
+    styles_in_text,
 )
 
 
@@ -175,6 +176,7 @@ def authoritative_item_or_gap(
         id="",
         category=category,
         subcategory=description,
+        style_tags=sorted(styles_in_text(description)),
         source=ItemSource.AI_SUGGEST,
     )
 

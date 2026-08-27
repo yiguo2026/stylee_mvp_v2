@@ -239,6 +239,48 @@ def test_scene_style_exclusion_beats_accessory_style_match() -> None:
     ) is False
 
 
+def test_gap_accessory_uses_description_style_facts_like_equivalent_owned_item() -> None:
+    wardrobe = [
+        _item("minimal-top", Category.TOP, "白色极简衬衫", styles=["极简"]),
+        _item("minimal-bottom", Category.BOTTOM, "黑色极简长裤", styles=["极简"]),
+        _item("formal-shoes", Category.SHOES, "黑色乐福鞋"),
+        _item("preppy-beret", Category.HAT, "学院风贝雷帽", styles=["学院风"]),
+    ]
+    owned = Outfit(items=[
+        _owned(Slot.TORSO, "minimal-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "minimal-bottom"),
+        _owned(Slot.FEET, "formal-shoes"),
+        _owned(Slot.ACCESSORY, "preppy-beret"),
+    ])
+    gap = Outfit(items=[
+        _owned(Slot.TORSO, "minimal-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "minimal-bottom"),
+        _owned(Slot.FEET, "formal-shoes"),
+        _gap(Slot.ACCESSORY, Category.HAT, "学院风贝雷帽"),
+    ])
+    ctx = RequestContext(
+        input_mode=InputMode.NL,
+        wardrobe=wardrobe,
+        weather=Weather(temp_c=22.0),
+        query_text="正式典礼",
+        n=1,
+    )
+    scene = SceneSpec(
+        occasions=["正式"],
+        formality=Formality.FORMAL,
+        style_keywords=["极简"],
+    )
+    policy = build_constraint_policy(ctx, scene)
+    index = {item.id: item for item in wardrobe}
+
+    assert "D_ACCESSORY_COHERENCE" in validate_outfit_result(
+        owned, ctx, scene, index, policy=policy,
+    ).error_codes
+    assert "D_ACCESSORY_COHERENCE" in validate_outfit_result(
+        gap, ctx, scene, index, policy=policy,
+    ).error_codes
+
+
 def test_body_coverage_and_dress_exclusivity_are_enforced() -> None:
     missing_bottom = Outfit(items=[
         _owned(Slot.TORSO, "top-1", LayerRole.BASE),
@@ -483,6 +525,39 @@ def test_only_affirmative_explicit_queries_override_new_default_rules() -> None:
     assert not named.enforces("D_ACCESSORY_COHERENCE")
 
 
+def test_each_exact_affirmative_term_overrides_only_its_rule() -> None:
+    cases = (
+        ("我要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("我要三层穿搭", "D_UPPER_LAYER_MAX_TWO"),
+        ("我要三件叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("我要衬衫敞开", "D_LAYER_COMPAT"),
+        ("我要敞穿衬衫", "D_LAYER_COMPAT"),
+        ("我要丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("我要多配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("我要配饰叠搭", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("我要多件配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("我要戴这顶帽", "D_ACCESSORY_COHERENCE"),
+        ("我要加围巾", "D_ACCESSORY_COHERENCE"),
+        ("我要搭这个包", "D_ACCESSORY_COHERENCE"),
+        ("我要用这件配饰", "D_ACCESSORY_COHERENCE"),
+    )
+    guarded_rules = (
+        "D_UPPER_LAYER_MAX_TWO",
+        "D_LAYER_COMPAT",
+        "D_ACCESSORY_COUNT_MAX_TWO",
+        "D_ACCESSORY_COHERENCE",
+    )
+    for query, overridden_rule in cases:
+        ctx, scene, _ = _context(query)
+        policy = build_constraint_policy(ctx, scene)
+        assert not policy.enforces(overridden_rule), (query, overridden_rule)
+        assert all(
+            policy.enforces(rule)
+            for rule in guarded_rules
+            if rule != overridden_rule
+        ), query
+
+
 def test_negated_or_ambiguous_queries_keep_new_default_rules_enabled() -> None:
     cases = (
         ("不要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
@@ -496,10 +571,95 @@ def test_negated_or_ambiguous_queries_keep_new_default_rules_enabled() -> None:
         ("不要戴这顶帽子", "D_ACCESSORY_COHERENCE"),
         ("不要加围巾", "D_ACCESSORY_COHERENCE"),
         ("勿加围巾", "D_ACCESSORY_COHERENCE"),
+        ("不建议三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("不要考虑三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("别再加围巾", "D_ACCESSORY_COHERENCE"),
+        ("不要太多配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("取消三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("不是不要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("不要oversize三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("不要normal丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("不要modern加围巾", "D_ACCESSORY_COHERENCE"),
+        ("先别论三层叠穿是否好看", "D_UPPER_LAYER_MAX_TWO"),
+        ("别扭头看三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
     )
     for query, code in cases:
         ctx, scene, _ = _context(query)
         assert build_constraint_policy(ctx, scene).enforces(code), (query, code)
+
+
+def test_tebie_is_not_treated_as_the_negation_bie() -> None:
+    cases = (
+        ("我特别想要三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("我特别想要衬衫敞开", "D_LAYER_COMPAT"),
+        ("我特别想要丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+        ("我特别想加围巾", "D_ACCESSORY_COHERENCE"),
+    )
+    for query, overridden_rule in cases:
+        ctx, scene, _ = _context(query)
+        assert not build_constraint_policy(ctx, scene).enforces(overridden_rule), query
+
+
+def test_independent_bie_in_clause_prefix_is_negation() -> None:
+    for query in ("最好别加围巾", "先别加围巾", "还是别加围巾", "能别加围巾吗"):
+        ctx, scene, _ = _context(query)
+        assert build_constraint_policy(ctx, scene).enforces("D_ACCESSORY_COHERENCE"), query
+
+
+def test_non_negating_bie_words_preserve_affirmative_override() -> None:
+    queries = (
+        "我特别想要三层叠穿",
+        "我想区别三层叠穿",
+        "我想分别三层叠穿",
+        "我想告别三层叠穿",
+        "我想填写性别三层叠穿",
+        "我想填写级别三层叠穿",
+        "我想填写类别三层叠穿",
+        "我想识别三层叠穿",
+        "我想个别三层叠穿",
+        "我想别致三层叠穿",
+        "我想别样三层叠穿",
+    )
+    for query in queries:
+        ctx, scene, _ = _context(query)
+        assert not build_constraint_policy(ctx, scene).enforces("D_UPPER_LAYER_MAX_TWO"), query
+
+
+def test_extended_bie_lexical_forms_preserve_affirmative_overrides() -> None:
+    reviewer_probes = (
+        ("我想要有差别的三层叠穿", "D_UPPER_LAYER_MAX_TWO"),
+        ("我想辨别后再加围巾", "D_ACCESSORY_COHERENCE"),
+        ("我想甄别后再丰富配饰", "D_ACCESSORY_COUNT_MAX_TWO"),
+    )
+    for query, overridden_rule in reviewer_probes:
+        ctx, scene, _ = _context(query)
+        assert not build_constraint_policy(ctx, scene).enforces(overridden_rule), query
+
+    compounds = ("永别", "道别", "派别", "鉴别", "判别")
+    for compound in compounds:
+        ctx, scene, _ = _context(f"我想{compound}三层叠穿")
+        assert not build_constraint_policy(ctx, scene).enforces("D_UPPER_LAYER_MAX_TWO"), compound
+
+    for follower in ("的", "人", "处", "名", "国", "家", "类", "致", "样"):
+        ctx, scene, _ = _context(f"我想别{follower}三层叠穿")
+        assert not build_constraint_policy(ctx, scene).enforces("D_UPPER_LAYER_MAX_TWO"), follower
+
+    for query in (
+        "我想另当别论后再三层叠穿",
+        "我觉得衣服很别扭但想要三层叠穿",
+    ):
+        ctx, scene, _ = _context(query)
+        assert not build_constraint_policy(ctx, scene).enforces("D_UPPER_LAYER_MAX_TWO"), query
+
+
+def test_newline_and_carriage_return_start_a_new_override_clause() -> None:
+    for query in ("不要加围巾\n我要加围巾", "不要加围巾\r我要加围巾"):
+        ctx, scene, _ = _context(query)
+        assert not build_constraint_policy(ctx, scene).enforces("D_ACCESSORY_COHERENCE"), query
+
+    for query in ("不要加围巾\n不要加围巾", "不要加围巾\r不要加围巾"):
+        ctx, scene, _ = _context(query)
+        assert build_constraint_policy(ctx, scene).enforces("D_ACCESSORY_COHERENCE"), query
 
 
 def test_item_facts_preserves_legacy_positional_constructor_order() -> None:
@@ -547,6 +707,7 @@ def main() -> None:
     test_cold_weather_scarf_has_a_functional_positive_signal()
     test_known_formality_conflict_rejects_functional_scarf_gap()
     test_scene_style_exclusion_beats_accessory_style_match()
+    test_gap_accessory_uses_description_style_facts_like_equivalent_owned_item()
     test_body_coverage_and_dress_exclusivity_are_enforced()
     test_three_layers_require_explicit_query_and_four_always_fail()
     test_layer_role_structure_is_absolute()
@@ -560,7 +721,13 @@ def main() -> None:
     test_weather_default_is_disabled_only_by_explicit_query()
     test_layer_facts_are_conservative_and_directional()
     test_only_affirmative_explicit_queries_override_new_default_rules()
+    test_each_exact_affirmative_term_overrides_only_its_rule()
     test_negated_or_ambiguous_queries_keep_new_default_rules_enabled()
+    test_tebie_is_not_treated_as_the_negation_bie()
+    test_independent_bie_in_clause_prefix_is_negation()
+    test_non_negating_bie_words_preserve_affirmative_override()
+    test_extended_bie_lexical_forms_preserve_affirmative_overrides()
+    test_newline_and_carriage_return_start_a_new_override_clause()
     test_item_facts_preserves_legacy_positional_constructor_order()
     test_unknown_default_facts_warn_instead_of_rejecting()
     print("ok")

@@ -268,12 +268,64 @@ _NEGATED_REQUEST_PREFIXES = (
     "无需",
     "避免",
     "拒绝",
+    "取消",
     "禁止",
     "别",
     "勿",
     "莫",
     "不",
 )
+_CLAUSE_DELIMITERS = frozenset("，,。.!！?？；;：:\n\r")
+_CLAUSE_WIDE_NEGATION_INTENTS = tuple(
+    intent for intent in _NEGATED_REQUEST_PREFIXES if intent != "别"
+)
+_NON_NEGATING_BIE_COMPOUNDS = (
+    "特别", "区别", "分别", "告别", "性别", "级别", "类别", "识别", "个别",
+    "差别", "辨别", "甄别", "永别", "道别", "派别", "鉴别", "判别",
+)
+_NON_NEGATING_BIE_FOLLOWERS = frozenset({
+    "的", "人", "处", "名", "国", "家", "类", "致", "样",
+})
+_NON_NEGATING_BIE_PHRASES = (
+    ("另当别论", 2),
+    ("很别扭", 1),
+)
+
+
+def _clause_prefix(text: str, index: int) -> str:
+    """Return the current punctuation-delimited clause before a request term."""
+    boundary = max((text.rfind(delimiter, 0, index) for delimiter in _CLAUSE_DELIMITERS), default=-1)
+    return text[boundary + 1:index]
+
+
+def _has_bie_negation(prefix: str) -> bool:
+    """Treat independent ``别`` as negation, excluding known lexical words."""
+    for index, char in enumerate(prefix):
+        if char != "别":
+            continue
+        if any(
+            index >= len(word) - 1
+            and prefix[index - len(word) + 1:index + 1] == word
+            for word in _NON_NEGATING_BIE_COMPOUNDS
+        ):
+            continue
+        if any(
+            index >= bie_offset
+            and prefix.startswith(phrase, index - bie_offset)
+            for phrase, bie_offset in _NON_NEGATING_BIE_PHRASES
+        ):
+            continue
+        if index + 1 < len(prefix) and prefix[index + 1] in _NON_NEGATING_BIE_FOLLOWERS:
+            continue
+        return True
+    return False
+
+
+def _has_negation_intent(prefix: str) -> bool:
+    return (
+        any(intent in prefix for intent in _CLAUSE_WIDE_NEGATION_INTENTS)
+        or _has_bie_negation(prefix)
+    )
 
 
 def _has_affirmative_request_term(text: str, terms: tuple[str, ...]) -> bool:
@@ -281,8 +333,8 @@ def _has_affirmative_request_term(text: str, terms: tuple[str, ...]) -> bool:
     for term in terms:
         offset = 0
         while (index := text.find(term, offset)) >= 0:
-            prefix = text[max(0, index - 5):index].rstrip()
-            if not any(prefix.endswith(value) for value in _NEGATED_REQUEST_PREFIXES):
+            prefix = _clause_prefix(text, index)
+            if not _has_negation_intent(prefix):
                 return True
             offset = index + len(term)
     return False
