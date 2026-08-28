@@ -259,22 +259,16 @@ export function useItemAttributes(
 
   const handleRemove = (key: string) => {
     setExtras(e => e.filter(k => k !== key));
-    setValues(v => { const n = { ...v }; delete n[key]; return n; });
     if (sheetKey === key) closeSheet();
-    // 真正清空底层值并持久化——否则下次进入 resync 会把仍有值的属性重新读回来展示。
-    const upd = toUpdate(key, '') ?? {};
+    // × 只控制该属性行是否展示，不删除属性值。
+    // 用户之后重新通过「添加属性」加入时，仍可直接看到并沿用原值。
     const existing: Record<string, unknown> & {
-      recognized_fields?: string[];
-      manual_fields?: string[];
       display_fields?: string[];
       user_added_fields?: string[];
     } = { ...(item.ai_recognized_attrs ?? {}) };
-    if (key === 'size') delete existing.size; // size 存在 JSON 列，需显式删除
-    existing.recognized_fields = (existing.recognized_fields ?? []).filter(k => k !== key);
-    existing.manual_fields = (existing.manual_fields ?? []).filter(k => k !== key);
     existing.display_fields = (existing.display_fields ?? []).filter(k => k !== key);
     existing.user_added_fields = (existing.user_added_fields ?? []).filter(k => k !== key);
-    onUpdate({ ...upd, ai_recognized_attrs: existing });
+    onUpdate({ ai_recognized_attrs: existing });
   };
 
   const aiBadgeVisible = (key: string) => {
