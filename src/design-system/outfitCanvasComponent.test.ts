@@ -3,7 +3,10 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rememberOutfitCanvasImageAspect } from '../lib/outfitCanvasLayout.ts';
+import {
+  rememberOutfitCanvasImageAspect,
+  sourceImageGeometryForVisiblePlacement,
+} from '../lib/outfitCanvasLayout.ts';
 
 test('editorial canvas composes transparent sources without per-item cards', () => {
   const source = readFileSync(
@@ -13,7 +16,7 @@ test('editorial canvas composes transparent sources without per-item cards', () 
   assert.match(source, /buildOutfitCanvasLayout\(layoutItems\)/);
   assert.match(source, /garmentImageScale\(entry\.role\)/);
   assert.match(source, /garmentImageOffsetY\(entry\.role\)/);
-  assert.match(source, /resizeMode="contain"/);
+  assert.match(source, /resizeMode=\{usesVisibleSourceGeometry \? 'stretch' : 'contain'\}/);
   assert.doesNotMatch(source, /\.filter\(/);
   assert.doesNotMatch(source, /accessory-band/);
   assert.doesNotMatch(source, /StyleeGarmentMedia/);
@@ -29,15 +32,40 @@ test('each visible garment remains accessible and has an enlarged touch target',
   assert.match(source, /hitSlop=\{ds\.space\[2\]\}/);
 });
 
-test('canvas resolves local and loaded image dimensions before rebuilding layout', () => {
+test('canvas resolves remote image dimensions and uses source-keyed error fallback', () => {
   const source = readFileSync(
     resolve(dirname(fileURLToPath(import.meta.url)), 'StyleeOutfitCanvas.tsx'),
     'utf8',
   );
-  assert.match(source, /Image\.resolveAssetSource/);
-  assert.match(source, /onLoad=\{/);
+  assert.match(source, /Image\.getSize/);
+  assert.match(source, /requestOutfitImageAspect/);
+  assert.match(source, /onError=\{\(\) =>/);
+  assert.match(source, /markOutfitCanvasImageError/);
+  assert.match(source, /outfitCanvasImageHasError/);
+  assert.match(source, /sourceImageGeometryForVisiblePlacement/);
+  assert.match(source, /resizeMode=\{usesVisibleSourceGeometry \? 'stretch' : 'contain'\}/);
+  assert.match(source, /<View style=\{styles\.placeholder\}>/);
+  assert.doesNotMatch(source, /Image\.resolveAssetSource/);
+  assert.doesNotMatch(source, /nativeEvent\.source/);
   assert.match(source, /buildOutfitCanvasLayout\(layoutItems\)/);
   assert.match(source, /rememberOutfitCanvasImageAspect/);
+});
+
+test('source geometry has a conservative full-frame fallback for legacy image rendering', () => {
+  assert.deepEqual(
+    sourceImageGeometryForVisiblePlacement({
+      item: { id: 'legacy', name: 'Legacy', category: '上装' },
+      role: 'base',
+      zone: 'core',
+      left: 0,
+      top: 0,
+      width: 1,
+      height: 1,
+      rotation: 0,
+      zIndex: 1,
+    }),
+    { left: 0, top: 0, width: 100, height: 100 },
+  );
 });
 
 test('repeated loaded dimensions reuse the same aspect registry object', () => {

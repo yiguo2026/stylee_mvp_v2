@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   type ImageSourcePropType,
@@ -16,9 +16,17 @@ import {
   OUTFIT_CANVAS_ASPECT_RATIO,
   OUTFIT_CANVAS_MIN_HEIGHT,
   rememberOutfitCanvasImageAspect,
+  sourceImageGeometryForVisiblePlacement,
   type OutfitCanvasImageAspectRegistry,
   type OutfitCanvasLayoutItem,
 } from '@/lib/outfitCanvasLayout';
+import { parseOutfitVisibleBounds } from '@/lib/outfitImageMetrics';
+import {
+  markOutfitCanvasImageError,
+  outfitCanvasImageHasError,
+  requestOutfitImageAspect,
+  type OutfitCanvasImageStatusRegistry,
+} from '@/lib/outfitCanvasImageState';
 import { ds } from './tokens';
 
 export interface StyleeOutfitCanvasProps {
@@ -41,7 +49,22 @@ type PreparedCanvasItem = {
   originalItem: OutfitCanvasLayoutItem;
   source: ImageSourcePropType | undefined;
   sourceKey: string;
+  sourceUri?: string;
 };
+
+function imageSourceUri(source: ImageSourcePropType | undefined): string | undefined {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return undefined;
+  const uri = (source as { uri?: unknown }).uri;
+  return typeof uri === 'string' && uri.length > 0 ? uri : undefined;
+}
+
+function isRemoteImageUri(uri: string | undefined): uri is string {
+  return Boolean(uri && /^https?:\/\//i.test(uri));
+}
+
+function hasCompleteVisibleMetrics(item: OutfitCanvasLayoutItem): boolean {
+  return validAspectRatio(item.imageAspectRatio) && Boolean(parseOutfitVisibleBounds(item.visibleBounds));
+}
 
 export function StyleeOutfitCanvas({
   items,
@@ -54,39 +77,71 @@ export function StyleeOutfitCanvas({
   const [loadedImageAspects, setLoadedImageAspects] = useState<
     OutfitCanvasImageAspectRegistry
   >({});
+  const [imageErrors, setImageErrors] = useState<OutfitCanvasImageStatusRegistry>({});
+  const requestedImageDimensions = useRef(new Set<string>());
+  const currentSourceKeys = useRef(new Map<string, string>());
+  const isMounted = useRef(false);
   const preparedItems = useMemo<PreparedCanvasItem[]>(() => items.map((item) => {
     const source = item.imageSource
       ? item.imageSource as ImageSourcePropType
       : item.imageUri
         ? { uri: item.imageUri }
         : undefined;
-    let resolvedSource: ReturnType<typeof Image.resolveAssetSource> | undefined;
-    if (source) {
-      try {
-        resolvedSource = Image.resolveAssetSource(source) ?? undefined;
-      } catch {
-        resolvedSource = undefined;
-      }
-    }
-    const sourceKey = resolvedSource?.uri
+    const sourceUri = imageSourceUri(source);
+    const sourceKey = sourceUri
       ?? item.imageUri
       ?? (typeof item.imageSource === 'number' ? `asset:${item.imageSource}` : `item:${item.id}`);
-    const synchronousAspect = validAspectRatio(resolvedSource?.width)
-      && validAspectRatio(resolvedSource?.height)
-      ? resolvedSource.width / resolvedSource.height
-      : null;
     const loadedAspect = loadedImageAspects[item.id];
     const matchingLoadedAspect = loadedAspect?.sourceKey === sourceKey
       ? loadedAspect.aspectRatio
       : null;
     const imageAspectRatio = validAspectRatio(item.imageAspectRatio)
       ? item.imageAspectRatio
-      : matchingLoadedAspect ?? synchronousAspect;
+      : matchingLoadedAspect;
     const layoutItem = imageAspectRatio === item.imageAspectRatio
       ? item
       : { ...item, imageAspectRatio };
-    return { layoutItem, originalItem: item, source, sourceKey };
+    return { layoutItem, originalItem: item, source, sourceKey, sourceUri };
   }), [items, loadedImageAspects]);
+  currentSourceKeys.current = new Map(preparedItems.map((entry) => [
+    entry.originalItem.id,
+    entry.sourceKey,
+  ]));
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    preparedItems.forEach((entry) => {
+      if (
+        !isRemoteImageUri(entry.sourceUri)
+        || validAspectRatio(entry.originalItem.imageAspectRatio)
+        || validAspectRatio(entry.layoutItem.imageAspectRatio)
+      ) return;
+
+      const requestKey = `${entry.originalItem.id}\u0000${entry.sourceKey}`;
+      if (requestedImageDimensions.current.has(requestKey)) return;
+      requestedImageDimensions.current.add(requestKey);
+
+      void requestOutfitImageAspect(entry.sourceUri, Image.getSize)
+        .then((aspectRatio) => {
+          if (
+            !isMounted.current
+            || currentSourceKeys.current.get(entry.originalItem.id) !== entry.sourceKey
+          ) return;
+          setLoadedImageAspects((current) => rememberOutfitCanvasImageAspect(
+            current,
+            entry.originalItem.id,
+            entry.sourceKey,
+            aspectRatio,
+            1,
+          ));
+        })
+        .catch(() => undefined);
+    });
+  }, [preparedItems]);
   const layoutItems = useMemo(
     () => preparedItems.map((entry) => entry.layoutItem),
     [preparedItems],
@@ -105,6 +160,11 @@ export function StyleeOutfitCanvas({
         const source = preparedItem?.source;
         const selected = selectedItemId === entry.item.id;
         const imageOffsetY = garmentImageOffsetY(entry.role);
+        const usesVisibleSourceGeometry = hasCompleteVisibleMetrics(entry.item);
+        const geometry = sourceImageGeometryForVisiblePlacement(entry);
+        const hasError = preparedItem
+          ? outfitCanvasImageHasError(imageErrors, entry.item.id, preparedItem.sourceKey)
+          : false;
         return (
           <Pressable
             key={entry.item.id}
@@ -126,35 +186,33 @@ export function StyleeOutfitCanvas({
               },
             ]}
           >
-            {source ? (
+            {source && !hasError ? (
               <Image
                 accessibilityElementsHidden
                 source={source}
-                onLoad={({ nativeEvent }) => {
-                  const width = nativeEvent.source?.width;
-                  const height = nativeEvent.source?.height;
-                  if (
-                    !preparedItem
-                    || !validAspectRatio(width)
-                    || !validAspectRatio(height)
-                    || Math.abs((entry.item.imageAspectRatio ?? 0) - (width / height)) <= 1e-6
-                  ) return;
-                  setLoadedImageAspects((current) => rememberOutfitCanvasImageAspect(
+                onError={() => {
+                  if (!preparedItem) return;
+                  setImageErrors((current) => markOutfitCanvasImageError(
                     current,
                     entry.item.id,
                     preparedItem.sourceKey,
-                    width,
-                    height,
                   ));
                 }}
                 style={[
                   styles.image,
-                  {
-                    top: imageOffsetY,
-                    transform: [{ scale: garmentImageScale(entry.role) }],
-                  },
+                  usesVisibleSourceGeometry
+                    ? {
+                      left: percent(geometry.left),
+                      top: percent(geometry.top),
+                      width: percent(geometry.width),
+                      height: percent(geometry.height),
+                    }
+                    : {
+                      top: imageOffsetY,
+                      transform: [{ scale: garmentImageScale(entry.role) }],
+                    },
                 ]}
-                resizeMode="contain"
+                resizeMode={usesVisibleSourceGeometry ? 'stretch' : 'contain'}
               />
             ) : (
               <View style={styles.placeholder}>
@@ -188,8 +246,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: ds.radius.lg,
+    overflow: 'hidden',
   },
   image: {
+    position: 'absolute',
     width: '100%',
     height: '100%',
   },
