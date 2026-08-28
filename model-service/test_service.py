@@ -16,7 +16,7 @@ from scripts.check_outfit_quality_live import validate_outfit as validate_live_o
 from stylee.contracts import (
     Category, InputMode, Sleeve, Fit, Season, BodyShape,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
-    StandardizedImage, WardrobeItem, PhotoType, Slot, RequestContext,
+    StandardizedImage, VisibleBounds, WardrobeItem, PhotoType, Slot, RequestContext,
 )
 
 
@@ -114,6 +114,7 @@ def test_std_to_app():
         alpha_verified=True,
         matte_provider="pillow-border-connected-v1",
         failure_stage=None,
+        visible_bounds=VisibleBounds(0.1, 0.2, 0.5, 0.6),
     )) == {
         "image_ref": "data:image/png;base64,AAAA",
         "mime": "image/png",
@@ -123,7 +124,21 @@ def test_std_to_app():
         "alpha_verified": True,
         "matte_provider": "pillow-border-connected-v1",
         "failure_stage": None,
+        "visible_bounds": {
+            "left": 0.1,
+            "top": 0.2,
+            "width": 0.5,
+            "height": 0.6,
+        },
     }
+
+
+def test_std_to_app_omits_absent_visible_bounds():
+    app = std_to_app(StandardizedImage(
+        image_ref="data:image/png;base64,AAAA",
+        method="img2img_alpha",
+    ))
+    assert "visible_bounds" not in app
 
 
 def test_normalize_multi_item_contract():
@@ -334,6 +349,12 @@ def test_server_smoke():
         assert b["mime"] == "image/png" and b["background"] == "transparent"
         assert b["verified"] is True and b["alpha_verified"] is True
         assert b["matte_provider"] == "mock-alpha-matte-v1" and b["failure_stage"] is None
+        assert b["visible_bounds"] == {
+            "left": 0.0,
+            "top": 0.0,
+            "width": 1.0,
+            "height": 1.0,
+        }
 
         st, b = _post(base + "/standardize",
                       {"image_url": "mock://x", "photo_type": "flat", "item": {"category": "上装"}})
@@ -470,6 +491,7 @@ def main():
     test_outfits_to_app()
     test_ingest_to_app()
     test_std_to_app()
+    test_std_to_app_omits_absent_visible_bounds()
     test_normalize_multi_item_contract()
     test_live_checker_rejects_duplicate_owned_and_recommended_keys()
     test_live_checker_rejects_missing_or_opposite_source_keys()

@@ -16,6 +16,7 @@ import warnings
 
 from PIL import Image, UnidentifiedImageError
 
+from ..contracts import VisibleBounds
 from .base import AlphaMatteProcessor, ImageRefSource
 
 
@@ -54,6 +55,7 @@ class AlphaStats:
     visible_ratio: float
     transparent_border_ratio: float
     visible_bbox: tuple[int, int, int, int]
+    visible_bounds: VisibleBounds
 
 
 @dataclass(frozen=True)
@@ -463,6 +465,12 @@ def validate_alpha_png(data: bytes) -> AlphaStats:
         visible_ratio=visible_ratio,
         transparent_border_ratio=transparent_border_ratio,
         visible_bbox=(left, top, right + 1, bottom + 1),
+        visible_bounds=VisibleBounds(
+            left=left / width,
+            top=top / height,
+            width=(right + 1 - left) / width,
+            height=(bottom + 1 - top) / height,
+        ),
     )
 
 

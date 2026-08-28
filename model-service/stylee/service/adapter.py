@@ -312,4 +312,9 @@ def std_to_app(si) -> dict:
         "alpha_verified": si.alpha_verified,
         "matte_provider": si.matte_provider,
         "failure_stage": si.failure_stage,
+        **(
+            {"visible_bounds": si.visible_bounds.to_dict()}
+            if si.visible_bounds is not None
+            else {}
+        ),
     }

@@ -4,6 +4,7 @@ import struct
 import warnings
 import zlib
 from PIL import Image, ImageDraw
+from stylee.contracts import VisibleBounds
 from stylee.vision.alpha_matte import AlphaMatteError, matte_image_bytes, read_image_ref, validate_alpha_png
 import stylee.vision.alpha_matte as matte
 
@@ -30,6 +31,31 @@ def test_connected_border_is_transparent_but_internal_white_survives():
     assert image.getpixel((0, 0))[3] <= 16
     assert image.getpixel((50, 50))[3] >= 32
     assert result.alpha_verified is True
+
+def test_alpha_stats_expose_normalized_visible_bounds():
+    result = matte_image_bytes(fixture_png())
+    bounds = result.stats.visible_bounds
+    assert 0 <= bounds.left < 1
+    assert 0 <= bounds.top < 1
+    assert 0 < bounds.width <= 1
+    assert 0 < bounds.height <= 1
+    assert bounds.left + bounds.width <= 1
+    assert bounds.top + bounds.height <= 1
+    assert bounds.width == 0.51
+    assert bounds.height == 0.61
+
+def test_visible_bounds_reject_non_finite_or_out_of_range_values():
+    for values in [
+        (-0.1, 0.0, 0.5, 0.5),
+        (0.0, 0.0, 0.0, 0.5),
+        (0.8, 0.0, 0.3, 0.5),
+        (float("nan"), 0.0, 0.5, 0.5),
+    ]:
+        try:
+            VisibleBounds(*values)
+            assert False, values
+        except ValueError:
+            pass
 
 def test_off_white_canvas_fails_validation():
     try:
@@ -246,6 +272,8 @@ def test_provider_remote_read_preserves_input_size_bound():
 
 def main():
     test_connected_border_is_transparent_but_internal_white_survives()
+    test_alpha_stats_expose_normalized_visible_bounds()
+    test_visible_bounds_reject_non_finite_or_out_of_range_values()
     test_off_white_canvas_fails_validation()
     test_data_uri_round_trip()
     test_exact_input_limits_fail_closed()

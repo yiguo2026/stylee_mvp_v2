@@ -10,8 +10,8 @@ import io
 
 from PIL import Image
 
-from ..contracts import WardrobeItem
-from .alpha_matte import AlphaMatteError, AlphaMatteOutput, validate_alpha_png
+from ..contracts import VisibleBounds, WardrobeItem
+from .alpha_matte import AlphaMatteError, AlphaMatteOutput, AlphaStats, validate_alpha_png
 from .base import AlphaMatteProcessor, ImageRefSource, ImageStandardizer, VisionProvider
 
 _FIXED = {
@@ -66,7 +66,14 @@ class MockAlphaMatteProcessor(AlphaMatteProcessor):
             image.save(output, format="PNG", optimize=True)
             png = output.getvalue()
         with _stage(stage_timer, "A2.alpha_validate"):
-            stats = validate_alpha_png(png)
+            validated_stats = validate_alpha_png(png)
+            stats = AlphaStats(
+                transparent_ratio=validated_stats.transparent_ratio,
+                visible_ratio=validated_stats.visible_ratio,
+                transparent_border_ratio=validated_stats.transparent_border_ratio,
+                visible_bbox=validated_stats.visible_bbox,
+                visible_bounds=VisibleBounds(0.0, 0.0, 1.0, 1.0),
+            )
         return AlphaMatteOutput(
             data_uri="data:image/png;base64," + base64.b64encode(png).decode("ascii"),
             mime="image/png",
