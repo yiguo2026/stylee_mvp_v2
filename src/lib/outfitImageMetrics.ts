@@ -1,8 +1,24 @@
+import { PRESET_OUTFIT_IMAGE_METRICS } from '../data/outfitCanvasImageMetrics.generated.ts';
+
 export interface OutfitVisibleBounds {
   left: number;
   top: number;
   width: number;
   height: number;
+}
+
+export interface OutfitImageMetrics {
+  sourceAspectRatio?: number;
+  visibleBounds?: OutfitVisibleBounds;
+}
+
+export function presetOutfitImageMetrics(uri?: string | null): OutfitImageMetrics | undefined {
+  if (!uri) return undefined;
+  const marker = '/preset-items/';
+  const index = uri.indexOf(marker);
+  if (index < 0) return undefined;
+  const key = uri.slice(index).split(/[?#]/, 1)[0];
+  return PRESET_OUTFIT_IMAGE_METRICS[key as keyof typeof PRESET_OUTFIT_IMAGE_METRICS];
 }
 
 const finite = (value: unknown): value is number => (

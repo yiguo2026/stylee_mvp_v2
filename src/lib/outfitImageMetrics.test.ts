@@ -4,6 +4,7 @@ import {
   mergeReplacementImageAttrs,
   parseOutfitVisibleBounds,
   visibleBoundsFromAttrs,
+  presetOutfitImageMetrics,
 } from './outfitImageMetrics.ts';
 
 test('accepts normalized visible bounds', () => {
@@ -63,4 +64,16 @@ test('replacement keeps only its own valid visible bounds', () => {
     },
   );
   assert.equal('visible_bounds' in invalidReplacement, false);
+});
+
+test('resolves generated preset bounds from absolute and base-prefixed URLs', () => {
+  const direct = presetOutfitImageMetrics('/preset-items/black-tshirt.png');
+  const preview = presetOutfitImageMetrics('/preview/outfit-19/preset-items/black-tshirt.png');
+  assert.ok(direct?.visibleBounds);
+  assert.deepEqual(preview, direct);
+  assert.ok(Math.abs((direct?.visibleBounds.width ?? 0) - 0.851) <= 0.01);
+});
+
+test('does not guess metrics for arbitrary remote images', () => {
+  assert.equal(presetOutfitImageMetrics('https://storage.example/user.png'), undefined);
 });

@@ -7,6 +7,11 @@ on:
       - "scripts/generate-design-tokens.mjs"
       - "scripts/check-design-system.mjs"
       - "scripts/check-wardrobe-density.mjs"
+      - "scripts/check-outfit-fixture-alpha.py"
+      - "src/data/outfitCanvasImageMetrics.generated.ts"
+      - "src/lib/outfitImageMetrics.ts"
+      - "src/lib/outfitImageMetrics.test.ts"
+      - "public/preset-items/**"
       - "src/design-system/**"
       - "src/app/**"
       - "src/components/**"
@@ -19,6 +24,11 @@ on:
       - "scripts/generate-design-tokens.mjs"
       - "scripts/check-design-system.mjs"
       - "scripts/check-wardrobe-density.mjs"
+      - "scripts/check-outfit-fixture-alpha.py"
+      - "src/data/outfitCanvasImageMetrics.generated.ts"
+      - "src/lib/outfitImageMetrics.ts"
+      - "src/lib/outfitImageMetrics.test.ts"
+      - "public/preset-items/**"
       - "src/design-system/**"
       - "src/app/**"
       - "src/components/**"
@@ -42,6 +52,16 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install image metric dependency
+        run: python -m pip install -r model-service/requirements.txt
+
+      - name: Verify outfit image metrics
+        run: npm run outfit-metrics:check
 
       - name: Verify generated tokens
         run: npm run tokens:check
