@@ -76,4 +76,10 @@ test('resolves generated preset bounds from absolute and base-prefixed URLs', ()
 
 test('does not guess metrics for arbitrary remote images', () => {
   assert.equal(presetOutfitImageMetrics('https://storage.example/user.png'), undefined);
+  assert.equal(presetOutfitImageMetrics('https://storage.example/preset-items/black-tshirt.png'), undefined);
+  assert.equal(
+    presetOutfitImageMetrics('https://storage.example/user.png?next=/preset-items/black-tshirt.png'),
+    undefined,
+  );
+  assert.equal(presetOutfitImageMetrics('//storage.example/preset-items/black-tshirt.png'), undefined);
 });

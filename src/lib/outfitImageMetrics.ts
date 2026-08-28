@@ -14,10 +14,12 @@ export interface OutfitImageMetrics {
 
 export function presetOutfitImageMetrics(uri?: string | null): OutfitImageMetrics | undefined {
   if (!uri) return undefined;
+  const pathname = uri.split(/[?#]/, 1)[0];
+  if (!pathname.startsWith('/') || pathname.startsWith('//')) return undefined;
   const marker = '/preset-items/';
-  const index = uri.indexOf(marker);
+  const index = pathname.indexOf(marker);
   if (index < 0) return undefined;
-  const key = uri.slice(index).split(/[?#]/, 1)[0];
+  const key = pathname.slice(index);
   return PRESET_OUTFIT_IMAGE_METRICS[key as keyof typeof PRESET_OUTFIT_IMAGE_METRICS];
 }
 
