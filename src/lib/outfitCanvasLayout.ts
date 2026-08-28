@@ -1,5 +1,8 @@
 import type { OutfitLayoutRole } from '@/types';
-import type { OutfitVisibleBounds } from './outfitImageMetrics.ts';
+import {
+  parseOutfitVisibleBounds,
+  type OutfitVisibleBounds,
+} from './outfitImageMetrics.ts';
 
 export type OutfitCanvasRole = OutfitLayoutRole;
 
@@ -124,7 +127,7 @@ const VISIBLE_ENVELOPE: Record<OutfitCanvasRole, { width: number; height: number
 };
 
 const DRESSING_GAP = 3;
-const FOOT_GAP = 6;
+const FOOT_GAP = 7;
 export const OUTFIT_CANVAS_ASPECT_RATIO = 0.8;
 export const OUTFIT_CANVAS_MIN_HEIGHT = 360;
 
@@ -157,17 +160,23 @@ function validImageAspectRatio(value: number | null | undefined): value is numbe
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
+function validVisibleBounds(value: unknown): OutfitVisibleBounds | undefined {
+  return parseOutfitVisibleBounds(value);
+}
+
 function hasVisibleSubjectMetrics(item: OutfitCanvasLayoutItem): item is OutfitCanvasLayoutItem & {
   imageAspectRatio: number;
   visibleBounds: OutfitVisibleBounds;
 } {
-  return validImageAspectRatio(item.imageAspectRatio) && Boolean(item.visibleBounds);
+  return validImageAspectRatio(item.imageAspectRatio) && Boolean(validVisibleBounds(item.visibleBounds));
 }
 
 export function visibleContentAspect(item: OutfitCanvasLayoutItem): number | null {
   const sourceAspect = item.imageAspectRatio;
-  const bounds = item.visibleBounds;
-  if (!sourceAspect || !bounds) return sourceAspect ?? null;
+  if (!validImageAspectRatio(sourceAspect)) return null;
+  if (item.visibleBounds === undefined) return sourceAspect;
+  const bounds = validVisibleBounds(item.visibleBounds);
+  if (!bounds) return null;
   return sourceAspect * bounds.width / bounds.height;
 }
 
@@ -175,9 +184,10 @@ function fitVisibleAspect(role: OutfitCanvasRole, aspect: number | null) {
   const envelope = VISIBLE_ENVELOPE[role];
   if (!aspect || !Number.isFinite(aspect) || aspect <= 0) return envelope;
   const envelopeAspect = envelope.width / envelope.height;
-  return aspect > envelopeAspect
-    ? { width: envelope.width, height: envelope.width / aspect }
-    : { width: envelope.height * aspect, height: envelope.height };
+  const logicalAspect = aspect / OUTFIT_CANVAS_ASPECT_RATIO;
+  return logicalAspect > envelopeAspect
+    ? { width: envelope.width, height: envelope.width / logicalAspect }
+    : { width: envelope.height * logicalAspect, height: envelope.height };
 }
 
 function visibleShapeForEntry(entry: LayoutEntry, fallback: PlacementShape): PlacementShape {
@@ -192,7 +202,7 @@ function visibleShapeForEntry(entry: LayoutEntry, fallback: PlacementShape): Pla
 }
 
 export function sourceImageGeometryForVisiblePlacement(entry: OutfitCanvasPlacement) {
-  const bounds = entry.item.visibleBounds;
+  const bounds = validVisibleBounds(entry.item.visibleBounds);
   if (!bounds || !validImageAspectRatio(entry.item.imageAspectRatio)) {
     return { left: 0, top: 0, width: 100, height: 100 };
   }
@@ -427,6 +437,16 @@ function renderedPlacementBounds(placements: OutfitCanvasPlacement[]) {
   };
 }
 
+function topForRenderedTop(
+  entry: LayoutEntry,
+  shape: PlacementShape,
+  targetTop: number,
+) {
+  const previewShape = visibleShapeForEntry(entry, { ...shape, top: 0 });
+  const preview = placement(entry.item, entry.role, previewShape);
+  return targetTop - renderedRect(preview).top;
+}
+
 function scalePlacementFrames(
   placements: OutfitCanvasPlacement[],
   scale: number,
@@ -552,19 +572,26 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   }
 
   if (dressEntries.length === 0 && bottomEntries.length > 0) {
-    const upperPlacements = [basePlacement, midPlacement]
-      .filter((entry): entry is OutfitCanvasPlacement => Boolean(entry));
-    const upperBottom = upperPlacements.length > 0
-      ? Math.max(...upperPlacements.map((entry) => entry.top + entry.height))
-      : 39;
-    const bottomShape: PlacementShape = {
+    const upperPlacements = result.filter((entry) => (
+      entry.zone === 'core' && (entry.role === 'base' || entry.role === 'mid')
+    ));
+    const bottomTemplate: PlacementShape = {
       zone: 'core',
       left: hasOuter ? 38 : 20,
-      top: upperBottom + DRESSING_GAP,
+      top: 0,
       width: hasOuter ? 44 : 46,
       height: 35,
       rotation: 0,
       zIndex: 4,
+    };
+    const upperBottom = upperPlacements.length > 0
+      ? Math.max(...upperPlacements.map((entry) => renderedRect(entry).bottom))
+      : undefined;
+    const bottomShape: PlacementShape = {
+      ...bottomTemplate,
+      top: upperBottom === undefined
+        ? 42
+        : topForRenderedTop(bottomEntries[0], bottomTemplate, upperBottom + DRESSING_GAP),
     };
     placeCoreEntries(bottomEntries, bottomShape, result);
     bottomPlacement = result.find((entry) => entry.item === bottomEntries[0].item);
@@ -601,18 +628,17 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
 
   const corePlacements = result.filter((entry) => entry.zone === 'core');
   const lowestCoreBottom = corePlacements.length > 0
-    ? Math.max(...corePlacements.map((entry) => entry.top + entry.height))
+    ? Math.max(...corePlacements.map((entry) => renderedRect(entry).bottom))
     : undefined;
   const footAnchor = bottomPlacement ?? dressPlacement ?? basePlacement ?? midPlacement;
   const shoesSize = shoesEntries.length > 0 && hasVisibleSubjectMetrics(shoesEntries[0].item)
     ? fitVisibleAspect('shoes', visibleContentAspect(shoesEntries[0].item))
     : { width: 29, height: 18 };
-  const shoesShape: PlacementShape = footAnchor
+  const shoesTemplate: PlacementShape = footAnchor
     ? {
         zone: 'foot',
         left: footAnchor.left + footAnchor.width / 2 - shoesSize.width / 2,
-        top: (lowestCoreBottom ?? footAnchor.top + footAnchor.height)
-          + (dressPlacement ? 7 : FOOT_GAP),
+        top: 0,
         width: shoesSize.width,
         height: shoesSize.height,
         rotation: hasOuter ? 4 : -4,
@@ -623,6 +649,16 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
         width: shoesSize.width, height: shoesSize.height,
         rotation: -4, zIndex: 9,
       };
+  const shoesShape: PlacementShape = {
+    ...shoesTemplate,
+    top: footAnchor && lowestCoreBottom !== undefined && shoesEntries.length > 0
+      ? topForRenderedTop(
+        shoesEntries[0],
+        shoesTemplate,
+        lowestCoreBottom + (dressPlacement ? 7 : FOOT_GAP),
+      )
+      : shoesTemplate.top,
+  };
   shoesEntries.forEach((entry, index) => {
     const entrySize = hasVisibleSubjectMetrics(entry.item)
       ? fitVisibleAspect('shoes', visibleContentAspect(entry.item))

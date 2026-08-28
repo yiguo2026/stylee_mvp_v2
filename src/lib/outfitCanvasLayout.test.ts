@@ -112,6 +112,88 @@ function assertVisibleSeparateGeometry(
 const CANVAS_ASPECT_RATIO = 0.8;
 const MIN_CANVAS_HEIGHT = 360;
 
+function renderedRectFor(
+  entry: OutfitCanvasPlacement,
+  loadedAspectRatio?: number,
+) {
+  const frameLeft = entry.left;
+  const frameTop = entry.top / CANVAS_ASPECT_RATIO;
+  const frameWidth = entry.width;
+  const frameHeight = entry.height / CANVAS_ASPECT_RATIO;
+  const frameCenterX = frameLeft + frameWidth / 2;
+  const frameCenterY = frameTop + frameHeight / 2;
+  const sourceAspect = loadedAspectRatio ?? entry.item.imageAspectRatio;
+  const bounds = entry.item.visibleBounds;
+  const hasValidBounds = Boolean(
+    bounds
+    && Number.isFinite(bounds.left)
+    && Number.isFinite(bounds.top)
+    && Number.isFinite(bounds.width)
+    && Number.isFinite(bounds.height)
+    && bounds.left >= 0
+    && bounds.top >= 0
+    && bounds.width > 0
+    && bounds.height > 0
+    && bounds.left + bounds.width <= 1
+    && bounds.top + bounds.height <= 1,
+  );
+  const hasVisibleSubject = hasValidBounds
+    && typeof sourceAspect === 'number'
+    && Number.isFinite(sourceAspect)
+    && sourceAspect > 0;
+  const hasImage = Boolean(entry.item.imageUri || entry.item.imageSource);
+  const hasKnownSourceAspect = typeof sourceAspect === 'number'
+    && Number.isFinite(sourceAspect)
+    && sourceAspect > 0;
+
+  let renderedWidth = frameWidth;
+  let renderedHeight = frameHeight;
+  let imageOffset = 0;
+  if (hasImage && !hasVisibleSubject) {
+    let containedWidth = frameWidth;
+    let containedHeight = frameHeight;
+    if (hasKnownSourceAspect) {
+      const frameAspect = frameWidth / frameHeight;
+      containedWidth = sourceAspect > frameAspect
+        ? frameWidth
+        : frameHeight * sourceAspect;
+      containedHeight = sourceAspect > frameAspect
+        ? frameWidth / sourceAspect
+        : frameHeight;
+    }
+    renderedWidth = containedWidth * garmentImageScale(entry.role);
+    renderedHeight = containedHeight * garmentImageScale(entry.role);
+    imageOffset = (garmentImageOffsetY(entry.role) / MIN_CANVAS_HEIGHT * 100)
+      / CANVAS_ASPECT_RATIO;
+  }
+
+  const radians = entry.rotation * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const imageCenterY = frameCenterY + imageOffset;
+  const corners = [
+    [-renderedWidth / 2, -renderedHeight / 2],
+    [renderedWidth / 2, -renderedHeight / 2],
+    [renderedWidth / 2, renderedHeight / 2],
+    [-renderedWidth / 2, renderedHeight / 2],
+  ].map(([offsetX, offsetY]) => {
+    const x = frameCenterX + offsetX;
+    const y = imageCenterY + offsetY;
+    const relativeX = x - frameCenterX;
+    const relativeY = y - frameCenterY;
+    return {
+      x: frameCenterX + relativeX * cosine - relativeY * sine,
+      y: frameCenterY + relativeX * sine + relativeY * cosine,
+    };
+  });
+  return {
+    left: Math.min(...corners.map((corner) => corner.x)),
+    right: Math.max(...corners.map((corner) => corner.x)),
+    top: Math.min(...corners.map((corner) => corner.y)) * CANVAS_ASPECT_RATIO,
+    bottom: Math.max(...corners.map((corner) => corner.y)) * CANVAS_ASPECT_RATIO,
+  };
+}
+
 function renderedBounds(
   layout: OutfitCanvasPlacement[],
   loadedAspectRatios: Readonly<Record<string, number>> = {},
@@ -216,10 +298,6 @@ function assertPairwiseNonOverlapping(entries: OutfitCanvasPlacement[]) {
   });
 }
 
-function visibleSizeTolerance(role: OutfitCanvasRole) {
-  return role === 'bag' ? 0.5 : 0;
-}
-
 function visibleSizeFor(
   role: OutfitCanvasRole,
   alpha: { width: number; height: number },
@@ -258,40 +336,6 @@ function visibleSizeFor(
   };
 }
 
-function assertVisibleRange(
-  role: OutfitCanvasRole,
-  alpha: { width: number; height: number },
-  minWidth: number,
-  maxWidth: number,
-  minHeight: number,
-  maxHeight: number,
-) {
-  const size = visibleSizeFor(role, alpha);
-  const tolerance = visibleSizeTolerance(role);
-  assert.ok(
-    size.width >= minWidth - tolerance && size.width <= maxWidth + tolerance,
-    `${role} width ${size.width}`,
-  );
-  assert.ok(
-    size.height >= minHeight - tolerance && size.height <= maxHeight + tolerance,
-    `${role} height ${size.height}`,
-  );
-}
-
-function assertVisibleWidthRange(
-  role: OutfitCanvasRole,
-  alpha: { width: number; height: number },
-  minWidth: number,
-  maxWidth: number,
-) {
-  const size = visibleSizeFor(role, alpha);
-  const tolerance = visibleSizeTolerance(role);
-  assert.ok(
-    size.width >= minWidth - tolerance && size.width <= maxWidth + tolerance,
-    `${role} width ${size.width}`,
-  );
-}
-
 test('service layout_role wins over ambiguous category text', () => {
   assert.equal(classifyOutfitCanvasRole({
     id: 'x', name: '帽巾单品', category: '帽巾', layoutRole: 'scarf',
@@ -328,9 +372,8 @@ test('every legal 2 through 8 item role set stays complete and centered', () => 
     const layout = buildOutfitCanvasLayout(items);
     assert.deepEqual(new Set(layout.map((x) => x.item.id)), new Set(items.map((x) => x.id)));
     assert.equal(layout.length, items.length);
-    const bounds = placementBounds(layout);
-    assert.ok(bounds.left >= 2 && bounds.right <= 98);
-    assert.ok(bounds.top >= 2 && bounds.bottom <= 98);
+    const bounds = renderedBounds(layout);
+    assertInsideSafeInset(bounds);
     assert.ok(Math.abs(bounds.centerX - 50) <= 1);
     assert.ok(Math.abs(bounds.centerY - 50) <= 1);
   }
@@ -397,7 +440,7 @@ test('visible outer layer leaves the lower garment and shoes separated', () => {
   ]);
   const lower = placement(layout, 'trousers');
   const shoes = placement(layout, 'shoes-with-metrics');
-  const footGap = shoes.top - (lower.top + lower.height);
+  const footGap = renderedRectFor(shoes).top - renderedRectFor(lower).bottom;
   assert.ok(footGap >= 5 && footGap <= 8, `${footGap}`);
   assert.equal(placement(layout, 'outer-with-metrics').role, 'outer');
   assert.equal(lower.role, 'bottom');
@@ -416,11 +459,18 @@ test('visible metric legal 2 through 6 item fixtures remain complete and centere
     const layout = buildOutfitCanvasLayout(items);
     assert.equal(layout.length, items.length);
     assert.deepEqual(new Set(layout.map((entry) => entry.item.id)), new Set(items.map((item) => item.id)));
-    const bounds = placementBounds(layout);
-    assert.ok(bounds.left >= 2 && bounds.right <= 98);
-    assert.ok(bounds.top >= 2 && bounds.bottom <= 98);
+    const rects = layout.map((entry) => renderedRectFor(entry));
+    const bounds = {
+      left: Math.min(...rects.map((entry) => entry.left)),
+      right: Math.max(...rects.map((entry) => entry.right)),
+      top: Math.min(...rects.map((entry) => entry.top)),
+      bottom: Math.max(...rects.map((entry) => entry.bottom)),
+      centerX: (Math.min(...rects.map((entry) => entry.left)) + Math.max(...rects.map((entry) => entry.right))) / 2,
+      centerY: (Math.min(...rects.map((entry) => entry.top)) + Math.max(...rects.map((entry) => entry.bottom))) / 2,
+    };
+    assertInsideSafeInset(bounds);
     assert.ok(Math.abs(bounds.centerX - 50) <= 1, `${bounds.centerX}`);
-    assert.ok(Math.abs(bounds.centerY - 50) <= 1, `${bounds.centerY}`);
+    assert.ok(Math.abs(bounds.centerY - 50) <= 1, `${items.length}: ${bounds.centerY}`);
   }
 });
 
@@ -448,17 +498,94 @@ test('visible content aspect requires both source aspect and visible bounds', ()
   assert.equal(visibleContentAspect({ ...shirt, imageAspectRatio: undefined }), null);
 });
 
-test('fixture alpha ratios land in approved visible size ranges', () => {
-  const alpha = {
-    bag: { width: 0.623, height: 0.847 },
-    hat: { width: 0.847, height: 0.821 },
-    scarf: { width: 0.773, height: 0.847 },
-    shoes: { width: 0.701, height: 0.246 },
-  } as const;
-  assertVisibleRange('bag', alpha.bag, 18, 22, 18, 24);
-  assertVisibleRange('hat', alpha.hat, 14, 18, 10, 15);
-  assertVisibleRange('scarf', alpha.scarf, 14, 18, 18, 26);
-  assertVisibleWidthRange('shoes', alpha.shoes, 20, 25);
+test('visible placements preserve square, non-square, and off-center physical aspects', () => {
+  const visibleSubjects = [
+    metricItem('square-visible', 'base', 1, { left: 0, top: 0, width: 1, height: 1 }),
+    metricItem('wide-visible', 'base', 2, { left: 0, top: 0, width: 1, height: 1 }),
+    metricItem('off-center-visible', 'base', 1.5, { left: 0.2, top: 0.1, width: 0.6, height: 0.8 }),
+  ];
+
+  for (const subject of visibleSubjects) {
+    const entry = placement(buildOutfitCanvasLayout([subject, trousers, shoesWithMetrics]), subject.id);
+    const renderedPhysicalAspect = entry.width * CANVAS_ASPECT_RATIO / entry.height;
+    assert.ok(
+      Math.abs(renderedPhysicalAspect - (visibleContentAspect(subject) ?? 0)) < 1e-6,
+      `${subject.id}: ${renderedPhysicalAspect}`,
+    );
+  }
+});
+
+test('invalid metric bounds and aspects always use conservative full-frame geometry', () => {
+  const invalidBounds = [
+    { left: 0.2, top: 0.2, width: 0, height: 0.5 },
+    { left: 0.2, top: 0.2, width: -0.1, height: 0.5 },
+    { left: Number.NaN, top: 0.2, width: 0.5, height: 0.5 },
+    { left: 0.2, top: Number.POSITIVE_INFINITY, width: 0.5, height: 0.5 },
+    { left: 0.7, top: 0.2, width: 0.5, height: 0.5 },
+    { left: 0.2, top: 0.7, width: 0.5, height: 0.5 },
+    { left: 0.2, top: 0.2, width: undefined, height: 0.5 },
+  ] as unknown as OutfitVisibleBounds[];
+  const invalidAspects = [0, -1, Number.NaN, Number.POSITIVE_INFINITY];
+
+  for (const [index, visibleBounds] of invalidBounds.entries()) {
+    const item = metricItem(`invalid-bounds-${index}`, 'base', 1, visibleBounds);
+    const entry = placement(buildOutfitCanvasLayout([item, trousers]), item.id);
+    assert.equal(visibleContentAspect(item), null);
+    assert.deepEqual(sourceImageGeometryForVisiblePlacement(entry), {
+      left: 0, top: 0, width: 100, height: 100,
+    });
+    assert.ok([entry.left, entry.top, entry.width, entry.height].every(Number.isFinite));
+  }
+
+  for (const [index, imageAspectRatio] of invalidAspects.entries()) {
+    const item = metricItem(`invalid-aspect-${index}`, 'base', imageAspectRatio, shirt.visibleBounds!);
+    const entry = placement(buildOutfitCanvasLayout([item, trousers]), item.id);
+    assert.equal(visibleContentAspect(item), null);
+    assert.deepEqual(sourceImageGeometryForVisiblePlacement(entry), {
+      left: 0, top: 0, width: 100, height: 100,
+    });
+    assert.ok([entry.left, entry.top, entry.width, entry.height].every(Number.isFinite));
+  }
+});
+
+test('duplicate base and duplicate mid layers leave a gap below the lowest rendered upper', () => {
+  for (const role of ['base', 'mid'] as const) {
+    const first = metricItem(`${role}-one`, role, 1, shirt.visibleBounds!);
+    const second = metricItem(`${role}-two`, role, 1, shirt.visibleBounds!);
+    const layout = buildOutfitCanvasLayout([first, second, trousers, shoesWithMetrics]);
+    const uppers = [first.id, second.id].map((id) => renderedRectFor(placement(layout, id)));
+    const lower = renderedRectFor(placement(layout, 'trousers'));
+    const gap = lower.top - Math.max(...uppers.map((entry) => entry.bottom));
+    assert.ok(gap >= 2 && gap <= 4, `${role}: ${gap}`);
+  }
+});
+
+test('mixed metric and legacy garment paths preserve actual rendered subject gaps', () => {
+  const unknownBase = {
+    ...roleItem('unknown-base', 'base'), imageUri: 'unknown-base.png', imageAspectRatio: 1,
+  } satisfies OutfitCanvasLayoutItem;
+  const unknownBottom = {
+    ...roleItem('unknown-bottom', 'bottom'), imageUri: 'unknown-bottom.png', imageAspectRatio: 1,
+  } satisfies OutfitCanvasLayoutItem;
+  const unknownShoes = {
+    ...roleItem('unknown-shoes', 'shoes'), imageUri: 'unknown-shoes.png', imageAspectRatio: 1,
+  } satisfies OutfitCanvasLayoutItem;
+  const cases = [
+    { id: 'known-upper-legacy-lower', upper: shirt, lower: unknownBottom, shoes: shoesWithMetrics },
+    { id: 'legacy-upper-known-lower', upper: unknownBase, lower: trousers, shoes: shoesWithMetrics },
+    { id: 'legacy-shoes', upper: shirt, lower: trousers, shoes: unknownShoes },
+  ];
+
+  for (const fixture of cases) {
+    const layout = buildOutfitCanvasLayout([fixture.upper, fixture.lower, fixture.shoes]);
+    const upper = renderedRectFor(placement(layout, fixture.upper.id));
+    const lower = renderedRectFor(placement(layout, fixture.lower.id));
+    const shoes = renderedRectFor(placement(layout, fixture.shoes.id));
+    const dressingGap = lower.top - upper.bottom;
+    const footGap = shoes.top - lower.bottom;
+    assert.ok(dressingGap >= 2 && dressingGap <= 4, `${fixture.id} dressing: ${dressingGap}`);
+    assert.ok(footGap >= 5 && footGap <= 8, `${fixture.id} foot: ${footGap}`);
+  }
 });
 
 test('square fixture contain geometry models the production canvas aspect ratio', () => {
@@ -468,15 +595,6 @@ test('square fixture contain geometry models the production canvas aspect ratio'
     assert.equal(size.containedWidth, containedSide);
     assert.equal(size.containedHeight, containedSide);
   }
-});
-
-test('only backpack visible-size assertions receive the 0.5 point tolerance', () => {
-  assert.equal(visibleSizeTolerance('bag'), 0.5);
-  for (const role of ['hat', 'scarf', 'shoes', 'accessory'] as const) {
-    assert.equal(visibleSizeTolerance(role), 0);
-  }
-  const backpack = visibleSizeFor('bag', { width: 0.623, height: 0.847 });
-  assert.ok(backpack.width < 18 && backpack.width >= 17.5);
 });
 
 test('opaque square outerwear rendered with contain stays inside the safe inset', () => {
@@ -532,18 +650,18 @@ test('loaded portrait and wide image ratios preserve gaps, safety, and center', 
   ];
 
   const layout = buildOutfitCanvasLayout(items);
-  const upper = placement(layout, 'loaded-portrait-base');
-  const bottom = placement(layout, 'loaded-bottom');
-  const shoes = placement(layout, 'loaded-wide-shoe');
+  const upper = renderedRectFor(placement(layout, 'loaded-portrait-base'));
+  const bottom = renderedRectFor(placement(layout, 'loaded-bottom'));
+  const shoes = renderedRectFor(placement(layout, 'loaded-wide-shoe'));
 
   assert.deepEqual(
     new Set(layout.map((entry) => entry.item.id)),
     new Set(items.map((item) => item.id)),
   );
-  assert.ok(bottom.top - (upper.top + upper.height) >= 2);
-  assert.ok(bottom.top - (upper.top + upper.height) <= 4);
-  assert.ok(shoes.top - (bottom.top + bottom.height) >= 5);
-  assert.ok(shoes.top - (bottom.top + bottom.height) <= 8);
+  assert.ok(bottom.top - upper.bottom >= 2);
+  assert.ok(bottom.top - upper.bottom <= 4);
+  assert.ok(shoes.top - bottom.bottom >= 5);
+  assert.ok(shoes.top - bottom.bottom <= 8);
   assertSafeAndCentered(renderedBounds(layout));
 });
 
