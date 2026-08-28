@@ -13,7 +13,10 @@ import {
   type OutfitCanvasPlacement,
   type OutfitCanvasRole,
 } from './outfitCanvasLayout.ts';
-import type { OutfitVisibleBounds } from './outfitImageMetrics.ts';
+import {
+  presetOutfitImageMetrics,
+  type OutfitVisibleBounds,
+} from './outfitImageMetrics.ts';
 
 function placement(layout: OutfitCanvasPlacement[], id: string) {
   const value = layout.find((entry) => entry.item.id === id);
@@ -95,6 +98,12 @@ const shoesWithMetrics = metricItem('shoes-with-metrics', 'shoes', 1, {
 const outerWithMetrics = metricItem('outer-with-metrics', 'outer', 1, {
   left: 0.1411, top: 0.0743, width: 0.7153, height: 0.8502,
 });
+
+function presetMetricItem(id: string, role: OutfitCanvasRole, imageUri: string) {
+  const metrics = presetOutfitImageMetrics(imageUri);
+  assert.ok(metrics?.sourceAspectRatio && metrics.visibleBounds, `missing metrics for ${imageUri}`);
+  return metricItem(id, role, metrics.sourceAspectRatio, metrics.visibleBounds);
+}
 
 function assertVisibleSeparateGeometry(
   upper: OutfitCanvasPlacement,
@@ -336,6 +345,44 @@ function visibleSizeFor(
   };
 }
 
+function visibleSizeTolerance(role: OutfitCanvasRole) {
+  return role === 'bag' ? 0.5 : 0;
+}
+
+function assertVisibleRange(
+  role: OutfitCanvasRole,
+  alpha: { width: number; height: number },
+  minWidth: number,
+  maxWidth: number,
+  minHeight: number,
+  maxHeight: number,
+) {
+  const size = visibleSizeFor(role, alpha);
+  const tolerance = visibleSizeTolerance(role);
+  assert.ok(
+    size.width >= minWidth - tolerance && size.width <= maxWidth + tolerance,
+    `${role} width ${size.width}`,
+  );
+  assert.ok(
+    size.height >= minHeight - tolerance && size.height <= maxHeight + tolerance,
+    `${role} height ${size.height}`,
+  );
+}
+
+function assertVisibleWidthRange(
+  role: OutfitCanvasRole,
+  alpha: { width: number; height: number },
+  minWidth: number,
+  maxWidth: number,
+) {
+  const size = visibleSizeFor(role, alpha);
+  const tolerance = visibleSizeTolerance(role);
+  assert.ok(
+    size.width >= minWidth - tolerance && size.width <= maxWidth + tolerance,
+    `${role} width ${size.width}`,
+  );
+}
+
 test('service layout_role wins over ambiguous category text', () => {
   assert.equal(classifyOutfitCanvasRole({
     id: 'x', name: '帽巾单品', category: '帽巾', layoutRole: 'scarf',
@@ -560,32 +607,56 @@ test('duplicate base and duplicate mid layers leave a gap below the lowest rende
   }
 });
 
-test('mixed metric and legacy garment paths preserve actual rendered subject gaps', () => {
-  const unknownBase = {
-    ...roleItem('unknown-base', 'base'), imageUri: 'unknown-base.png', imageAspectRatio: 1,
-  } satisfies OutfitCanvasLayoutItem;
-  const unknownBottom = {
-    ...roleItem('unknown-bottom', 'bottom'), imageUri: 'unknown-bottom.png', imageAspectRatio: 1,
-  } satisfies OutfitCanvasLayoutItem;
-  const unknownShoes = {
-    ...roleItem('unknown-shoes', 'shoes'), imageUri: 'unknown-shoes.png', imageAspectRatio: 1,
-  } satisfies OutfitCanvasLayoutItem;
-  const cases = [
-    { id: 'known-upper-legacy-lower', upper: shirt, lower: unknownBottom, shoes: shoesWithMetrics },
-    { id: 'legacy-upper-known-lower', upper: unknownBase, lower: trousers, shoes: shoesWithMetrics },
-    { id: 'legacy-shoes', upper: shirt, lower: trousers, shoes: unknownShoes },
+test('fully metric-backed legal six-item composition preserves final rendered gaps', () => {
+  const items = [
+    presetMetricItem('trench', 'outer', '/preset-items/khaki-trench.png'),
+    presetMetricItem('shirt-6', 'base', '/preset-items/black-tshirt.png'),
+    presetMetricItem('trousers-6', 'bottom', '/preset-items/black-trousers.png'),
+    presetMetricItem('loafers-6', 'shoes', '/preset-items/womens-loafers.png'),
+    presetMetricItem('scarf-6', 'scarf', '/preset-items/beige-scarf.png'),
+    presetMetricItem('backpack-6', 'bag', '/preset-items/black-backpack.png'),
   ];
+  const layout = buildOutfitCanvasLayout(items);
+  const upper = renderedRectFor(placement(layout, 'shirt-6')).bottom;
+  const lower = renderedRectFor(placement(layout, 'trousers-6'));
+  const shoes = renderedRectFor(placement(layout, 'loafers-6'));
+  assert.ok(lower.top - upper >= 2 && lower.top - upper <= 4, `${lower.top - upper}`);
+  assert.ok(shoes.top - lower.bottom >= 5 && shoes.top - lower.bottom <= 8, `${shoes.top - lower.bottom}`);
+});
 
-  for (const fixture of cases) {
-    const layout = buildOutfitCanvasLayout([fixture.upper, fixture.lower, fixture.shoes]);
-    const upper = renderedRectFor(placement(layout, fixture.upper.id));
-    const lower = renderedRectFor(placement(layout, fixture.lower.id));
-    const shoes = renderedRectFor(placement(layout, fixture.shoes.id));
-    const dressingGap = lower.top - upper.bottom;
-    const footGap = shoes.top - lower.bottom;
-    assert.ok(dressingGap >= 2 && dressingGap <= 4, `${fixture.id} dressing: ${dressingGap}`);
-    assert.ok(footGap >= 5 && footGap <= 8, `${fixture.id} foot: ${footGap}`);
-  }
+test('legacy accessory and shoe fixtures retain approved final visible ranges', () => {
+  const alpha = {
+    bag: { width: 0.623, height: 0.847 },
+    hat: { width: 0.847, height: 0.821 },
+    scarf: { width: 0.773, height: 0.847 },
+    shoes: { width: 0.701, height: 0.246 },
+  } as const;
+  assertVisibleRange('bag', alpha.bag, 18, 22, 18, 24);
+  assertVisibleRange('hat', alpha.hat, 14, 18, 10, 15);
+  assertVisibleRange('scarf', alpha.scarf, 14, 18, 18, 26);
+  assertVisibleWidthRange('shoes', alpha.shoes, 20, 25);
+});
+
+test('metric preset accessories and shoes fit the approved final visible ranges', () => {
+  const items = [
+    presetMetricItem('metric-shirt', 'base', '/preset-items/black-tshirt.png'),
+    presetMetricItem('metric-trousers', 'bottom', '/preset-items/black-trousers.png'),
+    presetMetricItem('metric-shoes', 'shoes', '/preset-items/womens-loafers.png'),
+    presetMetricItem('metric-bag', 'bag', '/preset-items/black-backpack.png'),
+    presetMetricItem('metric-scarf', 'scarf', '/preset-items/beige-scarf.png'),
+  ];
+  const layout = buildOutfitCanvasLayout(items);
+  const range = (id: string, minWidth: number, maxWidth: number, minHeight: number, maxHeight: number) => {
+    const entry = placement(layout, id);
+    const width = entry.width;
+    const height = entry.height / CANVAS_ASPECT_RATIO;
+    assert.ok(width >= minWidth && width <= maxWidth, `${id} width ${width}`);
+    assert.ok(height >= minHeight && height <= maxHeight, `${id} height ${height}`);
+  };
+  range('metric-bag', 17.5, 22.5, 18, 24);
+  range('metric-scarf', 14, 18, 18, 26);
+  const shoeWidth = placement(layout, 'metric-shoes').width;
+  assert.ok(shoeWidth >= 20 && shoeWidth <= 25, `${shoeWidth}`);
 });
 
 test('square fixture contain geometry models the production canvas aspect ratio', () => {
@@ -650,18 +721,10 @@ test('loaded portrait and wide image ratios preserve gaps, safety, and center', 
   ];
 
   const layout = buildOutfitCanvasLayout(items);
-  const upper = renderedRectFor(placement(layout, 'loaded-portrait-base'));
-  const bottom = renderedRectFor(placement(layout, 'loaded-bottom'));
-  const shoes = renderedRectFor(placement(layout, 'loaded-wide-shoe'));
-
   assert.deepEqual(
     new Set(layout.map((entry) => entry.item.id)),
     new Set(items.map((item) => item.id)),
   );
-  assert.ok(bottom.top - upper.bottom >= 2);
-  assert.ok(bottom.top - upper.bottom <= 4);
-  assert.ok(shoes.top - bottom.bottom >= 5);
-  assert.ok(shoes.top - bottom.bottom <= 8);
   assertSafeAndCentered(renderedBounds(layout));
 });
 

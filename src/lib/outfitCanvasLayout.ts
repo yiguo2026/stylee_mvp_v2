@@ -120,14 +120,15 @@ const VISIBLE_ENVELOPE: Record<OutfitCanvasRole, { width: number; height: number
   dress: { width: 56, height: 70 },
   bottom: { width: 38, height: 46 },
   shoes: { width: 25, height: 18 },
-  bag: { width: 22, height: 24 },
+  bag: { width: 22, height: 19.2 },
   hat: { width: 18, height: 15 },
   scarf: { width: 18, height: 26 },
   accessory: { width: 12, height: 12 },
 };
 
 const DRESSING_GAP = 3;
-const FOOT_GAP = 7;
+const FOOT_GAP = 6;
+const METRIC_FOOT_GAP = 7;
 export const OUTFIT_CANVAS_ASPECT_RATIO = 0.8;
 export const OUTFIT_CANVAS_MIN_HEIGHT = 360;
 
@@ -575,6 +576,8 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
     const upperPlacements = result.filter((entry) => (
       entry.zone === 'core' && (entry.role === 'base' || entry.role === 'mid')
     ));
+    const usesVisibleDressingGap = [...baseEntries, ...midEntries, ...bottomEntries]
+      .every((entry) => hasVisibleSubjectMetrics(entry.item));
     const bottomTemplate: PlacementShape = {
       zone: 'core',
       left: hasOuter ? 38 : 20,
@@ -585,13 +588,17 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
       zIndex: 4,
     };
     const upperBottom = upperPlacements.length > 0
-      ? Math.max(...upperPlacements.map((entry) => renderedRect(entry).bottom))
+      ? Math.max(...upperPlacements.map((entry) => (
+        usesVisibleDressingGap ? renderedRect(entry).bottom : entry.top + entry.height
+      )))
       : undefined;
     const bottomShape: PlacementShape = {
       ...bottomTemplate,
       top: upperBottom === undefined
         ? 42
-        : topForRenderedTop(bottomEntries[0], bottomTemplate, upperBottom + DRESSING_GAP),
+        : usesVisibleDressingGap
+          ? topForRenderedTop(bottomEntries[0], bottomTemplate, upperBottom + DRESSING_GAP)
+          : upperBottom + DRESSING_GAP,
     };
     placeCoreEntries(bottomEntries, bottomShape, result);
     bottomPlacement = result.find((entry) => entry.item === bottomEntries[0].item);
@@ -627,8 +634,12 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   }
 
   const corePlacements = result.filter((entry) => entry.zone === 'core');
+  const usesVisibleFootGap = shoesEntries.length > 0
+    && [...corePlacements, ...shoesEntries].every((entry) => hasVisibleSubjectMetrics(entry.item));
   const lowestCoreBottom = corePlacements.length > 0
-    ? Math.max(...corePlacements.map((entry) => renderedRect(entry).bottom))
+    ? Math.max(...corePlacements.map((entry) => (
+      usesVisibleFootGap ? renderedRect(entry).bottom : entry.top + entry.height
+    )))
     : undefined;
   const footAnchor = bottomPlacement ?? dressPlacement ?? basePlacement ?? midPlacement;
   const shoesSize = shoesEntries.length > 0 && hasVisibleSubjectMetrics(shoesEntries[0].item)
@@ -652,11 +663,13 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   const shoesShape: PlacementShape = {
     ...shoesTemplate,
     top: footAnchor && lowestCoreBottom !== undefined && shoesEntries.length > 0
-      ? topForRenderedTop(
-        shoesEntries[0],
-        shoesTemplate,
-        lowestCoreBottom + (dressPlacement ? 7 : FOOT_GAP),
-      )
+      ? usesVisibleFootGap
+        ? topForRenderedTop(
+          shoesEntries[0],
+          shoesTemplate,
+          lowestCoreBottom + (dressPlacement ? 7 : METRIC_FOOT_GAP),
+        )
+        : lowestCoreBottom + (dressPlacement ? 7 : FOOT_GAP)
       : shoesTemplate.top,
   };
   shoesEntries.forEach((entry, index) => {
