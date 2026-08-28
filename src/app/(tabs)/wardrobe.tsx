@@ -39,9 +39,8 @@ import { CLOTHING_CATEGORIES_WITH_ALL, ClothingCategory, WardrobeItem } from '@/
 function ItemCard({ item, animateIn = false }: { item: WardrobeItem; animateIn?: boolean }) {
   const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
   const scale = useRef(new Animated.Value(animateIn ? 1.02 : 1)).current;
-  const metadata = `${item.color} · ${item.category}${
-    item.wear_count ? ` · 穿过${item.wear_count}次` : ''
-  }`;
+  const material = item.material?.trim();
+  const metadata = material ? `${item.category} · ${material}` : item.category;
 
   useEffect(() => {
     if (!animateIn) {
