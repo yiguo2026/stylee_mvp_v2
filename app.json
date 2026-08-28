@@ -45,8 +45,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "baseUrl": "/stylee_mvp_v2"
+      "typedRoutes": true
     },
     "extra": {
       "router": {},

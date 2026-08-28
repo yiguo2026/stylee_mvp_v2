@@ -42,15 +42,6 @@ const ATTR_DEFS: AttrDef[] = [
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
 const CORE_KEYS = ['material', 'fit_type'];
 
-// 非核心属性是否展示，只信任新版「添加属性」入口写入的 user_added_fields。
-// 不读取值、manual_fields 或旧 display_fields，避免 AI 识别和历史脏数据让颜色/分类默认出现。
-function visibleExtraKeys(item: WardrobeItem): string[] {
-  const userAddedFields = item.ai_recognized_attrs?.user_added_fields ?? [];
-  return ATTR_DEFS
-    .filter(d => !d.aiCore && userAddedFields.includes(d.key) && !!readValue(item, d.key))
-    .map(d => d.key);
-}
-
 // 尺码选项随分类切换：鞋履用鞋码、包袋用容量档位，其余用通用衣服尺码
 const DEFAULT_SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '均码'];
 const SIZE_OPTIONS_BY_CATEGORY: Record<string, string[]> = {
@@ -105,7 +96,7 @@ function toUpdate(key: string, value: string): Partial<WardrobeItem> | null {
     case 'material': return { material: value };
     case 'fit_type': return { fit_type: value };
     case 'brand': return { brand: value };
-    case 'price': { const n = parseFloat(value); return { price: isNaN(n) ? null : n }; }
+    case 'price': { const n = parseFloat(value); return { price: isNaN(n) ? undefined : n }; }
     case 'color': return { color: value };
     case 'category': return { category: value as WardrobeItem['category'] };
     case 'season': return { season: arr as WardrobeItem['season'] };
@@ -168,8 +159,10 @@ export function useItemAttributes(
     });
     return seed;
   });
-  // extras：仅展示用户通过「添加属性」明确保存过、且当前仍有值的非核心属性。
-  const [extras, setExtras] = useState<string[]>(() => visibleExtraKeys(item));
+  // extras：所有「有值的非核心属性」都要作为已添加的行展示。
+  const [extras, setExtras] = useState<string[]>(() =>
+    ATTR_DEFS.filter(d => !d.aiCore && !!readValue(item, d.key)).map(d => d.key),
+  );
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<SheetMode>('edit');
@@ -185,7 +178,7 @@ export function useItemAttributes(
       if (v || CORE_KEYS.includes(d.key)) seed[d.key] = v;
     });
     setValues(seed);
-    setExtras(visibleExtraKeys(item));
+    setExtras(ATTR_DEFS.filter(d => !d.aiCore && !!readValue(item, d.key)).map(d => d.key));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.item_id, item.updated_at]);
 
@@ -204,20 +197,15 @@ export function useItemAttributes(
     const existing: Record<string, unknown> & {
       recognized_fields?: string[];
       manual_fields?: string[];
-      display_fields?: string[];
-      user_added_fields?: string[];
     } = item.ai_recognized_attrs ?? {};
     const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
-    const user_added_fields = sheetOrigin === 'add' && !CORE_KEYS.includes(key)
-      ? Array.from(new Set([...(existing.user_added_fields ?? []), key]))
-      : existing.user_added_fields;
     // size 没有独立数据库列，持久化到已存在的 ai_recognized_attrs JSON 列，
     // 保证离开详情页再进来时仍能读回（配合 store 的乐观更新）。
     const localExtra: Record<string, unknown> = {};
     if (key === 'size') localExtra[key] = value;
     onUpdate({
       ...(upd ?? {}),
-      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields, user_added_fields },
+      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields },
     });
   };
 
@@ -259,16 +247,18 @@ export function useItemAttributes(
 
   const handleRemove = (key: string) => {
     setExtras(e => e.filter(k => k !== key));
+    setValues(v => { const n = { ...v }; delete n[key]; return n; });
     if (sheetKey === key) closeSheet();
-    // × 只控制该属性行是否展示，不删除属性值。
-    // 用户之后重新通过「添加属性」加入时，仍可直接看到并沿用原值。
+    // 真正清空底层值并持久化——否则下次进入 resync 会把仍有值的属性重新读回来展示。
+    const upd = toUpdate(key, '') ?? {};
     const existing: Record<string, unknown> & {
-      display_fields?: string[];
-      user_added_fields?: string[];
+      recognized_fields?: string[];
+      manual_fields?: string[];
     } = { ...(item.ai_recognized_attrs ?? {}) };
-    existing.display_fields = (existing.display_fields ?? []).filter(k => k !== key);
-    existing.user_added_fields = (existing.user_added_fields ?? []).filter(k => k !== key);
-    onUpdate({ ai_recognized_attrs: existing });
+    if (key === 'size') delete existing.size; // size 存在 JSON 列，需显式删除
+    existing.recognized_fields = (existing.recognized_fields ?? []).filter(k => k !== key);
+    existing.manual_fields = (existing.manual_fields ?? []).filter(k => k !== key);
+    onUpdate({ ...upd, ai_recognized_attrs: existing });
   };
 
   const aiBadgeVisible = (key: string) => {

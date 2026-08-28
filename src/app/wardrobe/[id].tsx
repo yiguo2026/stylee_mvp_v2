@@ -115,10 +115,7 @@ export default function ItemDetailScreen() {
         .eq('item_id', id)
         .maybeSingle();
       if (!active) return;
-      if (data) {
-        const pending = useWardrobeStore.getState().pendingEdits[id];
-        setItem({ ...(data as WardrobeItem), ...(pending ?? {}) });
-      }
+      if (data) setItem(data as WardrobeItem);
       else setNotFound(true); // 查不到就给明确空态，避免无限转圈
     })();
     return () => { active = false; };
@@ -467,10 +464,10 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   deleteBtn: { ...T.buttonSecondary, color: Colors.accent },
   editBtn: { ...T.buttonSecondary, color: Colors.terracotta },
-  content: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.four, gap: Spacing.three },
+  content: { padding: Spacing.four, gap: Spacing.three },
 
   imageWrap: {
-    aspectRatio: 3 / 4, minHeight: 360, maxHeight: 620, borderRadius: Radius.lg, overflow: 'hidden',
+    aspectRatio: 3 / 4, minHeight: 360, maxHeight: 560, borderRadius: Radius.lg, overflow: 'hidden',
     backgroundColor: Colors.paperCard, ...Shadow.two,
   },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
