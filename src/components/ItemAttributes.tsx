@@ -42,12 +42,12 @@ const ATTR_DEFS: AttrDef[] = [
 const DEF_MAP: Record<string, AttrDef> = Object.fromEntries(ATTR_DEFS.map(d => [d.key, d]));
 const CORE_KEYS = ['material', 'fit_type'];
 
-// 非核心属性是否展示，只由「添加属性」入口写入的 display_fields 决定。
-// manual_fields 还包含用户对 AI 属性的修正，不能用它判断用户是否主动添加过该行。
+// 非核心属性是否展示，只信任新版「添加属性」入口写入的 user_added_fields。
+// 不读取值、manual_fields 或旧 display_fields，避免 AI 识别和历史脏数据让颜色/分类默认出现。
 function visibleExtraKeys(item: WardrobeItem): string[] {
-  const displayFields = item.ai_recognized_attrs?.display_fields ?? [];
+  const userAddedFields = item.ai_recognized_attrs?.user_added_fields ?? [];
   return ATTR_DEFS
-    .filter(d => !d.aiCore && displayFields.includes(d.key) && !!readValue(item, d.key))
+    .filter(d => !d.aiCore && userAddedFields.includes(d.key) && !!readValue(item, d.key))
     .map(d => d.key);
 }
 
@@ -205,18 +205,19 @@ export function useItemAttributes(
       recognized_fields?: string[];
       manual_fields?: string[];
       display_fields?: string[];
+      user_added_fields?: string[];
     } = item.ai_recognized_attrs ?? {};
     const manual_fields = Array.from(new Set([...(existing.manual_fields ?? []), key]));
-    const display_fields = sheetOrigin === 'add' && !CORE_KEYS.includes(key)
-      ? Array.from(new Set([...(existing.display_fields ?? []), key]))
-      : existing.display_fields;
+    const user_added_fields = sheetOrigin === 'add' && !CORE_KEYS.includes(key)
+      ? Array.from(new Set([...(existing.user_added_fields ?? []), key]))
+      : existing.user_added_fields;
     // size 没有独立数据库列，持久化到已存在的 ai_recognized_attrs JSON 列，
     // 保证离开详情页再进来时仍能读回（配合 store 的乐观更新）。
     const localExtra: Record<string, unknown> = {};
     if (key === 'size') localExtra[key] = value;
     onUpdate({
       ...(upd ?? {}),
-      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields, display_fields },
+      ai_recognized_attrs: { ...existing, ...localExtra, manual_fields, user_added_fields },
     });
   };
 
@@ -266,11 +267,13 @@ export function useItemAttributes(
       recognized_fields?: string[];
       manual_fields?: string[];
       display_fields?: string[];
+      user_added_fields?: string[];
     } = { ...(item.ai_recognized_attrs ?? {}) };
     if (key === 'size') delete existing.size; // size 存在 JSON 列，需显式删除
     existing.recognized_fields = (existing.recognized_fields ?? []).filter(k => k !== key);
     existing.manual_fields = (existing.manual_fields ?? []).filter(k => k !== key);
     existing.display_fields = (existing.display_fields ?? []).filter(k => k !== key);
+    existing.user_added_fields = (existing.user_added_fields ?? []).filter(k => k !== key);
     onUpdate({ ...upd, ai_recognized_attrs: existing });
   };
 
