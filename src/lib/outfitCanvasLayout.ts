@@ -496,6 +496,27 @@ export function fitAndCenterPlacements(
   }));
 }
 
+function preserveMeasuredPeripheralMinimums(
+  placements: OutfitCanvasPlacement[],
+): OutfitCanvasPlacement[] {
+  return placements.map((entry) => {
+    if (entry.role !== 'bag' || !hasVisibleSubjectMetrics(entry.item) || entry.width >= 17.5) {
+      return entry;
+    }
+    const aspect = visibleContentAspect(entry.item);
+    if (!aspect) return entry;
+    const targetWidth = 17.5;
+    const targetHeight = targetWidth * OUTFIT_CANVAS_ASPECT_RATIO / aspect;
+    if (targetHeight / OUTFIT_CANVAS_ASPECT_RATIO > 24) return entry;
+    return {
+      ...entry,
+      left: entry.left + entry.width - targetWidth,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  });
+}
+
 function placeCoreEntries(
   entries: LayoutEntry[],
   shape: PlacementShape,
@@ -691,5 +712,5 @@ export function buildOutfitCanvasLayout(items: OutfitCanvasLayoutItem[]): Outfit
   placePeripheralRole('bag', entriesFor('bag'), result);
   placeMicroEntries(entriesFor('accessory'), result);
 
-  return fitAndCenterPlacements(result);
+  return preserveMeasuredPeripheralMinimums(fitAndCenterPlacements(result));
 }

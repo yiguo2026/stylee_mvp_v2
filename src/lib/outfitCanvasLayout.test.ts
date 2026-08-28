@@ -622,6 +622,36 @@ test('fully metric-backed legal six-item composition preserves final rendered ga
   const shoes = renderedRectFor(placement(layout, 'loafers-6'));
   assert.ok(lower.top - upper >= 2 && lower.top - upper <= 4, `${lower.top - upper}`);
   assert.ok(shoes.top - lower.bottom >= 5 && shoes.top - lower.bottom <= 8, `${shoes.top - lower.bottom}`);
+  const range = (id: string, minWidth: number, maxWidth: number, minHeight: number, maxHeight: number) => {
+    const entry = placement(layout, id);
+    const width = entry.width;
+    const height = entry.height / CANVAS_ASPECT_RATIO;
+    assert.ok(width >= minWidth && width <= maxWidth, `${id} width ${width}`);
+    assert.ok(height >= minHeight && height <= maxHeight, `${id} height ${height}`);
+  };
+  range('backpack-6', 17.5, 22.5, 18, 24);
+  range('scarf-6', 14, 18, 18, 26);
+  const shoeWidth = placement(layout, 'loafers-6').width;
+  assert.ok(shoeWidth >= 20 && shoeWidth <= 25, `${shoeWidth}`);
+  const backpack = placement(layout, 'backpack-6');
+  assert.ok(
+    Math.abs(
+      backpack.width * CANVAS_ASPECT_RATIO / backpack.height
+      - (visibleContentAspect(backpack.item) ?? 0),
+    ) < 1e-6,
+  );
+  const rects = layout.map((entry) => renderedRectFor(entry));
+  const bounds = {
+    left: Math.min(...rects.map((entry) => entry.left)),
+    right: Math.max(...rects.map((entry) => entry.right)),
+    top: Math.min(...rects.map((entry) => entry.top)),
+    bottom: Math.max(...rects.map((entry) => entry.bottom)),
+    centerX: (Math.min(...rects.map((entry) => entry.left)) + Math.max(...rects.map((entry) => entry.right))) / 2,
+    centerY: (Math.min(...rects.map((entry) => entry.top)) + Math.max(...rects.map((entry) => entry.bottom))) / 2,
+  };
+  assertInsideSafeInset(bounds);
+  assert.ok(Math.abs(bounds.centerX - 50) <= 1, `${bounds.centerX}`);
+  assert.ok(Math.abs(bounds.centerY - 50) <= 1, `${bounds.centerY}`);
 });
 
 test('legacy accessory and shoe fixtures retain approved final visible ranges', () => {
