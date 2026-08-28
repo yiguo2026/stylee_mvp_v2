@@ -467,10 +467,10 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   deleteBtn: { ...T.buttonSecondary, color: Colors.accent },
   editBtn: { ...T.buttonSecondary, color: Colors.terracotta },
-  content: { padding: Spacing.four, gap: Spacing.three },
+  content: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.four, gap: Spacing.three },
 
   imageWrap: {
-    aspectRatio: 3 / 4, minHeight: 360, maxHeight: 560, borderRadius: Radius.lg, overflow: 'hidden',
+    aspectRatio: 3 / 4, minHeight: 360, maxHeight: 620, borderRadius: Radius.lg, overflow: 'hidden',
     backgroundColor: Colors.paperCard, ...Shadow.two,
   },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paperCard },
