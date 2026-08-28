@@ -21,24 +21,21 @@ import {
 import { parseOutfitVisibleBounds } from '@/lib/outfitImageMetrics';
 import {
   commitOutfitCanvasImageSources,
-  finishOutfitCanvasImageRequest,
   markOutfitCanvasImageError,
   outfitCanvasImageAspectFor,
   outfitCanvasImageHasError,
   outfitCanvasImagePresentation,
-  outfitCanvasImageRequestIsCurrent,
-  outfitCanvasImageRequestIsInFlight,
-  outfitCanvasImageRequestKey,
-  outfitCanvasImageRequestNeedsRetry,
   outfitCanvasImageSourceKey,
   outfitCanvasImageUsesVisibleGeometry,
   outfitCanvasRemoteImageUri,
+  planOutfitCanvasImageRequest,
   requestOutfitImageAspect,
   rememberOutfitCanvasImageAspect,
-  startOutfitCanvasImageRequest,
   type OutfitCanvasCommittedSourceRegistry,
   type OutfitCanvasImageAspectCache,
+  type OutfitCanvasImageRequestRegistry,
   type OutfitCanvasImageStatusRegistry,
+  settleOutfitCanvasImageRequest,
 } from '@/lib/outfitCanvasImageState';
 import { ds } from './tokens';
 
@@ -80,7 +77,7 @@ export function StyleeOutfitCanvas({
   const [loadedImageAspects, setLoadedImageAspects] = useState<OutfitCanvasImageAspectCache>({});
   const [imageErrors, setImageErrors] = useState<OutfitCanvasImageStatusRegistry>({});
   const [requestRevision, setRequestRevision] = useState(0);
-  const inFlightImageRequests = useRef<ReadonlySet<string>>(new Set());
+  const imageRequests = useRef<OutfitCanvasImageRequestRegistry>({});
   const committedSources = useRef<OutfitCanvasCommittedSourceRegistry>({});
   const isMounted = useRef(false);
   const preparedItems = useMemo<PreparedCanvasItem[]>(() => items.map((item) => {
@@ -128,52 +125,49 @@ export function StyleeOutfitCanvas({
         || validAspectRatio(entry.layoutItem.imageAspectRatio)
       ) return;
 
-      const requestKey = outfitCanvasImageRequestKey(entry.originalItem.id, entry.sourceKey);
-      if (outfitCanvasImageRequestIsInFlight(inFlightImageRequests.current, requestKey)) return;
-      const generation = committedSources.current[entry.originalItem.id]?.generation;
-      if (!generation || !outfitCanvasImageRequestIsCurrent(
+      const plan = planOutfitCanvasImageRequest(
+        imageRequests.current,
         committedSources.current,
         entry.originalItem.id,
         entry.sourceKey,
-        generation,
-      )) return;
-      inFlightImageRequests.current = startOutfitCanvasImageRequest(
-        inFlightImageRequests.current,
-        requestKey,
       );
+      imageRequests.current = plan.registry;
+      const request = plan.request;
+      if (!request) return;
 
-      let needsRetry = false;
+      let outcome: 'success' | 'failure' = 'failure';
+      let aspectRatio: number | null = null;
       void requestOutfitImageAspect(entry.sourceUri, Image.getSize)
-        .then((aspectRatio) => {
-          const requestIsCurrent = isMounted.current && outfitCanvasImageRequestIsCurrent(
-            committedSources.current,
-            entry.originalItem.id,
-            entry.sourceKey,
-            generation,
-          );
-          if (!requestIsCurrent) {
-            needsRetry = isMounted.current && outfitCanvasImageRequestNeedsRetry(
-              committedSources.current,
-              entry.originalItem.id,
-              entry.sourceKey,
-              generation,
-            );
-            return;
-          }
-          setLoadedImageAspects((current) => rememberOutfitCanvasImageAspect(
-            current,
-            entry.originalItem.id,
-            entry.sourceKey,
-            aspectRatio,
-          ));
-        })
-        .catch(() => undefined)
+        .then(
+          (resolvedAspectRatio) => {
+            outcome = 'success';
+            aspectRatio = resolvedAspectRatio;
+          },
+          () => undefined,
+        )
         .finally(() => {
-          inFlightImageRequests.current = finishOutfitCanvasImageRequest(
-            inFlightImageRequests.current,
-            requestKey,
+          const resolvedAspectRatio = aspectRatio;
+          const requestIsCurrent = isMounted.current && request.generation
+            === committedSources.current[request.itemId]?.generation
+            && request.sourceKey === committedSources.current[request.itemId]?.sourceKey;
+          if (outcome === 'success' && resolvedAspectRatio !== null && requestIsCurrent) {
+            setLoadedImageAspects((current) => rememberOutfitCanvasImageAspect(
+              current,
+              request.itemId,
+              request.sourceKey,
+              resolvedAspectRatio,
+            ));
+          }
+          const settlement = settleOutfitCanvasImageRequest(
+            imageRequests.current,
+            committedSources.current,
+            request,
+            outcome,
           );
-          if (needsRetry && isMounted.current) setRequestRevision((current) => current + 1);
+          imageRequests.current = settlement.registry;
+          if (settlement.scheduleRetry && isMounted.current) {
+            setRequestRevision((current) => current + 1);
+          }
         });
     });
   }, [preparedItems, requestRevision]);

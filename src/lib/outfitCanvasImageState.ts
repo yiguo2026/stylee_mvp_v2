@@ -16,6 +16,18 @@ export type OutfitCanvasCommittedSourceRegistry = Readonly<Record<string, {
   generation: number;
 }>>;
 
+export type OutfitCanvasImageRequestRegistry = Readonly<Record<string, {
+  generation: number;
+  status: 'in_flight' | 'failed';
+}>>;
+
+export interface OutfitCanvasImageRequest {
+  requestKey: string;
+  itemId: string;
+  sourceKey: string;
+  generation: number;
+}
+
 export type OutfitCanvasImagePresentation = 'placeholder' | 'mapped' | 'legacy';
 
 function validAspectRatio(value: unknown): value is number {
@@ -88,31 +100,6 @@ export function outfitCanvasImageRequestKey(itemId: string, sourceKey: string): 
   return outfitCanvasImageCacheKey(itemId, sourceKey);
 }
 
-export function outfitCanvasImageRequestIsInFlight(
-  current: ReadonlySet<string>,
-  requestKey: string,
-): boolean {
-  return current.has(requestKey);
-}
-
-export function startOutfitCanvasImageRequest(
-  current: ReadonlySet<string>,
-  requestKey: string,
-): ReadonlySet<string> {
-  if (current.has(requestKey)) return current;
-  return new Set([...current, requestKey]);
-}
-
-export function finishOutfitCanvasImageRequest(
-  current: ReadonlySet<string>,
-  requestKey: string,
-): ReadonlySet<string> {
-  if (!current.has(requestKey)) return current;
-  const next = new Set(current);
-  next.delete(requestKey);
-  return next;
-}
-
 export function commitOutfitCanvasImageSources(
   current: OutfitCanvasCommittedSourceRegistry,
   entries: readonly { itemId: string; sourceKey: string }[],
@@ -132,7 +119,7 @@ export function commitOutfitCanvasImageSources(
   return changed ? next : current;
 }
 
-export function outfitCanvasImageRequestIsCurrent(
+function requestMatchesCommittedSource(
   current: OutfitCanvasCommittedSourceRegistry,
   itemId: string,
   sourceKey: string,
@@ -142,14 +129,91 @@ export function outfitCanvasImageRequestIsCurrent(
   return committed?.sourceKey === sourceKey && committed.generation === generation;
 }
 
-export function outfitCanvasImageRequestNeedsRetry(
+export function outfitCanvasImageRequestIsCurrent(
   current: OutfitCanvasCommittedSourceRegistry,
   itemId: string,
   sourceKey: string,
   generation: number,
 ): boolean {
+  return requestMatchesCommittedSource(current, itemId, sourceKey, generation);
+}
+
+function committedGenerationForSource(
+  current: OutfitCanvasCommittedSourceRegistry,
+  itemId: string,
+  sourceKey: string,
+): number | null {
   const committed = current[itemId];
-  return committed?.sourceKey === sourceKey && committed.generation !== generation;
+  return committed?.sourceKey === sourceKey ? committed.generation : null;
+}
+
+export function planOutfitCanvasImageRequest(
+  current: OutfitCanvasImageRequestRegistry,
+  committedSources: OutfitCanvasCommittedSourceRegistry,
+  itemId: string,
+  sourceKey: string,
+): { registry: OutfitCanvasImageRequestRegistry; request: OutfitCanvasImageRequest | null } {
+  const generation = committedGenerationForSource(committedSources, itemId, sourceKey);
+  if (generation === null) return { registry: current, request: null };
+
+  const requestKey = outfitCanvasImageRequestKey(itemId, sourceKey);
+  const existing = current[requestKey];
+  if (
+    existing?.generation === generation
+    && (existing.status === 'in_flight' || existing.status === 'failed')
+  ) return { registry: current, request: null };
+  if (existing?.status === 'in_flight') return { registry: current, request: null };
+
+  const request = { requestKey, itemId, sourceKey, generation };
+  return {
+    registry: {
+      ...current,
+      [requestKey]: { generation, status: 'in_flight' },
+    },
+    request,
+  };
+}
+
+function removeOutfitCanvasImageRequest(
+  current: OutfitCanvasImageRequestRegistry,
+  requestKey: string,
+): OutfitCanvasImageRequestRegistry {
+  const next: Record<string, { generation: number; status: 'in_flight' | 'failed' }> = {};
+  Object.entries(current).forEach(([key, value]) => {
+    if (key !== requestKey) next[key] = value;
+  });
+  return next;
+}
+
+export function settleOutfitCanvasImageRequest(
+  current: OutfitCanvasImageRequestRegistry,
+  committedSources: OutfitCanvasCommittedSourceRegistry,
+  request: OutfitCanvasImageRequest,
+  outcome: 'success' | 'failure',
+): { registry: OutfitCanvasImageRequestRegistry; scheduleRetry: boolean } {
+  const existing = current[request.requestKey];
+  if (existing?.status !== 'in_flight' || existing.generation !== request.generation) {
+    return { registry: current, scheduleRetry: false };
+  }
+
+  const scheduleRetry = committedGenerationForSource(
+    committedSources,
+    request.itemId,
+    request.sourceKey,
+  ) !== null && !requestMatchesCommittedSource(
+    committedSources,
+    request.itemId,
+    request.sourceKey,
+    request.generation,
+  );
+  const registry = outcome === 'failure'
+    ? {
+      ...current,
+      [request.requestKey]: { generation: request.generation, status: 'failed' as const },
+    }
+    : removeOutfitCanvasImageRequest(current, request.requestKey);
+
+  return { registry, scheduleRetry };
 }
 
 export function outfitCanvasImageUsesVisibleGeometry(

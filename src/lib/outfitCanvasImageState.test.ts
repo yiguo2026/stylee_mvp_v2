@@ -7,15 +7,12 @@ import {
   outfitCanvasImageHasError,
   outfitCanvasImagePresentation,
   outfitCanvasImageRequestIsCurrent,
-  outfitCanvasImageRequestIsInFlight,
-  outfitCanvasImageRequestKey,
-  outfitCanvasImageRequestNeedsRetry,
   outfitCanvasImageSourceKey,
   outfitCanvasImageUsesVisibleGeometry,
   rememberOutfitCanvasImageAspect,
   requestOutfitImageAspect,
-  finishOutfitCanvasImageRequest,
-  startOutfitCanvasImageRequest,
+  planOutfitCanvasImageRequest,
+  settleOutfitCanvasImageRequest,
 } from './outfitCanvasImageState.ts';
 
 test('remote size adapter resolves an aspect ratio through its callback', async () => {
@@ -83,25 +80,64 @@ test('committed source generations reject a stale callback after replacement', (
   );
 });
 
-test('only a stale request whose source was restored needs another attempt', () => {
-  const sourceA = commitOutfitCanvasImageSources({}, [{ itemId: 'item', sourceKey: 'uri:A' }]);
-  const generationA = sourceA.item.generation;
-  const sourceB = commitOutfitCanvasImageSources(sourceA, [{ itemId: 'item', sourceKey: 'uri:B' }]);
-  const sourceAAgain = commitOutfitCanvasImageSources(sourceB, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+test('a rejected in-flight A1 schedules exactly one restored A3 retry', async () => {
+  const sourceA1 = commitOutfitCanvasImageSources({}, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const firstPlan = planOutfitCanvasImageRequest({}, sourceA1, 'item', 'uri:A');
+  assert.equal(firstPlan.request?.generation, 1);
+  const sourceB2 = commitOutfitCanvasImageSources(sourceA1, [{ itemId: 'item', sourceKey: 'uri:B' }]);
+  const sourceA3 = commitOutfitCanvasImageSources(sourceB2, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const restoredPlan = planOutfitCanvasImageRequest(firstPlan.registry, sourceA3, 'item', 'uri:A');
+  assert.equal(restoredPlan.request, null);
 
-  assert.equal(outfitCanvasImageRequestNeedsRetry(sourceB, 'item', 'uri:A', generationA), false);
-  assert.equal(outfitCanvasImageRequestNeedsRetry(sourceAAgain, 'item', 'uri:A', generationA), true);
+  await assert.rejects(
+    requestOutfitImageAspect('https://image.test/a.png', () => { throw new Error('sync failure'); }),
+    /sync failure/,
+  );
+  const settled = settleOutfitCanvasImageRequest(
+    restoredPlan.registry,
+    sourceA3,
+    firstPlan.request!,
+    'failure',
+  );
+  assert.equal(settled.scheduleRetry, true);
+  const retry = planOutfitCanvasImageRequest(settled.registry, sourceA3, 'item', 'uri:A');
+  assert.equal(retry.request?.generation, 3);
+  assert.equal(planOutfitCanvasImageRequest(retry.registry, sourceA3, 'item', 'uri:A').request, null);
 });
 
-test('request keys are in-flight only and become re-requestable after settlement', () => {
-  const requestKey = outfitCanvasImageRequestKey('item', 'uri:A');
-  const started = startOutfitCanvasImageRequest(new Set(), requestKey);
+test('a stale fulfillment also schedules one restored-source retry', () => {
+  const sourceA1 = commitOutfitCanvasImageSources({}, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const firstPlan = planOutfitCanvasImageRequest({}, sourceA1, 'item', 'uri:A');
+  const sourceB2 = commitOutfitCanvasImageSources(sourceA1, [{ itemId: 'item', sourceKey: 'uri:B' }]);
+  const sourceA3 = commitOutfitCanvasImageSources(sourceB2, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const restoredPlan = planOutfitCanvasImageRequest(firstPlan.registry, sourceA3, 'item', 'uri:A');
 
-  assert.equal(outfitCanvasImageRequestIsInFlight(started, requestKey), true);
-  assert.strictEqual(startOutfitCanvasImageRequest(started, requestKey), started);
-  const settled = finishOutfitCanvasImageRequest(started, requestKey);
-  assert.equal(outfitCanvasImageRequestIsInFlight(settled, requestKey), false);
-  assert.notStrictEqual(startOutfitCanvasImageRequest(settled, requestKey), settled);
+  assert.equal(
+    settleOutfitCanvasImageRequest(restoredPlan.registry, sourceA3, firstPlan.request!, 'success')
+      .scheduleRetry,
+    true,
+  );
+});
+
+test('a current-generation failure is remembered across equivalent plans but a newer generation retries once', () => {
+  const sourceA1 = commitOutfitCanvasImageSources({}, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const firstPlan = planOutfitCanvasImageRequest({}, sourceA1, 'item', 'uri:A');
+  const failed = settleOutfitCanvasImageRequest(firstPlan.registry, sourceA1, firstPlan.request!, 'failure');
+  assert.equal(failed.scheduleRetry, false);
+
+  let repeated = failed.registry;
+  for (let index = 0; index < 5; index += 1) {
+    const plan = planOutfitCanvasImageRequest(repeated, sourceA1, 'item', 'uri:A');
+    assert.equal(plan.request, null);
+    assert.strictEqual(plan.registry, repeated);
+    repeated = plan.registry;
+  }
+
+  const sourceB2 = commitOutfitCanvasImageSources(sourceA1, [{ itemId: 'item', sourceKey: 'uri:B' }]);
+  const sourceA3 = commitOutfitCanvasImageSources(sourceB2, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const retry = planOutfitCanvasImageRequest(repeated, sourceA3, 'item', 'uri:A');
+  assert.equal(retry.request?.generation, 3);
+  assert.equal(planOutfitCanvasImageRequest(retry.registry, sourceA3, 'item', 'uri:A').request, null);
 });
 
 test('source keys distinguish numeric assets, URI objects, arrays, and serializable objects', () => {

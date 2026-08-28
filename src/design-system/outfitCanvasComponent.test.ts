@@ -42,6 +42,8 @@ test('canvas resolves remote image dimensions and uses source-keyed error fallba
   );
   assert.match(source, /Image\.getSize/);
   assert.match(source, /requestOutfitImageAspect/);
+  assert.match(source, /planOutfitCanvasImageRequest/);
+  assert.match(source, /settleOutfitCanvasImageRequest/);
   assert.match(source, /onError=\{\(\) =>/);
   assert.match(source, /markOutfitCanvasImageError/);
   assert.match(source, /outfitCanvasImageHasError/);
