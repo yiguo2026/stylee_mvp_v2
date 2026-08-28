@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { aiRecognizeClothing, aiStandardizeGarment } from '@/lib/ai';
-import { mergeReplacementImageAttrs } from '@/lib/outfitImageMetrics';
+import {
+  beginReplacementAfterInitialWrite,
+  buildFinalReplacementImageUpdate,
+  buildInitialReplacementImageUpdate,
+} from '@/lib/garmentImageReplacement';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
 import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
 import type { RecognitionResult, WardrobeItem } from '@/types';
@@ -69,6 +73,8 @@ export function useGarmentImageReplace(
   const bgTokenRef = useRef(0);
   const reqTokenRef = useRef(0);
   const mountedRef = useRef(true);
+  const currentItemRef = useRef(item);
+  currentItemRef.current = item;
 
   // 用 ref 持有最新的 context / 回调，避免闭包捕获旧值（换图与后台任务跨越多次渲染）
   const contextRef = useRef<GarmentImageContext | undefined>(opts.context);
@@ -142,14 +148,17 @@ export function useGarmentImageReplace(
       }
 
       const finalUrl = persistedImage.imageUrl;
+      const currentItem = currentItemRef.current;
+      if (!currentItem || currentItem.item_id !== item.item_id) return;
       setImageUri(finalUrl);
-      await updateItem(item.item_id, {
-        image_url: finalUrl,
-        ai_recognized_attrs: mergeReplacementImageAttrs(
-          item.ai_recognized_attrs,
+      await updateItem(
+        currentItem.item_id,
+        buildFinalReplacementImageUpdate(
+          finalUrl,
+          currentItemRef.current?.ai_recognized_attrs,
           persistedImage.metadata,
         ),
-      });
+      );
       if (!stillCurrent()) return;
       toast(
         persistedImage.status === 'transparent_master'
@@ -182,9 +191,25 @@ export function useGarmentImageReplace(
     // 抠图 / 标准化 / 重新识别在后台异步进行，完成后自动替换为透明主图。
     const token = ++bgTokenRef.current; // 标记本次换图，后台任务只在仍是最新时生效
     setImageUri(localUri);
-    void updateItem(item.item_id, { image_url: localUri });
     setStandardizing(true);
-    void standardizeInBackground(localUri, token);
+    const initialWriteResult = await beginReplacementAfterInitialWrite({
+      writeInitial: () => updateItem(
+        item.item_id,
+        buildInitialReplacementImageUpdate(localUri, item.ai_recognized_attrs),
+      ),
+      isCurrent: () => mountedRef.current && bgTokenRef.current === token,
+      startBackground: () => { void standardizeInBackground(localUri, token); },
+    });
+    if (initialWriteResult === 'failed') {
+      if (mountedRef.current && bgTokenRef.current === token) {
+        setStandardizing(false);
+        toast('图片保存失败，请重试');
+      }
+      return;
+    }
+    if (initialWriteResult === 'stale' && mountedRef.current && bgTokenRef.current === token) {
+      setStandardizing(false);
+    }
   }, [item, updateItem, standardizeInBackground]);
 
   return {
