@@ -5,6 +5,7 @@ import {
   beginReplacementAfterInitialWrite,
   buildFinalReplacementImageUpdate,
   buildInitialReplacementImageUpdate,
+  imageUriAfterInitialReplacementWrite,
 } from '@/lib/garmentImageReplacement';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
 import { persistGarmentMaster, shouldPersistReplacementImage } from '@/lib/uploadImage';
@@ -25,7 +26,7 @@ export interface UseGarmentImageReplaceOptions {
   /** 目标单品（必须包含 item_id / user_id；缺失时换图不可用） */
   item: Pick<WardrobeItem, 'item_id' | 'user_id' | 'name' | 'image_url' | 'ai_recognized_attrs'> | undefined;
   /** 写入 store 的更新函数（乐观更新） */
-  updateItem: (id: string, updates: Partial<WardrobeItem>) => void | Promise<void>;
+  updateItem: (id: string, updates: Partial<WardrobeItem>) => boolean | void | Promise<boolean | void>;
   /** 标准化/识别所需上下文，随每次渲染传入最新值 */
   context?: GarmentImageContext;
   /** 标准化成功后是否重新做 AI 识别，默认 true */
@@ -74,7 +75,6 @@ export function useGarmentImageReplace(
   const reqTokenRef = useRef(0);
   const mountedRef = useRef(true);
   const currentItemRef = useRef(item);
-  currentItemRef.current = item;
 
   // 用 ref 持有最新的 context / 回调，避免闭包捕获旧值（换图与后台任务跨越多次渲染）
   const contextRef = useRef<GarmentImageContext | undefined>(opts.context);
@@ -86,6 +86,7 @@ export function useGarmentImageReplace(
   const recognizeRef = useRef(recognize);
   recognizeRef.current = recognize;
 
+  useEffect(() => { currentItemRef.current = item; }, [item]);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const toast = useCallback((msg: string) => {
@@ -186,6 +187,8 @@ export function useGarmentImageReplace(
 
     const localUri = result.assets[0].uri;
     if (!shouldPersistReplacementImage(localUri)) return;
+    const replacementItem = currentItemRef.current ?? item;
+    const previousCommittedImageUri = replacementItem.image_url ?? '';
 
     // 换图立即生效：先展示并落地原图，用户可马上继续操作或直接离开，
     // 抠图 / 标准化 / 重新识别在后台异步进行，完成后自动替换为透明主图。
@@ -194,14 +197,19 @@ export function useGarmentImageReplace(
     setStandardizing(true);
     const initialWriteResult = await beginReplacementAfterInitialWrite({
       writeInitial: () => updateItem(
-        item.item_id,
-        buildInitialReplacementImageUpdate(localUri, item.ai_recognized_attrs),
+        replacementItem.item_id,
+        buildInitialReplacementImageUpdate(localUri, replacementItem.ai_recognized_attrs),
       ),
       isCurrent: () => mountedRef.current && bgTokenRef.current === token,
       startBackground: () => { void standardizeInBackground(localUri, token); },
     });
     if (initialWriteResult === 'failed') {
       if (mountedRef.current && bgTokenRef.current === token) {
+        setImageUri(imageUriAfterInitialReplacementWrite(
+          previousCommittedImageUri,
+          localUri,
+          initialWriteResult,
+        ));
         setStandardizing(false);
         toast('图片保存失败，请重试');
       }

@@ -24,6 +24,14 @@ export function buildFinalReplacementImageUpdate(
   };
 }
 
+export function imageUriAfterInitialReplacementWrite(
+  previousCommittedImageUri: string,
+  selectedImageUri: string,
+  result: ReplacementInitialWriteResult,
+): string {
+  return result === 'failed' ? previousCommittedImageUri : selectedImageUri;
+}
+
 export type ReplacementInitialWriteResult = 'started' | 'failed' | 'stale';
 
 export async function beginReplacementAfterInitialWrite({
@@ -31,12 +39,12 @@ export async function beginReplacementAfterInitialWrite({
   isCurrent,
   startBackground,
 }: {
-  writeInitial: () => void | Promise<void>;
+  writeInitial: () => boolean | void | Promise<boolean | void>;
   isCurrent: () => boolean;
   startBackground: () => void;
 }): Promise<ReplacementInitialWriteResult> {
   try {
-    await writeInitial();
+    if (await writeInitial() === false) return 'failed';
   } catch {
     return 'failed';
   }

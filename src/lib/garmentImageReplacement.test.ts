@@ -7,6 +7,7 @@ import {
   beginReplacementAfterInitialWrite,
   buildFinalReplacementImageUpdate,
   buildInitialReplacementImageUpdate,
+  imageUriAfterInitialReplacementWrite,
 } from './garmentImageReplacement.ts';
 
 function deferred<T>() {
@@ -74,6 +75,26 @@ test('failed or unmounted initial replacement never starts background work', asy
   assert.deepEqual(unmounted, []);
 });
 
+test('an explicit false initial write rolls display back and never starts background work', async () => {
+  const background: string[] = [];
+  const result = await beginReplacementAfterInitialWrite({
+    writeInitial: () => false,
+    isCurrent: () => true,
+    startBackground: () => { background.push('background'); },
+  });
+
+  assert.equal(result, 'failed');
+  assert.deepEqual(background, []);
+  assert.equal(
+    imageUriAfterInitialReplacementWrite(
+      'https://storage.test/committed.jpg',
+      'file:///replacement.jpg',
+      result,
+    ),
+    'https://storage.test/committed.jpg',
+  );
+});
+
 test('final replacement metadata merges with the latest unrelated attrs', () => {
   assert.deepEqual(
     buildFinalReplacementImageUpdate(
@@ -109,4 +130,8 @@ test('replacement hook delegates ordered writes and final attrs to the current i
   assert.match(source, /buildInitialReplacementImageUpdate\s*\(/);
   assert.match(source, /buildFinalReplacementImageUpdate\s*\(/);
   assert.match(source, /currentItemRef\.current\?\.ai_recognized_attrs/);
+  const refDeclaration = source.indexOf('const currentItemRef = useRef(item);');
+  const refEffect = source.indexOf('useEffect(() => { currentItemRef.current = item; }, [item]);');
+  assert.ok(refDeclaration >= 0 && refEffect > refDeclaration);
+  assert.doesNotMatch(source.slice(refDeclaration, refEffect), /currentItemRef\.current\s*=/);
 });

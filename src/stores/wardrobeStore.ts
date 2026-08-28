@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { WardrobeItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
 
-interface WardrobeState {
+export interface WardrobeState {
   items: WardrobeItem[];
   isLoading: boolean;
   error: string | null;
@@ -16,7 +16,7 @@ interface WardrobeState {
 
   fetchItems: (userId: string) => Promise<void>;
   addItem: (item: Omit<WardrobeItem, 'item_id' | 'created_at' | 'updated_at'>) => Promise<WardrobeItem | null>;
-  updateItem: (itemId: string, updates: Partial<WardrobeItem>) => Promise<void>;
+  updateItem: (itemId: string, updates: Partial<WardrobeItem>) => Promise<boolean>;
   deleteItem: (itemId: string) => Promise<void>;
   incrementWearCount: (itemId: string) => Promise<void>;
   setItems: (items: WardrobeItem[]) => void;
@@ -163,9 +163,11 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
         .update({ ...updates, updated_at: now })
         .eq('item_id', itemId);
       if (error) throw error;
+      return true;
     } catch (e: any) {
       // 云端写入失败不回滚本地更改（demo 环境云端可能不可用），仅记录错误
       set({ error: e.message });
+      return false;
     }
   },
 
