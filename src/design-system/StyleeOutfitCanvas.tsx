@@ -15,16 +15,29 @@ import {
   garmentImageScale,
   OUTFIT_CANVAS_ASPECT_RATIO,
   OUTFIT_CANVAS_MIN_HEIGHT,
-  rememberOutfitCanvasImageAspect,
   sourceImageGeometryForVisiblePlacement,
-  type OutfitCanvasImageAspectRegistry,
   type OutfitCanvasLayoutItem,
 } from '@/lib/outfitCanvasLayout';
 import { parseOutfitVisibleBounds } from '@/lib/outfitImageMetrics';
 import {
+  commitOutfitCanvasImageSources,
+  finishOutfitCanvasImageRequest,
   markOutfitCanvasImageError,
+  outfitCanvasImageAspectFor,
   outfitCanvasImageHasError,
+  outfitCanvasImagePresentation,
+  outfitCanvasImageRequestIsCurrent,
+  outfitCanvasImageRequestIsInFlight,
+  outfitCanvasImageRequestKey,
+  outfitCanvasImageRequestNeedsRetry,
+  outfitCanvasImageSourceKey,
+  outfitCanvasImageUsesVisibleGeometry,
+  outfitCanvasRemoteImageUri,
   requestOutfitImageAspect,
+  rememberOutfitCanvasImageAspect,
+  startOutfitCanvasImageRequest,
+  type OutfitCanvasCommittedSourceRegistry,
+  type OutfitCanvasImageAspectCache,
   type OutfitCanvasImageStatusRegistry,
 } from '@/lib/outfitCanvasImageState';
 import { ds } from './tokens';
@@ -52,16 +65,6 @@ type PreparedCanvasItem = {
   sourceUri?: string;
 };
 
-function imageSourceUri(source: ImageSourcePropType | undefined): string | undefined {
-  if (!source || typeof source !== 'object' || Array.isArray(source)) return undefined;
-  const uri = (source as { uri?: unknown }).uri;
-  return typeof uri === 'string' && uri.length > 0 ? uri : undefined;
-}
-
-function isRemoteImageUri(uri: string | undefined): uri is string {
-  return Boolean(uri && /^https?:\/\//i.test(uri));
-}
-
 function hasCompleteVisibleMetrics(item: OutfitCanvasLayoutItem): boolean {
   return validAspectRatio(item.imageAspectRatio) && Boolean(parseOutfitVisibleBounds(item.visibleBounds));
 }
@@ -74,27 +77,25 @@ export function StyleeOutfitCanvas({
   emptyLabel = '暂无搭配单品',
   style,
 }: StyleeOutfitCanvasProps) {
-  const [loadedImageAspects, setLoadedImageAspects] = useState<
-    OutfitCanvasImageAspectRegistry
-  >({});
+  const [loadedImageAspects, setLoadedImageAspects] = useState<OutfitCanvasImageAspectCache>({});
   const [imageErrors, setImageErrors] = useState<OutfitCanvasImageStatusRegistry>({});
-  const requestedImageDimensions = useRef(new Set<string>());
-  const currentSourceKeys = useRef(new Map<string, string>());
+  const [requestRevision, setRequestRevision] = useState(0);
+  const inFlightImageRequests = useRef<ReadonlySet<string>>(new Set());
+  const committedSources = useRef<OutfitCanvasCommittedSourceRegistry>({});
   const isMounted = useRef(false);
   const preparedItems = useMemo<PreparedCanvasItem[]>(() => items.map((item) => {
-    const source = item.imageSource
+    const source = item.imageSource !== undefined && item.imageSource !== null
       ? item.imageSource as ImageSourcePropType
       : item.imageUri
         ? { uri: item.imageUri }
         : undefined;
-    const sourceUri = imageSourceUri(source);
-    const sourceKey = sourceUri
-      ?? item.imageUri
-      ?? (typeof item.imageSource === 'number' ? `asset:${item.imageSource}` : `item:${item.id}`);
-    const loadedAspect = loadedImageAspects[item.id];
-    const matchingLoadedAspect = loadedAspect?.sourceKey === sourceKey
-      ? loadedAspect.aspectRatio
-      : null;
+    const sourceKey = outfitCanvasImageSourceKey(item.id, source);
+    const sourceUri = outfitCanvasRemoteImageUri(source);
+    const matchingLoadedAspect = outfitCanvasImageAspectFor(
+      loadedImageAspects,
+      item.id,
+      sourceKey,
+    );
     const imageAspectRatio = validAspectRatio(item.imageAspectRatio)
       ? item.imageAspectRatio
       : matchingLoadedAspect;
@@ -103,10 +104,6 @@ export function StyleeOutfitCanvas({
       : { ...item, imageAspectRatio };
     return { layoutItem, originalItem: item, source, sourceKey, sourceUri };
   }), [items, loadedImageAspects]);
-  currentSourceKeys.current = new Map(preparedItems.map((entry) => [
-    entry.originalItem.id,
-    entry.sourceKey,
-  ]));
 
   useEffect(() => {
     isMounted.current = true;
@@ -114,34 +111,72 @@ export function StyleeOutfitCanvas({
   }, []);
 
   useEffect(() => {
+    committedSources.current = commitOutfitCanvasImageSources(
+      committedSources.current,
+      preparedItems.map((entry) => ({
+        itemId: entry.originalItem.id,
+        sourceKey: entry.sourceKey,
+      })),
+    );
+  }, [preparedItems]);
+
+  useEffect(() => {
     preparedItems.forEach((entry) => {
       if (
-        !isRemoteImageUri(entry.sourceUri)
+        !entry.sourceUri
         || validAspectRatio(entry.originalItem.imageAspectRatio)
         || validAspectRatio(entry.layoutItem.imageAspectRatio)
       ) return;
 
-      const requestKey = `${entry.originalItem.id}\u0000${entry.sourceKey}`;
-      if (requestedImageDimensions.current.has(requestKey)) return;
-      requestedImageDimensions.current.add(requestKey);
+      const requestKey = outfitCanvasImageRequestKey(entry.originalItem.id, entry.sourceKey);
+      if (outfitCanvasImageRequestIsInFlight(inFlightImageRequests.current, requestKey)) return;
+      const generation = committedSources.current[entry.originalItem.id]?.generation;
+      if (!generation || !outfitCanvasImageRequestIsCurrent(
+        committedSources.current,
+        entry.originalItem.id,
+        entry.sourceKey,
+        generation,
+      )) return;
+      inFlightImageRequests.current = startOutfitCanvasImageRequest(
+        inFlightImageRequests.current,
+        requestKey,
+      );
 
+      let needsRetry = false;
       void requestOutfitImageAspect(entry.sourceUri, Image.getSize)
         .then((aspectRatio) => {
-          if (
-            !isMounted.current
-            || currentSourceKeys.current.get(entry.originalItem.id) !== entry.sourceKey
-          ) return;
+          const requestIsCurrent = isMounted.current && outfitCanvasImageRequestIsCurrent(
+            committedSources.current,
+            entry.originalItem.id,
+            entry.sourceKey,
+            generation,
+          );
+          if (!requestIsCurrent) {
+            needsRetry = isMounted.current && outfitCanvasImageRequestNeedsRetry(
+              committedSources.current,
+              entry.originalItem.id,
+              entry.sourceKey,
+              generation,
+            );
+            return;
+          }
           setLoadedImageAspects((current) => rememberOutfitCanvasImageAspect(
             current,
             entry.originalItem.id,
             entry.sourceKey,
             aspectRatio,
-            1,
           ));
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          inFlightImageRequests.current = finishOutfitCanvasImageRequest(
+            inFlightImageRequests.current,
+            requestKey,
+          );
+          if (needsRetry && isMounted.current) setRequestRevision((current) => current + 1);
+        });
     });
-  }, [preparedItems]);
+  }, [preparedItems, requestRevision]);
   const layoutItems = useMemo(
     () => preparedItems.map((entry) => entry.layoutItem),
     [preparedItems],
@@ -160,11 +195,19 @@ export function StyleeOutfitCanvas({
         const source = preparedItem?.source;
         const selected = selectedItemId === entry.item.id;
         const imageOffsetY = garmentImageOffsetY(entry.role);
-        const usesVisibleSourceGeometry = hasCompleteVisibleMetrics(entry.item);
+        const usesVisibleSourceGeometry = outfitCanvasImageUsesVisibleGeometry(
+          source,
+          hasCompleteVisibleMetrics(entry.item),
+        );
         const geometry = sourceImageGeometryForVisiblePlacement(entry);
         const hasError = preparedItem
           ? outfitCanvasImageHasError(imageErrors, entry.item.id, preparedItem.sourceKey)
           : false;
+        const presentation = outfitCanvasImagePresentation({
+          hasSource: Boolean(source),
+          hasError,
+          hasCompleteVisibleMetrics: usesVisibleSourceGeometry,
+        });
         return (
           <Pressable
             key={entry.item.id}
@@ -186,7 +229,29 @@ export function StyleeOutfitCanvas({
               },
             ]}
           >
-            {source && !hasError ? (
+            {presentation === 'mapped' && source ? (
+              <View style={styles.mappedImageClip}>
+                <Image
+                  accessibilityElementsHidden
+                  source={source}
+                  onError={() => {
+                    if (!preparedItem) return;
+                    setImageErrors((current) => markOutfitCanvasImageError(
+                      current,
+                      entry.item.id,
+                      preparedItem.sourceKey,
+                    ));
+                  }}
+                  style={[styles.mappedImage, {
+                    left: percent(geometry.left),
+                    top: percent(geometry.top),
+                    width: percent(geometry.width),
+                    height: percent(geometry.height),
+                  }]}
+                  resizeMode="stretch"
+                />
+              </View>
+            ) : presentation === 'legacy' && source ? (
               <Image
                 accessibilityElementsHidden
                 source={source}
@@ -198,21 +263,11 @@ export function StyleeOutfitCanvas({
                     preparedItem.sourceKey,
                   ));
                 }}
-                style={[
-                  styles.image,
-                  usesVisibleSourceGeometry
-                    ? {
-                      left: percent(geometry.left),
-                      top: percent(geometry.top),
-                      width: percent(geometry.width),
-                      height: percent(geometry.height),
-                    }
-                    : {
-                      top: imageOffsetY,
-                      transform: [{ scale: garmentImageScale(entry.role) }],
-                    },
-                ]}
-                resizeMode={usesVisibleSourceGeometry ? 'stretch' : 'contain'}
+                style={[styles.image, {
+                  top: imageOffsetY,
+                  transform: [{ scale: garmentImageScale(entry.role) }],
+                }]}
+                resizeMode="contain"
               />
             ) : (
               <View style={styles.placeholder}>
@@ -246,12 +301,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: ds.radius.lg,
-    overflow: 'hidden',
   },
   image: {
-    position: 'absolute',
     width: '100%',
     height: '100%',
+  },
+  mappedImageClip: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  mappedImage: {
+    position: 'absolute',
   },
   placeholder: {
     width: '100%',

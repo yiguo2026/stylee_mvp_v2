@@ -16,7 +16,8 @@ test('editorial canvas composes transparent sources without per-item cards', () 
   assert.match(source, /buildOutfitCanvasLayout\(layoutItems\)/);
   assert.match(source, /garmentImageScale\(entry\.role\)/);
   assert.match(source, /garmentImageOffsetY\(entry\.role\)/);
-  assert.match(source, /resizeMode=\{usesVisibleSourceGeometry \? 'stretch' : 'contain'\}/);
+  assert.match(source, /resizeMode="stretch"/);
+  assert.match(source, /resizeMode="contain"/);
   assert.doesNotMatch(source, /\.filter\(/);
   assert.doesNotMatch(source, /accessory-band/);
   assert.doesNotMatch(source, /StyleeGarmentMedia/);
@@ -29,7 +30,9 @@ test('each visible garment remains accessible and has an enlarged touch target',
     'utf8',
   );
   assert.match(source, /accessibilityLabel=\{entry\.item\.name\}/);
+  assert.match(source, /accessibilityState=\{\{ selected \}\}/);
   assert.match(source, /hitSlop=\{ds\.space\[2\]\}/);
+  assert.match(source, /onPress=\{\(\) => onItemPress\?\.\(preparedItem\?\.originalItem \?\? entry\.item\)\}/);
 });
 
 test('canvas resolves remote image dimensions and uses source-keyed error fallback', () => {
@@ -43,12 +46,28 @@ test('canvas resolves remote image dimensions and uses source-keyed error fallba
   assert.match(source, /markOutfitCanvasImageError/);
   assert.match(source, /outfitCanvasImageHasError/);
   assert.match(source, /sourceImageGeometryForVisiblePlacement/);
-  assert.match(source, /resizeMode=\{usesVisibleSourceGeometry \? 'stretch' : 'contain'\}/);
+  assert.match(source, /outfitCanvasImagePresentation/);
+  assert.match(source, /resizeMode="stretch"/);
+  assert.match(source, /resizeMode="contain"/);
   assert.match(source, /<View style=\{styles\.placeholder\}>/);
   assert.doesNotMatch(source, /Image\.resolveAssetSource/);
   assert.doesNotMatch(source, /nativeEvent\.source/);
   assert.match(source, /buildOutfitCanvasLayout\(layoutItems\)/);
   assert.match(source, /rememberOutfitCanvasImageAspect/);
+});
+
+test('mapped images have a dedicated clip wrapper while legacy images retain their overflow-visible footprint', () => {
+  const source = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), 'StyleeOutfitCanvas.tsx'),
+    'utf8',
+  );
+  assert.match(source, /<View style=\{styles\.mappedImageClip\}>/);
+  assert.match(source, /mappedImageClip:\s*\{[\s\S]*?overflow: 'hidden'/);
+  const garmentStyle = source.match(/garment:\s*\{([\s\S]*?)\n  \},\n  image:/)?.[1] ?? '';
+  assert.doesNotMatch(garmentStyle, /overflow:/);
+  assert.match(source, /presentation === 'legacy'/);
+  assert.match(source, /top: imageOffsetY/);
+  assert.match(source, /garmentImageScale\(entry\.role\)/);
 });
 
 test('source geometry has a conservative full-frame fallback for legacy image rendering', () => {
