@@ -7,10 +7,13 @@ import {
   garmentImageOffsetY,
   garmentImageScale,
   placementBounds,
+  sourceImageGeometryForVisiblePlacement,
+  visibleContentAspect,
   type OutfitCanvasLayoutItem,
   type OutfitCanvasPlacement,
   type OutfitCanvasRole,
 } from './outfitCanvasLayout.ts';
+import type { OutfitVisibleBounds } from './outfitImageMetrics.ts';
 
 function placement(layout: OutfitCanvasPlacement[], id: string) {
   const value = layout.find((entry) => entry.item.id === id);
@@ -58,6 +61,53 @@ const baseSeparates = [
   { id: 'bottom', name: '长裤', category: '下装', layoutRole: 'bottom' as const },
   { id: 'shoes', name: '鞋', category: '鞋履', layoutRole: 'shoes' as const },
 ];
+
+const metricItem = (
+  id: string,
+  role: OutfitCanvasRole,
+  sourceAspectRatio: number,
+  visibleBounds: OutfitVisibleBounds,
+): OutfitCanvasLayoutItem => ({
+  id,
+  name: id,
+  category: role,
+  layoutRole: role,
+  imageUri: `${id}.png`,
+  imageAspectRatio: sourceAspectRatio,
+  visibleBounds,
+});
+
+const shirt = metricItem('shirt', 'base', 1, {
+  left: 0.0747, top: 0.0885, width: 0.8506, height: 0.8242,
+});
+const trousers = metricItem('trousers', 'bottom', 1, {
+  left: 0.3353, top: 0.0757, width: 0.3299, height: 0.8505,
+});
+const shorts = metricItem('shorts', 'bottom', 1, {
+  left: 0.3111, top: 0.0764, width: 0.3757, height: 0.8466,
+});
+const skirt = metricItem('skirt', 'bottom', 1, {
+  left: 0.1763, top: 0.0783, width: 0.6473, height: 0.8458,
+});
+const shoesWithMetrics = metricItem('shoes-with-metrics', 'shoes', 1, {
+  left: 0.2243, top: 0.3181, width: 0.7009, height: 0.2459,
+});
+const outerWithMetrics = metricItem('outer-with-metrics', 'outer', 1, {
+  left: 0.1411, top: 0.0743, width: 0.7153, height: 0.8502,
+});
+
+function assertVisibleSeparateGeometry(
+  upper: OutfitCanvasPlacement,
+  lower: OutfitCanvasPlacement,
+  shoes: OutfitCanvasPlacement,
+) {
+  const dressingGap = lower.top - (upper.top + upper.height);
+  const footGap = shoes.top - (lower.top + lower.height);
+  assert.ok(dressingGap >= 2 && dressingGap <= 4, `${dressingGap}`);
+  assert.ok(footGap >= 5 && footGap <= 8, `${footGap}`);
+  assert.ok(upper.width / lower.width < 2, `${upper.width / lower.width}`);
+  assert.ok(lower.height > upper.height, `${lower.height} <= ${upper.height}`);
+}
 
 const CANVAS_ASPECT_RATIO = 0.8;
 const MIN_CANVAS_HEIGHT = 360;
@@ -309,6 +359,93 @@ test('separates preserve dressing and footwear gaps', () => {
   assert.ok(bottom.top - (upper.top + upper.height) <= 4);
   assert.ok(shoes.top - (bottom.top + bottom.height) >= 5);
   assert.ok(shoes.top - (bottom.top + bottom.height) <= 8);
+});
+
+test('visible shirt and trousers use role envelopes and preserve a real gap', () => {
+  const layout = buildOutfitCanvasLayout([shirt, trousers, shoesWithMetrics]);
+  assertVisibleSeparateGeometry(
+    placement(layout, 'shirt'),
+    placement(layout, 'trousers'),
+    placement(layout, 'shoes-with-metrics'),
+  );
+});
+
+test('visible shorts preserve the separate garment gaps', () => {
+  const layout = buildOutfitCanvasLayout([shirt, shorts, shoesWithMetrics]);
+  assertVisibleSeparateGeometry(
+    placement(layout, 'shirt'),
+    placement(layout, 'shorts'),
+    placement(layout, 'shoes-with-metrics'),
+  );
+});
+
+test('visible skirt preserves the separate garment gaps', () => {
+  const layout = buildOutfitCanvasLayout([shirt, skirt, shoesWithMetrics]);
+  assertVisibleSeparateGeometry(
+    placement(layout, 'shirt'),
+    placement(layout, 'skirt'),
+    placement(layout, 'shoes-with-metrics'),
+  );
+});
+
+test('visible outer layer leaves the lower garment and shoes separated', () => {
+  const layout = buildOutfitCanvasLayout([
+    outerWithMetrics,
+    shirt,
+    trousers,
+    shoesWithMetrics,
+  ]);
+  const lower = placement(layout, 'trousers');
+  const shoes = placement(layout, 'shoes-with-metrics');
+  const footGap = shoes.top - (lower.top + lower.height);
+  assert.ok(footGap >= 5 && footGap <= 8, `${footGap}`);
+  assert.equal(placement(layout, 'outer-with-metrics').role, 'outer');
+  assert.equal(lower.role, 'bottom');
+});
+
+test('visible metric legal 2 through 6 item fixtures remain complete and centered', () => {
+  const metricFixtures = [
+    [metricItem('dress-2', 'dress', 1, { left: 0.1, top: 0.05, width: 0.8, height: 0.9 }), shoesWithMetrics],
+    [shirt, trousers, shoesWithMetrics],
+    [outerWithMetrics, shirt, trousers, shoesWithMetrics],
+    [outerWithMetrics, shirt, trousers, shoesWithMetrics, metricItem('scarf-5', 'scarf', 1, { left: 0.15, top: 0.05, width: 0.7, height: 0.85 })],
+    [outerWithMetrics, shirt, trousers, shoesWithMetrics, metricItem('bag-6', 'bag', 1, { left: 0.12, top: 0.08, width: 0.76, height: 0.84 }), metricItem('hat-6', 'hat', 1, { left: 0.08, top: 0.1, width: 0.84, height: 0.8 })],
+  ];
+
+  for (const items of metricFixtures) {
+    const layout = buildOutfitCanvasLayout(items);
+    assert.equal(layout.length, items.length);
+    assert.deepEqual(new Set(layout.map((entry) => entry.item.id)), new Set(items.map((item) => item.id)));
+    const bounds = placementBounds(layout);
+    assert.ok(bounds.left >= 2 && bounds.right <= 98);
+    assert.ok(bounds.top >= 2 && bounds.bottom <= 98);
+    assert.ok(Math.abs(bounds.centerX - 50) <= 1, `${bounds.centerX}`);
+    assert.ok(Math.abs(bounds.centerY - 50) <= 1, `${bounds.centerY}`);
+  }
+});
+
+test('visible placement source geometry maps the subject bounds instead of scaling it twice', () => {
+  const knownPlacement = placement(buildOutfitCanvasLayout([shirt, trousers, shoesWithMetrics]), 'shirt');
+  const geometry = sourceImageGeometryForVisiblePlacement(knownPlacement);
+  assert.ok(Math.abs(geometry.left - (-0.0747 / 0.8506 * 100)) < 1e-9);
+  assert.ok(Math.abs(geometry.top - (-0.0885 / 0.8242 * 100)) < 1e-9);
+  assert.ok(Math.abs(geometry.width - (100 / 0.8506)) < 1e-9);
+  assert.ok(Math.abs(geometry.height - (100 / 0.8242)) < 1e-9);
+  assert.equal(knownPlacement.width <= 44, true);
+
+  const unknownPlacement = placement(buildOutfitCanvasLayout([
+    { ...roleItem('unknown', 'base'), imageUri: 'unknown.png' },
+    roleItem('unknown-bottom', 'bottom'),
+  ]), 'unknown');
+  assert.deepEqual(sourceImageGeometryForVisiblePlacement(unknownPlacement), {
+    left: 0, top: 0, width: 100, height: 100,
+  });
+});
+
+test('visible content aspect requires both source aspect and visible bounds', () => {
+  assert.ok(Math.abs((visibleContentAspect(shirt) ?? 0) - (0.8506 / 0.8242)) < 1e-6);
+  assert.equal(visibleContentAspect({ ...shirt, visibleBounds: undefined }), 1);
+  assert.equal(visibleContentAspect({ ...shirt, imageAspectRatio: undefined }), null);
 });
 
 test('fixture alpha ratios land in approved visible size ranges', () => {
