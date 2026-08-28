@@ -11,12 +11,30 @@ on:
       - "src/data/outfitCanvasImageMetrics.generated.ts"
       - "src/lib/outfitImageMetrics.ts"
       - "src/lib/outfitImageMetrics.test.ts"
+      - "src/lib/standardizationPolicy.ts"
+      - "src/lib/standardizationPolicy.test.ts"
+      - "src/lib/garmentImageReplacement.ts"
+      - "src/lib/garmentImageReplacement.test.ts"
+      - "src/lib/outfitCanvasLayout.ts"
+      - "src/lib/outfitCanvasLayout.test.ts"
+      - "src/lib/outfitCanvasImageState.ts"
+      - "src/lib/outfitCanvasImageState.test.ts"
+      - "src/lib/outfitResultRole.test.ts"
+      - "src/lib/outfitLayoutDemoRoute.test.ts"
+      - "src/lib/styleeMapping.ts"
+      - "src/lib/styleeMapping.test.ts"
+      - "src/hooks/useGarmentImageReplace.ts"
+      - "src/design-system/StyleeOutfitCanvas.tsx"
+      - "src/design-system/outfitCanvasComponent.test.ts"
+      - "src/app/outfit/result.tsx"
+      - "src/app/outfit-layout-demo.tsx"
       - "public/preset-items/**"
       - "src/design-system/**"
       - "src/app/**"
       - "src/components/**"
       - "package.json"
       - "package-lock.json"
+      - ".github/workflows/design-system.yml"
   push:
     branches: [main, tokens-sync]
     paths:
@@ -28,12 +46,30 @@ on:
       - "src/data/outfitCanvasImageMetrics.generated.ts"
       - "src/lib/outfitImageMetrics.ts"
       - "src/lib/outfitImageMetrics.test.ts"
+      - "src/lib/standardizationPolicy.ts"
+      - "src/lib/standardizationPolicy.test.ts"
+      - "src/lib/garmentImageReplacement.ts"
+      - "src/lib/garmentImageReplacement.test.ts"
+      - "src/lib/outfitCanvasLayout.ts"
+      - "src/lib/outfitCanvasLayout.test.ts"
+      - "src/lib/outfitCanvasImageState.ts"
+      - "src/lib/outfitCanvasImageState.test.ts"
+      - "src/lib/outfitResultRole.test.ts"
+      - "src/lib/outfitLayoutDemoRoute.test.ts"
+      - "src/lib/styleeMapping.ts"
+      - "src/lib/styleeMapping.test.ts"
+      - "src/hooks/useGarmentImageReplace.ts"
+      - "src/design-system/StyleeOutfitCanvas.tsx"
+      - "src/design-system/outfitCanvasComponent.test.ts"
+      - "src/app/outfit/result.tsx"
+      - "src/app/outfit-layout-demo.tsx"
       - "public/preset-items/**"
       - "src/design-system/**"
       - "src/app/**"
       - "src/components/**"
       - "package.json"
       - "package-lock.json"
+      - ".github/workflows/design-system.yml"
 
 permissions:
   contents: read
@@ -48,10 +84,23 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
+
+      - name: Verify outfit canvas regressions
+        run: |
+          node --experimental-strip-types --test \
+            src/lib/garmentImageReplacement.test.ts \
+            src/lib/outfitImageMetrics.test.ts \
+            src/lib/standardizationPolicy.test.ts \
+            src/lib/outfitCanvasLayout.test.ts \
+            src/lib/outfitCanvasImageState.test.ts \
+            src/design-system/outfitCanvasComponent.test.ts \
+            src/lib/outfitResultRole.test.ts \
+            src/lib/outfitLayoutDemoRoute.test.ts \
+            src/lib/styleeMapping.test.ts
 
       - uses: actions/setup-python@v5
         with:

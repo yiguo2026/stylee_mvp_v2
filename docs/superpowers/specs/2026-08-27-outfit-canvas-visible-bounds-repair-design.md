@@ -1,7 +1,7 @@
 # Stylee Outfit Canvas Visible-Bounds Repair Design
 
-Date: 2026-08-27  
-Status: Approved in chat; written spec pending user review  
+Date: 2026-08-27
+Status: Approved in chat; written spec pending user review
 Repositories:
 
 - Canonical service: `fitzw/style-model`
