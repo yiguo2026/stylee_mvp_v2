@@ -18,6 +18,7 @@ import {
 } from '@/design-system';
 import type { OutfitCanvasLayoutItem } from '@/lib/outfitCanvasLayout';
 import { outfitLayoutDemoFixtures, outfitLayoutDemoWardrobe } from '@/data/outfitLayoutDemoFixtures';
+import { outfitImageMetricsForWardrobeItem } from '@/lib/outfitImageMetrics';
 import { outfitsRespToApp } from '@/lib/styleeMapping';
 
 const scenarios = outfitLayoutDemoFixtures.map(fixture => {
@@ -25,14 +26,19 @@ const scenarios = outfitLayoutDemoFixtures.map(fixture => {
     [fixture.outfit], outfitLayoutDemoWardrobe, 'layout-demo', fixture.id,
   );
   const items: OutfitCanvasLayoutItem[] = [
-    ...(outfit.items ?? []).map(entry => ({
-      id: entry.item_id,
-      name: entry.item?.name ?? '',
-      category: entry.item?.category ?? '',
-      imageUri: entry.item?.image_url,
-      owned: true,
-      layoutRole: entry.role,
-    })),
+    ...(outfit.items ?? []).map(entry => {
+      const metrics = outfitImageMetricsForWardrobeItem(entry.item);
+      return {
+        id: entry.item_id,
+        name: entry.item?.name ?? '',
+        category: entry.item?.category ?? '',
+        imageUri: entry.item?.image_url,
+        owned: true,
+        layoutRole: entry.role,
+        imageAspectRatio: metrics?.sourceAspectRatio,
+        visibleBounds: metrics?.visibleBounds,
+      };
+    }),
     ...(outfit.recommended_items ?? []).map((entry, index) => ({
       id: `rec_${index}`,
       name: entry.name,

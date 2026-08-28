@@ -27,3 +27,8 @@ test('the shareable demo route is not redirected to login', () => {
   assert.match(rootLayout, /pathname\.startsWith\('\/outfit-layout-demo'\)/);
   assert.match(rootLayout, /if \(!isPublicPreview\) router\.replace\('\/\(auth\)\/login'\)/);
 });
+
+test('demo owned items resolve garment image metrics through the shared resolver', () => {
+  const source = readFileSync(resolve(libDir, '../app/outfit-layout-demo.tsx'), 'utf8');
+  assert.match(source, /outfitImageMetricsForWardrobeItem\(entry\.item\)/);
+});

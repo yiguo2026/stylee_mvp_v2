@@ -1,4 +1,5 @@
 import { PRESET_OUTFIT_IMAGE_METRICS } from '../data/outfitCanvasImageMetrics.generated.ts';
+import type { WardrobeItem } from '@/types';
 
 export interface OutfitVisibleBounds {
   left: number;
@@ -41,6 +42,19 @@ export function visibleBoundsFromAttrs(
   attrs: Record<string, unknown> | null | undefined,
 ): OutfitVisibleBounds | undefined {
   return parseOutfitVisibleBounds(attrs?.visible_bounds);
+}
+
+export function outfitImageMetricsForWardrobeItem(
+  item: Pick<WardrobeItem, 'image_url' | 'ai_recognized_attrs'> | null | undefined,
+): OutfitImageMetrics | undefined {
+  if (!item) return undefined;
+  const preset = presetOutfitImageMetrics(item.image_url);
+  const persisted = visibleBoundsFromAttrs(item.ai_recognized_attrs);
+  if (!preset && !persisted) return undefined;
+  return {
+    sourceAspectRatio: preset?.sourceAspectRatio,
+    visibleBounds: persisted ?? preset?.visibleBounds,
+  };
 }
 
 export function mergeReplacementImageAttrs(

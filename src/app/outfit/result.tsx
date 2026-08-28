@@ -32,6 +32,7 @@ import {
   StyleeStickyDecisionBar,
 } from '@/design-system';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
+import { outfitImageMetricsForWardrobeItem } from '@/lib/outfitImageMetrics';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory } from '@/types';
 import type { OutfitCanvasLayoutItem } from '@/lib/outfitCanvasLayout';
 
@@ -475,10 +476,15 @@ export default function OutfitResultScreen() {
 
   const allCanvasItems: OutfitCanvasLayoutItem[] = currentOutfit
     ? [
-        ...(currentOutfit.items ?? []).map(oi => ({
-          id: oi.item_id, name: oi.item?.name ?? oi.item?.category ?? '',
-          category: oi.item?.category ?? '', imageUri: oi.item?.image_url, owned: true, layoutRole: oi.role,
-        })),
+        ...(currentOutfit.items ?? []).map(oi => {
+          const metrics = outfitImageMetricsForWardrobeItem(oi.item);
+          return {
+            id: oi.item_id, name: oi.item?.name ?? oi.item?.category ?? '',
+            category: oi.item?.category ?? '', imageUri: oi.item?.image_url, owned: true, layoutRole: oi.role,
+            imageAspectRatio: metrics?.sourceAspectRatio,
+            visibleBounds: metrics?.visibleBounds,
+          };
+        }),
         ...(currentOutfit.recommended_items ?? []).map((rec, idx) => ({
           id: `rec_${idx}`, name: rec.name, category: rec.category,
           imageUri: rec.image_url, owned: false, layoutRole: rec.role,

@@ -91,6 +91,14 @@ The `head`/`neck`/`carry`/`micro`/`foot` semantic zones do not compete for
 positions in response order; `foot` contains shoes only. The complete group is
 fit and centered by its aggregate bounds.
 
+For an owned `WardrobeItem`, canvas metrics resolve in this order: valid
+persisted `ai_recognized_attrs.visible_bounds` overrides generated preset
+bounds; a matching preset still supplies the source aspect ratio. Invalid
+persisted bounds are ignored, so valid preset metrics remain usable. New or
+remote items without preset metrics retain valid persisted bounds and obtain
+their source aspect ratio from the image at runtime; no catalog aspect is
+guessed. Source-less recommended items remain placeholders.
+
 ## Engineering rules
 
 1. Do not add raw hex colors or one-off button/card geometry to product screens.

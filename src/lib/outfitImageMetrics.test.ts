@@ -5,6 +5,7 @@ import {
   parseOutfitVisibleBounds,
   visibleBoundsFromAttrs,
   presetOutfitImageMetrics,
+  outfitImageMetricsForWardrobeItem,
 } from './outfitImageMetrics.ts';
 
 test('accepts normalized visible bounds', () => {
@@ -82,4 +83,38 @@ test('does not guess metrics for arbitrary remote images', () => {
     undefined,
   );
   assert.equal(presetOutfitImageMetrics('//storage.example/preset-items/black-tshirt.png'), undefined);
+});
+
+test('persisted bounds override preset metrics while preset aspect fills missing values', () => {
+  const metrics = outfitImageMetricsForWardrobeItem({
+    image_url: '/preset-items/black-tshirt.png',
+    ai_recognized_attrs: {
+      visible_bounds: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+    },
+  });
+  assert.deepEqual(metrics?.visibleBounds, { left: 0.1, top: 0.1, width: 0.8, height: 0.8 });
+  assert.equal(metrics?.sourceAspectRatio, 1);
+});
+
+test('invalid persisted bounds do not suppress valid preset metrics', () => {
+  const metrics = outfitImageMetricsForWardrobeItem({
+    image_url: '/preset-items/black-tshirt.png',
+    ai_recognized_attrs: {
+      visible_bounds: { left: 0.9, top: 0, width: 0.2, height: 1 },
+    },
+  });
+  assert.deepEqual(metrics, presetOutfitImageMetrics('/preset-items/black-tshirt.png'));
+});
+
+test('keeps valid persisted bounds without guessing an aspect for remote items', () => {
+  const metrics = outfitImageMetricsForWardrobeItem({
+    image_url: 'https://storage.example/user.png',
+    ai_recognized_attrs: {
+      visible_bounds: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+    },
+  });
+  assert.deepEqual(metrics, {
+    sourceAspectRatio: undefined,
+    visibleBounds: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+  });
 });
