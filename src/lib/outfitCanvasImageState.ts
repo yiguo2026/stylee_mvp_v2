@@ -12,8 +12,9 @@ export type OutfitCanvasImageStatusRegistry = Readonly<Record<string, {
 export type OutfitCanvasImageAspectCache = Readonly<Record<string, number>>;
 
 export type OutfitCanvasCommittedSourceRegistry = Readonly<Record<string, {
-  sourceKey: string;
+  sourceKey: string | null;
   generation: number;
+  active: boolean;
 }>>;
 
 export type OutfitCanvasImageRequestRegistry = Readonly<Record<string, {
@@ -104,16 +105,33 @@ export function commitOutfitCanvasImageSources(
   current: OutfitCanvasCommittedSourceRegistry,
   entries: readonly { itemId: string; sourceKey: string }[],
 ): OutfitCanvasCommittedSourceRegistry {
-  const next: Record<string, { sourceKey: string; generation: number }> = {};
-  let changed = Object.keys(current).length !== entries.length;
+  const activeSources = new Map(entries.map(({ itemId, sourceKey }) => [itemId, sourceKey]));
+  const itemIds = new Set([...Object.keys(current), ...activeSources.keys()]);
+  const next: Record<string, { sourceKey: string | null; generation: number; active: boolean }> = {};
+  let changed = false;
 
-  entries.forEach(({ itemId, sourceKey }) => {
+  itemIds.forEach((itemId) => {
     const previous = current[itemId];
-    const generation = previous?.sourceKey === sourceKey
+    const sourceKey = activeSources.get(itemId);
+    if (sourceKey === undefined) {
+      const tombstone = previous?.active
+        ? { sourceKey: previous.sourceKey, generation: previous.generation + 1, active: false }
+        : previous;
+      if (tombstone) next[itemId] = tombstone;
+      if (previous?.active) changed = true;
+      return;
+    }
+
+    const generation = previous?.active && previous.sourceKey === sourceKey
       ? previous.generation
       : (previous?.generation ?? 0) + 1;
-    next[itemId] = { sourceKey, generation };
-    if (previous?.sourceKey !== sourceKey || previous?.generation !== generation) changed = true;
+    const entry = { sourceKey, generation, active: true };
+    next[itemId] = entry;
+    if (
+      previous?.sourceKey !== entry.sourceKey
+      || previous?.generation !== entry.generation
+      || previous?.active !== entry.active
+    ) changed = true;
   });
 
   return changed ? next : current;
@@ -126,7 +144,9 @@ function requestMatchesCommittedSource(
   generation: number,
 ): boolean {
   const committed = current[itemId];
-  return committed?.sourceKey === sourceKey && committed.generation === generation;
+  return committed?.active === true
+    && committed.sourceKey === sourceKey
+    && committed.generation === generation;
 }
 
 export function outfitCanvasImageRequestIsCurrent(
@@ -144,7 +164,9 @@ function committedGenerationForSource(
   sourceKey: string,
 ): number | null {
   const committed = current[itemId];
-  return committed?.sourceKey === sourceKey ? committed.generation : null;
+  return committed?.active === true && committed.sourceKey === sourceKey
+    ? committed.generation
+    : null;
 }
 
 export function planOutfitCanvasImageRequest(

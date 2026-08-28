@@ -140,6 +140,57 @@ test('a current-generation failure is remembered across equivalent plans but a n
   assert.equal(planOutfitCanvasImageRequest(retry.registry, sourceA3, 'item', 'uri:A').request, null);
 });
 
+test('a failed A1 survives absence as a tombstone and re-added A receives a newer request', () => {
+  const sourceA1 = commitOutfitCanvasImageSources({}, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const firstPlan = planOutfitCanvasImageRequest({}, sourceA1, 'item', 'uri:A');
+  const failedA1 = settleOutfitCanvasImageRequest(
+    firstPlan.registry,
+    sourceA1,
+    firstPlan.request!,
+    'failure',
+  );
+
+  const absent = commitOutfitCanvasImageSources(sourceA1, []);
+  assert.equal(absent.item.active, false);
+  assert.equal(absent.item.generation, 2);
+  assert.strictEqual(commitOutfitCanvasImageSources(absent, []), absent);
+
+  const readdedA3 = commitOutfitCanvasImageSources(absent, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  assert.equal(readdedA3.item.active, true);
+  assert.equal(readdedA3.item.generation, 3);
+  assert.equal(
+    planOutfitCanvasImageRequest(failedA1.registry, readdedA3, 'item', 'uri:A').request?.generation,
+    3,
+  );
+});
+
+test('an in-flight A1 settles safely after removal and a re-added generation suppresses only itself', () => {
+  const sourceA1 = commitOutfitCanvasImageSources({}, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const firstPlan = planOutfitCanvasImageRequest({}, sourceA1, 'item', 'uri:A');
+  const absent = commitOutfitCanvasImageSources(sourceA1, []);
+
+  assert.equal(outfitCanvasImageRequestIsCurrent(absent, 'item', 'uri:A', 1), false);
+  const staleSettlement = settleOutfitCanvasImageRequest(
+    firstPlan.registry,
+    absent,
+    firstPlan.request!,
+    'failure',
+  );
+  assert.equal(staleSettlement.scheduleRetry, false);
+
+  const readdedA3 = commitOutfitCanvasImageSources(absent, [{ itemId: 'item', sourceKey: 'uri:A' }]);
+  const retryA3 = planOutfitCanvasImageRequest(staleSettlement.registry, readdedA3, 'item', 'uri:A');
+  assert.equal(retryA3.request?.generation, 3);
+  const failedA3 = settleOutfitCanvasImageRequest(
+    retryA3.registry,
+    readdedA3,
+    retryA3.request!,
+    'failure',
+  );
+  assert.equal(failedA3.scheduleRetry, false);
+  assert.equal(planOutfitCanvasImageRequest(failedA3.registry, readdedA3, 'item', 'uri:A').request, null);
+});
+
 test('source keys distinguish numeric assets, URI objects, arrays, and serializable objects', () => {
   const asset = outfitCanvasImageSourceKey('item', 12);
   const uri = outfitCanvasImageSourceKey('item', { uri: 'https://image.test/a.png' });
