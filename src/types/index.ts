@@ -122,11 +122,12 @@ export interface WardrobeItem {
   occasion_tags?: string[]; // v2: 场合标签
   // 兼容既有图片处理元数据；
   // recognized_fields 记录 AI 识别字段，manual_fields 记录用户校准字段，
-  // display_fields 仅记录用户通过「添加属性」入口明确加入详情页的非核心属性。
+  // user_added_fields 仅记录用户通过「添加属性」入口明确加入详情页的非核心属性。
   ai_recognized_attrs?: Record<string, unknown> & {
     recognized_fields?: string[];
     manual_fields?: string[];
-    display_fields?: string[];
+    display_fields?: string[]; // 旧版字段，仅保留数据兼容，不再用于控制展示
+    user_added_fields?: string[];
   };
   status: ItemStatus;
   tags?: StyleTag[];
