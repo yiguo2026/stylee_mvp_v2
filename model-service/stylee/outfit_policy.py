@@ -554,4 +554,4 @@ def _formality_level(item: WardrobeItem, styles: frozenset[str]) -> int | None:
         return 2
     if any(token in name for token in ("衬衫", "风衣", "连衣裙", "乐福", "针织")):
         return 2
-    return 3
+    return None

@@ -17,6 +17,7 @@ from stylee.contracts import (
     OutfitItemRef,
     RequestContext,
     SceneSpec,
+    Season,
     Slot,
     WardrobeItem,
     Weather,
@@ -195,7 +196,7 @@ def test_baseball_cap_does_not_pass_formal_outfit_by_color_alone() -> None:
 
 def test_cold_weather_scarf_has_a_functional_positive_signal() -> None:
     wardrobe = _wardrobe() + [
-        _item("scarf-1", Category.SCARF, "羊绒围巾", "米色", styles=["法式慵懒"]),
+        _item("scarf-1", Category.SCARF, "羊绒围巾", "米色"),
     ]
     outfit = _base_outfit()
     outfit.items.append(_owned(Slot.ACCESSORY, "scarf-1"))
@@ -204,19 +205,90 @@ def test_cold_weather_scarf_has_a_functional_positive_signal() -> None:
     )
 
 
+def test_unknown_accessory_without_evidence_is_rejected_for_owned_and_gap_paths() -> None:
+    wardrobe = [
+        _item("plain-top", Category.TOP, "白色T恤", "白色"),
+        _item("plain-bottom", Category.BOTTOM, "黑色长裤", "黑色"),
+        _item("plain-shoes", Category.SHOES, "普通鞋", "黑色"),
+        _item("mystery-accessory", Category.ACCESSORY, "神秘配饰", "黑色"),
+    ]
+    owned = Outfit(items=[
+        _owned(Slot.TORSO, "plain-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "plain-bottom"),
+        _owned(Slot.FEET, "plain-shoes"),
+        _owned(Slot.ACCESSORY, "mystery-accessory"),
+    ])
+    gap = Outfit(items=[
+        _owned(Slot.TORSO, "plain-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "plain-bottom"),
+        _owned(Slot.FEET, "plain-shoes"),
+        _gap(Slot.ACCESSORY, Category.ACCESSORY, "神秘配饰"),
+    ])
+
+    assert "D_ACCESSORY_COHERENCE" in _codes(owned, wardrobe=wardrobe)
+    assert "D_ACCESSORY_COHERENCE" in _codes(gap, wardrobe=wardrobe)
+
+
+def test_known_formality_tokens_allow_owned_and_gap_accessories() -> None:
+    wardrobe = [
+        _item("formal-top", Category.TOP, "白色西装上衣", "白色"),
+        _item("formal-bottom", Category.BOTTOM, "黑色西装长裤", "黑色"),
+        _item("formal-shoes", Category.SHOES, "黑色西装皮鞋", "黑色"),
+        _item("formal-accessory", Category.ACCESSORY, "西装胸针", "黑色"),
+    ]
+    owned = Outfit(items=[
+        _owned(Slot.TORSO, "formal-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "formal-bottom"),
+        _owned(Slot.FEET, "formal-shoes"),
+        _owned(Slot.ACCESSORY, "formal-accessory"),
+    ])
+    gap = Outfit(items=[
+        _owned(Slot.TORSO, "formal-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "formal-bottom"),
+        _owned(Slot.FEET, "formal-shoes"),
+        _gap(Slot.ACCESSORY, Category.ACCESSORY, "西装胸针"),
+    ])
+
+    assert "D_ACCESSORY_COHERENCE" not in _codes(owned, wardrobe=wardrobe)
+    assert "D_ACCESSORY_COHERENCE" not in _codes(gap, wardrobe=wardrobe)
+
+
+def test_seasonal_accessory_has_a_reliable_positive_signal() -> None:
+    wardrobe = [
+        _item("plain-top", Category.TOP, "白色T恤", "白色"),
+        _item("plain-bottom", Category.BOTTOM, "黑色长裤", "黑色"),
+        _item("plain-shoes", Category.SHOES, "普通鞋", "黑色"),
+        WardrobeItem(
+            id="spring-accessory",
+            category=Category.ACCESSORY,
+            subcategory="神秘配饰",
+            colors=["黑色"],
+            seasons=[Season.SPRING],
+        ),
+    ]
+    outfit = Outfit(items=[
+        _owned(Slot.TORSO, "plain-top", LayerRole.BASE),
+        _owned(Slot.BOTTOM, "plain-bottom"),
+        _owned(Slot.FEET, "plain-shoes"),
+        _owned(Slot.ACCESSORY, "spring-accessory"),
+    ])
+
+    assert "D_ACCESSORY_COHERENCE" not in _codes(outfit, wardrobe=wardrobe)
+
+
 def test_known_formality_conflict_rejects_functional_scarf_gap() -> None:
     wardrobe = [
-        _item("formal-top", Category.TOP, "黑色西装上衣", styles=["通勤职场"]),
-        _item("formal-bottom", Category.BOTTOM, "黑色西装长裤", styles=["通勤职场"]),
-        _item("formal-shoes", Category.SHOES, "黑色正装皮鞋", occasions=["正式"]),
-        _item("formal-outer", Category.OUTERWEAR, "黑色西装外套", styles=["通勤职场"]),
+        _item("formal-top", Category.TOP, "黑色西装上衣"),
+        _item("formal-bottom", Category.BOTTOM, "黑色西装长裤"),
+        _item("formal-shoes", Category.SHOES, "黑色西装皮鞋"),
+        _item("formal-outer", Category.OUTERWEAR, "黑色西装外套"),
     ]
     outfit = Outfit(items=[
         _owned(Slot.TORSO, "formal-top", LayerRole.BASE),
         _owned(Slot.BOTTOM, "formal-bottom"),
         _owned(Slot.FEET, "formal-shoes"),
         _owned(Slot.OUTER, "formal-outer", LayerRole.OUTER),
-        _gap(Slot.ACCESSORY, Category.SCARF, "运动围巾"),
+        _gap(Slot.ACCESSORY, Category.SCARF, "运动机能围巾"),
     ])
     ctx = RequestContext(
         input_mode=InputMode.NL,
@@ -226,9 +298,8 @@ def test_known_formality_conflict_rejects_functional_scarf_gap() -> None:
         n=1,
     )
     scene = SceneSpec(
-        occasions=["正式"],
+        occasions=[],
         formality=Formality.FORMAL,
-        style_keywords=["通勤职场"],
     )
     result = validate_outfit_result(
         outfit,
@@ -750,6 +821,9 @@ def main() -> None:
     test_accessories_are_optional_and_default_to_at_most_two()
     test_baseball_cap_does_not_pass_formal_outfit_by_color_alone()
     test_cold_weather_scarf_has_a_functional_positive_signal()
+    test_unknown_accessory_without_evidence_is_rejected_for_owned_and_gap_paths()
+    test_known_formality_tokens_allow_owned_and_gap_accessories()
+    test_seasonal_accessory_has_a_reliable_positive_signal()
     test_known_formality_conflict_rejects_functional_scarf_gap()
     test_scene_style_exclusion_beats_accessory_style_match()
     test_gap_accessory_uses_description_style_facts_like_equivalent_owned_item()
