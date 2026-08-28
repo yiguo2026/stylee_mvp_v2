@@ -236,6 +236,17 @@ html = html.replace('<html lang="en">', '<html lang="zh">');
 html = html.replace('</head>', fontFaceStyle + shellStyle + '\n</head>');
 html = html.replace('<div id="root"></div>', shellMarkup);
 
+// 当前生产流程把 dist 直接发布到 yiguo2026.github.io 根目录。
+// 构建时校验 HTML 引用的本地脚本确实存在，防止误加 baseUrl 后线上白屏。
+const localScriptSources = [...html.matchAll(/<script[^>]+src="(\/[^"]+)"/g)].map(match => match[1]);
+for (const src of localScriptSources) {
+  const localPath = path.join(__dirname, '..', 'dist', src.replace(/^\//, ''));
+  if (!fs.existsSync(localPath)) {
+    console.error(`Invalid deploy asset path: ${src} does not exist under dist/`);
+    process.exit(1);
+  }
+}
+
 fs.writeFileSync(htmlPath, html);
 
 // ── 4. Create 404.html (identical to index.html for SPA routing on GitHub Pages) ──
