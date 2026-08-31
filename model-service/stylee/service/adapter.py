@@ -9,10 +9,11 @@ import re
 
 from ..contracts import (
     BodyShape, Category, FilterTags, Fit, InputMode, RequestContext,
-    Season, Sleeve, UserProfile, WardrobeItem, Weather,
+    ItemSource, LayerRole, Season, Sleeve, UserProfile, WardrobeItem, Weather,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
     StandardizedImage,
 )
+from ..outfit_policy import build_item_facts
 
 _OCCASION = {"commute": "通勤", "date": "约会", "travel": "差旅",
              "casual": "休闲", "work": "正式", "sport": "运动"}
@@ -39,10 +40,18 @@ def label(tag_id: str) -> str:
     return _OCCASION.get(tag_id) or _STYLE.get(tag_id) or _COLOR.get(tag_id) or tag_id
 
 
-def model_category(value: str) -> Category:
+def model_category(value: str, name: str = "") -> Category:
+    lowered = str(name or "").lower()
+    if value == "帽巾":
+        if any(token in lowered for token in ("帽", "cap", "hat", "beanie")):
+            return Category.HAT
+        if any(token in lowered for token in ("围巾", "丝巾", "领巾", "scarf")):
+            return Category.SCARF
+        return Category.SCARF
+    if value == "配饰":
+        return Category.ACCESSORY
     aliases = {
         "连体装": Category.DRESS, "鞋履": Category.SHOES, "包袋": Category.BAG,
-        "帽巾": Category.SCARF, "配饰": Category.HAT,
     }
     if value in aliases:
         return aliases[value]
@@ -56,6 +65,7 @@ def app_category(cat: Category) -> str:
     return {
         Category.DRESS: "连体装", Category.SHOES: "鞋履", Category.BAG: "包袋",
         Category.HAT: "帽巾", Category.SCARF: "帽巾",
+        Category.ACCESSORY: "配饰",
     }.get(cat, cat.value)
 
 
@@ -113,7 +123,7 @@ def wardrobe_item(d: dict) -> WardrobeItem:
     seasons = [s for s in (_enum(Season, x) for x in (d.get("season") or [])) if s]
     return WardrobeItem(
         id=str(d.get("item_id") or d.get("id") or ""),
-        category=model_category(d.get("category")),
+        category=model_category(d.get("category"), d.get("name", "")),
         subcategory=d.get("name", "") or "",
         colors=[c for c in colors if c],
         material=d.get("material", "") or "",
@@ -169,22 +179,99 @@ def to_request_context(payload: dict) -> RequestContext:
     )
 
 
+_LAYOUT_ROLE_BY_CATEGORY = {
+    Category.BOTTOM: "bottom",
+    Category.DRESS: "dress",
+    Category.OUTERWEAR: "outer",
+    Category.SHOES: "shoes",
+    Category.BAG: "bag",
+    Category.SCARF: "scarf",
+    Category.ACCESSORY: "accessory",
+}
+
+
+def layout_role_for_ref(
+    ref: OutfitItemRef,
+    item_index: dict[str, WardrobeItem],
+) -> str | None:
+    category = (
+        item_index[ref.ref].category
+        if ref.owned and ref.ref in item_index
+        else ref.suggest.category if ref.suggest else None
+    )
+    if category is Category.TOP:
+        role = ref.layer_role or LayerRole.BASE
+        return role.value if role in {LayerRole.BASE, LayerRole.MID} else None
+    if category is Category.HAT:
+        accessory = (
+            item_index[ref.ref]
+            if ref.owned and ref.ref in item_index
+            else WardrobeItem(
+                id="",
+                category=Category.HAT,
+                subcategory=ref.suggest.desc if ref.suggest else "",
+                source=ItemSource.AI_SUGGEST,
+            )
+        )
+        return "hat" if build_item_facts(accessory).definite_hat is True else "accessory"
+    return _LAYOUT_ROLE_BY_CATEGORY.get(category)
+
+
 def outfits_to_app(result, ctx) -> dict:
+    item_index = {item.id: item for item in ctx.wardrobe}
+    layout_items_emitted = 0
+    layout_contract_build_error_count = 0
     outfits = []
-    for i, o in enumerate(result.outfits):
-        rec = []
-        for it in o.items:
-            if not it.owned and it.suggest:
-                g = it.suggest
-                rec.append({"name": compact_recommended_name(g.desc, g.category),
-                            "category": app_category(g.category),
-                            "color": "", "description": g.reason})
-        outfits.append({
-            "name": o.occasion or f"方案{i + 1}",
-            "owned_item_ids": o.owned_refs(),
-            "recommended_items": rec,
-            "comment": o.reasoning or "",
-        })
+    for i, outfit in enumerate(result.outfits):
+        owned_ids: list[str] = []
+        recommended_items: list[dict] = []
+        layout_items: list[dict] = []
+        layout_keys: set[tuple[str, str | int]] = set()
+        layout_valid = True
+
+        for ref in outfit.items:
+            role = layout_role_for_ref(ref, item_index)
+            if ref.owned and ref.ref:
+                owned_ids.append(ref.ref)
+                key = ("owned", ref.ref)
+                entry = {"source": "owned", "item_id": ref.ref, "layout_role": role}
+            elif not ref.owned and ref.suggest:
+                suggestion = ref.suggest
+                recommended_index = len(recommended_items)
+                recommended_items.append({
+                    "name": compact_recommended_name(suggestion.desc, suggestion.category),
+                    "category": app_category(suggestion.category),
+                    "color": "",
+                    "description": suggestion.reason,
+                })
+                key = ("recommended", recommended_index)
+                entry = {
+                    "source": "recommended",
+                    "recommended_index": recommended_index,
+                    "layout_role": role,
+                }
+            else:
+                layout_valid = False
+                continue
+
+            if role is None or key in layout_keys:
+                layout_valid = False
+            else:
+                layout_keys.add(key)
+                layout_items.append(entry)
+
+        value = {
+            "name": outfit.occasion or f"方案{i + 1}",
+            "owned_item_ids": owned_ids,
+            "recommended_items": recommended_items,
+            "comment": outfit.reasoning or "",
+        }
+        if layout_valid and len(layout_items) == len(owned_ids) + len(recommended_items):
+            value["layout_items"] = layout_items
+            layout_items_emitted += 1
+        else:
+            layout_contract_build_error_count += 1
+        outfits.append(value)
     trace = {
         "rag_mode": result.trace.get("rag_mode", "?"),
         "pool": result.trace.get("candidate_pool_size", 0),
@@ -192,6 +279,8 @@ def outfits_to_app(result, ctx) -> dict:
     for key in _CONSTRAINT_TRACE_KEYS:
         if key in result.trace:
             trace[key] = result.trace[key]
+    trace["layout_items_emitted"] = layout_items_emitted
+    trace["layout_contract_build_error_count"] = layout_contract_build_error_count
     return {"outfits": outfits, "trace": trace}
 
 
@@ -223,4 +312,9 @@ def std_to_app(si) -> dict:
         "alpha_verified": si.alpha_verified,
         "matte_provider": si.matte_provider,
         "failure_stage": si.failure_stage,
+        **(
+            {"visible_bounds": si.visible_bounds.to_dict()}
+            if si.visible_bounds is not None
+            else {}
+        ),
     }

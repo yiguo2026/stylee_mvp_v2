@@ -38,7 +38,10 @@ test('photo_type 旧值归一化，多品识别元数据不丢失', () => {
 
 test('toRecommendRequest 映射 fit_type→fit、拆 style_prefs、temp→temp_c', () => {
   const req = toRecommendRequest(
-    [item({ item_id: 't1', category: '上装', fit_type: '修身', color: '白', material: '棉', season: ['春'], occasion_tags: ['通勤'] })],
+    [item({ item_id: 't1', category: '上装', fit_type: '修身', color: '白', material: '棉', season: ['春'], occasion_tags: ['通勤'], tags: [
+      { tag_id: 'style-1', tag_name: '法式慵懒', tag_type: 'style' },
+      { tag_id: 'occasion-1', tag_name: '通勤', tag_type: 'occasion' },
+    ] })],
     { query: '约会', temp: '22', city: '上海', weather: '晴', stylePreferences: '法式、通勤' },
   );
   assert.equal(req.input_mode, 'nl');
@@ -49,6 +52,7 @@ test('toRecommendRequest 映射 fit_type→fit、拆 style_prefs、temp→temp_c
   assert.equal(req.weather.temp_c, 22);
   assert.equal(req.weather.city, '上海');
   assert.deepEqual(req.profile.style_prefs, ['法式', '通勤']);
+  assert.deepEqual(req.wardrobe[0].style_tags, ['法式慵懒']);
 });
 
 test('toRecommendRequest 只取 active、query 空时退回 tags', () => {
@@ -88,4 +92,95 @@ test('推荐补位名称去掉购买建议句，只保留简短单品名', () =>
     compactRecommendedName('建议选择一双透气轻便的白色帆布鞋', '鞋履'),
     '白色帆布鞋',
   );
+});
+
+test('validated layout_items map onto owned and recommended items', () => {
+  const wardrobe = [item({ item_id: 't1', category: '上装' }), item({ item_id: 'b1', category: '下装' })];
+  const [outfit] = outfitsRespToApp([{
+    name: '通勤',
+    owned_item_ids: ['t1', 'b1'],
+    recommended_items: [{ name: '乐福鞋', category: '鞋履', color: '白色' }],
+    comment: '',
+    layout_items: [
+      { source: 'owned', item_id: 't1', layout_role: 'base' },
+      { source: 'owned', item_id: 'b1', layout_role: 'bottom' },
+      { source: 'recommended', recommended_index: 0, layout_role: 'shoes' },
+    ],
+  }], wardrobe, 'u1', 's1');
+  assert.equal(outfit.items?.[0].role, 'base');
+  assert.equal(outfit.items?.[1].role, 'bottom');
+  assert.equal(outfit.recommended_items?.[0].role, 'shoes');
+});
+
+test('invalid layout entries degrade locally without dropping n', () => {
+  const wardrobe = [item({ item_id: 't1', category: '上装' }), item({ item_id: 'b1', category: '下装' })];
+  const [outfit] = outfitsRespToApp([{
+    name: '兼容',
+    owned_item_ids: ['t1', 'b1'],
+    recommended_items: [{ name: '围巾', category: '帽巾', color: '米色' }],
+    comment: '',
+    layout_items: [
+      { source: 'owned', item_id: 't1', layout_role: 'unknown' as never },
+      { source: 'owned', item_id: 'b1', layout_role: 'bottom' },
+      { source: 'owned', item_id: 'b1', layout_role: 'base' },
+      { source: 'recommended', recommended_index: 8, layout_role: 'scarf' },
+    ],
+  }], wardrobe, 'u1', 's1');
+  assert.equal(outfit.items?.length, 2);
+  assert.equal(outfit.recommended_items?.length, 1);
+  assert.equal(outfit.items?.[0].role, undefined);
+  assert.equal(outfit.items?.[1].role, undefined);
+  assert.equal(outfit.recommended_items?.[0].role, undefined);
+});
+
+test('malformed layout entries do not interrupt outfit mapping', () => {
+  const wardrobe = [item({ item_id: 't1', category: '上装' })];
+  const [outfit] = outfitsRespToApp([{
+    name: '兼容',
+    owned_item_ids: ['t1'],
+    recommended_items: [],
+    comment: '',
+    layout_items: [null as never, { source: 'owned', item_id: 't1', layout_role: 'base' }],
+  }], wardrobe, 'u1', 's1');
+  assert.equal(outfit.items?.length, 1);
+  assert.equal(outfit.items?.[0].role, 'base');
+});
+
+test('unknown owned role permanently invalidates a later valid duplicate target', () => {
+  const wardrobe = [item({ item_id: 't1', category: '上装' })];
+  const [outfit] = outfitsRespToApp([{
+    name: '兼容',
+    owned_item_ids: ['t1'],
+    recommended_items: [],
+    comment: '',
+    layout_items: [
+      { source: 'owned', item_id: 't1', layout_role: 'unknown' as never },
+      { source: 'owned', item_id: 't1', layout_role: 'base' },
+    ],
+  }], wardrobe, 'u1', 's1');
+
+  assert.equal(outfit.items?.length, 1);
+  assert.equal(outfit.items?.[0].role, undefined);
+});
+
+test('duplicate and unknown recommended targets cannot regain a trusted role', () => {
+  const [outfit] = outfitsRespToApp([{
+    name: '兼容',
+    owned_item_ids: [],
+    recommended_items: [
+      { name: '丝巾', category: '帽巾', color: '米色' },
+      { name: '珍珠耳饰', category: '配饰', color: '白色' },
+    ],
+    comment: '',
+    layout_items: [
+      { source: 'recommended', recommended_index: 0, layout_role: 'scarf' },
+      { source: 'recommended', recommended_index: 0, layout_role: 'accessory' },
+      { source: 'recommended', recommended_index: 1, layout_role: 'unknown' as never },
+      { source: 'recommended', recommended_index: 1, layout_role: 'accessory' },
+    ],
+  }], [], 'u1', 's1');
+
+  assert.equal(outfit.recommended_items?.length, 2);
+  assert.equal(outfit.recommended_items?.[0].role, undefined);
+  assert.equal(outfit.recommended_items?.[1].role, undefined);
 });

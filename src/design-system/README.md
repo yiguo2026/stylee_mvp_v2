@@ -85,8 +85,19 @@ the client. It never requests a generated composite image. The pure layout
 policy in `src/lib/outfitCanvasLayout.ts` selects percentage-based positions by
 garment role and item count: core garments form a central dressing axis,
 outerwear sits behind it, shoes remain smaller and separate below the trousers,
-and accessories use natural surrounding space only when present. More than two
-accessories move to a compact lower band without shrinking the core outfit.
+and accessories use natural surrounding space only when present. Roles come
+from the optional server contract, while legacy responses degrade by name.
+The `head`/`neck`/`carry`/`micro`/`foot` semantic zones do not compete for
+positions in response order; `foot` contains shoes only. The complete group is
+fit and centered by its aggregate bounds.
+
+For an owned `WardrobeItem`, canvas metrics resolve in this order: valid
+persisted `ai_recognized_attrs.visible_bounds` overrides generated preset
+bounds; a matching preset still supplies the source aspect ratio. Invalid
+persisted bounds are ignored, so valid preset metrics remain usable. New or
+remote items without preset metrics retain valid persisted bounds and obtain
+their source aspect ratio from the image at runtime; no catalog aspect is
+guessed. Source-less recommended items remain placeholders.
 
 ## Engineering rules
 

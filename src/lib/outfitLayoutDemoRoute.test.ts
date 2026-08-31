@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 const libDir = dirname(fileURLToPath(import.meta.url));
 
-test('online demo exposes 3, 4, and 6 item states through the production canvas', () => {
+test('demo uses fixed response fixtures and labels stress cases honestly', () => {
   const source = readFileSync(resolve(libDir, '../app/outfit-layout-demo.tsx'), 'utf8');
-  assert.match(source, /StyleeOutfitCanvas/);
-  assert.match(source, /3件基础/);
-  assert.match(source, /4件叠穿/);
-  assert.match(source, /6件配饰/);
+  const fixtures = readFileSync(resolve(libDir, '../data/outfitLayoutDemoFixtures.ts'), 'utf8');
+  assert.match(source, /outfitLayoutDemoFixtures/);
+  assert.match(fixtures, /合法响应 fixture/);
+  assert.match(fixtures, /8件结构压力测试/);
+  assert.doesNotMatch(fixtures, /8件合法上限/);
   assert.doesNotMatch(source, /aiRecommend|tryon|fetch\(|supabase/);
 });
 
@@ -25,4 +26,9 @@ test('the shareable demo route is not redirected to login', () => {
   const rootLayout = readFileSync(resolve(libDir, '../app/_layout.tsx'), 'utf8');
   assert.match(rootLayout, /pathname\.startsWith\('\/outfit-layout-demo'\)/);
   assert.match(rootLayout, /if \(!isPublicPreview\) router\.replace\('\/\(auth\)\/login'\)/);
+});
+
+test('demo owned items resolve garment image metrics through the shared resolver', () => {
+  const source = readFileSync(resolve(libDir, '../app/outfit-layout-demo.tsx'), 'utf8');
+  assert.match(source, /outfitImageMetricsForWardrobeItem\(entry\.item\)/);
 });

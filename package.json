@@ -7,6 +7,8 @@
     "build:web": "node node_modules/expo/bin/cli export --platform web && node ./scripts/patch-html.js",
     "tokens:build": "node ./scripts/generate-design-tokens.mjs",
     "tokens:check": "node ./scripts/generate-design-tokens.mjs --check",
+    "outfit-metrics:build": "python3 scripts/check-outfit-fixture-alpha.py --write",
+    "outfit-metrics:check": "python3 scripts/check-outfit-fixture-alpha.py --check",
     "wardrobe-density:check": "node ./scripts/check-wardrobe-density.mjs",
     "design-system:check": "node ./scripts/check-design-system.mjs",
     "check": "npm run tokens:check && npm run design-system:check && npm run wardrobe-density:check && tsc --noEmit",

@@ -163,8 +163,9 @@ _GEN_SCHEMA = (
     '{"outfits":[{"items":['
     '{"role":"torso|bottom|outer|feet|accessory",'
     '"layer_role":"base|mid|outer|null","id":"候选池里的真实id"},'
-    '{"role":"feet","layer_role":null,'
-    '"gap":{"category":"鞋","desc":"补买建议","reason":"理由"}}'
+    '{"role":"torso|bottom|outer|feet|accessory","layer_role":"base|mid|outer|null",'
+    '"gap":{"category":"上装|下装|连衣裙|外套|鞋|包|帽子|围巾|配饰",'
+    '"desc":"补买建议","reason":"理由"}}'
     '],"primary_style":"主风格","secondary_style":"辅风格或空",'
     '"style_tags":[],"occasion":"","reasoning":"一句话理由"}]}'
 )
@@ -183,6 +184,16 @@ def build_gen_messages(ctx: RequestContext, scene: SceneSpec, pool: CandidatePoo
         f"上轮候选全部未通过代码校验。这是定向重生成，重新生成 {k} 套。\n"
         if retry_codes else ""
     )
+    layer_rule = (
+        "普通推荐上身最多 2 层；上装用 base|mid，外套用 outer；"
+        if policy.enforces("D_UPPER_LAYER_MAX_TWO")
+        else "用户明确要求三层；只允许完整且兼容的 base+mid+outer；"
+    )
+    accessory_rule = (
+        "配饰默认最多 2 件且可以为 0 件；不要为了凑数量添加配饰；"
+        if policy.enforces("D_ACCESSORY_COUNT_MAX_TWO")
+        else "用户明确要求丰富配饰；仍需满足单类绝对数量限制；"
+    )
     sys = (
         retry_header
         + "你是资深个人穿搭师。从给定『候选池』里按 id 选用户真实拥有的单品,组成整套搭配。\n"
@@ -193,6 +204,8 @@ def build_gen_messages(ctx: RequestContext, scene: SceneSpec, pool: CandidatePoo
         "4) 鞋恰好 1 双;包至多 1 个;帽至多 1 顶;\n"
         "5) 某个必需槽位没有合适已有单品时必须用 gap;gap 与已有单品同样参与数量、分层和覆盖约束;\n"
         "默认规则(用户明确要求冲突时，以用户要求为准):\n"
+        f"{layer_rule}\n"
+        f"{accessory_rule}\n"
         "6) 彩色家族至多 3 种、中性色家族至多 2 种;彩色单品至多 3 件;荧光色单品至多 1 件;\n"
         "7) 单品正式度跨度至多 1 级;主风格属于场景风格池;同套不混用互斥风格;冷天应有外套;\n"
         "生成要求:\n"

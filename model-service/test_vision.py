@@ -3,7 +3,7 @@ from stylee.vision.prompts import (
     build_verify_messages, parse_verify_json,
 )
 from stylee.vision.base import ImageRefSource, VisionProvider, ImageStandardizer
-from stylee.contracts import StandardizedImage, IngestResult, WardrobeItem, Category, PhotoType, Sleeve, Fit, Season
+from stylee.contracts import StandardizedImage, IngestResult, VisibleBounds, WardrobeItem, Category, PhotoType, Sleeve, Fit, Season
 from stylee.ingest import to_data_url, derive_warmth, normalize_attrs, recognize_item, mode_for, standardize_item
 
 
@@ -140,7 +140,7 @@ class _FakeMatte:
         from stylee.vision.alpha_matte import AlphaMatteOutput, AlphaStats
         return AlphaMatteOutput(
             "data:image/png;base64,AAAA", "image/png", True, self.name,
-            AlphaStats(0.5, 0.5, 1.0, (1, 1, 2, 2)),
+            AlphaStats(0.5, 0.5, 1.0, (1, 1, 2, 2), VisibleBounds(0.01, 0.01, 0.01, 0.01)),
         )
 
 
@@ -224,6 +224,7 @@ def test_standardize_ok_cutout():
     si = standardize_item("orig://x", item, PhotoType.FLATLAY,
                           MockVisionProvider(), MockImageStandardizer(), _FakeMatte())
     assert si.image_ref == "data:image/png;base64,AAAA" and si.method == "cutout_alpha" and si.verified is True
+    assert si.visible_bounds == VisibleBounds(0.01, 0.01, 0.01, 0.01)
 
 
 def test_standardize_drift_falls_back():

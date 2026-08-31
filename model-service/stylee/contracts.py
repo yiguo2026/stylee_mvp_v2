@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+import math
 from typing import Optional
 
 
@@ -24,6 +25,7 @@ class Category(str, Enum):
     BAG = "包"
     HAT = "帽子"
     SCARF = "围巾"
+    ACCESSORY = "配饰"
 
 
 class Slot(str, Enum):
@@ -32,11 +34,11 @@ class Slot(str, Enum):
     BOTTOM = "bottom"      # 下身:由 BOTTOM 占;DRESS 同时覆盖 TORSO+BOTTOM
     OUTER = "outer"        # 外层:OUTERWEAR
     FEET = "feet"          # 鞋
-    ACCESSORY = "accessory"  # 配饰:BAG/HAT/SCARF
+    ACCESSORY = "accessory"  # 配饰:BAG/HAT/SCARF/ACCESSORY
 
 
 class LayerRole(str, Enum):
-    """上身穿着顺序；只用于服务端生成与校验，不暴露给 App。"""
+    """上身穿着顺序；服务端生成与校验，并经 adapter 归一化为可选 App 布局角色。"""
     BASE = "base"
     MID = "mid"
     OUTER = "outer"
@@ -52,6 +54,7 @@ CATEGORY_SLOT: dict[Category, Slot] = {
     Category.BAG: Slot.ACCESSORY,
     Category.HAT: Slot.ACCESSORY,
     Category.SCARF: Slot.ACCESSORY,
+    Category.ACCESSORY: Slot.ACCESSORY,
 }
 
 
@@ -106,6 +109,26 @@ class PhotoType(str, Enum):
     ON_BODY = "on_body"     # 上身穿着 → 生成重绘
     WEB = "web"             # 网图 / 模特图 → 生成重绘
     ANGLED = "angled"       # 侧拍 / 遮挡 → 生成重绘
+
+
+@dataclass(frozen=True)
+class VisibleBounds:
+    left: float
+    top: float
+    width: float
+    height: float
+
+    def __post_init__(self) -> None:
+        values = (self.left, self.top, self.width, self.height)
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("visible bounds must be finite")
+        if self.left < 0 or self.top < 0 or self.width <= 0 or self.height <= 0:
+            raise ValueError("visible bounds must be positive and in range")
+        if self.left + self.width > 1 or self.top + self.height > 1:
+            raise ValueError("visible bounds exceed source image")
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +286,7 @@ class StandardizedImage:
     alpha_verified: bool = False
     matte_provider: str = ""
     failure_stage: str | None = None
+    visible_bounds: VisibleBounds | None = None
 
 
 @dataclass

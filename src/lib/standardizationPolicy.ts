@@ -1,5 +1,6 @@
 import type { StandardizeResp } from './styleeMapping.ts';
 import { normalizePhotoType } from './styleeMapping.ts';
+import { parseOutfitVisibleBounds, type OutfitVisibleBounds } from './outfitImageMetrics.ts';
 
 export const MAX_STANDARDIZED_DATA_URI_LENGTH = 12 * 1024 * 1024;
 
@@ -29,6 +30,7 @@ export interface StandardizationMetadata {
   alpha_verified: boolean;
   transparent_background: boolean;
   matte_provider: string | null;
+  visible_bounds?: OutfitVisibleBounds;
   request_id?: string;
   failure_stage?: string;
   original_uri: string;
@@ -124,6 +126,8 @@ export function buildStandardizationMetadata(
     };
   }
 
+  const visibleBounds = parseOutfitVisibleBounds(acceptance.response.visible_bounds);
+
   return {
     standardization_ok: true,
     standardization: acceptance.response.method,
@@ -131,6 +135,7 @@ export function buildStandardizationMetadata(
     alpha_verified: acceptance.response.alpha_verified === true,
     transparent_background: acceptance.response.background === 'transparent',
     matte_provider: acceptance.response.matte_provider ?? null,
+    ...(visibleBounds ? { visible_bounds: visibleBounds } : {}),
     ...(requestId ? { request_id: requestId } : {}),
     original_uri: originalUri,
     photo_type: normalizePhotoType(photoType),

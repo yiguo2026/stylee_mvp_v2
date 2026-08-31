@@ -249,4 +249,5 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
         alpha_verified=True,
         matte_provider=matte_output.provider,
         failure_stage=None,
+        visible_bounds=matte_output.stats.visible_bounds,
     )

@@ -256,6 +256,7 @@ const accepted = {
     alpha_verified: true,
     matte_provider: 'matte-v1',
     failure_stage: null,
+    visible_bounds: { left: 0.1, top: 0.2, width: 0.5, height: 0.6 },
   },
 };
 
@@ -344,6 +345,7 @@ test('accepted master persists original then master and returns durable metadata
   assert.equal(result.metadata.original_image_url, 'https://storage.test/original.jpg');
   assert.equal(result.metadata.standardized_image_url, 'https://storage.test/master.png');
   assert.equal(result.metadata.photo_type, 'flatlay');
+  assert.deepEqual(result.metadata.visible_bounds, { left: 0.1, top: 0.2, width: 0.5, height: 0.6 });
   assert.equal(JSON.stringify(result.metadata).includes('data:image/png'), false);
 });
 

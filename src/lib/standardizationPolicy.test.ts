@@ -107,6 +107,29 @@ test('success metadata normalizes a missing matte provider to null', () => {
   assert.equal(JSON.stringify(metadata).includes('"matte_provider":null'), true);
 });
 
+test('success metadata preserves only valid visible bounds', () => {
+  const acceptance = acceptTransparentStandardization({
+    ...valid,
+    visible_bounds: { left: 0.1, top: 0.2, width: 0.5, height: 0.6 },
+  });
+  assert.deepEqual(
+    buildStandardizationMetadata(acceptance, 'https://storage/original.jpg', 'flatlay').visible_bounds,
+    { left: 0.1, top: 0.2, width: 0.5, height: 0.6 },
+  );
+});
+
+test('invalid bounds do not reject an otherwise valid transparent PNG', () => {
+  const acceptance = acceptTransparentStandardization({
+    ...valid,
+    visible_bounds: { left: 0.9, top: 0, width: 0.2, height: 1 },
+  });
+  assert.equal(acceptance.ok, true);
+  assert.equal(
+    buildStandardizationMetadata(acceptance, 'https://storage/original.jpg', 'flatlay').visible_bounds,
+    undefined,
+  );
+});
+
 test('rejected responses produce JSONB-safe fallback metadata', () => {
   const metadata = buildStandardizationMetadata(
     acceptTransparentStandardization({ ...valid, alpha_verified: false }),

@@ -6,8 +6,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
-from .contracts import Category, LayerRole, RequestContext, SceneSpec, WardrobeItem
+from .contracts import Category, LayerRole, RequestContext, SceneSpec, Season, WardrobeItem, Weather
 
 
 ALL_DEFAULT_RULES = frozenset({
@@ -18,6 +19,10 @@ ALL_DEFAULT_RULES = frozenset({
     "D_SCENE_STYLE_POOL",
     "D_STYLE_CONFLICT",
     "D_WEATHER_COMPAT",
+    "D_UPPER_LAYER_MAX_TWO",
+    "D_LAYER_COMPAT",
+    "D_ACCESSORY_COUNT_MAX_TWO",
+    "D_ACCESSORY_COHERENCE",
 })
 
 
@@ -114,6 +119,33 @@ class ConstraintPolicy:
         return cls(overridden_rules=ALL_DEFAULT_RULES, enforce_weather=False)
 
 
+class GarmentKind(str, Enum):
+    TEE = "tee"
+    SHIRT = "shirt"
+    OVERSHIRT = "overshirt"
+    CARDIGAN = "cardigan"
+    KNIT_VEST = "knit_vest"
+    TURTLENECK = "turtleneck"
+    SWEATER = "sweater"
+    SWEATSHIRT = "sweatshirt"
+    OUTER = "outer"
+    DRESS = "dress"
+    UNKNOWN = "unknown"
+
+
+class ClosureMode(str, Enum):
+    OPENABLE = "openable"
+    CLOSED = "closed"
+    UNKNOWN = "unknown"
+
+
+class ThicknessBand(str, Enum):
+    THIN = "thin"
+    MEDIUM = "medium"
+    THICK = "thick"
+    UNKNOWN = "unknown"
+
+
 @dataclass(frozen=True)
 class ItemFacts:
     layer_capabilities: frozenset[LayerRole]
@@ -123,6 +155,200 @@ class ItemFacts:
     formality_level: int | None = None
     styles: frozenset[str] = frozenset()
     definite_hat: bool | None = None
+    garment_kind: GarmentKind = GarmentKind.UNKNOWN
+    closure_mode: ClosureMode = ClosureMode.UNKNOWN
+    thickness_band: ThicknessBand = ThicknessBand.UNKNOWN
+    seasons: frozenset[Season] = frozenset()
+
+
+def current_season(weather: Weather) -> Season:
+    """没有日历就用温度近似季节(够 demo 用;真实可换成月份+地域)。"""
+    t = weather.temp_c
+    if t >= 24:
+        return Season.SUMMER
+    if t >= 15:
+        return Season.AUTUMN if weather.time_of_day == "evening" else Season.SPRING
+    if t >= 8:
+        return Season.AUTUMN
+    return Season.WINTER
+
+
+def _garment_kind(item: WardrobeItem) -> GarmentKind:
+    name = item.subcategory.lower()
+    if item.category is Category.OUTERWEAR:
+        return GarmentKind.OUTER
+    if item.category is Category.DRESS:
+        return GarmentKind.DRESS
+    if item.category is not Category.TOP:
+        return GarmentKind.UNKNOWN
+    ordered = (
+        (("衬衫外套", "overshirt", "shacket"), GarmentKind.OVERSHIRT),
+        (("开衫", "cardigan"), GarmentKind.CARDIGAN),
+        (("针织背心", "毛衣背心", "knit vest"), GarmentKind.KNIT_VEST),
+        (("高领", "turtleneck"), GarmentKind.TURTLENECK),
+        (("t恤", "t-shirt", "tee"), GarmentKind.TEE),
+        (("卫衣", "sweatshirt", "hoodie"), GarmentKind.SWEATSHIRT),
+        (("毛衣", "针织衫", "sweater"), GarmentKind.SWEATER),
+        (("衬衫", "shirt"), GarmentKind.SHIRT),
+    )
+    for tokens, kind in ordered:
+        if any(token in name for token in tokens):
+            return kind
+    return GarmentKind.UNKNOWN
+
+
+def _layer_capabilities(category: Category, kind: GarmentKind) -> frozenset[LayerRole]:
+    if category is Category.OUTERWEAR:
+        return frozenset({LayerRole.OUTER})
+    if category is Category.DRESS:
+        return frozenset({LayerRole.BASE})
+    if category is not Category.TOP:
+        return frozenset()
+    roles = {LayerRole.BASE}
+    if kind in {
+        GarmentKind.OVERSHIRT, GarmentKind.CARDIGAN, GarmentKind.KNIT_VEST,
+        GarmentKind.SWEATER, GarmentKind.SWEATSHIRT,
+    }:
+        roles.add(LayerRole.MID)
+    return frozenset(roles)
+
+
+def _closure_mode(kind: GarmentKind) -> ClosureMode:
+    if kind in {GarmentKind.OVERSHIRT, GarmentKind.CARDIGAN}:
+        return ClosureMode.OPENABLE
+    if kind in {
+        GarmentKind.TEE, GarmentKind.KNIT_VEST, GarmentKind.TURTLENECK,
+        GarmentKind.SWEATER, GarmentKind.SWEATSHIRT,
+    }:
+        return ClosureMode.CLOSED
+    return ClosureMode.UNKNOWN
+
+
+def _thickness_band(item: WardrobeItem, kind: GarmentKind) -> ThicknessBand:
+    text = f"{item.subcategory} {item.material}".lower()
+    if any(token in text for token in ("厚", "羊绒", "羊毛", "摇粒绒")) or item.warmth >= 3:
+        return ThicknessBand.THICK
+    if kind in {GarmentKind.TEE, GarmentKind.SHIRT} or item.warmth == 0:
+        return ThicknessBand.THIN
+    if kind is not GarmentKind.UNKNOWN:
+        return ThicknessBand.MEDIUM
+    return ThicknessBand.UNKNOWN
+
+
+def layer_pair_compatible(base: ItemFacts, mid: ItemFacts) -> bool:
+    allowed = {
+        GarmentKind.TEE: {GarmentKind.CARDIGAN, GarmentKind.KNIT_VEST,
+                          GarmentKind.OVERSHIRT, GarmentKind.SWEATER,
+                          GarmentKind.SWEATSHIRT},
+        GarmentKind.SHIRT: {GarmentKind.CARDIGAN, GarmentKind.KNIT_VEST,
+                            GarmentKind.SWEATER},
+        GarmentKind.TURTLENECK: {GarmentKind.CARDIGAN, GarmentKind.KNIT_VEST,
+                                 GarmentKind.OVERSHIRT},
+    }
+    if base.garment_kind is GarmentKind.UNKNOWN or mid.garment_kind is GarmentKind.UNKNOWN:
+        return False
+    if LayerRole.BASE not in base.layer_capabilities or LayerRole.MID not in mid.layer_capabilities:
+        return False
+    return mid.garment_kind in allowed.get(base.garment_kind, set())
+
+
+_CLAUSE_WIDE_AVOIDANCE_INTENTS = (
+    "不愿意",
+    "不打算",
+    "不可以",
+    "不想要",
+    "不希望",
+    "不需要",
+    "不建议",
+    "不考虑",
+    "请勿",
+    "不能",
+    "不可",
+    "不要",
+    "不想",
+    "不愿",
+    "无需",
+    "不用",
+    "避免",
+    "拒绝",
+    "取消",
+    "禁止",
+    "告别",
+    "算了",
+    "勿",
+    "莫",
+)
+_CLAUSE_DELIMITERS = frozenset("，,。.!！?？；;：:\n\r")
+_NON_NEGATING_BIE_COMPOUNDS = (
+    "特别", "区别", "分别", "性别", "级别", "类别", "识别", "个别",
+    "差别", "辨别", "甄别", "永别", "道别", "派别", "鉴别", "判别",
+)
+_NON_NEGATING_BIE_FOLLOWERS = frozenset({
+    "的", "人", "处", "名", "国", "家", "类", "致", "样",
+})
+_NON_NEGATING_BIE_PHRASES = (
+    ("另当别论", 2),
+    ("很别扭", 1),
+)
+
+
+def _surrounding_clause(text: str, index: int, term_length: int) -> str:
+    """Return the full punctuation-delimited clause containing a request term."""
+    start = max(
+        (text.rfind(delimiter, 0, index) for delimiter in _CLAUSE_DELIMITERS),
+        default=-1,
+    ) + 1
+    end = min(
+        (
+            boundary
+            for delimiter in _CLAUSE_DELIMITERS
+            if (boundary := text.find(delimiter, index + term_length)) >= 0
+        ),
+        default=len(text),
+    )
+    return text[start:end]
+
+
+def _has_bie_negation(clause: str) -> bool:
+    """Treat independent ``别`` as negation, excluding known lexical words."""
+    for index, char in enumerate(clause):
+        if char != "别":
+            continue
+        if any(
+            index >= len(word) - 1
+            and clause[index - len(word) + 1:index + 1] == word
+            for word in _NON_NEGATING_BIE_COMPOUNDS
+        ):
+            continue
+        if any(
+            index >= bie_offset
+            and clause.startswith(phrase, index - bie_offset)
+            for phrase, bie_offset in _NON_NEGATING_BIE_PHRASES
+        ):
+            continue
+        if index + 1 < len(clause) and clause[index + 1] in _NON_NEGATING_BIE_FOLLOWERS:
+            continue
+        return True
+    return False
+
+
+def _has_negation_intent(clause: str) -> bool:
+    return (
+        any(intent in clause for intent in _CLAUSE_WIDE_AVOIDANCE_INTENTS)
+        or _has_bie_negation(clause)
+    )
+
+
+def _has_affirmative_request_term(text: str, terms: tuple[str, ...]) -> bool:
+    """Return true only when at least one exact request term is not negated."""
+    for term in terms:
+        offset = 0
+        while (index := text.find(term, offset)) >= 0:
+            clause = _surrounding_clause(text, index, len(term))
+            if not _has_negation_intent(clause):
+                return True
+            offset = index + len(term)
+    return False
 
 
 def build_constraint_policy(ctx: RequestContext, scene: SceneSpec) -> ConstraintPolicy:
@@ -156,6 +382,19 @@ def build_constraint_policy(ctx: RequestContext, scene: SceneSpec) -> Constraint
     if ignore_weather:
         overridden.add("D_WEATHER_COMPAT")
 
+    three_layer_terms = ("三层叠穿", "三层穿搭", "三件叠穿")
+    special_layer_terms = ("衬衫敞开", "敞穿衬衫")
+    rich_accessory_terms = ("丰富配饰", "多配饰", "配饰叠搭", "多件配饰")
+    explicit_accessory_terms = ("戴这顶帽", "加围巾", "搭这个包", "用这件配饰")
+    if _has_affirmative_request_term(text, three_layer_terms):
+        overridden.add("D_UPPER_LAYER_MAX_TWO")
+    if _has_affirmative_request_term(text, special_layer_terms):
+        overridden.add("D_LAYER_COMPAT")
+    if _has_affirmative_request_term(text, rich_accessory_terms):
+        overridden.add("D_ACCESSORY_COUNT_MAX_TWO")
+    if _has_affirmative_request_term(text, explicit_accessory_terms):
+        overridden.add("D_ACCESSORY_COHERENCE")
+
     return ConstraintPolicy(
         overridden_rules=frozenset(overridden),
         enforce_weather=not ignore_weather,
@@ -163,13 +402,19 @@ def build_constraint_policy(ctx: RequestContext, scene: SceneSpec) -> Constraint
     )
 
 
+def _known_item_styles(item: WardrobeItem) -> frozenset[str]:
+    """Union explicit normalized tags with deterministic styles named by the item."""
+    explicit = {
+        normalized
+        for tag in item.style_tags
+        if (normalized := normalize_style(tag))
+    }
+    return frozenset(explicit) | styles_in_text(item.subcategory)
+
+
 def build_item_facts(item: WardrobeItem) -> ItemFacts:
-    if item.category == Category.OUTERWEAR:
-        layers = frozenset({LayerRole.OUTER})
-    elif item.category in (Category.TOP, Category.DRESS):
-        layers = frozenset({LayerRole.BASE, LayerRole.MID})
-    else:
-        layers = frozenset()
+    kind = _garment_kind(item)
+    layers = _layer_capabilities(item.category, kind)
 
     definite_hat: bool | None = False
     if item.category == Category.HAT:
@@ -194,15 +439,16 @@ def build_item_facts(item: WardrobeItem) -> ItemFacts:
                 color_families.add(family)
                 recognized_color = True
 
-    styles = frozenset(
-        normalized for tag in item.style_tags
-        if (normalized := normalize_style(tag))
-    )
+    styles = _known_item_styles(item)
     formality = _formality_level(item, styles)
     fluorescent_fact: bool | None = fluorescent if recognized_color else None
 
     return ItemFacts(
         layer_capabilities=layers,
+        garment_kind=kind,
+        closure_mode=_closure_mode(kind),
+        thickness_band=_thickness_band(item, kind),
+        seasons=frozenset(item.seasons),
         color_families=frozenset(color_families),
         neutral_families=frozenset(neutral_families),
         fluorescent=fluorescent_fact,
@@ -210,6 +456,51 @@ def build_item_facts(item: WardrobeItem) -> ItemFacts:
         styles=styles,
         definite_hat=definite_hat,
     )
+
+
+def accessory_is_coherent(
+    accessory: WardrobeItem,
+    core: list[WardrobeItem],
+    scene: SceneSpec,
+    weather: Weather,
+) -> bool:
+    """Require a non-color signal that an optional accessory belongs with its core."""
+    accessory_facts = build_item_facts(accessory)
+    core_facts = [build_item_facts(item) for item in core]
+
+    known_styles = frozenset().union(*(facts.styles for facts in core_facts))
+    if accessory_facts.styles and has_style_conflict(
+        known_styles | accessory_facts.styles
+    ):
+        return False
+
+    allowed_scene_styles = allowed_styles_for_scene(scene)
+    if (
+        accessory_facts.styles
+        and allowed_scene_styles is not None
+        and not accessory_facts.styles.issubset(allowed_scene_styles)
+    ):
+        return False
+
+    style_match = bool(accessory_facts.styles & known_styles)
+    core_levels = [
+        facts.formality_level for facts in core_facts
+        if facts.formality_level is not None
+    ]
+    formality_distances = (
+        tuple(
+            abs(accessory_facts.formality_level - level)
+            for level in core_levels
+        )
+        if accessory_facts.formality_level is not None and core_levels
+        else ()
+    )
+    if any(distance > 1 for distance in formality_distances):
+        return False
+    formality_match = bool(formality_distances)
+    functional_match = accessory.category is Category.SCARF and weather.temp_c < 18
+    seasonal_match = bool(set(accessory.seasons) & {current_season(weather)})
+    return style_match or formality_match or functional_match or seasonal_match
 
 
 def normalize_style(value: str) -> str | None:
@@ -249,6 +540,8 @@ def _formality_level(item: WardrobeItem, styles: frozenset[str]) -> int | None:
     name = item.subcategory or ""
     if not name and not raw_tags:
         return None
+    if any(token in name.lower() for token in ("棒球帽", "鸭舌帽", "渔夫帽", "beanie", "cap")):
+        return 4
     if styles & {"街头潮流", "运动机能", "摇滚机车", "哥特暗黑"}:
         return 4
     if any(token in name for token in ("运动鞋", "卫衣", "运动裤")):
@@ -261,4 +554,4 @@ def _formality_level(item: WardrobeItem, styles: frozenset[str]) -> int | None:
         return 2
     if any(token in name for token in ("衬衫", "风衣", "连衣裙", "乐福", "针织")):
         return 2
-    return 3
+    return None

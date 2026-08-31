@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+from copy import deepcopy
+
 from stylee import recommend
 from stylee.constraints import build_candidate_pool, validate_outfit
 from stylee.contracts import Formality, InputMode, LayerRole, Slot
@@ -64,8 +66,24 @@ def main() -> None:
     _check(torso_id in gen_msgs[1]["content"], "生成 prompt 含候选池真实 id")
     _check("绝不编造" in gen_msgs[0]["content"], "生成 prompt 强调不许编造 id")
     _check("上身叠穿最多 3 层" in gen_msgs[0]["content"], "生成 prompt 含三层叠穿硬约束")
+    _check("普通推荐上身最多 2 层" in gen_msgs[0]["content"], "普通生成 prompt 限制上身两层")
+    _check("配饰默认最多 2 件且可以为 0 件" in gen_msgs[0]["content"], "普通生成 prompt 限制配饰数量")
+    _check("不要为了凑数量添加配饰" in gen_msgs[0]["content"], "普通生成 prompt 禁止凑配饰")
+    _check(
+        '"category":"上装|下装|连衣裙|外套|鞋|包|帽子|围巾|配饰"'
+        in gen_msgs[0]["content"],
+        "gap schema exposes the canonical generic accessory category",
+    )
     _check("视觉焦点" in gen_msgs[0]["content"] and "7:2:1" in gen_msgs[0]["content"],
            "生成 prompt 含当前不可硬判的软审美规则")
+
+    explicit_ctx = deepcopy(ctx)
+    explicit_ctx.query_text = "我要三层叠穿和丰富配饰"
+    explicit_msgs = build_gen_messages(explicit_ctx, scene, pool, [], k=3)
+    _check("用户明确要求三层；只允许完整且兼容的 base+mid+outer" in explicit_msgs[0]["content"],
+           "明确三层需求切换为完整兼容提示")
+    _check("用户明确要求丰富配饰；仍需满足单类绝对数量限制" in explicit_msgs[0]["content"],
+           "丰富配饰需求保留单类绝对上限")
 
     retry_msgs = build_gen_messages(
         ctx, scene, pool, [], k=4,
@@ -125,6 +143,18 @@ def main() -> None:
     ]}]}
     go = parse_outfits_json(gap)[0]
     _check(go.has_gap() and go.items[-1].suggest.desc == "小白鞋", "gap JSON → GapSuggestion")
+
+    generic_gap = parse_outfits_json({"outfits": [{"items": [
+        {"role": "accessory", "gap": {
+            "category": "配饰", "desc": "珍珠耳饰", "reason": "点睛",
+        }},
+    ]}]})[0].items[0]
+    _check(
+        generic_gap.suggest is not None
+        and generic_gap.suggest.category.value == "配饰"
+        and generic_gap.role is Slot.ACCESSORY,
+        "generic accessory gap parses one-to-one instead of falling back to TOP",
+    )
 
     # gap 的 role 不能由模型任意填写；两个下装即使其中一个伪装成 accessory，
     # 也必须按 category 归为 bottom 并被硬校验拒绝。

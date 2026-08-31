@@ -138,10 +138,14 @@ export interface WardrobeItem {
   updated_at: string;
 }
 
+export type OutfitLayoutRole =
+  | 'base' | 'mid' | 'outer' | 'dress' | 'bottom' | 'shoes'
+  | 'bag' | 'hat' | 'scarf' | 'accessory';
+
 export interface OutfitItem {
   item_id: string;
   outfit_id: string;
-  role?: string;
+  role?: OutfitLayoutRole;
   display_order: number;
   item?: WardrobeItem;
 }
@@ -150,6 +154,7 @@ export interface RecommendedItem {
   name: string;
   category: ClothingCategory;
   color: string;
+  role?: OutfitLayoutRole;
   image_url?: string;
   description?: string;
 }
