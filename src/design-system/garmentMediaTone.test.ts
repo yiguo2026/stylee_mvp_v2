@@ -47,6 +47,9 @@ test('wardrobe detail media uses the same owned-item background', () => {
     resolve(designSystemDir, '../app/wardrobe/[id].tsx'),
     'utf8',
   );
-  assert.doesNotMatch(wardrobeDetail, /StyleeGarmentMedia[^>]+tone="neutral"/);
-  assert.match(wardrobeDetail, /StyleeGarmentMedia[^>]+tone="owned"/);
+  const heroMediaTags = wardrobeDetail.match(/<HeroMedia[\s\S]*?>/g) ?? [];
+  assert.match(wardrobeDetail, /<StyleeGarmentMedia[^>]+tone=\{tone\}/);
+  assert.ok(heroMediaTags.some(tag => /tone="owned"/.test(tag)));
+  assert.ok(heroMediaTags.some(tag => /tone="recommended"/.test(tag)));
+  assert.equal(heroMediaTags.some(tag => /tone="neutral"/.test(tag)), false);
 });
