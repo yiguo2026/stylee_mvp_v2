@@ -52,3 +52,30 @@ export async function beginReplacementAfterInitialWrite({
   startBackground();
   return 'started';
 }
+
+export type ReplacementFinalWriteResult = 'committed' | 'failed' | 'stale';
+
+export async function finishReplacementAfterFinalWrite({
+  writeFinal,
+  isCurrent,
+  commitSuccess,
+  reportFailure,
+}: {
+  writeFinal: () => boolean | void | Promise<boolean | void>;
+  isCurrent: () => boolean;
+  commitSuccess: () => void;
+  reportFailure: () => void;
+}): Promise<ReplacementFinalWriteResult> {
+  try {
+    if (await writeFinal() === false) {
+      if (isCurrent()) reportFailure();
+      return 'failed';
+    }
+  } catch {
+    if (isCurrent()) reportFailure();
+    return 'failed';
+  }
+  if (!isCurrent()) return 'stale';
+  commitSuccess();
+  return 'committed';
+}

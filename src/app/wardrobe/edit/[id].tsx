@@ -37,7 +37,7 @@ const CATEGORIES = CLOTHING_CATEGORIES_WITH_ALL.filter(c => c !== '全部') as C
 
 export default function EditItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { items, updateItem } = useWardrobeStore();
+  const { items, updateItem, updateItemWithRollback } = useWardrobeStore();
   const [item, setItem] = useState(items.find(i => i.item_id === id));
 
   const [name, setName] = useState(item?.name ?? '');
@@ -74,7 +74,7 @@ export default function EditItemScreen() {
   // 换图逻辑复用通用 hook：原图立即生效 + 后台标准化/识别，带并发令牌与 mounted 守卫
   const imageReplace = useGarmentImageReplace({
     item,
-    updateItem,
+    commitReplacementUpdate: updateItemWithRollback,
     context: { category, color, material, description: name || item?.name },
     recognize: true,
     onRecognized: (result) => {

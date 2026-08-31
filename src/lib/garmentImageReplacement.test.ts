@@ -135,3 +135,61 @@ test('replacement hook delegates ordered writes and final attrs to the current i
   assert.ok(refDeclaration >= 0 && refEffect > refDeclaration);
   assert.doesNotMatch(source.slice(refDeclaration, refEffect), /currentItemRef\.current\s*=/);
 });
+
+test('final success effects run only after the durable write succeeds', async () => {
+  const replacementModule = await import('./garmentImageReplacement.ts');
+  const finishReplacementAfterFinalWrite = replacementModule.finishReplacementAfterFinalWrite;
+  assert.equal(typeof finishReplacementAfterFinalWrite, 'function');
+
+  const write = deferred<boolean>();
+  const events: string[] = [];
+  const flow = finishReplacementAfterFinalWrite({
+    writeFinal: async () => {
+      events.push('write');
+      const result = await write.promise;
+      events.push('write-settled');
+      return result;
+    },
+    isCurrent: () => true,
+    commitSuccess: () => { events.push('success'); },
+    reportFailure: () => { events.push('failure'); },
+  });
+
+  await Promise.resolve();
+  assert.deepEqual(events, ['write']);
+  write.resolve(true);
+  assert.equal(await flow, 'committed');
+  assert.deepEqual(events, ['write', 'write-settled', 'success']);
+});
+
+test('failed or stale final writes route only the matching outcome callback', async () => {
+  const replacementModule = await import('./garmentImageReplacement.ts');
+  const finishReplacementAfterFinalWrite = replacementModule.finishReplacementAfterFinalWrite;
+  assert.equal(typeof finishReplacementAfterFinalWrite, 'function');
+
+  const failed: string[] = [];
+  assert.equal(await finishReplacementAfterFinalWrite({
+    writeFinal: async () => false,
+    isCurrent: () => true,
+    commitSuccess: () => { failed.push('success'); },
+    reportFailure: () => { failed.push('failure'); },
+  }), 'failed');
+  assert.deepEqual(failed, ['failure']);
+
+  assert.equal(await finishReplacementAfterFinalWrite({
+    writeFinal: async () => { throw new Error('write failed'); },
+    isCurrent: () => true,
+    commitSuccess: () => { failed.push('thrown-success'); },
+    reportFailure: () => { failed.push('thrown-failure'); },
+  }), 'failed');
+  assert.deepEqual(failed, ['failure', 'thrown-failure']);
+
+  const stale: string[] = [];
+  assert.equal(await finishReplacementAfterFinalWrite({
+    writeFinal: async () => true,
+    isCurrent: () => false,
+    commitSuccess: () => { stale.push('success'); },
+    reportFailure: () => { stale.push('failure'); },
+  }), 'stale');
+  assert.deepEqual(stale, []);
+});
