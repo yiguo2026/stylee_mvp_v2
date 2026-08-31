@@ -6,6 +6,7 @@ import argparse
 import base64
 import io
 import json
+import math
 import os
 from pathlib import Path
 import queue
@@ -168,6 +169,27 @@ def _validate_recognition(payload: dict) -> dict:
 
 
 def _validate_standardization(payload: dict) -> None:
+    bounds = payload.get("visible_bounds")
+    if not isinstance(bounds, dict):
+        raise SmokeError("standardize_invalid_contract")
+    values = tuple(bounds.get(field) for field in ("left", "top", "width", "height"))
+    if not all(
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        for value in values
+    ):
+        raise SmokeError("standardize_invalid_contract")
+    left, top, width, height = values
+    if (
+        left < 0
+        or top < 0
+        or width <= 0
+        or height <= 0
+        or left + width > 1
+        or top + height > 1
+    ):
+        raise SmokeError("standardize_invalid_contract")
     if not _real_provider(payload.get("provider")):
         raise SmokeError("standardize_mock_provider")
     if not (
