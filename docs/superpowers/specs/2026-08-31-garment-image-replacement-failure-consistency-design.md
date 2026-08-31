@@ -118,8 +118,10 @@ is now also durable.
 
 The pure generation, snapshot, optimistic-apply, and guarded-rollback
 operations live in `src/lib/wardrobeOptimisticUpdate.ts`. The Zustand store owns
-Supabase I/O and delegates state transitions to that module. This keeps failure
-and concurrency behavior testable without mocking the Supabase client.
+Supabase I/O and injects that persistence boundary into the module's
+`runRollbackableWardrobeUpdate` coordinator. This keeps asynchronous failure
+and concurrency behavior testable against real state transitions without
+mocking the Supabase client.
 
 ### 3. Initial replacement write
 
@@ -202,10 +204,10 @@ picker result
 
 - `src/lib/wardrobeOptimisticUpdate.ts`
   - pure field-generation, snapshot, optimistic-apply, and guarded-rollback
-    state transitions;
+    state transitions plus injected-persistence orchestration;
 - `src/lib/wardrobeOptimisticUpdate.test.ts`
-  - initial rollback, pending-edit restoration, successful settlement, and
-    stale-generation protection;
+  - initial rollback, pending-edit restoration, successful/failed asynchronous
+    settlement, and stale-generation protection;
 - `src/stores/wardrobeStore.ts`
   - expose `updateItemWithRollback`, share the existing Supabase update payload,
     and retain ordinary `updateItem` semantics;
@@ -218,9 +220,7 @@ picker result
 - `src/app/wardrobe/edit/[id].tsx`
   - pass the same rollbackable replacement persistence contract;
 - `src/lib/garmentImageReplacement.test.ts`
-  - cover ordered initial failure and the final durable-write result contract;
-- `src/lib/imageUploadPolicy.test.ts`
-  - preserve the shared-hook ownership boundary for replacement processing.
+  - cover ordered initial failure and the final durable-write result callbacks.
 
 ## Testing strategy
 

@@ -32,7 +32,7 @@
 **Interfaces:**
 
 - Consumes: `WardrobeItem` from `src/types/index.ts`.
-- Produces: `WardrobeMutationGenerations`, `WardrobeOptimisticState`, `WardrobeRollbackTransaction`, `applyWardrobeOptimisticUpdate`, and `rollbackWardrobeOptimisticUpdate`.
+- Produces: `WardrobeMutationGenerations`, `WardrobeOptimisticState`, `WardrobeRollbackTransaction`, `applyWardrobeOptimisticUpdate`, `rollbackWardrobeOptimisticUpdate`, and `runRollbackableWardrobeUpdate`.
 - Used by: Task 2 store actions.
 
 - [ ] **Step 1: Write the failing pure-state tests**
@@ -205,6 +205,22 @@ export function rollbackWardrobeOptimisticUpdate(
   state: WardrobeOptimisticState,
   transaction: WardrobeRollbackTransaction,
 ): WardrobeOptimisticState;
+
+export async function runRollbackableWardrobeUpdate({
+  getState,
+  setState,
+  itemId,
+  updates,
+  updatedAt,
+  persist,
+}: {
+  getState: () => WardrobeOptimisticState;
+  setState: (state: WardrobeOptimisticState) => void;
+  itemId: string;
+  updates: Partial<WardrobeItem>;
+  updatedAt: string;
+  persist: (updates: Partial<WardrobeItem> & { updated_at: string }) => Promise<void>;
+}): Promise<{ ok: true } | { ok: false; error: unknown }>;
 ```
 
 Implementation rules:
@@ -217,10 +233,59 @@ Implementation rules:
 6. During rollback, restore or delete a touched key only when the current field generation equals the transaction generation.
 7. Remove `pendingEdits[itemId]` when no keys remain after guarded rollback.
 8. Preserve unrelated items, pending edits, fields, and all newer field generations.
+9. `runRollbackableWardrobeUpdate` applies optimistic state before awaiting
+   `persist`, returns `{ ok: true }` on success, and performs guarded rollback
+   against `getState()` before returning `{ ok: false, error }` on rejection.
 
 Use small internal helpers for `hasOwnProperty`, field snapshots, and immutable field restore/delete operations. Do not use JSON serialization for equality or cloning.
 
-- [ ] **Step 4: Run the pure-state tests and verify GREEN**
+- [ ] **Step 4: Add asynchronous settlement tests and verify RED**
+
+Append to `src/lib/wardrobeOptimisticUpdate.test.ts` and import
+`runRollbackableWardrobeUpdate`:
+
+```ts
+test('rollbackable persistence restores optimistic fields after rejection', async () => {
+  let state = initialState();
+  const result = await runRollbackableWardrobeUpdate({
+    getState: () => state,
+    setState: (next) => { state = next; },
+    itemId: item.item_id,
+    updates: { image_url: 'file:///replacement.jpg' },
+    updatedAt: '2026-08-31T01:00:00.000Z',
+    persist: async () => { throw new Error('offline'); },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(state.items[0].image_url, item.image_url);
+  assert.deepEqual(state.pendingEdits, {});
+});
+
+test('rollbackable persistence retains optimistic fields after success', async () => {
+  let state = initialState();
+  const result = await runRollbackableWardrobeUpdate({
+    getState: () => state,
+    setState: (next) => { state = next; },
+    itemId: item.item_id,
+    updates: { image_url: 'file:///replacement.jpg' },
+    updatedAt: '2026-08-31T01:00:00.000Z',
+    persist: async (payload) => {
+      assert.equal(payload.image_url, 'file:///replacement.jpg');
+      assert.equal(payload.updated_at, '2026-08-31T01:00:00.000Z');
+    },
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal(state.items[0].image_url, 'file:///replacement.jpg');
+  assert.equal(state.pendingEdits[item.item_id]?.image_url, 'file:///replacement.jpg');
+});
+```
+
+Run the focused test. Expected: the original four tests pass and the two new
+tests fail because `runRollbackableWardrobeUpdate` is absent. Implement rule 9
+above after observing that RED result.
+
+- [ ] **Step 5: Run the pure-state tests and verify GREEN**
 
 Run:
 
@@ -228,9 +293,9 @@ Run:
 node --experimental-strip-types --test src/lib/wardrobeOptimisticUpdate.test.ts
 ```
 
-Expected: 4 tests pass, 0 fail.
+Expected: 6 tests pass, 0 fail.
 
-- [ ] **Step 5: Commit Task 1**
+- [ ] **Step 6: Commit Task 1**
 
 ```bash
 git add src/lib/wardrobeOptimisticUpdate.ts src/lib/wardrobeOptimisticUpdate.test.ts
@@ -244,59 +309,15 @@ git commit -m "fix(wardrobe): add guarded optimistic rollback"
 **Files:**
 
 - Modify: `src/stores/wardrobeStore.ts`
-- Create: `src/lib/wardrobeStorePolicy.test.ts`
+- Test: `src/lib/wardrobeOptimisticUpdate.test.ts`
 
 **Interfaces:**
 
-- Consumes: Task 1 `applyWardrobeOptimisticUpdate` and `rollbackWardrobeOptimisticUpdate`.
+- Consumes: Task 1 `applyWardrobeOptimisticUpdate` and `runRollbackableWardrobeUpdate`.
 - Produces: `WardrobeState.updateItemWithRollback(itemId, updates) -> Promise<boolean>`.
 - Used by: Task 4 callers.
 
-- [ ] **Step 1: Write the failing store-wiring contract test**
-
-Create `src/lib/wardrobeStorePolicy.test.ts`:
-
-```ts
-import assert from 'node:assert';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
-
-const testDirectory = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(testDirectory, '../stores/wardrobeStore.ts'), 'utf8');
-
-test('ordinary and rollbackable updates share field generations but only replacement failures roll back', () => {
-  assert.match(source, /updateItemWithRollback:\s*\(itemId: string, updates: Partial<WardrobeItem>\) => Promise<boolean>/);
-  assert.match(source, /mutationGenerations:\s*WardrobeMutationGenerations/);
-  assert.match(source, /applyWardrobeOptimisticUpdate\s*\(/);
-  const rollbackableStart = source.indexOf('updateItemWithRollback: async');
-  const deleteStart = source.indexOf('deleteItem: async', rollbackableStart);
-  assert.ok(rollbackableStart >= 0 && deleteStart > rollbackableStart);
-  const rollbackableSource = source.slice(rollbackableStart, deleteStart);
-  assert.match(rollbackableSource, /rollbackWardrobeOptimisticUpdate\s*\(/);
-  assert.match(rollbackableSource, /return false/);
-
-  const ordinaryStart = source.indexOf('updateItem: async');
-  const ordinarySource = source.slice(ordinaryStart, rollbackableStart);
-  assert.match(ordinarySource, /applyWardrobeOptimisticUpdate\s*\(/);
-  assert.doesNotMatch(ordinarySource, /rollbackWardrobeOptimisticUpdate\s*\(/);
-});
-```
-
-- [ ] **Step 2: Run the store contract and verify RED**
-
-Run:
-
-```bash
-node --experimental-strip-types --test \
-  src/lib/wardrobeOptimisticUpdate.test.ts \
-  src/lib/wardrobeStorePolicy.test.ts
-```
-
-Expected: pure tests pass; store contract fails because `updateItemWithRollback` and `mutationGenerations` are absent.
-
-- [ ] **Step 3: Refactor the existing optimistic apply through Task 1**
+- [ ] **Step 1: Refactor the existing optimistic apply through Task 1**
 
 In `src/stores/wardrobeStore.ts`:
 
@@ -318,54 +339,61 @@ The helper must pass and receive only:
 
 and merge only those three returned fields into Zustand state.
 
-- [ ] **Step 4: Implement `updateItemWithRollback`**
+- [ ] **Step 2: Implement `updateItemWithRollback` through the tested coordinator**
 
 Add the action immediately after `updateItem`:
 
 ```ts
 updateItemWithRollback: async (itemId, updates) => {
   const now = new Date().toISOString();
-  const transaction = applyOptimisticUpdate(set, itemId, updates, now);
-  try {
-    const { error } = await supabase
-      .from('wardrobe_items')
-      .update({ ...updates, updated_at: now })
-      .eq('item_id', itemId);
-    if (error) throw error;
-    return true;
-  } catch (e: any) {
-    set(state => {
-      const rolledBack = rollbackWardrobeOptimisticUpdate({
+  const result = await runRollbackableWardrobeUpdate({
+    getState: () => {
+      const state = get();
+      return {
         items: state.items,
         pendingEdits: state.pendingEdits,
         mutationGenerations: state.mutationGenerations,
-      }, transaction);
-      return { ...rolledBack, error: e.message };
-    });
-    return false;
-  }
+      };
+    },
+    setState: (next) => { set(next); },
+    itemId,
+    updates,
+    updatedAt: now,
+    persist: async (payload) => {
+      const { error } = await supabase
+        .from('wardrobe_items')
+        .update(payload)
+        .eq('item_id', itemId);
+      if (error) throw error;
+    },
+  });
+  if (result.ok) return true;
+  const message = result.error instanceof Error
+    ? result.error.message
+    : String(result.error);
+  set({ error: message });
+  return false;
 },
 ```
 
 Do not call `updateItem` from this action because its intentional keep-local failure policy conflicts with replacement rollback.
 
-- [ ] **Step 5: Run focused store tests and static checking**
+- [ ] **Step 3: Run behavior tests and static checking**
 
 Run:
 
 ```bash
-node --experimental-strip-types --test \
-  src/lib/wardrobeOptimisticUpdate.test.ts \
-  src/lib/wardrobeStorePolicy.test.ts
+node --experimental-strip-types --test src/lib/wardrobeOptimisticUpdate.test.ts
 npx tsc --noEmit
 ```
 
-Expected: 5 tests pass, TypeScript exits 0.
+Expected: 6 tests pass, TypeScript exits 0. Review the store diff to confirm
+ordinary `updateItem` ignores its transaction and never invokes rollback.
 
-- [ ] **Step 6: Commit Task 2**
+- [ ] **Step 4: Commit Task 2**
 
 ```bash
-git add src/stores/wardrobeStore.ts src/lib/wardrobeStorePolicy.test.ts
+git add src/stores/wardrobeStore.ts
 git commit -m "fix(wardrobe): rollback failed replacement writes"
 ```
 
@@ -389,7 +417,7 @@ git commit -m "fix(wardrobe): rollback failed replacement writes"
 Append to `src/lib/garmentImageReplacement.test.ts`:
 
 ```ts
-test('final display commits only after the durable write succeeds', async () => {
+test('final success effects run only after the durable write succeeds', async () => {
   const write = deferred<boolean>();
   const events: string[] = [];
   const flow = finishReplacementAfterFinalWrite({
@@ -400,37 +428,41 @@ test('final display commits only after the durable write succeeds', async () => 
       return result;
     },
     isCurrent: () => true,
-    commitDisplay: () => { events.push('display'); },
+    commitSuccess: () => { events.push('success'); },
+    reportFailure: () => { events.push('failure'); },
   });
 
   await Promise.resolve();
   assert.deepEqual(events, ['write']);
   write.resolve(true);
   assert.equal(await flow, 'committed');
-  assert.deepEqual(events, ['write', 'write-settled', 'display']);
+  assert.deepEqual(events, ['write', 'write-settled', 'success']);
 });
 
-test('failed or stale final writes never commit display', async () => {
+test('failed or stale final writes route only the matching outcome callback', async () => {
   const failed: string[] = [];
   assert.equal(await finishReplacementAfterFinalWrite({
     writeFinal: async () => false,
     isCurrent: () => true,
-    commitDisplay: () => { failed.push('display'); },
+    commitSuccess: () => { failed.push('success'); },
+    reportFailure: () => { failed.push('failure'); },
   }), 'failed');
-  assert.deepEqual(failed, []);
+  assert.deepEqual(failed, ['failure']);
 
   assert.equal(await finishReplacementAfterFinalWrite({
     writeFinal: async () => { throw new Error('write failed'); },
     isCurrent: () => true,
-    commitDisplay: () => { failed.push('thrown-display'); },
+    commitSuccess: () => { failed.push('thrown-success'); },
+    reportFailure: () => { failed.push('thrown-failure'); },
   }), 'failed');
-  assert.deepEqual(failed, []);
+  assert.deepEqual(failed, ['failure', 'thrown-failure']);
 
   const stale: string[] = [];
   assert.equal(await finishReplacementAfterFinalWrite({
     writeFinal: async () => true,
     isCurrent: () => false,
-    commitDisplay: () => { stale.push('display'); },
+    commitSuccess: () => { stale.push('success'); },
+    reportFailure: () => { stale.push('failure'); },
   }), 'stale');
   assert.deepEqual(stale, []);
 });
@@ -458,19 +490,25 @@ export type ReplacementFinalWriteResult = 'committed' | 'failed' | 'stale';
 export async function finishReplacementAfterFinalWrite({
   writeFinal,
   isCurrent,
-  commitDisplay,
+  commitSuccess,
+  reportFailure,
 }: {
   writeFinal: () => boolean | void | Promise<boolean | void>;
   isCurrent: () => boolean;
-  commitDisplay: () => void;
+  commitSuccess: () => void;
+  reportFailure: () => void;
 }): Promise<ReplacementFinalWriteResult> {
   try {
-    if (await writeFinal() === false) return 'failed';
+    if (await writeFinal() === false) {
+      if (isCurrent()) reportFailure();
+      return 'failed';
+    }
   } catch {
+    if (isCurrent()) reportFailure();
     return 'failed';
   }
   if (!isCurrent()) return 'stale';
-  commitDisplay();
+  commitSuccess();
   return 'committed';
 }
 ```
@@ -485,32 +523,7 @@ node --experimental-strip-types --test src/lib/garmentImageReplacement.test.ts
 
 Expected: 8 tests pass, 0 fail.
 
-- [ ] **Step 5: Add a failing hook source-contract test**
-
-Extend `replacement hook delegates ordered writes and final attrs to the current item ref` in `src/lib/garmentImageReplacement.test.ts` with:
-
-```ts
-assert.match(source, /commitReplacementUpdate:\s*\(/);
-assert.match(source, /finishReplacementAfterFinalWrite\s*\(/);
-assert.match(
-  source,
-  /if \(finalWriteResult === 'failed'\) \{[\s\S]*?背景处理失败，已保留原图[\s\S]*?return;[\s\S]*?\}/,
-);
-const finalFlow = source.indexOf('await finishReplacementAfterFinalWrite');
-const successToast = source.indexOf("? '已完成背景处理'", finalFlow);
-const recognition = source.indexOf('void runRecognition(finalUrl)', finalFlow);
-assert.ok(finalFlow >= 0 && successToast > finalFlow && recognition > successToast);
-```
-
-Run:
-
-```bash
-node --experimental-strip-types --test src/lib/garmentImageReplacement.test.ts
-```
-
-Expected: FAIL because the hook still accepts `updateItem`, sets `finalUrl` before the final write, and ignores the result.
-
-- [ ] **Step 6: Implement hook failure gating**
+- [ ] **Step 5: Implement hook failure gating through the tested callbacks**
 
 In `src/hooks/useGarmentImageReplace.ts`:
 
@@ -539,33 +552,40 @@ In `src/hooks/useGarmentImageReplace.ts`:
        ),
      ),
      isCurrent: stillCurrent,
-     commitDisplay: () => { setImageUri(finalUrl); },
+     commitSuccess: () => {
+       setImageUri(finalUrl);
+       toast(
+         persistedImage.status === 'transparent_master'
+           ? '已完成背景处理'
+           : '背景处理失败，已保留原图',
+       );
+       if (persistedImage.status === 'transparent_master' && recognizeRef.current) {
+         void runRecognition(finalUrl);
+       }
+     },
+     reportFailure: () => { toast('背景处理失败，已保留原图'); },
    });
-   if (finalWriteResult === 'failed') {
-     if (stillCurrent()) toast('背景处理失败，已保留原图');
-     return;
-   }
-   if (finalWriteResult === 'stale') return;
+   if (finalWriteResult !== 'committed') return;
    ```
 
-6. Leave the existing success/fallback toast and optional recognition after the `committed` result only.
+6. Remove the former success/fallback toast and recognition block after the
+   helper because those effects now live inside `commitSuccess`.
 7. Update `useCallback` dependency arrays from `updateItem` to `commitReplacementUpdate`.
 
-- [ ] **Step 7: Run Task 3 focused tests and TypeScript**
+- [ ] **Step 6: Run Task 3 focused tests and TypeScript**
 
 Run:
 
 ```bash
 node --experimental-strip-types --test \
   src/lib/garmentImageReplacement.test.ts \
-  src/lib/wardrobeOptimisticUpdate.test.ts \
-  src/lib/wardrobeStorePolicy.test.ts
+  src/lib/wardrobeOptimisticUpdate.test.ts
 npx tsc --noEmit
 ```
 
 Expected: Node tests pass; TypeScript fails only at the two existing hook callers because they still pass `updateItem`. That caller failure is the intentional RED boundary for Task 4.
 
-- [ ] **Step 8: Commit Task 3 without bypassing the caller RED**
+- [ ] **Step 7: Continue without committing the caller RED**
 
 Do not commit a TypeScript-broken intermediate state. Continue directly to Task 4, then commit Tasks 3 and 4 together after caller wiring is GREEN.
 
@@ -577,45 +597,18 @@ Do not commit a TypeScript-broken intermediate state. Continue directly to Task 
 
 - Modify: `src/app/wardrobe/[id].tsx`
 - Modify: `src/app/wardrobe/edit/[id].tsx`
-- Modify: `src/lib/imageUploadPolicy.test.ts`
-- Modify: `src/lib/garmentImageReplacement.test.ts`
-- Modify: `src/hooks/useGarmentImageReplace.ts`
-- Modify: `src/lib/garmentImageReplacement.ts`
+- Verify: `src/lib/imageUploadPolicy.test.ts`
 
 **Interfaces:**
 
 - Consumes: `WardrobeState.updateItemWithRollback` from Task 2.
 - Produces: both detail and edit callers pass `commitReplacementUpdate: updateItemWithRollback` while ordinary form/recognition edits keep using `updateItem`.
 
-- [ ] **Step 1: Add failing caller ownership assertions**
+- [ ] **Step 1: Confirm the caller RED from Task 3**
 
-In `src/lib/imageUploadPolicy.test.ts`, rename `ordinary edit save cannot standardize or persist an untouched image` to `replacement hook owns image persistence while ordinary edits keep their existing update action`. Keep its existing assertions, then add the detail source immediately after `editSource`:
-
-```ts
-const detailSource = readFileSync(
-  resolve(testDirectory, '../app/wardrobe/[id].tsx'),
-  'utf8',
-);
-```
-
-Append these assertions to the same test:
-
-```ts
-assert.match(detailSource, /updateItemWithRollback/);
-assert.match(editSource, /updateItemWithRollback/);
-assert.match(detailSource, /commitReplacementUpdate:\s*updateItemWithRollback/);
-assert.match(editSource, /commitReplacementUpdate:\s*updateItemWithRollback/);
-assert.match(detailSource, /useItemAttributes\(item, \(updates\) => updateItem\(/);
-assert.match(editSource, /await updateItem\(item\.item_id,/);
-```
-
-Run:
-
-```bash
-node --experimental-strip-types --test src/lib/imageUploadPolicy.test.ts
-```
-
-Expected: FAIL because callers do not select or pass `updateItemWithRollback`.
+Run `npx tsc --noEmit` and read both errors. Expected: the detail and edit
+callers still provide removed option `updateItem` and omit required option
+`commitReplacementUpdate`.
 
 - [ ] **Step 2: Wire the detail caller**
 
@@ -650,7 +643,6 @@ Run:
 ```bash
 node --experimental-strip-types --test \
   src/lib/wardrobeOptimisticUpdate.test.ts \
-  src/lib/wardrobeStorePolicy.test.ts \
   src/lib/garmentImageReplacement.test.ts \
   src/lib/imageUploadPolicy.test.ts
 npx tsc --noEmit
@@ -666,8 +658,7 @@ git add \
   src/lib/garmentImageReplacement.test.ts \
   src/hooks/useGarmentImageReplace.ts \
   'src/app/wardrobe/[id].tsx' \
-  'src/app/wardrobe/edit/[id].tsx' \
-  src/lib/imageUploadPolicy.test.ts
+  'src/app/wardrobe/edit/[id].tsx'
 git commit -m "fix(wardrobe): surface replacement persistence failures"
 ```
 
@@ -692,7 +683,7 @@ Run:
 node --experimental-strip-types --test $(find src -name '*.test.ts' -print)
 ```
 
-Expected: 145 tests pass, 0 fail. If the exact count differs because a test was split during implementation, require 0 failures and account for every added test by name.
+Expected: 146 tests pass, 0 fail. If the exact count differs because a test was split during implementation, require 0 failures and account for every added test by name.
 
 - [ ] **Step 2: Run repository checks**
 
@@ -722,7 +713,8 @@ git log --format='%h %an <%ae> %cn <%ce> %s' origin/main..HEAD
 Expected:
 
 - no whitespace errors;
-- only the approved specification, plan, replacement-state module/tests, store, hook, two callers, and two existing policy tests changed;
+- only the approved specification, plan, replacement-state module/tests,
+  store, replacement helper/test, hook, and two callers changed;
 - all commits use `fitz <fitz.wyh@gmail.com>` as author and committer;
 - no generated output, `.env`, credential, media, model-service, token, preview, or Figma file appears.
 
