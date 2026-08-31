@@ -90,6 +90,12 @@ def _responses(recognition_provider="qwen3-vl-flash"):
             "verified": True,
             "background": "transparent",
             "alpha_verified": True,
+            "visible_bounds": {
+                "left": 0.1,
+                "top": 0.2,
+                "width": 0.5,
+                "height": 0.6,
+            },
             "matte_provider": "pillow-border-connected-v1",
             "failure_stage": None,
             "provider": "qwen-image-edit",
@@ -261,6 +267,24 @@ def test_release_smoke_rejects_invalid_endpoint_contracts():
     _expect_smoke_error(responses, "tryon-image_missing_real_image")
 
 
+def test_release_smoke_requires_normalized_visible_bounds():
+    invalid_bounds = [
+        None,
+        {"left": 0.0, "top": 0.0, "width": 0.0, "height": 1.0},
+        {"left": 0.8, "top": 0.0, "width": 0.3, "height": 1.0},
+        {"left": float("nan"), "top": 0.0, "width": 1.0, "height": 1.0},
+        {"left": "0", "top": 0.0, "width": 1.0, "height": 1.0},
+        {"left": False, "top": 0.0, "width": 1.0, "height": 1.0},
+    ]
+    for bounds in invalid_bounds:
+        responses = _responses()
+        if bounds is None:
+            responses[2].payload.pop("visible_bounds")
+        else:
+            responses[2].payload["visible_bounds"] = bounds
+        _expect_smoke_error(responses, "standardize_invalid_contract")
+
+
 def test_tryon_validation_rejects_example_and_disallowed_hosts():
     for image_ref in (
         "https://example.test/canned.png",
@@ -408,6 +432,7 @@ def main():
     test_release_smoke_request_sequence_auth_contract_and_log_redaction()
     test_release_smoke_rejects_mock_provider_contract()
     test_release_smoke_rejects_invalid_endpoint_contracts()
+    test_release_smoke_requires_normalized_visible_bounds()
     test_tryon_validation_rejects_example_and_disallowed_hosts()
     test_tryon_validation_rejects_malformed_provider_bytes()
     test_tryon_validation_fully_decodes_and_rejects_truncated_jpeg()
