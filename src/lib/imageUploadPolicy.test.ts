@@ -509,17 +509,21 @@ test('ordinary edit save cannot standardize or persist an untouched image', () =
     resolve(testDirectory, '../app/wardrobe/edit/[id].tsx'),
     'utf8',
   );
-  const pickerStart = editSource.indexOf('const pickMainImage =');
+  const replacementHook = readFileSync(
+    resolve(testDirectory, '../hooks/useGarmentImageReplace.ts'),
+    'utf8',
+  );
   const saveStart = editSource.indexOf('const handleSave =');
-  const deleteStart = editSource.indexOf('const confirmDelete =');
-  assert.ok(pickerStart >= 0 && saveStart > pickerStart && deleteStart > saveStart);
+  const saveEnd = editSource.indexOf('\n\n  if (!item)', saveStart);
+  assert.ok(saveStart >= 0 && saveEnd > saveStart);
 
-  const replacementFlow = editSource.slice(pickerStart, saveStart);
-  const ordinarySaveFlow = editSource.slice(saveStart, deleteStart);
-  assert.match(replacementFlow, /shouldPersistReplacementImage\s*\(/);
-  assert.match(replacementFlow, /persistGarmentMaster\s*\(/);
-  assert.doesNotMatch(replacementFlow, /flat_lay/);
-  assert.equal(replacementFlow.match(/'flatlay'/g)?.length, 2);
+  const ordinarySaveFlow = editSource.slice(saveStart, saveEnd);
+  assert.match(editSource, /useGarmentImageReplace\s*\(/);
+  assert.match(editSource, /onPress=\{imageReplace\.pickAndReplace\}/);
+  assert.match(replacementHook, /shouldPersistReplacementImage\s*\(/);
+  assert.match(replacementHook, /persistGarmentMaster\s*\(/);
+  assert.doesNotMatch(replacementHook, /flat_lay/);
+  assert.equal(replacementHook.match(/'flatlay'/g)?.length, 2);
   assert.doesNotMatch(ordinarySaveFlow, /aiStandardizeGarment\s*\(|persistGarmentMaster\s*\(/);
 });
 
