@@ -1,7 +1,7 @@
 # Garment Image Replacement Failure Consistency Design
 
-**Date:** 2026-08-31  
-**Status:** Approved in chat; awaiting written-spec review  
+**Date:** 2026-08-31
+**Status:** Approved
 **Repository baseline:** `yiguo2026/stylee_mvp_v2@cffc93126f15d85aea97e84a56f2803e271a0db0`
 
 ## Goal
@@ -90,6 +90,7 @@ interface WardrobeRollbackTransaction {
   touchedKeys: Array<keyof WardrobeItem>;
   fieldGenerations: Partial<Record<keyof WardrobeItem, number>>;
   previousItemFields: Partial<WardrobeItem>;
+  itemKeysPreviouslyPresent: Array<keyof WardrobeItem>;
   previousPendingFields: Partial<WardrobeItem>;
   pendingKeysPreviouslyPresent: Array<keyof WardrobeItem>;
 }
