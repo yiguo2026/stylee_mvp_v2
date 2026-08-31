@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { WardrobeItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
+import {
+  applyWardrobeOptimisticUpdate,
+  runRollbackableWardrobeUpdate,
+  type WardrobeMutationGenerations,
+  type WardrobeRollbackTransaction,
+} from '@/lib/wardrobeOptimisticUpdate';
 
 export interface WardrobeState {
   items: WardrobeItem[];
@@ -13,10 +19,12 @@ export interface WardrobeState {
   // 真正清除），若直接用云端旧数据覆盖，就会出现「删除的属性再次进入详情页又出现」。
   pendingEdits: Record<string, Partial<WardrobeItem>>;
   deletedIds: string[];
+  mutationGenerations: WardrobeMutationGenerations;
 
   fetchItems: (userId: string) => Promise<void>;
   addItem: (item: Omit<WardrobeItem, 'item_id' | 'created_at' | 'updated_at'>) => Promise<WardrobeItem | null>;
   updateItem: (itemId: string, updates: Partial<WardrobeItem>) => Promise<boolean>;
+  updateItemWithRollback: (itemId: string, updates: Partial<WardrobeItem>) => Promise<boolean>;
   deleteItem: (itemId: string) => Promise<void>;
   incrementWearCount: (itemId: string) => Promise<void>;
   setItems: (items: WardrobeItem[]) => void;
@@ -64,12 +72,37 @@ function sortWardrobeItemsNewestFirst(items: WardrobeItem[]): WardrobeItem[] {
   });
 }
 
+type WardrobeStoreSetter = (
+  updater: (state: WardrobeState) => Partial<WardrobeState>,
+) => void;
+
+function applyOptimisticUpdate(
+  set: WardrobeStoreSetter,
+  itemId: string,
+  updates: Partial<WardrobeItem>,
+  updatedAt: string,
+): WardrobeRollbackTransaction {
+  let transaction: WardrobeRollbackTransaction | undefined;
+  set((state) => {
+    const applied = applyWardrobeOptimisticUpdate({
+      items: state.items,
+      pendingEdits: state.pendingEdits,
+      mutationGenerations: state.mutationGenerations,
+    }, itemId, updates, updatedAt);
+    transaction = applied.transaction;
+    return applied.state;
+  });
+  if (!transaction) throw new Error('optimistic wardrobe update did not start');
+  return transaction;
+}
+
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   items: [],
   isLoading: false,
   error: null,
   pendingEdits: {},
   deletedIds: [],
+  mutationGenerations: {},
 
   setItems: (items) => set({ items }),
 
@@ -150,13 +183,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     // 同时把改动累加进 pendingEdits，并本地 bump updated_at，
     // 使 focus 重新 fetchItems 时本地覆盖云端旧值、详情页 resync 也能感知变化。
     const now = new Date().toISOString();
-    set(state => ({
-      items: state.items.map(i => i.item_id === itemId ? { ...i, ...updates, updated_at: now } : i),
-      pendingEdits: {
-        ...state.pendingEdits,
-        [itemId]: { ...(state.pendingEdits[itemId] ?? {}), ...updates, updated_at: now },
-      },
-    }));
+    applyOptimisticUpdate(set, itemId, updates, now);
     try {
       const { error } = await supabase
         .from('wardrobe_items')
@@ -169,6 +196,37 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       set({ error: e.message });
       return false;
     }
+  },
+
+  updateItemWithRollback: async (itemId, updates) => {
+    const now = new Date().toISOString();
+    const result = await runRollbackableWardrobeUpdate({
+      getState: () => {
+        const state = get();
+        return {
+          items: state.items,
+          pendingEdits: state.pendingEdits,
+          mutationGenerations: state.mutationGenerations,
+        };
+      },
+      setState: (next) => { set(next); },
+      itemId,
+      updates,
+      updatedAt: now,
+      persist: async (payload) => {
+        const { error } = await supabase
+          .from('wardrobe_items')
+          .update(payload)
+          .eq('item_id', itemId);
+        if (error) throw error;
+      },
+    });
+    if (result.ok) return true;
+    const message = result.error instanceof Error
+      ? result.error.message
+      : String(result.error);
+    set({ error: message });
+    return false;
   },
 
   deleteItem: async (itemId) => {
