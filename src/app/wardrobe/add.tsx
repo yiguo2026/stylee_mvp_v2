@@ -14,7 +14,7 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment, CATEGORY_OPTIONS, COLOR_OPTIONS, MATERIAL_OPTIONS, AIMeta } from '@/lib/ai';
 import type { GarmentStandardizationResult } from '@/lib/ai';
 import { consumePendingImages } from '@/lib/pendingImages';
-import { persistGarmentMaster } from '@/lib/uploadImage';
+import { persistManualGarmentMaster } from '@/lib/uploadImage';
 import { ClothingCategory, CLOTHING_CATEGORIES_WITH_ALL, OCCASION_TAGS, FitType, SleeveLength, DetectedItem, PhotoType } from '@/types';
 import { AIResultBanner } from '@/components/AIResultBanner';
 import { AILoading } from '@/components/AILoading';
@@ -78,8 +78,15 @@ export default function AddWardrobeItem() {
   const [photoType, setPhotoType] = useState<PhotoType>('on_body');
   const [recognizedAttrs, setRecognizedAttrs] = useState<Record<string, unknown> | null>(null);
   const [standardizationResult, setStandardizationResult] = useState<GarmentStandardizationResult | null>(null);
+  const [standardizationSourceUri, setStandardizationSourceUri] = useState<string | null>(null);
   const [stdState, setStdState] = useState<'idle' | 'generating' | 'done' | 'failed'>('idle');
+  const [originalConfirmedUri, setOriginalConfirmedUri] = useState<string | null>(null);
   const [recognizeMeta, setRecognizeMeta] = useState<AIMeta | null>(null);
+
+  const originalConfirmed = Boolean(imageUri && originalConfirmedUri === imageUri);
+  const effectiveStandardizationResult = imageUri && standardizationSourceUri === imageUri
+    ? standardizationResult
+    : null;
 
   const reqTokenRef = useRef(0);
 
@@ -195,7 +202,8 @@ export default function AddWardrobeItem() {
     setBrand(''); setPrice(''); setFitType(''); setSleeveLength(undefined); setSeasons([]);
     setOccasionTags([]); setPurchaseDate('');
     setPhotoType('on_body'); setRecognizedAttrs(null);
-    setStandardizationResult(null); setStdState('idle');
+    setStandardizationResult(null); setStandardizationSourceUri(null); setStdState('idle');
+    setOriginalConfirmedUri(null);
   };
 
   const fillFormFromDetected = (item: DetectedItem): PhotoType => {
@@ -215,8 +223,10 @@ export default function AddWardrobeItem() {
     const recognizedFields: string[] = [];
     if (item.material) recognizedFields.push('material');
     if (item.fit_type) recognizedFields.push('fit_type');
+    if (item.sleeve_length) recognizedFields.push('sleeve_length');
     setRecognizedAttrs({
       style: item.style || null,
+      description: item.description || undefined,
       photo_type: detectedPhotoType,
       needs_review: item.needs_review ?? false,
       confidence: item.confidence ?? null,
@@ -227,6 +237,9 @@ export default function AddWardrobeItem() {
   };
 
   const runStandardize = async (uri: string, cat: string, pt: string, token: number, extras?: { color?: string; material?: string; description?: string }) => {
+    setOriginalConfirmedUri(null);
+    setStandardizationResult(null);
+    setStandardizationSourceUri(uri);
     setStdState('generating');
     let result: GarmentStandardizationResult;
     try {
@@ -246,14 +259,15 @@ export default function AddWardrobeItem() {
       setStdState('done');
     } else {
       setStdState('failed');
-      showToast('透明主图生成失败，已保留原图', 'error');
+      showToast('透明主图生成失败，原图尚未加入衣橱', 'error');
     }
   };
 
   const runRecognition = async (uri: string) => {
     const token = ++reqTokenRef.current;
+    setOriginalConfirmedUri(null);
     setRecognizing(true);
-    setRecognizeMeta(null); setStandardizationResult(null); setStdState('idle');
+    setRecognizeMeta(null); setStandardizationResult(null); setStandardizationSourceUri(null); setStdState('idle');
     setDetectedItems([]); setSelectedIndices(new Set()); setShowItemPicker(false);
     try {
       const { items, meta } = await aiDetectMultiItems(uri);
@@ -333,16 +347,21 @@ export default function AddWardrobeItem() {
       let finalImageUrl: string | null = null;
       let persistedAttrs = recognizedAttrs ?? undefined;
       if (imageUri) {
-        const persistedImage = await persistGarmentMaster({
+        const persistedImage = await persistManualGarmentMaster({
           sourceUri: imageUri,
           userId: user.id,
           photoType,
-          acceptance: standardizationResult?.acceptance
+          acceptance: effectiveStandardizationResult?.acceptance
             ?? { ok: false, reason: 'missing' },
-          diagnostics: standardizationResult?.meta,
-        });
+          diagnostics: effectiveStandardizationResult?.meta,
+        }, originalConfirmed);
         if (!persistedImage.ok) {
-          showToast('图片上传失败，请检查网络后重试', 'error');
+          if (persistedImage.reason === 'original_confirmation_required') {
+            setStdState('failed');
+            showToast('请先重试透明主图，或明确选择“用原图保存”', 'error');
+          } else {
+            showToast('图片上传失败，请检查网络后重试', 'error');
+          }
           return;
         }
 
@@ -350,12 +369,14 @@ export default function AddWardrobeItem() {
         persistedAttrs = {
           ...(recognizedAttrs ?? {}),
           ...persistedImage.metadata,
+          ...(persistedImage.status === 'fallback_original' && originalConfirmed
+            ? { user_confirmed_original: true }
+            : {}),
         };
         showToast(
           persistedImage.status === 'transparent_master'
             ? '已更新为透明主图'
-            : '透明主图生成失败，已保留原图',
-          persistedImage.status === 'transparent_master' ? undefined : 'error',
+            : '已按你的选择使用原图保存',
         );
       }
 
@@ -392,7 +413,7 @@ export default function AddWardrobeItem() {
     } finally {
       setSaving(false);
     }
-  }, [user, name, category, color, material, brand, price, fitType, sleeveLength, seasons, occasionTags, purchaseDate, imageUri, standardizationResult, photoType, recognizedAttrs, addItem]);
+  }, [user, name, category, color, material, brand, price, fitType, sleeveLength, seasons, occasionTags, purchaseDate, imageUri, effectiveStandardizationResult, photoType, recognizedAttrs, originalConfirmed, addItem]);
 
   const pickerOptions: Record<PickerField, string[]> = {
     category: CATEGORY_OPTIONS,
@@ -465,10 +486,18 @@ export default function AddWardrobeItem() {
         <Text style={styles.title}>
           {queueTotal > 1 ? `添加衣物 (${queueTotal - itemQueue.length + 1}/${queueTotal})` : '添加衣物'}
         </Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving || !name.trim()}>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saving || !name.trim() || stdState === 'generating'
+            || (stdState === 'failed' && !originalConfirmed)}
+        >
           {saving
             ? <ActivityIndicator size="small" color={Colors.terracotta} />
-            : <Text style={[styles.save, !name.trim() && styles.saveDisabled]}>
+            : <Text style={[
+                styles.save,
+                (saving || !name.trim() || stdState === 'generating'
+                  || (stdState === 'failed' && !originalConfirmed)) && styles.saveDisabled,
+              ]}>
                 {itemQueue.length > 1
                   ? `保存 (还有${itemQueue.length - 1}件)`
                   : '保存'}
@@ -485,7 +514,15 @@ export default function AddWardrobeItem() {
               <TouchableOpacity
                 key={`thumb-${idx}`}
                 style={[styles.thumbItem, uri === imageUri && styles.thumbItemActive]}
-                onPress={() => setImageUri(uri)}
+                onPress={() => {
+                  if (uri === imageUri) return;
+                  reqTokenRef.current += 1;
+                  setImageUri(uri);
+                  setOriginalConfirmedUri(null);
+                  setStandardizationResult(null);
+                  setStandardizationSourceUri(null);
+                  setStdState('idle');
+                }}
               >
                 <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" />
                 <Text style={styles.thumbLabel}>图{idx + 1}</Text>
@@ -499,7 +536,7 @@ export default function AddWardrobeItem() {
           {imageUri ? (
             <View style={styles.imageContainer}>
               <Image
-                source={{ uri: standardizationResult?.acceptance.ok ? standardizationResult.acceptance.uri : imageUri }}
+                source={{ uri: effectiveStandardizationResult?.acceptance.ok ? effectiveStandardizationResult.acceptance.uri : imageUri }}
                 style={styles.image}
                 resizeMode="contain"
               />
@@ -530,7 +567,7 @@ export default function AddWardrobeItem() {
           ) : null}
           {stdState === 'failed' ? (
             <View style={styles.stdFailedRow}>
-              <Text style={styles.stdFailedCaption}>透明主图生成失败，已保留原图</Text>
+              <Text style={styles.stdFailedCaption}>透明主图生成失败，原图尚未加入衣橱</Text>
               <TouchableOpacity
                 style={styles.stdRetryBtn}
                 onPress={() => {
@@ -550,7 +587,11 @@ export default function AddWardrobeItem() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.stdUseOriginalBtn}
-                onPress={() => setStdState('idle')}
+                onPress={() => {
+                  setOriginalConfirmedUri(imageUri);
+                  setStdState('idle');
+                  showToast('已选择用原图保存；点击右上角保存即可');
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="使用原图保存"
               >

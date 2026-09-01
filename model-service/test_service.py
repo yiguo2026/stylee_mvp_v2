@@ -12,6 +12,7 @@ from stylee.service.adapter import (
     compact_recommended_name, outfits_to_app, ingest_to_app, std_to_app
 )
 from stylee.service.ai_features import normalize_multi_item
+import stylee.service.server as server_module
 from scripts.check_outfit_quality_live import validate_outfit as validate_live_outfit
 from stylee.contracts import (
     Category, InputMode, Sleeve, Fit, Season, BodyShape,
@@ -27,6 +28,13 @@ def test_label_and_category():
     assert app_category(Category.SHOES) == "鞋履"
     assert model_category("连体装") == Category.DRESS
     assert model_category("包袋") == Category.BAG
+
+
+def test_standardize_target_box_parser_rejects_untrusted_coordinates():
+    parser = getattr(server_module, "_target_bbox", None)
+    assert callable(parser)
+    assert parser({"bbox_2d": [80, 120, 360, 620]}) == [80, 120, 360, 620]
+    assert parser({"bbox_2d": [400, 500, 200, 900]}) is None
 
 
 def test_wardrobe_item():
@@ -145,6 +153,7 @@ def test_normalize_multi_item_contract():
     item = normalize_multi_item({
         "category": "上装", "color": "白色", "material": "棉",
         "description": "白色T恤", "photo_type": "flat",
+        "bbox_2d": [100, 100, 900, 900],
     }, 0)
     assert item["photo_type"] == "flatlay" and item["needs_review"] is False
     assert item["confidence"] == 0.95 and item["index"] == 1
@@ -312,7 +321,7 @@ def test_server_smoke():
         st, b, headers = _get_with_headers(base + "/health")
         assert st == 200 and b["status"] == "ok"
         assert headers["cache-control"] == "no-store"
-        assert b["contract_version"] == "2026-08-18"
+        assert b["contract_version"] == "2026-09-01"
         assert b["git_sha"] == "abc123"
         assert b["git_branch"] == "main"
         assert b["repo_slug"] == "fitzw/style-model"
@@ -485,6 +494,7 @@ def test_server_smoke():
 
 def main():
     test_label_and_category()
+    test_standardize_target_box_parser_rejects_untrusted_coordinates()
     test_wardrobe_item()
     test_to_request_context_nl()
     test_to_request_context_tags()

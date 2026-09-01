@@ -24,6 +24,7 @@ from .contracts import (
 from .vision.base import AlphaMatteProcessor, ImageRefSource, ImageStandardizer, VisionProvider
 from .vision.alpha_matte import AlphaMatteError, AlphaMatteOutput
 from .vision.dashscope import VisionError
+from .vision.target_crop import TargetCropError, crop_target_image
 
 
 def to_data_url(image_bytes: bytes, mime: str) -> str:
@@ -148,6 +149,7 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
                      matte_processor: AlphaMatteProcessor,
                      stage_timer: Callable[[str], ContextManager[None]] | None = None,
                      on_fallback: Callable[[str, BaseException], None] | None = None,
+                     target_bbox=None,
                      ) -> StandardizedImage:
     """A2:透明化优先，必要时白底准备后透明化，再对透明 PNG 回验。"""
     first_failed_stage: str | None = None
@@ -184,6 +186,15 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
             record_failure(stage, error)
             return None
 
+    working_image_url = image_url
+    if target_bbox is not None:
+        try:
+            with stage_timer("A2.target_crop") if stage_timer else nullcontext():
+                working_image_url = crop_target_image(image_url, target_bbox)
+        except TargetCropError as error:
+            record_failure(error.stage, error)
+            return terminal_failure()
+
     expected = {"category": item.category.value, "colors": item.colors}
 
     def visually_clean(output: AlphaMatteOutput) -> bool:
@@ -208,7 +219,7 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
     visually_verified = False
     if photo_type == PhotoType.WEB:
         matte_output = apply_matte(
-            image_url, ImageRefSource.CLIENT, "A2.direct_matte",
+            working_image_url, ImageRefSource.CLIENT, "A2.direct_matte",
         )
         method = "direct_matte"
         if matte_output is not None:
@@ -223,7 +234,7 @@ def standardize_item(image_url: str, item: WardrobeItem, photo_type: PhotoType,
         edit_error = None
         with stage_timer("A2.image_edit") if stage_timer else nullcontext():
             try:
-                prepared_ref = standardizer.standardize(image_url, item, mode)
+                prepared_ref = standardizer.standardize(working_image_url, item, mode)
             except Exception as error:
                 edit_error = error
                 prepared_ref = ""

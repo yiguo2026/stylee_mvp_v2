@@ -4,9 +4,19 @@ import { useWardrobeStore } from '@/stores/wardrobeStore';
 import { aiDetectMultiItems, aiStandardizeGarment } from '@/lib/ai';
 import type { GarmentStandardizationResult } from '@/lib/ai';
 import { buildItemName, ensureUniqueName } from '@/lib/itemNaming';
-import { persistGarmentMaster } from '@/lib/uploadImage';
+import { persistBatchImportMaster } from '@/lib/uploadImage';
 import { track } from '@/lib/track';
-import { acceptedRecognitionItems } from '@/lib/recognitionPolicy';
+import {
+  acceptedRecognitionItems,
+  canStandardizeDetectedTarget,
+  missingTargetBoxIndices,
+} from '@/lib/recognitionPolicy';
+import {
+  createSingleFlightScheduler,
+  processImportSubtasks,
+  resetImportSubtasksForRetry,
+  type ImportSubtaskState,
+} from '@/lib/importBatchProcessor';
 import {
   canOperateImportTask,
   formatRecognitionFailure,
@@ -41,6 +51,10 @@ export interface ImportTask {
   standardizedImageUri?: string;
   /** True when standardization failed and the original image was used instead */
   standardizationFallback?: boolean;
+  /** Per-garment progress. Successful entries are immutable across retries. */
+  itemStates?: ImportSubtaskState<string>[];
+  /** True when repeated provider timeouts paused untouched garments. */
+  circuitOpen?: boolean;
   /** Error message if failed */
   error?: string;
   requestId?: string;
@@ -114,12 +128,14 @@ export const useImportStore = create<ImportState>((set, get) => ({
     });
 
     // Start processing
-    void processQueue();
+    void scheduleProcessQueue();
   },
 
   confirmSelection: (taskId: string, selectedItems: DetectedItem[]) => {
     const activeUserId = get().activeUserId;
-    if (!canOperateImportTask(get().tasks.find((task) => task.id === taskId), activeUserId)) return;
+    const target = get().tasks.find((task) => task.id === taskId);
+    if (!canOperateImportTask(target, activeUserId)
+        || target.status !== 'needs_selection') return;
     set(state => ({
       ...(() => {
         const tasks = state.tasks.map(t =>
@@ -130,17 +146,30 @@ export const useImportStore = create<ImportState>((set, get) => ({
         return { tasks, ...summarizeImportTasks(tasks) };
       })(),
     }));
-    void processQueue();
+    void scheduleProcessQueue();
   },
 
   retryFailed: (taskId: string) => {
     const activeUserId = get().activeUserId;
-    if (!canOperateImportTask(get().tasks.find((task) => task.id === taskId), activeUserId)) return;
+    const target = get().tasks.find((task) => task.id === taskId);
+    if (!canOperateImportTask(target, activeUserId) || target.status !== 'failed') return;
+    const targetBoxMissing = target.itemStates?.some(
+      (itemState) => itemState.failureStage === 'target_bbox_missing',
+    );
+    const retryConfirmedItems = Boolean(
+      target.confirmedItems?.length && target.itemStates?.length && !targetBoxMissing,
+    );
     set(state => ({
       ...(() => {
         const tasks = state.tasks.map(t => t.id === taskId ? {
           ...t,
-          status: 'pending' as const,
+          status: retryConfirmedItems ? 'selected' as const : 'pending' as const,
+          itemStates: retryConfirmedItems
+            ? resetImportSubtasksForRetry(t.itemStates ?? [])
+            : undefined,
+          confirmedItems: retryConfirmedItems ? t.confirmedItems : undefined,
+          allDetectedItems: retryConfirmedItems ? t.allDetectedItems : undefined,
+          circuitOpen: false,
           error: undefined,
           requestId: undefined,
           failedStage: undefined,
@@ -150,13 +179,13 @@ export const useImportStore = create<ImportState>((set, get) => ({
         return { tasks, ...summarizeImportTasks(tasks), isProcessing: true };
       })(),
     }));
-    void processQueue();
+    void scheduleProcessQueue();
   },
 
   clearCompleted: () => {
     set(state => {
       const remainingTasks = tasksForUser(state.tasks, state.activeUserId)
-        .filter(t => t.status !== 'done' && t.status !== 'failed');
+        .filter(t => t.status !== 'done');
       return {
         tasks: remainingTasks,
         ...summarizeImportTasks(remainingTasks),
@@ -209,6 +238,18 @@ async function processQueue() {
   }
 }
 
+const scheduleProcessQueue = createSingleFlightScheduler(
+  processQueue,
+  () => {
+    const state = useImportStore.getState();
+    return Boolean(
+      state.activeUserId
+      && tasksForUser(state.tasks, state.activeUserId)
+        .some((task) => task.status === 'pending' || task.status === 'selected'),
+    );
+  },
+);
+
 function taskIsActive(taskId: string, ownerUserId: string): boolean {
   const state = useImportStore.getState();
   return state.activeUserId === ownerUserId
@@ -218,7 +259,7 @@ function taskIsActive(taskId: string, ownerUserId: string): boolean {
 async function handleDetection(taskId: string, ownerUserId: string) {
   const store = useImportStore;
   const task = store.getState().tasks.find(t => t.id === taskId);
-  if (!canOperateImportTask(task, ownerUserId)) return;
+  if (!canOperateImportTask(task, ownerUserId) || task.status !== 'pending') return;
   
   store.setState(state => ({
     tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'detecting' } : t)
@@ -300,82 +341,135 @@ async function handleDetection(taskId: string, ownerUserId: string) {
 async function handleFinalize(taskId: string, ownerUserId: string) {
   const store = useImportStore;
   const task = store.getState().tasks.find(t => t.id === taskId);
-  if (!canOperateImportTask(task, ownerUserId) || !task.confirmedItems) return;
+  if (!canOperateImportTask(task, ownerUserId)
+      || task.status !== 'selected'
+      || !task.confirmedItems) return;
   const finalizeStart = Date.now();
+  const detectedItemCount = task.allDetectedItems?.length ?? task.confirmedItems.length;
+  const missingTargetBoxes = missingTargetBoxIndices(detectedItemCount, task.confirmedItems);
+  if (missingTargetBoxes.length > 0) {
+    const missingSet = new Set(missingTargetBoxes);
+    const itemStates: ImportSubtaskState<string>[] = task.confirmedItems.map((_item, index) => (
+      missingSet.has(index)
+        ? {
+            index,
+            status: 'failed',
+            attempts: 0,
+            failureStage: 'target_bbox_missing',
+            retryable: false,
+          }
+        : {
+            index,
+            status: 'waiting',
+            attempts: 0,
+            failureStage: 'preflight_blocked',
+            retryable: true,
+          }
+    ));
+    store.setState(state => ({
+      ...(() => {
+        const tasks = state.tasks.map(t => t.id === taskId ? {
+          ...t,
+          status: 'failed' as const,
+          itemStates,
+          error: '单品定位不完整，本批尚未导入；请重试识别',
+          failedStage: 'target_bbox_missing',
+        } : t);
+        return { tasks, ...summarizeImportTasks(tasks) };
+      })(),
+    }));
+    return;
+  }
 
-  try {
-    // 用于本次导入内 + 衣橱已有单品的同名去重（保证标题唯一且 ≤10 字）
-    const existingNames = new Set(
-      useWardrobeStore.getState().items
-        .map(i => (i.name || '').trim())
-        .filter(Boolean),
-    );
+  const existingNames = new Set(
+    useWardrobeStore.getState().items
+      .map(i => (i.name || '').trim())
+      .filter(Boolean),
+  );
 
-    for (let i = 0; i < task.confirmedItems.length; i++) {
-      const item = task.confirmedItems[i];
-      const sourceUri = item.sourceImageUri || task.sourceUri;
-      
+  const batch = await processImportSubtasks({
+    items: task.confirmedItems,
+    initialStates: task.itemStates,
+    concurrency: 2,
+    maxAttempts: 2,
+    timeoutCircuitThreshold: 2,
+    onUpdate: (itemStates) => {
+      if (!taskIsActive(taskId, ownerUserId)) return;
+      const processing = itemStates.find((itemState) => itemState.status === 'processing');
       store.setState(state => ({
         tasks: state.tasks.map(t => t.id === taskId ? {
           ...t,
-          status: 'standardizing',
-          currentSubIndex: i,
-          standardizedImageUri: undefined,
-          standardizationFallback: false,
-        } : t)
+          status: processing ? 'standardizing' : t.status,
+          currentSubIndex: processing?.index,
+          itemStates: [...itemStates],
+        } : t),
       }));
-
-      // Real standardization/background-removal path used by /wardrobe/add.
-      // Keep a minimum dwell time so the user can visibly see “扣除背景中”.
+    },
+    process: async (item, index) => {
+      if (!taskIsActive(taskId, ownerUserId)) {
+        return { ok: false, failureStage: 'cancelled', retryable: false };
+      }
+      const importKey = taskId + ':' + index;
+      const existing = useWardrobeStore.getState().items.find((wardrobeItem) => (
+        wardrobeItem.ai_recognized_attrs?.import_key === importKey
+      ));
+      if (existing) {
+        return { ok: true, value: existing.item_id };
+      }
+      const sourceUri = item.sourceImageUri || task.sourceUri;
       const photoType = item.photo_type ?? 'on_body';
-      const standardizationPromise: Promise<GarmentStandardizationResult> =
-        aiStandardizeGarment(sourceUri, item.category, photoType, {
+      if (!canStandardizeDetectedTarget(detectedItemCount, item.bbox_2d)) {
+        return { ok: false, failureStage: 'target_bbox_missing', retryable: false };
+      }
+      let standardized: GarmentStandardizationResult;
+      try {
+        standardized = await aiStandardizeGarment(sourceUri, item.category, photoType, {
           color: item.color,
           material: item.material,
           description: item.description,
-        }).catch((err) => {
-          console.warn('[importStore] aiStandardizeGarment failed:', err);
-          return {
-            url: null,
-            skipped: false,
-            acceptance: { ok: false, reason: 'missing' },
-            meta: { source: 'model-service/error', durationMs: 0, ok: false },
-          };
+          bbox_2d: item.bbox_2d,
         });
-      const [standardized] = await Promise.all([
-        standardizationPromise,
-        new Promise(resolve => setTimeout(resolve, 2200)),
-      ]);
+      } catch (err) {
+        console.warn('[importStore] aiStandardizeGarment failed:', err);
+        return { ok: false, failureStage: 'client_error', retryable: true };
+      }
 
-      if (!taskIsActive(taskId, ownerUserId)) return;
+      if (!standardized.acceptance.ok) {
+        return {
+          ok: false,
+          failureStage: standardized.meta.failedStage || 'standardization_rejected',
+          retryable: true,
+        };
+      }
+      if (!taskIsActive(taskId, ownerUserId)) {
+        return { ok: false, failureStage: 'cancelled', retryable: false };
+      }
 
       store.setState(state => ({
         tasks: state.tasks.map(t => t.id === taskId ? {
           ...t,
           status: 'uploading',
-        } : t)
+          currentSubIndex: index,
+        } : t),
       }));
-
-      const persistedImage = await persistGarmentMaster({
+      const persistedImage = await persistBatchImportMaster({
         sourceUri,
         userId: ownerUserId,
         photoType,
         acceptance: standardized.acceptance,
         diagnostics: standardized.meta,
       });
-      if (!persistedImage.ok) throw new Error('原图上传失败');
-      if (!taskIsActive(taskId, ownerUserId)) return;
-      const finalImageUrl = persistedImage.imageUrl;
+      if (!persistedImage.ok) {
+        return {
+          ok: false,
+          failureStage: persistedImage.reason,
+          retryable: persistedImage.reason !== 'standardization_failed',
+        };
+      }
+      if (!taskIsActive(taskId, ownerUserId)) {
+        return { ok: false, failureStage: 'cancelled', retryable: false };
+      }
 
-      store.setState(state => ({
-        tasks: state.tasks.map(t => t.id === taskId ? {
-          ...t,
-          standardizedImageUri: finalImageUrl,
-          standardizationFallback: persistedImage.status === 'fallback_original',
-        } : t)
-      }));
-
-      // 统一命名规则：[记忆点]+[颜色]+[细分品类]，≤10 字，衣橱内去重
       const itemName = ensureUniqueName(
         buildItemName({
           category: item.category,
@@ -390,53 +484,71 @@ async function handleFinalize(taskId: string, ownerUserId: string) {
         existingNames,
       );
       existingNames.add(itemName);
-
-      // Save to wardrobe. The primary image is the standardized/bg-removed image when available.
-      const { addItem } = useWardrobeStore.getState();
-      // 仅将 AI 实际识别出且非空、且真正写入 item 的字段计入 recognized_fields（此路径仅落库 material）
       const recognizedFields: string[] = [];
       if (item.material) recognizedFields.push('material');
-      const saved = await addItem({
+      if (item.fit_type) recognizedFields.push('fit_type');
+      if (item.sleeve_length) recognizedFields.push('sleeve_length');
+      const saved = await useWardrobeStore.getState().addItem({
         user_id: ownerUserId,
+        import_key: importKey,
         name: itemName,
         category: item.category,
         color: normalizeColor(item.color),
         material: item.material ? normalizeMaterial(item.material) : undefined,
-        image_url: finalImageUrl,
+        fit_type: item.fit_type,
+        sleeve_length: item.sleeve_length,
+        image_url: persistedImage.imageUrl,
         ai_recognized_attrs: {
           async_import: true,
+          import_key: importKey,
           detection_index: item.index,
+          detected_item_count: task.allDetectedItems?.length ?? task.confirmedItems?.length ?? 1,
+          description: item.description || undefined,
           ...persistedImage.metadata,
           recognized_fields: recognizedFields,
         },
         source_type: 'album_ai',
         source_label: '相册导入',
         status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       } as any);
-      if (!saved) throw new Error('衣橱保存失败');
-    }
+      if (!saved) {
+        return { ok: false, failureStage: 'wardrobe_save_failed', retryable: true };
+      }
+      return { ok: true, value: saved.item_id };
+    },
+  });
 
-    store.setState(state => ({
-      ...(() => {
-        const tasks = state.tasks.map(t => t.id === taskId ? { ...t, status: 'done' as const } : t);
-        return { tasks, ...summarizeImportTasks(tasks) };
-      })(),
-    }));
-    try { track('wardrobe_import_result', { status: 'success', item_count: task.confirmedItems?.length ?? 1, duration_ms: Date.now() - finalizeStart }); } catch {}
-  } catch (err: any) {
-    if (!taskIsActive(taskId, ownerUserId)) return;
-    store.setState(state => ({
-      ...(() => {
-        const tasks = state.tasks.map(t => t.id === taskId ? {
-          ...t,
-          status: 'failed' as const,
-          error: err.message || '导入失败',
-        } : t);
-        return { tasks, ...summarizeImportTasks(tasks) };
-      })(),
-    }));
-    try { track('wardrobe_import_result', { status: 'failed', item_count: 0, duration_ms: Date.now() - finalizeStart, error_code: err.message }); } catch {}
-  }
+  if (!taskIsActive(taskId, ownerUserId)) return;
+  const succeeded = batch.states.filter((state) => state.status === 'succeeded').length;
+  const failed = batch.states.filter((state) => state.status === 'failed').length;
+  const waiting = batch.states.filter((state) => state.status === 'waiting').length;
+  const unresolved = failed + waiting;
+  store.setState(state => ({
+    ...(() => {
+      const tasks = state.tasks.map(t => t.id === taskId ? {
+        ...t,
+        status: unresolved > 0 ? 'failed' as const : 'done' as const,
+        itemStates: batch.states,
+        circuitOpen: batch.circuitOpen,
+        currentSubIndex: undefined,
+        standardizedImageUri: undefined,
+        standardizationFallback: false,
+        failedStage: batch.circuitOpen ? 'client_timeout' : undefined,
+        error: unresolved > 0
+          ? '已导入 ' + succeeded + ' 件 · ' + unresolved + ' 件待重试；失败原图未加入衣橱'
+          : undefined,
+      } : t);
+      return { tasks, ...summarizeImportTasks(tasks) };
+    })(),
+  }));
+  try {
+    track('wardrobe_import_result', {
+      status: unresolved > 0 ? 'failed' : 'success',
+      item_count: succeeded,
+      duration_ms: Date.now() - finalizeStart,
+      error_code: unresolved > 0
+        ? (batch.circuitOpen ? 'client_timeout' : 'partial_failure')
+        : undefined,
+    });
+  } catch {}
 }

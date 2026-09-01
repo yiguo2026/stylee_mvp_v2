@@ -10,7 +10,7 @@ from typing import Mapping, Optional
 
 
 MANIFEST_SCHEMA_VERSION = 1
-CONTRACT_VERSION = "2026-08-18"
+CONTRACT_VERSION = "2026-09-01"
 RAG_SIGNATURE = "openai_compat:text-embedding-v4:1024"
 RAG_DIM = 1024
 RAG_COUNT = 3000

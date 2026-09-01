@@ -33,6 +33,7 @@ import {
 } from '@/design-system';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import { outfitImageMetricsForWardrobeItem } from '@/lib/outfitImageMetrics';
+import { buildTryOnItemBrief } from '@/lib/tryonItemPolicy';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory } from '@/types';
 import type { OutfitCanvasLayoutItem } from '@/lib/outfitCanvasLayout';
 
@@ -342,18 +343,21 @@ export default function OutfitResultScreen() {
     if (!currentOutfit) return;
     try { track('outfit_action', { outfit_id: savedId ?? `temp_${currentIndex}`, action: 'try_on' }); } catch {}
     const tryOnItems = [
-      ...(currentOutfit.items ?? []).map(i => ({
-        item_id: i.item_id,
+      ...(currentOutfit.items ?? []).map(i => buildTryOnItemBrief({
         name: i.item?.name ?? '单品',
         category: i.item?.category ?? '',
         color: i.item?.color ?? '',
+        material: i.item?.material,
+        sleeve_length: i.item?.sleeve_length,
+        fit_type: i.item?.fit_type,
         image_url: i.item?.image_url,
+        ai_recognized_attrs: i.item?.ai_recognized_attrs,
       })),
-      ...(currentOutfit.recommended_items ?? []).map((r, idx) => ({
-        item_id: `rec_${idx}`,
+      ...(currentOutfit.recommended_items ?? []).map((r) => buildTryOnItemBrief({
         name: r.name,
         category: r.category,
         color: r.color,
+        description: r.description,
         image_url: r.image_url,
       })),
     ];

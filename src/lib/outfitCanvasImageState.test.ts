@@ -251,3 +251,64 @@ test('array sources keep the legacy presentation even when callers provide visib
     true,
   );
 });
+
+test('array sources strip tight visible metrics before layout', async () => {
+  const imageState = await import('./outfitCanvasImageState.ts');
+  const prepareLayoutItem = (imageState as typeof imageState & {
+    outfitCanvasLayoutItemForImageSource?: (
+      item: Record<string, unknown>, source: unknown, loadedAspectRatio: number | null,
+    ) => Record<string, unknown>;
+  }).outfitCanvasLayoutItemForImageSource;
+  assert.equal(typeof prepareLayoutItem, 'function');
+
+  const source = [
+    { uri: 'https://image.test/a.png' },
+    { uri: 'https://image.test/b.png' },
+  ];
+  const item = {
+    id: 'array-item',
+    name: '数组单品',
+    category: '上装',
+    imageSource: source,
+    imageAspectRatio: 0.5,
+    visibleBounds: { left: 0.1, top: 0.2, width: 0.6, height: 0.7 },
+  };
+
+  const prepared = prepareLayoutItem?.(item, source, 2);
+
+  assert.ok(prepared);
+  assert.equal('imageAspectRatio' in prepared, false);
+  assert.equal('visibleBounds' in prepared, false);
+  assert.strictEqual(prepared.imageSource, source);
+});
+
+test('ordinary sources retain visible bounds and use a loaded aspect only when needed', async () => {
+  const imageState = await import('./outfitCanvasImageState.ts');
+  const prepareLayoutItem = (imageState as typeof imageState & {
+    outfitCanvasLayoutItemForImageSource?: (
+      item: Record<string, unknown>, source: unknown, loadedAspectRatio: number | null,
+    ) => Record<string, unknown>;
+  }).outfitCanvasLayoutItemForImageSource;
+  assert.equal(typeof prepareLayoutItem, 'function');
+
+  const visibleBounds = { left: 0.1, top: 0.2, width: 0.6, height: 0.7 };
+  const withoutAspect = {
+    id: 'remote-item',
+    name: '远程单品',
+    category: '鞋履',
+    visibleBounds,
+  };
+  const withLoadedAspect = prepareLayoutItem?.(
+    withoutAspect,
+    { uri: 'https://image.test/shoe.png' },
+    2,
+  );
+  assert.equal(withLoadedAspect?.imageAspectRatio, 2);
+  assert.strictEqual(withLoadedAspect?.visibleBounds, visibleBounds);
+
+  const explicit = { ...withoutAspect, imageAspectRatio: 0.5 };
+  assert.strictEqual(
+    prepareLayoutItem?.(explicit, { uri: 'https://image.test/shoe.png' }, 2),
+    explicit,
+  );
+});

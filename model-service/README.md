@@ -24,7 +24,7 @@ node scripts/styleeSmoke.ts /path/to/approved-garment.png  # 在仓库根目录�
 npm start
 ```
 
-App 侧行为：服务在 → AI 能力走真模型；透明主图失败 → 保留已持久化原图，并显示「透明主图生成失败，已保留原图」；成功保存后显示「已更新为透明主图」。其他能力继续使用各自既有的 mock / 预置结果降级。App 绝不直连 DeepSeek 或 DashScope。
+App 侧行为：服务在 → AI 能力走真模型；手动单品导入失败时可由用户明确选择保留原图；后台多品导入失败时原图仅停留在待重试任务，不创建 active 衣橱行，也不进入推荐或试穿。成功保存后显示「已更新为透明主图」。App 绝不直连 DeepSeek 或 DashScope。
 
 ## 生产安全配置
 
@@ -54,14 +54,15 @@ Blueprint 默认关闭自动部署，首次使用免费实例完成 HTTPS 与真
 |---|---|---|
 | `GET /health` | 存活检查 | - |
 | `POST /recognize` | 识别衣物属性（类目/颜色/材质/照片类型） | qwen3-vl-plus |
-| `POST /recognize-multi` | 识别图片中的全部衣物，返回标准化属性和可复核元数据 | qwen3-vl-plus |
-| `POST /standardize` | 原图 → 经 alpha 与视觉双重校验的透明 PNG 主图 data URI | qwen-image-edit + Pillow 12.3.0 |
+| `POST /recognize-multi` | 识别全部衣物并返回属性与 0–1000 目标框 | qwen3-vl-plus |
+| `POST /standardize` | 可按目标框裁剪后生成经 alpha 与视觉双重校验的透明 PNG | qwen-image-edit + Pillow 12.3.0 |
 | `POST /recommend` | 衣橱+场景 → 3 套搭配+理由（B0-B6 链路，仅 2 次 LLM 调用） | DeepSeek flash/pro |
+| `POST /tryon-image` | 身体照 + 最多两张真实服装图，多图编辑后做水印/版型质检 | Qwen Image Edit + Qwen VL Flash |
 | `POST /gamma/import` | Gamma 单次识别与标准化 | Qwen VL + Image Edit |
 | `POST /gamma/outfit` | Gamma 直接搭配、换单件、换整套 | DeepSeek + Qwen Image |
 | `POST /gamma/tryon` | Gamma 身体照、搭配、场景直接生成试穿图 | Qwen 多图编辑 |
 
-注意：`/recommend` 真实生成耗时约 40~60s（App 侧超时 90s）。单品/多品识别的服务端默认限时分别为 15s/50s（`VL_RECOGNIZE_TIMEOUT_SECONDS` / `VL_MULTI_TIMEOUT_SECONDS`），必须短于 App 侧 20s/60s，确保服务端能先返回可追踪错误。`/standardize` 顺序执行图片编辑和视觉回验，默认分别限时 60s/20s，App 侧整体限时 90s。可用 `IMG_EDIT_TIMEOUT_SECONDS` 和 `VL_VERIFY_TIMEOUT_SECONDS` 调整，三者必须保持整体限时大于服务端两段之和。
+注意：`/recommend` 真实生成耗时约 40~60s（App 侧超时 90s）。单品/多品识别的服务端默认限时分别为 15s/50s（`VL_RECOGNIZE_TIMEOUT_SECONDS` / `VL_MULTI_TIMEOUT_SECONDS`），必须短于 App 侧 20s/60s，确保服务端能先返回可追踪错误。`/standardize` 顺序执行图片编辑和视觉回验，默认分别限时 60s/20s，App 侧整体限时 120s。普通试穿图片编辑默认 35s、质检默认 10s，首次不合格时只允许一次整图重试。
 
 每个模型请求都由 App 生成 `X-Request-ID`，服务端用同一 ID 输出一行结构化日志。成功响应的 `trace.stage_ms` 会列出实际阶段耗时；失败响应会返回 `stage`、`error_type`、`duration_ms` 和 `retryable`。即使客户端先中止请求，也能用客户端日志里的 request ID 在 Render 日志中定位服务端最终停在哪个阶段。线上复测时分别跑一次推荐和识别，再按 request ID 对齐浏览器日志与 Render 的 `stylee_request` 日志即可。
 

@@ -54,12 +54,12 @@ Production controls:
 
 | Capability | HTTP endpoint | Pipeline/model |
 |---|---|---|
-| Clothing recognition | `POST /recognize`, `/recognize-multi` | DashScope Qwen VL |
-| Transparent garment master | `POST /standardize` | WEB direct alpha matte fast path, otherwise Qwen Image Edit preparation + Pillow alpha matte + visual verification |
+| Clothing recognition | `POST /recognize`, `/recognize-multi` | DashScope Qwen VL, including normalized per-item target boxes |
+| Transparent garment master | `POST /standardize` | Optional target crop, WEB direct alpha matte fast path, otherwise Qwen Image Edit preparation + Pillow alpha matte + visual verification |
 | Outfit recommendation | `POST /recommend` | B0-B6 constraints/RAG + DeepSeek |
 | Intent and reasons | `POST /intent`, `/reason` | DeepSeek |
 | Product extraction | `POST /product-extract` | DeepSeek |
-| Try-on helpers | `POST /tryon-suggestion`, `/tryon-image` | DeepSeek / DashScope |
+| Try-on helpers | `POST /tryon-suggestion`, `/tryon-image` | DeepSeek / Qwen multi-image edit + Flash output verification |
 
 The recommendation path keeps deterministic work in code:
 
@@ -108,8 +108,8 @@ model service must never receive a Supabase secret/service-role key.
 The App imports a garment through one controlled path:
 
 ```text
-local image -> /recognize-multi -> normalized attributes + photo_type
-            -> /standardize -> transparent PNG alpha validation -> bounded VL verification
+local image -> /recognize-multi -> normalized attributes + photo_type + bbox_2d
+            -> /standardize -> target crop -> transparent PNG alpha validation -> bounded VL verification
             -> App copies the verified transparent PNG to Supabase Storage
             -> wardrobe_items + ai_recognized_attrs
 ```
@@ -136,6 +136,12 @@ alpha validation with no visual drift sets `verified=true`. Terminal failure
 returns the original `image_ref`, `method=cropped_fallback`, both verification
 flags false, and the first failed stage; a white preparation image is never a
 successful response.
+
+The production `/tryon-image` path uses the same reference discipline as
+Gamma: the body photo is image 1 and up to two real garment images are images
+2–3. Structural attributes remain in the text contract. A bounded Flash vision
+check rejects text, pseudo-watermarks, garment drift, and sleeve drift; one
+whole-image regeneration is allowed, after which the request fails closed.
 
 Pillow 12.3.0 is installed from `requirements.txt`. Alpha processing accepts
 only base64 PNG/JPEG data URIs or HTTP(S) references. Encoded input is limited

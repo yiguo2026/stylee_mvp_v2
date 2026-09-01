@@ -105,6 +105,8 @@ export interface UserStylePreference {
 export interface WardrobeItem {
   item_id: string;
   user_id: string;
+  /** Durable idempotency key for independently processed batch-import items. */
+  import_key?: string;
   name: string;
   category: ClothingCategory;
   color: string;
@@ -234,6 +236,8 @@ export interface DetectedItem {
   photo_type?: PhotoType;
   needs_review?: boolean;
   confidence?: number;
+  /** Target garment bounds on a normalized 0..1000 image grid. */
+  bbox_2d?: [number, number, number, number];
   sourceImageUri?: string;
   description: string;
 }

@@ -10,10 +10,17 @@ import {
   serviceStandardizeDetailed,
   uriToBase64,
 } from '@/lib/styleeService';
-import type { ServiceErrorInfo } from '@/lib/styleeService';
-import { outfitsRespToApp, recognizeManyItemToDetected, recognizeRespToResult, toRecommendRequest } from '@/lib/styleeMapping';
+import type { ServiceErrorInfo, StandardizeItemExtras } from '@/lib/styleeService';
+import {
+  isRecommendationEligible,
+  outfitsRespToApp,
+  recognizeManyItemToDetected,
+  recognizeRespToResult,
+  toRecommendRequest,
+} from '@/lib/styleeMapping';
 import { acceptTransparentStandardization } from '@/lib/standardizationPolicy';
 import type { TransparentAcceptance } from '@/lib/standardizationPolicy';
+import type { TryOnItemBrief } from '@/lib/tryonItemPolicy';
 import {
   acceptedRecognitionItems,
   isTrustedRecognition,
@@ -145,7 +152,7 @@ export interface GarmentStandardizationResult {
 
 export const aiStandardizeGarment = async (
   imageUri: string, category: string, photoType: string,
-  extras?: { color?: string; material?: string; description?: string },
+  extras?: StandardizeItemExtras,
 ): Promise<GarmentStandardizationResult> => {
   const t0 = Date.now();
   const encoded = await uriToBase64(imageUri);
@@ -220,7 +227,7 @@ export async function aiRecommendOutfits(
       };
     }
   }
-  const activeItems = wardrobeItems.filter(i => i.status === 'active');
+  const activeItems = wardrobeItems.filter(isRecommendationEligible);
   const hasTop = activeItems.some(i => i.category === '上装' || i.category === '外套');
   const hasBottom = activeItems.some(i => i.category === '下装' || i.category === '连体装');
   const hasDress = activeItems.some(i => i.category === '连体装');
@@ -307,7 +314,7 @@ export interface TryOnSuggestion {
   tips: string[];
 }
 
-type ItemBrief = Pick<WardrobeItem, 'name' | 'category' | 'color'>;
+type ItemBrief = Omit<TryOnItemBrief, 'reference_blocked'>;
 
 export async function aiGenerateTryOnSuggestion(
   outfitItems: ItemBrief[],

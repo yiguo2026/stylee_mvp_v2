@@ -47,3 +47,23 @@ test('all future image types request transparent standardization', async () => {
     assert.equal(policy.shouldStandardizePhotoType(photoType), true);
   }
 });
+
+test('multi-item standardization requires an individual target box', async () => {
+  const policy = await import('./recognitionPolicy.ts');
+
+  assert.equal(policy.canStandardizeDetectedTarget(1, undefined), true);
+  assert.equal(policy.canStandardizeDetectedTarget(5, [10, 20, 300, 400]), true);
+  assert.equal(policy.canStandardizeDetectedTarget(5, undefined), false);
+});
+
+test('batch target preflight identifies every missing box before any item runs', async () => {
+  const policy = await import('./recognitionPolicy.ts');
+  const missing = policy.missingTargetBoxIndices(5, [
+    { bbox_2d: [10, 20, 300, 400] },
+    {},
+    { bbox_2d: [400, 100, 800, 700] },
+  ]);
+
+  assert.deepEqual(missing, [1]);
+  assert.deepEqual(policy.missingTargetBoxIndices(1, [{}]), []);
+});

@@ -4,7 +4,9 @@ Prompts and provider credentials live here, never in the Expo bundle.
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 import json
+import math
 import os
 import time
 import urllib.error
@@ -12,8 +14,9 @@ import urllib.request
 
 from ..providers.openai_compat import _chat_completion, _extract_json
 from ..usage_log import log_usage
-from ..vision.dashscope import build_edit_payload, parse_edit_response
+from ..vision.dashscope import VisionError, build_edit_payload, parse_edit_response
 from ..vision.recognition_input import prepare_recognition_data_uri
+from .gamma import build_tryon_prompt, normalize_tryon_items, tryon_reference_images
 
 _SCENES = {
     "cafe": "坐在咖啡馆里，暖色调灯光，悠闲氛围",
@@ -39,6 +42,24 @@ def multi_max_pixels() -> int:
     return min(16777216, max(65536, configured))
 
 
+def normalize_target_bbox(value) -> list[float | int] | None:
+    if not isinstance(value, list) or len(value) != 4:
+        return None
+    if any(
+        isinstance(coordinate, bool)
+        or not isinstance(coordinate, (int, float))
+        or not math.isfinite(coordinate)
+        or coordinate < 0
+        or coordinate > 1000
+        for coordinate in value
+    ):
+        return None
+    left, top, right, bottom = value
+    if right <= left or bottom <= top:
+        return None
+    return list(value)
+
+
 def normalize_multi_item(raw: dict, index: int) -> dict:
     """Keep /recognize-multi compatible with the typed App contract.
 
@@ -50,7 +71,22 @@ def normalize_multi_item(raw: dict, index: int) -> dict:
     color = str(item.get("color") or "").strip()
     photo_raw = str(item.get("photo_type") or "")
     photo_type = _PHOTO_TYPE_ALIASES.get(photo_raw, "on_body")
-    needs_review = category not in _CATEGORIES or not color or photo_raw not in _PHOTO_TYPE_ALIASES
+    sleeve_raw = item.get("sleeve_length")
+    sleeve_invalid = sleeve_raw not in (None, "", "无袖", "短袖", "长袖")
+    if sleeve_invalid:
+        item["sleeve_length"] = None
+    bbox = normalize_target_bbox(item.get("bbox_2d"))
+    if bbox is None:
+        item.pop("bbox_2d", None)
+    else:
+        item["bbox_2d"] = bbox
+    needs_review = (
+        category not in _CATEGORIES
+        or not color
+        or photo_raw not in _PHOTO_TYPE_ALIASES
+        or sleeve_invalid
+        or bbox is None
+    )
     if category not in _CATEGORIES:
         category = "上装"
     completeness = sum(bool(item.get(key)) for key in ("category", "color", "material", "description"))
@@ -92,13 +128,18 @@ def recognize_many(image_url: str) -> dict:
               '"color":"颜色","material":"材质","style":"风格","brand":"",'
               '"sleeve_length":"无袖|短袖|长袖|null","fit_type":"版型|null",'
               '"season":[],"occasion_tags":[],"description":"简洁客观名称",'
-              '"photo_type":"flatlay|on_body|web|angled"}]}')
+              '"photo_type":"flatlay|on_body|web|angled",'
+              '"bbox_2d":[x1,y1,x2,y2]}]}')
     photo_type_rules = (
         "photo_type判定：白底商品图优先判为 web，即使衣物是平铺状态；"
         "flatlay 仅指有真实环境背景的俯拍平铺照，不含已抠净或棚拍商品图；"
         "on_body 指真人或人台穿着；angled 指带场景的非正俯视角度照片。"
     )
-    messages = [{"role": "system", "content": "识别图片中所有服饰单品，只输出JSON。" + photo_type_rules + "schema:" + schema},
+    messages = [{"role": "system", "content": (
+                    "识别图片中所有服饰单品，只输出JSON。"
+                    "bbox_2d必须紧贴该单品可见主体，坐标使用0-1000归一化网格，"
+                    "格式为左上x、左上y、右下x、右下y。"
+                    + photo_type_rules + "schema:" + schema)},
                 {"role": "user", "content": [
                     {"type": "text", "text": "逐件识别所有可辨认的服饰。"},
                     {"type": "image_url", "image_url": {"url": prepared.data_uri}, "max_pixels": max_pixels},
@@ -151,19 +192,104 @@ def tryon_suggestion(payload: dict) -> dict:
     )
 
 
-def tryon_image(payload: dict) -> str:
-    items = payload.get("items") if isinstance(payload.get("items"), list) else []
-    items_desc = "、".join(
-        str(x.get("color") or "") + str(x.get("name") or x.get("category") or "单品")
-        for x in items if isinstance(x, dict)
-    )[:300]
-    body_shape = str(payload.get("body_shape") or "")[:50]
-    scene = _SCENES.get(str(payload.get("scene") or ""), _SCENES["street"])
-    prompt = ("严格保持参考照片中人物的面部五官、脸型轮廓、肤色和发型完全一致，"
-              f"一位{body_shape}身材的年轻女性穿着{items_desc}，{scene}，"
-              "全身照，时尚杂志摄影质感，高质量摄影，但不是杂志封面。"
-              "画面中禁止出现任何文字、字母、数字、标题、Logo或水印。")
-    return edit_image(str(payload.get("image_url") or ""), prompt, "tryon")
+def _tryon_quality_messages(image_ref: str, items: list[dict]) -> list[dict]:
+    expected = [
+        {
+            "name": item.get("name"),
+            "category": item.get("category"),
+            "color": item.get("color"),
+            "material": item.get("material"),
+            "sleeve_length": item.get("sleeve_length"),
+            "fit_type": item.get("fit_type"),
+            "description": item.get("description"),
+        }
+        for item in items
+    ]
+    schema = (
+        '{"has_text_or_watermark":false,"garment_match":true,'
+        '"detail_match":true,"sleeve_match":true,'
+        '"sleeveless_not_straps":true,"reason":"一句话"}'
+    )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "你是虚拟试穿成图质检器。检查画面是否出现任何文字、伪文字、签名、"
+                "社交媒体标记、Logo或水印，并检查服装品类、颜色、材质、描述细节、袖型与版型是否匹配。"
+                "当期望为无袖时，宽肩无袖可以，但绝不能变成细肩带、吊带、抹胸或露肩款。"
+                "只输出JSON，schema:" + schema
+            ),
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "期望服装:" + json.dumps(expected, ensure_ascii=False)},
+                {"type": "image_url", "image_url": {"url": image_ref}, "max_pixels": 524288},
+            ],
+        },
+    ]
+
+
+def verify_tryon_output(image_ref: str, items: list[dict]) -> dict:
+    key = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not key or not image_ref:
+        return {"ok": False, "reason": "quality verifier unavailable"}
+    model = os.environ.get(
+        "TRYON_VERIFY_MODEL",
+        os.environ.get("VL_MULTI_MODEL", os.environ.get("VL_MODEL", "qwen3-vl-flash")),
+    )
+    content = _chat_completion(
+        os.environ.get("VL_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+        key,
+        model,
+        _tryon_quality_messages(image_ref, items),
+        0.0,
+        int(os.environ.get("TRYON_VERIFY_TIMEOUT_SECONDS", "10")),
+        True,
+    )
+    result = _extract_json(content)
+    ok = (
+        result.get("has_text_or_watermark") is False
+        and result.get("garment_match") is True
+        and result.get("detail_match") is True
+        and result.get("sleeve_match") is True
+        and result.get("sleeveless_not_straps") is True
+    )
+    return {"ok": ok, "reason": str(result.get("reason") or "")[:200]}
+
+
+def tryon_image(payload: dict, generate=None, verify=None, stage_timer=None) -> str:
+    person_image = str(payload.get("image_url") or "")
+    items = normalize_tryon_items(
+        payload.get("items") if isinstance(payload.get("items"), list) else []
+    )
+    if not person_image or not items:
+        raise VisionError("try-on requires a person image and at least one garment")
+    references = tryon_reference_images(items)
+    images = [person_image, *references]
+    prompt = build_tryon_prompt(
+        items,
+        str(payload.get("scene") or ""),
+        str(payload.get("body_shape") or "")[:100],
+        len(references),
+    )
+    generate_fn = generate or edit_image
+    verify_fn = verify or verify_tryon_output
+    last_reason = ""
+    for attempt in range(2):
+        retry_instruction = (
+            " 上一张候选未通过质检，原因：" + last_reason
+            + "。重新生成整张图片并严格修正。"
+            if attempt else ""
+        )
+        with stage_timer(f"tryon.generate.{attempt + 1}") if stage_timer else nullcontext():
+            image_ref = generate_fn(images, prompt + retry_instruction, "tryon")
+        with stage_timer(f"tryon.verify.{attempt + 1}") if stage_timer else nullcontext():
+            quality = verify_fn(image_ref, items)
+        if quality.get("ok") is True:
+            return image_ref
+        last_reason = str(quality.get("reason") or "quality verification failed")[:200]
+    raise VisionError("try-on output failed quality verification: " + last_reason)
 
 
 def tryon_edit_parameters(model: str) -> dict:
@@ -179,7 +305,7 @@ def tryon_edit_parameters(model: str) -> dict:
     return parameters
 
 
-def edit_image(image_url: str, prompt: str, feature: str) -> str:
+def edit_image(image_url: str | list[str], prompt: str, feature: str) -> str:
     key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not key:
         return ""
@@ -192,9 +318,10 @@ def edit_image(image_url: str, prompt: str, feature: str) -> str:
         data=data, method="POST",
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
     )
+    timeout = int(os.environ.get("TRYON_EDIT_TIMEOUT_SECONDS", "35"))
     t0 = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         url = parse_edit_response(body)
         log_usage("qwen", model, feature, "image", body.get("usage"), int((time.time() - t0) * 1000), True, body.get("request_id"))

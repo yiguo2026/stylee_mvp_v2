@@ -42,7 +42,7 @@
 - 单图多品识别：上传包含多件单品的照片时，AI 检测所有单品，用户多选后逐件确认（标准图+属性）批量导入
 - 多图导入：相册选择多张图片，AI 并行识别所有图片中的单品，汇总展示后逐件确认
 - 统一添加入口：所有页面（首页/衣橱/穿搭结果）添加衣物均走「相册导入」弹窗 → 拉起图片选择器 → 详情页
-- 透明主图失败处理：仅接受严格校验通过的透明 PNG；失败时保留原图并显示「透明主图生成失败，已保留原图」
+- 透明主图失败处理：手动单品允许用户明确保留原图；多品后台导入失败项保留为待重试任务，不加入正式衣橱、推荐池或试穿
 
 ### 穿搭推荐
 - 实时天气卡片（和风天气 API，180+ 城市本地 ID 映射，自动匹配温度标签）
@@ -60,8 +60,8 @@
   - 推荐结果入口：身体信息 → 搭配单品（已选） → 选择场景 → 生成
 - 场景风格选择（☕咖啡馆/🏙️街道/💼办公室/🌿公园/🏠居家）
 - 等待过程态（1%-99% 进度条 + 4 步清单 + 呼吸闪烁动画：分析身体数据→匹配单品→合成效果→优化细节）
-- AI 试穿图生成（qwen-image-2.0-pro）
-- 效果图展示 + 保存（AI 生成失败时 fallback 到预置场景图）
+- AI 试穿图生成（人物照 + 最多两张核心服装原图，并携带材质/袖长/版型）
+- 成图检查伪文字、Logo、水印和服装结构；仅重试一次，仍不合格则提示失败，不展示预置图冒充结果
 - 试穿记录持久化到 Supabase tryon_records 表，详情页展示 AI 效果图
 - 每日使用次数限制（10次/天，客户端 AsyncStorage 计数）
 
@@ -116,6 +116,12 @@ npx expo start
 ### 用户注册安全配置
 
 用户管理由主仓 Supabase Auth 承担，不经过 model service。现有 Supabase 项目需在 SQL Editor 执行一次 `supabase-auth-registration.sql`，并在 Authentication → Providers → Email 中关闭 `Confirm email`（项目使用 `username@users.stylee.app` 虚拟邮箱）。该方案通过数据库 trigger 创建 `users` 资料行，不需要任何客户端或 model service 的 service-role key。
+
+多品异步导入上线前还必须应用
+`supabase/migrations/20260901170000_wardrobe_import_idempotency.sql`。它为
+`wardrobe_items` 增加可空 `import_key`，并以 `(user_id, import_key)` 唯一约束
+保证网络响应不确定时的重试不会重复入库。普通手动单品的
+`import_key` 为 `NULL`，仍保持原有 insert 行为。
 
 ### iOS 构建
 
@@ -229,14 +235,14 @@ App 不直连任何模型 API，全部能力通过 model service：
 | 透明服装主图/试穿图生成 | qwen-image-edit + Pillow 12.3.0 / qwen-image-edit | model service `/standardize` / `/tryon-image` |
 | 意图识别 / 搭配推荐 / 试穿建议 | DeepSeek | model service 专用端点 |
 
-生产部署时 model service 会校验 Supabase 用户 JWT、限制来源域名与每分钟请求数。透明主图失败不会伪装成成功或写入准备图：App 保留已持久化原图，并显示精确文案「透明主图生成失败，已保留原图」；成功保存后显示「已更新为透明主图」。其他 AI 能力按各自既有降级策略处理。
+生产部署时 model service 会校验 Supabase 用户 JWT、限制来源域名与每分钟请求数。手动单品的透明主图失败时，用户必须明确选择才能使用原图；多品后台导入失败项不写入衣橱，只保留为待重试任务。成功保存透明主图后显示「已更新为透明主图」。
 
 ### 透明服装主图合同
 
 - `/standardize` 的成功结果必须同时满足 `verified=true`、`alpha_verified=true`、`background=transparent`、`mime=image/png`，且 `image_ref` 是 PNG data URI。App 还会严格校验格式，并把 data URI 长度限制为 12 MiB。
 - 服务端透明处理使用固定版本 Pillow 12.3.0。编码输入上限为 20 MiB，解码输入上限为 16,000,000 像素，处理时最长边缩至 1600 px，编码 PNG 输出上限为 8 MiB。
-- 通过合同的透明 PNG 会先转存至 Stylee 自有 Supabase Storage，再写入衣橱；data URI 不进入日志、分析事件或持久化元数据。失败则保存原图和不含图片字节的失败元数据。
-- 新增或替换的服装图片采用透明主图。现存历史白底/不透明图片保持原样，不批量迁移、不重处理，也不新增数据库迁移。
+- 通过合同的透明 PNG 会先转存至 Stylee 自有 Supabase Storage，再写入衣橱；data URI 不进入日志、分析事件或持久化元数据。失败的多品后台任务不持久化原图行。
+- 新增或替换的服装图片采用透明主图。现存历史白底/不透明图片保持原样，不批量迁移、不重处理；`import_key` 迁移只用于新的批量导入幂等性，不改动历史图片。
 - 服装内容与背景解耦：衣橱、搭配、推荐和反色场景分别通过 Design System 的 `neutral`、`owned`、`recommended`、`inverse` 语义 surface 呈现，图片统一 `contain`；不要从图片像素猜背景色。
 
 规范仓优先：先在 canonical `style-model` 修改并验证，再同步其受治理文件到本仓 `model-service/`。发布前使用 canonical 路径核对镜像，并完成 App 的 Node、Token、Design System、密度、TypeScript 和 Web 构建验证：

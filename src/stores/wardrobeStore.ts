@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { WardrobeItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
 import {
+  WARDROBE_IMPORT_CONFLICT_TARGET,
+  wardrobePersistenceMethod,
+} from '@/lib/wardrobePersistencePolicy';
+import {
   applyWardrobeOptimisticUpdate,
   runRollbackableWardrobeUpdate,
   type WardrobeMutationGenerations,
@@ -159,11 +163,14 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
         created_at: (item as Partial<WardrobeItem>).created_at ?? now,
         updated_at: (item as Partial<WardrobeItem>).updated_at ?? now,
       };
-      const { data, error } = await supabase
-        .from('wardrobe_items')
-        .insert(payload)
-        .select()
-        .single();
+      const wardrobeTable = supabase.from('wardrobe_items');
+      const write = wardrobePersistenceMethod(payload) === 'upsert'
+        ? wardrobeTable.upsert(payload, {
+            onConflict: WARDROBE_IMPORT_CONFLICT_TARGET,
+            ignoreDuplicates: false,
+          })
+        : wardrobeTable.insert(payload);
+      const { data, error } = await write.select().single();
       if (error) throw error;
       const newItem = data as WardrobeItem;
       set(state => ({ items: sortWardrobeItemsNewestFirst([newItem, ...state.items]) }));

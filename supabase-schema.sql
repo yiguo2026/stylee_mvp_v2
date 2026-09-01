@@ -146,6 +146,7 @@ CREATE POLICY "Users manage own preferences" ON user_style_preferences
 CREATE TABLE IF NOT EXISTS wardrobe_items (
   item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(user_id) ON DELETE CASCADE NOT NULL,
+  import_key TEXT,
   name TEXT NOT NULL,
   category TEXT CHECK (category IN ('上装', '下装', '连体装', '外套', '鞋履', '包袋', '帽巾', '配饰')) NOT NULL,
   color TEXT NOT NULL DEFAULT '',
@@ -164,7 +165,8 @@ CREATE TABLE IF NOT EXISTS wardrobe_items (
   ai_recognized_attrs JSONB,
   status TEXT CHECK (status IN ('active', 'inactive', 'archived')) DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, import_key)
 );
 
 ALTER TABLE wardrobe_items ENABLE ROW LEVEL SECURITY;

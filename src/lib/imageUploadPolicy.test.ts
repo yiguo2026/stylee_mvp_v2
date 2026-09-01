@@ -153,14 +153,29 @@ test('remote HTTP image is copied to Supabase with policy content type when pers
     { persistRemote: true },
   );
 
-  assert.equal(result, 'https://storage.test/user-1/originals/1234.png');
+  assert.equal(result, 'https://storage.test/user-1/originals/1234-1.png');
   assert.deepEqual(harness.fetchUris, ['https://provider.test/temporary.jpg?token=secret']);
   assert.deepEqual(harness.uploadCalls, [{
-    path: 'user-1/originals/1234.png',
+    path: 'user-1/originals/1234-1.png',
     contentType: 'image/png',
     upsert: false,
     blobType: 'image/png',
   }]);
+});
+
+test('concurrent uploads with the same timestamp still use unique storage paths', async () => {
+  const harness = uploaderHarness();
+
+  const urls = await Promise.all([
+    harness.uploader('data:image/png;base64,AAAA', 'user-1'),
+    harness.uploader('data:image/png;base64,BBBB', 'user-1'),
+  ]);
+
+  assert.deepEqual(urls, [
+    'https://storage.test/user-1/1234-1.png',
+    'https://storage.test/user-1/1234-2.png',
+  ]);
+  assert.equal(new Set(harness.uploadCalls.map((call) => call.path)).size, 2);
 });
 
 test('fetch exceptions log only allowlisted diagnostics and restore console.warn', async () => {
@@ -368,6 +383,100 @@ test('processing rejection persists only the durable original', async () => {
   assert.equal(result.metadata.standardized_image_url, null);
 });
 
+test('batch import rejection never uploads or persists the original automatically', async () => {
+  const uploadModule = await import('./uploadImage.ts');
+  const persistBatchImportMaster = (uploadModule as typeof uploadModule & {
+    persistBatchImportMaster?: typeof persistGarmentMaster;
+  }).persistBatchImportMaster;
+  assert.equal(typeof persistBatchImportMaster, 'function');
+
+  const harness = recordingUploader(['https://storage.test/original.jpg']);
+  const result = await persistBatchImportMaster?.({
+    sourceUri: 'file:///five-items.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: { ok: false, reason: 'missing' },
+    diagnostics: { failedStage: 'client_timeout' },
+  }, harness.upload);
+
+  assert.deepEqual(result, { ok: false, reason: 'standardization_failed' });
+  assert.deepEqual(harness.calls, []);
+});
+
+test('batch import master-upload failure never promotes the durable original', async () => {
+  const uploadModule = await import('./uploadImage.ts');
+  const persistBatchImportMaster = uploadModule.persistBatchImportMaster;
+  const harness = recordingUploader(['https://storage.test/original.jpg', null]);
+
+  const result = await persistBatchImportMaster({
+    sourceUri: 'file:///five-items.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: accepted,
+  }, harness.upload);
+
+  assert.deepEqual(result, { ok: false, reason: 'transparent_upload_failed' });
+  assert.equal(harness.calls.length, 2);
+});
+
+test('manual save requires explicit confirmation before persisting a rejected original', async () => {
+  const uploadModule = await import('./uploadImage.ts');
+  const persistManualGarmentMaster = (uploadModule as typeof uploadModule & {
+    persistManualGarmentMaster?: (
+      input: Parameters<typeof persistGarmentMaster>[0],
+      originalConfirmed: boolean,
+      upload: UploadWardrobeImage,
+    ) => Promise<unknown>;
+  }).persistManualGarmentMaster;
+  assert.equal(typeof persistManualGarmentMaster, 'function');
+  const harness = recordingUploader(['https://storage.test/original.jpg']);
+
+  const result = await persistManualGarmentMaster?.({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: { ok: false, reason: 'missing' },
+  }, false, harness.upload);
+
+  assert.deepEqual(result, { ok: false, reason: 'original_confirmation_required' });
+  assert.deepEqual(harness.calls, []);
+});
+
+test('manual save does not silently promote the original when transparent upload fails', async () => {
+  const uploadModule = await import('./uploadImage.ts');
+  const persistManualGarmentMaster = uploadModule.persistManualGarmentMaster;
+  assert.equal(typeof persistManualGarmentMaster, 'function');
+  const harness = recordingUploader(['https://storage.test/original.jpg', null]);
+
+  const result = await persistManualGarmentMaster?.({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: accepted,
+  }, false, harness.upload);
+
+  assert.deepEqual(result, { ok: false, reason: 'original_confirmation_required' });
+  assert.equal(harness.calls.length, 2);
+});
+
+test('manual save persists a rejected original only after explicit confirmation', async () => {
+  const uploadModule = await import('./uploadImage.ts');
+  const persistManualGarmentMaster = uploadModule.persistManualGarmentMaster;
+  const harness = recordingUploader(['https://storage.test/original.jpg']);
+
+  const result = await persistManualGarmentMaster?.({
+    sourceUri: 'file:///source.jpg',
+    userId: 'user-1',
+    photoType: 'flatlay',
+    acceptance: { ok: false, reason: 'missing' },
+  }, true, harness.upload);
+
+  assert.equal(result?.ok, true);
+  if (!result?.ok) return;
+  assert.equal(result.status, 'fallback_original');
+  assert.equal(result.imageUrl, 'https://storage.test/original.jpg');
+});
+
 test('service failures persist only sanitized request ID and accurate failed stage', async () => {
   const harness = recordingUploader(['https://storage.test/original.jpg']);
   const imageMarker = ['service', 'image', 'marker'].join('-');
@@ -544,4 +653,11 @@ test('add failure state offers retry and explicit original-image fallback action
   assert.match(failureState, />重试</);
   assert.match(failureState, />用原图保存</);
   assert.match(addSource, /stdRetryBtn|stdRetryBtnText/);
+  assert.match(addSource, /persistManualGarmentMaster\s*\(/);
+  assert.match(addSource, /originalConfirmed/);
+  assert.match(addSource, /originalConfirmedUri === imageUri/);
+  assert.match(addSource, /standardizationSourceUri === imageUri/);
+  assert.match(addSource, /setOriginalConfirmedUri\(null\)/);
+  assert.match(addSource, /user_confirmed_original: true/);
+  assert.doesNotMatch(addSource, /persistGarmentMaster\s*\(/);
 });

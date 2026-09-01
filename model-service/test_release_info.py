@@ -68,7 +68,7 @@ def test_health_payload_reports_render_sha_and_rag_status():
             "RENDER_GIT_REPO_SLUG": "fitzw/style-model",
         }, str(root))
         assert payload["status"] == "ok"
-        assert payload["contract_version"] == "2026-08-18"
+        assert payload["contract_version"] == "2026-09-01"
         assert payload["git_sha"] == "abc123"
         assert payload["git_branch"] == "main"
         assert payload["repo_slug"] == "fitzw/style-model"

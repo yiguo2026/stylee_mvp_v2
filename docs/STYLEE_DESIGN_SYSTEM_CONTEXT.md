@@ -363,3 +363,24 @@ Rules:
   and shorter viewports may reduce the number of complete visible rows.
 - Canonical values live under `Components.wardrobeGrid`; detailed acceptance
   criteria live in `docs/STYLEE_WARDROBE_GRID_SPEC.md`.
+
+### Import failure and AI eligibility — 2026-09-01
+
+- Background multi-item imports process confirmed garments as independent
+  subtasks with at most two active jobs.
+- Multi-item target boxes are preflighted for the entire selection before any
+  garment is persisted. Unsupported sleeve values are marked for review and
+  are never written to typed wardrobe fields.
+- A successful subtask stays complete across retries. Two client timeouts open
+  the circuit and leave untouched garments waiting.
+- Failed background standardization never promotes the full source photo into
+  an active wardrobe item. The import task remains visible for retry.
+- Successful batch rows carry a durable `import_key`; the database enforces
+  `(user_id, import_key)` uniqueness and the App upserts on that conflict key.
+- Manual single-item flows may preserve an original only after explicit user
+  choice.
+- Failed asynchronous originals are excluded from recommendation and try-on
+  until a trusted image replaces them or the user explicitly confirms a
+  single-item original.
+- Try-on uses the body photo plus up to two trusted garment references and
+  fails closed when output quality verification rejects both generated images.

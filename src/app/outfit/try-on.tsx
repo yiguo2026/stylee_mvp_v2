@@ -14,8 +14,13 @@ import { useTryOnStore } from '@/stores/tryonStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
-import type { ClothingCategory } from '@/types';
 import { ds, StyleeGarmentMedia } from '@/design-system';
+import {
+  buildTryOnItemBrief,
+  decideTryOnGeneration,
+  type TryOnItemBrief,
+  type TryOnItemInput,
+} from '@/lib/tryonItemPolicy';
 
 const TRYON_SCENES = [
   { id: 'cafe', label: '咖啡馆' },
@@ -25,23 +30,11 @@ const TRYON_SCENES = [
   { id: 'home', label: '居家' },
 ];
 
-const SCENE_IMAGES: Record<string, any> = {
-  casual: require('../../../assets/tryon/casual.png'),
-  street: require('../../../assets/tryon/street.png'),
-  office: require('../../../assets/tryon/office.png'),
-  layered: require('../../../assets/tryon/layered.png'),
-  home: require('../../../assets/tryon/home.png'),
-};
-
-const SCENE_ASSET_MAP: Record<string, string> = {
-  cafe: 'casual', street: 'street', office: 'office', park: 'layered', home: 'home',
-};
-
 type OutfitSummary = {
   outfit_id: string;
   name: string;
   created_at: string;
-  items: { name: string; category: string; image_url?: string }[];
+  items: TryOnItemInput[];
 };
 
 export default function TryOnScreen() {
@@ -88,7 +81,7 @@ export default function TryOnScreen() {
       // Worn outfits
       const { data: worn } = await supabase
         .from('outfits')
-        .select(`outfit_id, name, created_at, outfit_items(item_id, display_order, wardrobe_items(name, category, image_url))`)
+        .select(`outfit_id, name, created_at, outfit_items(item_id, display_order, wardrobe_items(name, category, color, material, sleeve_length, fit_type, image_url, ai_recognized_attrs))`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -100,7 +93,12 @@ export default function TryOnScreen() {
           items: (o.outfit_items ?? []).map((oi: any) => ({
             name: oi.wardrobe_items?.name ?? '单品',
             category: oi.wardrobe_items?.category ?? '',
+            color: oi.wardrobe_items?.color ?? '',
+            material: oi.wardrobe_items?.material,
+            sleeve_length: oi.wardrobe_items?.sleeve_length,
+            fit_type: oi.wardrobe_items?.fit_type,
             image_url: oi.wardrobe_items?.image_url,
+            ai_recognized_attrs: oi.wardrobe_items?.ai_recognized_attrs,
           })),
         })));
       }
@@ -108,7 +106,7 @@ export default function TryOnScreen() {
       // Favorited outfits
       const { data: favs } = await supabase
         .from('outfit_favorites')
-        .select(`outfit_id, outfits(name, created_at, outfit_items(item_id, display_order, wardrobe_items(name, category, image_url)))`)
+        .select(`outfit_id, outfits(name, created_at, outfit_items(item_id, display_order, wardrobe_items(name, category, color, material, sleeve_length, fit_type, image_url, ai_recognized_attrs)))`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -120,7 +118,12 @@ export default function TryOnScreen() {
           items: (f.outfits?.outfit_items ?? []).map((oi: any) => ({
             name: oi.wardrobe_items?.name ?? '单品',
             category: oi.wardrobe_items?.category ?? '',
+            color: oi.wardrobe_items?.color ?? '',
+            material: oi.wardrobe_items?.material,
+            sleeve_length: oi.wardrobe_items?.sleeve_length,
+            fit_type: oi.wardrobe_items?.fit_type,
             image_url: oi.wardrobe_items?.image_url,
+            ai_recognized_attrs: oi.wardrobe_items?.ai_recognized_attrs,
           })),
         })));
       }
@@ -146,6 +149,16 @@ export default function TryOnScreen() {
       return;
     }
 
+    const items: TryOnItemBrief[] = isFromResult
+      ? resultItems.map(buildTryOnItemBrief)
+      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? [])
+        .map(buildTryOnItemBrief);
+    if (items.some((item) => item.reference_blocked)) {
+      showToast('这套搭配含有待处理的原图单品，请先完成抠图或更换图片');
+      return;
+    }
+    const modelItems = items.map(({ reference_blocked: _blocked, ...item }) => item);
+
     const q = await consumeQuota(user.id, 'tryon');
     setQuota({ used: q.used, limit: q.limit, remaining: q.remaining });
     if (!q.ok) {
@@ -155,17 +168,6 @@ export default function TryOnScreen() {
 
     setGenerating(true);
     setGenStep(0);
-
-    // Collect outfit items as ItemBrief[]
-    const items = isFromResult
-      ? resultItems.map(i => ({
-          name: i.name ?? '', category: (i.category ?? '上装') as ClothingCategory, color: i.color ?? '',
-          description: i.description ?? '', image_url: i.image_url ?? null,
-        }))
-      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []).map(i => ({
-          name: i.name ?? '', category: (i.category ?? '上装') as ClothingCategory, color: '',
-          image_url: i.image_url ?? null,
-        }));
 
     const bodyShape = undefined; // TODO: extract from selfieUri / user profile
 
@@ -177,7 +179,7 @@ export default function TryOnScreen() {
     let imageResult: { url: string | null; meta: AIMeta };
     let suggestionResult: Awaited<ReturnType<typeof aiGenerateTryOnSuggestion>>;
     if (isGamma) {
-      const gammaResult = await gammaTryOn(items, selectedScene, selfieUri!, bodyShape);
+      const gammaResult = await gammaTryOn(modelItems, selectedScene, selfieUri!, bodyShape);
       imageResult = {
         url: gammaResult?.image_url ?? null,
         meta: {
@@ -197,9 +199,16 @@ export default function TryOnScreen() {
       }
     } else {
       [imageResult, suggestionResult] = await Promise.all([
-        aiGenerateTryOnImage(items, bodyShape, selectedScene, selfieUri),
-        aiGenerateTryOnSuggestion(items, bodyShape),
+        aiGenerateTryOnImage(modelItems, bodyShape, selectedScene, selfieUri),
+        aiGenerateTryOnSuggestion(modelItems, bodyShape),
       ]);
+    }
+
+    const generation = decideTryOnGeneration(imageResult.url);
+    if (!generation.ok) {
+      setGenerating(false);
+      showToast('AI 试穿生成未通过质量检查，请重试');
+      return;
     }
 
     setGenStep(2); // "优化画面细节..."
@@ -207,10 +216,7 @@ export default function TryOnScreen() {
 
     setGenStep(3); // "完成"
 
-    // Image: use AI URL if available, otherwise fall back to local asset
-    const resultImage: string | number = imageResult.url
-      ? imageResult.url
-      : (SCENE_IMAGES[SCENE_ASSET_MAP[selectedScene] ?? 'casual'] || SCENE_IMAGES.casual);
+    const resultImage = generation.imageUrl;
 
     // Meta: combine image + suggestion results
     const anyOk = imageResult.meta.ok || suggestionResult.meta.ok;
@@ -233,7 +239,12 @@ export default function TryOnScreen() {
       : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.name ?? '自定义搭配');
     const recordItems = isFromResult
       ? resultItems.map(i => ({ name: i.name, category: i.category ?? '', color: i.color, image_url: i.image_url }))
-      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []);
+      : (currentOutfits.find(o => o.outfit_id === selectedOutfitId)?.items ?? []).map(i => ({
+          name: i.name ?? '单品',
+          category: i.category ?? '',
+          color: i.color,
+          image_url: i.image_url ?? undefined,
+        }));
 
     // Stash result for the dedicated full-screen result page
     setLastResult({
