@@ -92,7 +92,7 @@ function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
 
 export default function ItemDetailScreen() {
   const { id, itemData: itemDataParam } = useLocalSearchParams<{ id: string; itemData?: string }>();
-  const { items, deleteItem, updateItem } = useWardrobeStore();
+  const { items, deleteItem, updateItem, updateItemWithRollback } = useWardrobeStore();
   const [item, setItem] = useState<WardrobeItem | undefined>();
   const [recommendedItem, setRecommendedItem] = useState<RecommendedItem | undefined>();
   const [notFound, setNotFound] = useState(false);
@@ -155,7 +155,14 @@ export default function ItemDetailScreen() {
     return <RecommendedItemDetail rec={recommendedItem} />;
   }
 
-  return <OwnedItemDetail item={item!} updateItem={updateItem} deleteItem={deleteItem} />;
+  return (
+    <OwnedItemDetail
+      item={item!}
+      updateItem={updateItem}
+      commitReplacementUpdate={updateItemWithRollback}
+      deleteItem={deleteItem}
+    />
+  );
 }
 
 // 推荐态单品详情：来自灵感页 / 推荐结果页的「尚未加入衣橱」单品。
@@ -280,9 +287,13 @@ function RecommendedItemDetail({ rec }: { rec: RecommendedItem }) {
   );
 }
 
-function OwnedItemDetail({ item, updateItem, deleteItem }: {
+function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, deleteItem }: {
   item: WardrobeItem;
   updateItem: (id: string, updates: Partial<WardrobeItem>) => void;
+  commitReplacementUpdate: (
+    id: string,
+    updates: Partial<WardrobeItem>,
+  ) => Promise<boolean>;
   deleteItem: (id: string) => Promise<void>;
 }) {
   const [deleting, setDeleting] = useState(false);
@@ -317,7 +328,7 @@ function OwnedItemDetail({ item, updateItem, deleteItem }: {
   // 换图：在详情页内直接调起系统相册就地替换（复用编辑页的稳健逻辑，含并发令牌 + mounted 守卫）
   const imageReplace = useGarmentImageReplace({
     item,
-    updateItem,
+    commitReplacementUpdate,
     context: { category: item.category, color: item.color, material: item.material, description: item.name },
     recognize: true,
     onRecognized: handleRecognized,

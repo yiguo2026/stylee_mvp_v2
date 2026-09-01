@@ -5,6 +5,7 @@ import {
   beginReplacementAfterInitialWrite,
   buildFinalReplacementImageUpdate,
   buildInitialReplacementImageUpdate,
+  finishReplacementAfterFinalWrite,
   imageUriAfterInitialReplacementWrite,
 } from '@/lib/garmentImageReplacement';
 import { shouldApplyRecognition } from '@/lib/recognitionPolicy';
@@ -25,8 +26,11 @@ export interface GarmentImageContext {
 export interface UseGarmentImageReplaceOptions {
   /** 目标单品（必须包含 item_id / user_id；缺失时换图不可用） */
   item: Pick<WardrobeItem, 'item_id' | 'user_id' | 'name' | 'image_url' | 'ai_recognized_attrs'> | undefined;
-  /** 写入 store 的更新函数（乐观更新） */
-  updateItem: (id: string, updates: Partial<WardrobeItem>) => boolean | void | Promise<boolean | void>;
+  /** 仅用于换图的持久化更新；失败时必须回滚 store 的乐观图片字段 */
+  commitReplacementUpdate: (
+    id: string,
+    updates: Partial<WardrobeItem>,
+  ) => Promise<boolean>;
   /** 标准化/识别所需上下文，随每次渲染传入最新值 */
   context?: GarmentImageContext;
   /** 标准化成功后是否重新做 AI 识别，默认 true */
@@ -64,7 +68,7 @@ export interface UseGarmentImageReplaceReturn {
 export function useGarmentImageReplace(
   opts: UseGarmentImageReplaceOptions,
 ): UseGarmentImageReplaceReturn {
-  const { item, updateItem, recognize = true } = opts;
+  const { item, commitReplacementUpdate, recognize = true } = opts;
 
   const [imageUri, setImageUri] = useState(item?.image_url ?? '');
   const [standardizing, setStandardizing] = useState(false);
@@ -151,31 +155,37 @@ export function useGarmentImageReplace(
       const finalUrl = persistedImage.imageUrl;
       const currentItem = currentItemRef.current;
       if (!currentItem || currentItem.item_id !== item.item_id) return;
-      setImageUri(finalUrl);
-      await updateItem(
-        currentItem.item_id,
-        buildFinalReplacementImageUpdate(
-          finalUrl,
-          currentItemRef.current?.ai_recognized_attrs,
-          persistedImage.metadata,
+      const finalWriteResult = await finishReplacementAfterFinalWrite({
+        writeFinal: () => commitReplacementUpdate(
+          currentItem.item_id,
+          buildFinalReplacementImageUpdate(
+            finalUrl,
+            currentItemRef.current?.ai_recognized_attrs,
+            persistedImage.metadata,
+          ),
         ),
-      );
-      if (!stillCurrent()) return;
-      toast(
-        persistedImage.status === 'transparent_master'
-          ? '已完成背景处理'
-          : '背景处理失败，已保留原图',
-      );
-      if (persistedImage.status === 'transparent_master' && recognizeRef.current) {
-        void runRecognition(finalUrl);
-      }
+        isCurrent: stillCurrent,
+        commitSuccess: () => {
+          setImageUri(finalUrl);
+          toast(
+            persistedImage.status === 'transparent_master'
+              ? '已完成背景处理'
+              : '背景处理失败，已保留原图',
+          );
+          if (persistedImage.status === 'transparent_master' && recognizeRef.current) {
+            void runRecognition(finalUrl);
+          }
+        },
+        reportFailure: () => { toast('背景处理失败，已保留原图'); },
+      });
+      if (finalWriteResult !== 'committed') return;
     } catch (e) {
       console.warn('[useGarmentImageReplace] standardizeInBackground error:', e);
       if (stillCurrent()) toast('背景处理失败，已保留原图');
     } finally {
       if (stillCurrent()) setStandardizing(false);
     }
-  }, [item, updateItem, toast, runRecognition]);
+  }, [item, commitReplacementUpdate, toast, runRecognition]);
 
   // 打开系统相册选图 → 原图立即生效 → 后台标准化 / 识别
   const pickAndReplace = useCallback(async () => {
@@ -196,7 +206,7 @@ export function useGarmentImageReplace(
     setImageUri(localUri);
     setStandardizing(true);
     const initialWriteResult = await beginReplacementAfterInitialWrite({
-      writeInitial: () => updateItem(
+      writeInitial: () => commitReplacementUpdate(
         replacementItem.item_id,
         buildInitialReplacementImageUpdate(localUri, replacementItem.ai_recognized_attrs),
       ),
@@ -218,7 +228,7 @@ export function useGarmentImageReplace(
     if (initialWriteResult === 'stale' && mountedRef.current && bgTokenRef.current === token) {
       setStandardizing(false);
     }
-  }, [item, updateItem, standardizeInBackground]);
+  }, [item, commitReplacementUpdate, standardizeInBackground]);
 
   return {
     imageUri,
