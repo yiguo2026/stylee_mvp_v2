@@ -7,7 +7,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius, Shadow, T, Fonts } from '@/constants/theme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { AILoading } from '@/components/AILoading';
-import { TryOnDisclaimer } from '@/components/TryOnDisclaimer';
 import { showToast } from '@/components/Toast';
 import { AIMeta, aiGenerateTryOnImage, aiGenerateTryOnSuggestion } from '@/lib/ai';
 import { gammaTryOn } from '@/lib/gammaService';
@@ -16,7 +15,7 @@ import { useUserStore } from '@/stores/userStore';
 import { supabase } from '@/lib/supabase';
 import { consumeQuota, getQuota } from '@/lib/dailyQuota';
 import type { ClothingCategory } from '@/types';
-import { StyleeGarmentMedia } from '@/design-system';
+import { ds, StyleeGarmentMedia } from '@/design-system';
 
 const TRYON_SCENES = [
   { id: 'cafe', label: '咖啡馆' },
@@ -421,15 +420,14 @@ export default function TryOnScreen() {
             <Text style={styles.generateBtnText}>{isGamma ? 'Gamma 直接生成试穿图' : '生成试穿效果图'}</Text>
           )}
         </TouchableOpacity>
-        <Text style={styles.generateHint}>{isGamma
-          ? '身体照和搭配将经 Model Service 直接交给 Qwen 多图编辑'
-          : 'AI 将结合身体信息 + 搭配方案 + 场景氛围生成效果图'}</Text>
-        {quota ? (
-          <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
-        ) : null}
-
-        {/* AI 生成免责声明 */}
-        <TryOnDisclaimer variant="inline" />
+        <View style={styles.generateMeta}>
+          {quota ? (
+            <Text style={styles.quotaHint}>今日剩余 {quota.remaining}/{quota.limit} 次</Text>
+          ) : null}
+          <Text style={styles.generateHint}>{isGamma
+            ? '身体照和搭配将经 Model Service 直接交给 Qwen 多图编辑'
+            : 'AI 将结合身体信息、搭配方案与场景生成试穿效果，仅供参考，实际上身以实物为准'}</Text>
+        </View>
 
       </ScrollView>
 
@@ -559,8 +557,9 @@ const styles = StyleSheet.create({
   },
   generateBtnDisabled: { opacity: 0.4 },
   generateBtnText: { ...T.buttonPrimary, color: Colors.paper, fontSize: 16 },
-  generateHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: Spacing.one },
-  quotaHint: { ...T.micro, textAlign: 'center', color: Colors.walnut2, marginTop: 2 },
+  generateMeta: { gap: ds.space[1] },
+  generateHint: { ...ds.typography.support, textAlign: 'center', color: ds.color.semantic.text.tertiary },
+  quotaHint: { ...ds.typography.support, textAlign: 'center', color: ds.color.semantic.text.secondary },
   generatingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
 
   // ── Progress (Full Screen) ──
