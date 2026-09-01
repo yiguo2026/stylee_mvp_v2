@@ -24,6 +24,7 @@ import {
   markOutfitCanvasImageError,
   outfitCanvasImageAspectFor,
   outfitCanvasImageHasError,
+  outfitCanvasLayoutItemForImageSource,
   outfitCanvasImagePresentation,
   outfitCanvasImageSourceKey,
   outfitCanvasImageUsesVisibleGeometry,
@@ -93,12 +94,11 @@ export function StyleeOutfitCanvas({
       item.id,
       sourceKey,
     );
-    const imageAspectRatio = validAspectRatio(item.imageAspectRatio)
-      ? item.imageAspectRatio
-      : matchingLoadedAspect;
-    const layoutItem = imageAspectRatio === item.imageAspectRatio
-      ? item
-      : { ...item, imageAspectRatio };
+    const layoutItem = outfitCanvasLayoutItemForImageSource(
+      item,
+      source,
+      matchingLoadedAspect,
+    );
     return { layoutItem, originalItem: item, source, sourceKey, sourceUri };
   }), [items, loadedImageAspects]);
 
