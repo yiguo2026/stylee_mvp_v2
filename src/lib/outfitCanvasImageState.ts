@@ -1,3 +1,5 @@
+import type { OutfitCanvasLayoutItem } from './outfitCanvasLayout.ts';
+
 export type ImageGetSize = (
   uri: string,
   success: (width: number, height: number) => void,
@@ -243,6 +245,28 @@ export function outfitCanvasImageUsesVisibleGeometry(
   hasCompleteVisibleMetrics: boolean,
 ): boolean {
   return hasCompleteVisibleMetrics && !Array.isArray(source);
+}
+
+export function outfitCanvasLayoutItemForImageSource(
+  item: OutfitCanvasLayoutItem,
+  source: unknown,
+  loadedAspectRatio: number | null,
+): OutfitCanvasLayoutItem {
+  if (Array.isArray(source)) {
+    const {
+      imageAspectRatio: _imageAspectRatio,
+      visibleBounds: _visibleBounds,
+      ...legacyLayoutItem
+    } = item;
+    return legacyLayoutItem;
+  }
+
+  const imageAspectRatio = validAspectRatio(item.imageAspectRatio)
+    ? item.imageAspectRatio
+    : loadedAspectRatio;
+  return imageAspectRatio === item.imageAspectRatio
+    ? item
+    : { ...item, imageAspectRatio };
 }
 
 export function outfitCanvasImagePresentation({

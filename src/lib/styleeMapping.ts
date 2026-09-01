@@ -12,6 +12,7 @@ export interface RecognizeManyItemResp {
   index?: number; category?: string; color?: string; material?: string; style?: string;
   brand?: string; photo_type?: string; needs_review?: boolean; confidence?: number;
   fit_type?: string; sleeve_length?: string; season?: string[]; occasion_tags?: string[];
+  bbox_2d?: unknown;
   description?: string;
 }
 export interface RecognizeManyResp {
@@ -72,6 +73,15 @@ export type RecommendContext = {
   weather?: string; temp?: string; city?: string; query?: string; tags?: string; stylePreferences?: string;
 };
 
+export function isRecommendationEligible(item: WardrobeItem): boolean {
+  if (item.status !== 'active') return false;
+  const attrs = item.ai_recognized_attrs;
+  const failedAsyncOriginal = attrs?.async_import === true
+    && attrs?.standardization_ok === false
+    && attrs?.standardization === 'fallback_original';
+  return !failedAsyncOriginal || attrs?.user_confirmed_original === true;
+}
+
 const OUTFIT_LAYOUT_ROLES = new Set<OutfitLayoutRole>([
   'base', 'mid', 'outer', 'dress', 'bottom', 'shoes',
   'bag', 'hat', 'scarf', 'accessory',
@@ -124,7 +134,28 @@ export function normalizePhotoType(value?: string | null): PhotoType {
   return 'on_body';
 }
 
+function normalizeSleeveLength(value?: string | null): SleeveLength | undefined {
+  return value === '无袖' || value === '短袖' || value === '长袖'
+    ? value
+    : undefined;
+}
+
+function normalizedTargetBox(value: unknown): [number, number, number, number] | undefined {
+  if (!Array.isArray(value) || value.length !== 4) return undefined;
+  if (!value.every((coordinate) => (
+    typeof coordinate === 'number'
+    && Number.isFinite(coordinate)
+    && coordinate >= 0
+    && coordinate <= 1000
+  ))) return undefined;
+  const [left, top, right, bottom] = value;
+  if (right <= left || bottom <= top) return undefined;
+  return [left, top, right, bottom];
+}
+
 export function recognizeManyItemToDetected(item: RecognizeManyItemResp, index: number): DetectedItem {
+  const sleeveLength = normalizeSleeveLength(item.sleeve_length);
+  const sleeveNeedsReview = Boolean(item.sleeve_length) && !sleeveLength;
   return {
     index: item.index ?? index + 1,
     category: String(item.category || '上装') as ClothingCategory,
@@ -132,13 +163,14 @@ export function recognizeManyItemToDetected(item: RecognizeManyItemResp, index: 
     material: item.material || undefined,
     style: item.style || undefined,
     brand: item.brand || undefined,
-    sleeve_length: item.sleeve_length ? item.sleeve_length as SleeveLength : undefined,
+    sleeve_length: sleeveLength,
     fit_type: item.fit_type ? item.fit_type as FitType : undefined,
     season: Array.isArray(item.season) ? item.season : undefined,
     occasion_tags: Array.isArray(item.occasion_tags) ? item.occasion_tags : undefined,
     photo_type: normalizePhotoType(item.photo_type),
-    needs_review: item.needs_review ?? false,
+    needs_review: (item.needs_review ?? false) || sleeveNeedsReview,
     confidence: typeof item.confidence === 'number' ? item.confidence : undefined,
+    bbox_2d: normalizedTargetBox(item.bbox_2d),
     description: item.description || `${item.color || '未知'}${item.category || '单品'}`,
   };
 }
@@ -180,6 +212,8 @@ export function compactRecommendedName(value: string, category = '单品'): stri
 }
 
 export function recognizeRespToResult(resp: RecognizeResp): RecognitionResult {
+  const sleeveLength = normalizeSleeveLength(resp.sleeve_length);
+  const sleeveNeedsReview = Boolean(resp.sleeve_length) && !sleeveLength;
   return {
     category: (resp.category || '上装') as ClothingCategory,
     color: resp.color || '未知',
@@ -187,17 +221,17 @@ export function recognizeRespToResult(resp: RecognizeResp): RecognitionResult {
     style: resp.style || '',
     brand: resp.brand || '',
     photo_type: normalizePhotoType(resp.photo_type),
-    needs_review: resp.needs_review ?? undefined,
+    needs_review: (resp.needs_review ?? false) || sleeveNeedsReview,
     confidence: typeof resp.confidence === 'number' ? resp.confidence : undefined,
     fit_type: resp.fit_type ? resp.fit_type as FitType : undefined,
-    sleeve_length: resp.sleeve_length ? resp.sleeve_length as SleeveLength : undefined,
+    sleeve_length: sleeveLength,
     season: Array.isArray(resp.season) ? resp.season : undefined,
     occasion_tags: Array.isArray(resp.occasion_tags) ? resp.occasion_tags : undefined,
   };
 }
 
 export function toRecommendRequest(items: WardrobeItem[], context?: RecommendContext): RecommendReq {
-  const active = items.filter(i => i.status === 'active');
+  const active = items.filter(isRecommendationEligible);
   const prefs = (context?.stylePreferences || '').split(/[、,，]/).map(s => s.trim()).filter(Boolean);
   const temp = context?.temp ? parseInt(context.temp, 10) : undefined;
   return {

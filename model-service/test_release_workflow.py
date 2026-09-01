@@ -21,7 +21,7 @@ from scripts.wait_for_release import ReleaseError, wait_for_release
 
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED_CONTRACT_VERSION = "2026-08-18"
+EXPECTED_CONTRACT_VERSION = "2026-09-01"
 MISSING = object()
 
 

@@ -74,9 +74,10 @@ Do not infer a surface from image pixels or bake a white/colored canvas into a
 new master. Existing historical white-background or opaque images remain
 untouched: there is no bulk migration, background variant, or database
 migration. The same semantic surfaces must continue to render those historical
-assets safely. Persistence success copy is exactly `已更新为透明主图`; rejected
-or failed standardization preserves the original and uses exactly
-`透明主图生成失败，已保留原图`.
+assets safely. Persistence success copy is exactly `已更新为透明主图`. Manual
+single-item flows may preserve an original only after explicit user choice.
+Background multi-item imports keep failed originals in the retry task and never
+promote them into active wardrobe, recommendation, or try-on state.
 
 ## Editorial outfit canvas
 

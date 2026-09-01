@@ -325,6 +325,13 @@ def normalize_tryon_items(values: list[dict]) -> list[dict]:
             "name": name or category,
             "category": category,
             "color": str(value.get("color") or "")[:30],
+            "material": str(value.get("material") or "")[:60],
+            "sleeve_length": (
+                value.get("sleeve_length")
+                if value.get("sleeve_length") in {"无袖", "短袖", "长袖"}
+                else None
+            ),
+            "fit_type": str(value.get("fit_type") or "")[:40] or None,
             "description": str(value.get("description") or "")[:160],
             "image_url": str(value.get("image_url") or "")[:3000] or None,
         })
@@ -350,7 +357,14 @@ def tryon_reference_images(items: list[dict]) -> list[str]:
 def build_tryon_prompt(items: list[dict], scene: str, body_shape: str, reference_count: int) -> str:
     garments = []
     for item in items:
-        detail = " ".join(x for x in [item["color"], item["name"], item["description"]] if x)
+        color_name = (str(item["color"]) + str(item["name"])).strip()
+        detail = " ".join(x for x in [
+            color_name,
+            item.get("material"),
+            item.get("sleeve_length"),
+            item.get("fit_type"),
+            item["description"],
+        ] if x)
         garments.append(f"{item['category']}：{detail}"[:220])
     reference_note = (
         f"图片2到图片{reference_count + 1}是服饰参考图，严格保留它们的颜色、版型、材质和图案。"
@@ -358,13 +372,21 @@ def build_tryon_prompt(items: list[dict], scene: str, body_shape: str, reference
     )
     scene_text = _TRYON_SCENES.get(scene, scene or "自然光下的简洁室内空间")
     body_note = f"用户体型信息：{body_shape[:100]}。" if body_shape else ""
+    sleeveless_rule = (
+        "清单中的无袖服装必须保留完整肩部或宽肩衣身，不得改成细肩带、吊带或抹胸。"
+        if any(item.get("sleeve_length") == "无袖" for item in items)
+        else ""
+    )
     return (
         "图片1是真实用户本人，也是唯一人物主体。生成一张写实的全身虚拟试穿照片。"
         "保持图片1人物的脸型、五官、发型、肤色、年龄感和真实体型，不美化成其他人，不改变身份。"
         f"{reference_note}{body_note}"
         f"让人物完整穿上以下搭配：{'；'.join(garments)}。"
+        f"{sleeveless_rule}"
         f"场景为{scene_text}，自然站姿，真实摄影光线，服装比例和遮挡关系合理。"
-        "不要增加清单以外的外套或下装，不要出现第二个人、拼贴、商品平铺、文字、水印、畸形肢体或多余手指。"
+        "高质量时尚杂志摄影质感，但不是杂志封面。"
+        "不要增加清单以外的外套或下装，不要出现第二个人、拼贴、商品平铺、"
+        "任何文字、字母、数字、标题、Logo、水印、畸形肢体或多余手指。"
     )
 
 

@@ -1,5 +1,6 @@
 import type { WardrobeItem } from '@/types';
 import { serviceFeature, uriToBase64 } from './styleeService.ts';
+import { isRecommendationEligible } from './styleeMapping.ts';
 
 export type GammaAction = 'generate' | 'replace_item' | 'replace_all';
 
@@ -69,13 +70,32 @@ export interface GammaTryOnResponse {
   };
 }
 
-export type GammaTryOnItem = Pick<
-  GammaOutfitItem,
-  'name' | 'category' | 'color' | 'description' | 'image_url'
->;
+export interface GammaTryOnItem {
+  name: string;
+  category: string;
+  color: string;
+  material?: string;
+  sleeve_length?: '无袖' | '短袖' | '长袖';
+  fit_type?: string;
+  description?: string;
+  image_url?: string | null;
+}
+
+export function toGammaTryOnItems(items: GammaTryOnItem[]) {
+  return items.map(item => ({
+    name: item.name,
+    category: item.category,
+    color: item.color,
+    material: item.material,
+    sleeve_length: item.sleeve_length,
+    fit_type: item.fit_type,
+    description: item.description,
+    image_url: item.image_url,
+  }));
+}
 
 export function toGammaWardrobe(items: WardrobeItem[]) {
-  return items.map(item => ({
+  return items.filter(isRecommendationEligible).map(item => ({
     item_id: item.item_id,
     name: item.name,
     category: item.category,
@@ -117,12 +137,6 @@ export async function gammaTryOn(
     ...person,
     scene,
     body_shape: bodyShape,
-    items: items.map(item => ({
-      name: item.name,
-      category: item.category,
-      color: item.color,
-      description: item.description,
-      image_url: item.image_url,
-    })),
+    items: toGammaTryOnItems(items),
   }, 150000);
 }

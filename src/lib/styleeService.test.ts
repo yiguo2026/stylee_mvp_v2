@@ -43,9 +43,11 @@ const aiModuleHooks = registerHooks({
 
 const realFetch = globalThis.fetch;
 const realFileReader = globalThis.FileReader;
+const realSetTimeout = globalThis.setTimeout;
 afterEach(() => {
   globalThis.fetch = realFetch;
   globalThis.FileReader = realFileReader;
+  globalThis.setTimeout = realSetTimeout;
 });
 after(() => { aiModuleHooks.deregister(); });
 
@@ -178,7 +180,13 @@ test('serviceStandardizeDetailed requests web standardization and preserves resp
     } as any;
   }) as any;
 
-  const result = await serviceStandardizeDetailed('QUJD', 'image/png', 'web', '上装');
+  const result = await serviceStandardizeDetailed(
+    'QUJD',
+    'image/png',
+    'web',
+    '上装',
+    { bbox_2d: [80, 120, 360, 620] } as any,
+  );
 
   assert.match(seen.url, /\/standardize$/);
   assert.equal(seen.init.method, 'POST');
@@ -187,7 +195,7 @@ test('serviceStandardizeDetailed requests web standardization and preserves resp
     image_b64: 'QUJD',
     mime: 'image/png',
     photo_type: 'web',
-    item: { category: '上装' },
+    item: { category: '上装', bbox_2d: [80, 120, 360, 620] },
   });
   assert.equal(result.error, undefined);
   assert.equal(result.data?.trace?.request_id, 'server-standardize-123');
@@ -206,6 +214,22 @@ test('serviceStandardizeDetailed normalizes legacy flat_lay at the request bound
 
   const body = requestBody as Record<string, unknown> | null;
   assert.equal(body?.photo_type, 'flatlay');
+});
+
+test('serviceStandardizeDetailed leaves enough client time for edit plus verification', async () => {
+  let scheduledDeadline = 0;
+  globalThis.setTimeout = ((handler: TimerHandler, timeout?: number) => {
+    scheduledDeadline = Number(timeout);
+    return realSetTimeout(handler, 10_000);
+  }) as typeof setTimeout;
+  globalThis.fetch = (async () => ({
+    ok: true,
+    json: async () => ({}),
+  }) as any) as any;
+
+  await serviceStandardizeDetailed('QUJD', 'image/png', 'flatlay', '上装');
+
+  assert.equal(scheduledDeadline, 120_000);
 });
 
 test('aiStandardizeGarment accepts a verified transparent result without skipping web images', async () => {

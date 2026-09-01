@@ -1,3 +1,8 @@
+import base64
+import io
+
+from PIL import Image
+
 from stylee.vision.prompts import (
     build_recognize_messages, parse_recognize_json,
     build_verify_messages, parse_verify_json,
@@ -127,6 +132,14 @@ class _BoomStd:
     def standardize(self, image_url, item, mode): raise RuntimeError("api down")
 
 
+class _CaptureStd:
+    name = "capture"
+    def __init__(self): self.refs = []
+    def standardize(self, image_url, item, mode):
+        self.refs.append(image_url)
+        return "mock://std/cropped"
+
+
 class _FakeMatte:
     name = "pillow-border-connected-v1"
     def __init__(self, fail_first=False):
@@ -227,6 +240,30 @@ def test_standardize_ok_cutout():
     assert si.visible_bounds == VisibleBounds(0.01, 0.01, 0.01, 0.01)
 
 
+def test_standardize_target_bbox_crops_before_image_edit():
+    source = Image.new("RGB", (100, 100), "white")
+    output = io.BytesIO()
+    source.save(output, format="PNG")
+    source_ref = "data:image/png;base64," + base64.b64encode(output.getvalue()).decode("ascii")
+    standardizer = _CaptureStd()
+    item = WardrobeItem(id="i", category=Category.TOP)
+
+    si = standardize_item(
+        source_ref,
+        item,
+        PhotoType.FLATLAY,
+        _FakeVP({}),
+        standardizer,
+        _FakeMatte(),
+        target_bbox=[200, 300, 600, 800],
+    )
+
+    assert si.verified is True
+    assert len(standardizer.refs) == 1
+    assert standardizer.refs[0].startswith("data:image/png;base64,")
+    assert standardizer.refs[0] != source_ref
+
+
 def test_standardize_drift_falls_back():
     from stylee.vision.mock import MockImageStandardizer
     item = WardrobeItem(id="i", category=Category.TOP)
@@ -270,6 +307,21 @@ def test_build_edit_payload_accepts_explicit_parameters():
     p = build_edit_payload("qwen-image-edit", "data:img", "真实摄影", params)
     assert p["parameters"] == params
     assert p["parameters"] is not params
+
+
+def test_build_edit_payload_orders_multiple_reference_images_before_text():
+    p = build_edit_payload(
+        "qwen-image-edit",
+        ["data:person", "https://storage.test/dress.png", "https://storage.test/shoes.png"],
+        "虚拟试穿",
+        {"watermark": False},
+    )
+    assert p["input"]["messages"][0]["content"] == [
+        {"image": "data:person"},
+        {"image": "https://storage.test/dress.png"},
+        {"image": "https://storage.test/shoes.png"},
+        {"text": "虚拟试穿"},
+    ]
 
 
 def test_standardizer_prompts_preserve_prints_for_every_mode():
@@ -345,6 +397,7 @@ def main():
     test_mock_recognize_and_standardize()
     test_mode_for()
     test_standardize_ok_cutout()
+    test_standardize_target_bbox_crops_before_image_edit()
     test_standardize_drift_falls_back()
     test_standardize_api_error_falls_back()
     test_web_uses_direct_matte_before_edit()
@@ -353,6 +406,7 @@ def main():
     test_terminal_failure_never_verifies_white_output()
     test_build_edit_payload()
     test_build_edit_payload_accepts_explicit_parameters()
+    test_build_edit_payload_orders_multiple_reference_images_before_text()
     test_standardizer_prompts_preserve_prints_for_every_mode()
     test_parse_edit_response_ok_and_bad()
     test_factories_no_key_fall_back_to_mock()

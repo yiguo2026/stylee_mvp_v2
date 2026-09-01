@@ -39,6 +39,10 @@ def _photo_type(value):
     return PhotoType.ON_BODY
 
 
+def _target_bbox(item: dict):
+    return ai_features.normalize_target_bbox(item.get("bbox_2d"))
+
+
 def _image_url(payload: dict) -> str:
     if payload.get("image_url"):
         return payload["image_url"]
@@ -181,7 +185,12 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/tryon-image":
                 payload["image_url"] = _image_url(payload)
                 with trace.stage("tryon_image.model_call"):
-                    response = {"image_ref": ai_features.tryon_image(payload)}
+                    response = {
+                        "image_ref": ai_features.tryon_image(
+                            payload,
+                            stage_timer=trace.stage,
+                        )
+                    }
             elif self.path == "/gamma/import":
                 with trace.stage("gamma.import"):
                     response = gamma.import_garment(payload)
@@ -281,7 +290,8 @@ class Handler(BaseHTTPRequestHandler):
         )
         si = standardize_item(_image_url(payload), item, _photo_type(payload.get("photo_type")),
                               vision, standardizer, matte_processor, stage_timer=trace.stage,
-                              on_fallback=trace.record_fallback)
+                              on_fallback=trace.record_fallback,
+                              target_bbox=_target_bbox(d))
         with trace.stage("response_adapter"):
             response = adapter.std_to_app(si)
         response["provider"] = standardizer.name

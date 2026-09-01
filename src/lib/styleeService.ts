@@ -30,6 +30,13 @@ export interface ServiceResult<T> {
   error?: ServiceErrorInfo;
 }
 
+export interface StandardizeItemExtras {
+  color?: string;
+  material?: string;
+  description?: string;
+  bbox_2d?: [number, number, number, number];
+}
+
 function _requestId(): string {
   return `stylee-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -142,19 +149,20 @@ export async function serviceRecognizeMultiDetailed(
 
 export async function serviceStandardize(
   b64: string, mime: string, photoType: string, category: string,
-  extras?: { color?: string; material?: string; description?: string },
+  extras?: StandardizeItemExtras,
 ): Promise<StandardizeResp | null> {
   return (await serviceStandardizeDetailed(b64, mime, photoType, category, extras)).data;
 }
 
 export async function serviceStandardizeDetailed(
   b64: string, mime: string, photoType: string, category: string,
-  extras?: { color?: string; material?: string; description?: string },
+  extras?: StandardizeItemExtras,
 ): Promise<ServiceResult<StandardizeResp>> {
   // Backend performs image edit followed by visual verification. Its defaults are
-  // 60s + 20s, so keep the client deadline above the complete server operation.
+  // 60s + 20s. Keep enough transport margin so completed server work is not
+  // discarded as a client timeout during multi-item imports.
   return _postJsonDetailed<StandardizeResp>('/standardize',
-    { image_b64: b64, mime, photo_type: normalizePhotoType(photoType), item: { category, ...extras } }, 90000);
+    { image_b64: b64, mime, photo_type: normalizePhotoType(photoType), item: { category, ...extras } }, 120000);
 }
 
 export async function serviceRecommend(req: RecommendReq): Promise<RecommendResp | null> {

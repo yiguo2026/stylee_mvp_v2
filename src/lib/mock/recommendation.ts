@@ -1,4 +1,5 @@
 import { WardrobeItem, Outfit, OutfitItem, RecommendedItem, ClothingCategory, UserStylePreference } from '@/types';
+import { isRecommendationEligible } from '@/lib/styleeMapping';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -157,7 +158,7 @@ export const mockGetOutfitRecommendations = async (
 ): Promise<Outfit[]> => {
   await delay(2000);
 
-  const activeItems = wardrobeItems.filter(i => i.status === 'active');
+  const activeItems = wardrobeItems.filter(isRecommendationEligible);
 
   // Need at least some items to build outfits
   if (activeItems.length === 0) return [];

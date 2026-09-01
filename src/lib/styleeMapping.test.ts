@@ -36,6 +36,44 @@ test('photo_type 旧值归一化，多品识别元数据不丢失', () => {
   assert.equal(item.confidence, 0.7);
 });
 
+test('multi-item recognition preserves only a valid normalized target box', () => {
+  const valid = recognizeManyItemToDetected({
+    category: '包袋',
+    color: '米色',
+    description: '藤编水桶包',
+    bbox_2d: [80, 120, 360, 620],
+  } as any, 0);
+  const invalid = recognizeManyItemToDetected({
+    category: '鞋履',
+    color: '粉色',
+    description: '乐福鞋',
+    bbox_2d: [400, 500, 200, 900],
+  } as any, 1);
+
+  assert.deepEqual(valid.bbox_2d, [80, 120, 360, 620]);
+  assert.equal(invalid.bbox_2d, undefined);
+});
+
+test('recognition rejects unsupported sleeve values before database persistence', () => {
+  const many = recognizeManyItemToDetected({
+    category: '上装',
+    color: '黑色',
+    description: '黑色七分袖上衣',
+    sleeve_length: '七分袖',
+    needs_review: false,
+  }, 0);
+  const single = recognizeRespToResult({
+    category: '上装', color: '黑色', material: '', style: '', brand: '',
+    photo_type: 'flatlay', needs_review: false, confidence: 0.9,
+    sleeve_length: '七分袖',
+  });
+
+  assert.equal(many.sleeve_length, undefined);
+  assert.equal(many.needs_review, true);
+  assert.equal(single.sleeve_length, undefined);
+  assert.equal(single.needs_review, true);
+});
+
 test('toRecommendRequest 映射 fit_type→fit、拆 style_prefs、temp→temp_c', () => {
   const req = toRecommendRequest(
     [item({ item_id: 't1', category: '上装', fit_type: '修身', color: '白', material: '棉', season: ['春'], occasion_tags: ['通勤'], tags: [
@@ -63,6 +101,37 @@ test('toRecommendRequest 只取 active、query 空时退回 tags', () => {
   assert.equal(req.wardrobe.length, 1);
   assert.equal(req.wardrobe[0].item_id, 'a');
   assert.equal(req.query, '通勤,黑色');
+});
+
+test('toRecommendRequest excludes failed async-import originals until explicitly confirmed', () => {
+  const req = toRecommendRequest([
+    item({ item_id: 'legacy-active', status: 'active' }),
+    item({
+      item_id: 'failed-batch-original',
+      status: 'active',
+      ai_recognized_attrs: {
+        async_import: true,
+        standardization_ok: false,
+        standardization: 'fallback_original',
+      },
+    }),
+    item({
+      item_id: 'confirmed-single-original',
+      status: 'active',
+      ai_recognized_attrs: {
+        async_import: true,
+        standardization_ok: false,
+        standardization: 'fallback_original',
+        user_confirmed_original: true,
+        detected_item_count: 1,
+      },
+    }),
+  ]);
+
+  assert.deepEqual(
+    req.wardrobe.map((entry) => entry.item_id),
+    ['legacy-active', 'confirmed-single-original'],
+  );
 });
 
 test('outfitsRespToApp 用 itemMap 还原已有单品、映射补充件与理由', () => {

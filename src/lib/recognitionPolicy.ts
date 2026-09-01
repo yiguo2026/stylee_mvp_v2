@@ -19,3 +19,20 @@ export function isTrustedRecognition(provider?: string, degraded?: boolean): boo
 export function shouldStandardizePhotoType(_photoType?: string): boolean {
   return true;
 }
+
+export function canStandardizeDetectedTarget(
+  detectedItemCount: number,
+  bbox: readonly number[] | undefined,
+): boolean {
+  return detectedItemCount <= 1 || bbox?.length === 4;
+}
+
+export function missingTargetBoxIndices(
+  detectedItemCount: number,
+  items: readonly { bbox_2d?: readonly number[] }[],
+): number[] {
+  if (detectedItemCount <= 1) return [];
+  return items.flatMap((item, index) => (
+    canStandardizeDetectedTarget(detectedItemCount, item.bbox_2d) ? [] : [index]
+  ));
+}

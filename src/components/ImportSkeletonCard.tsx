@@ -56,8 +56,8 @@ function getStatusMeta(task: ImportTask): StatusMeta {
       };
     case 'failed':
       return {
-        label: '识别失败 · 点击重试',
-        detail: task.error || '轻触后重新加入队列',
+        label: task.circuitOpen ? '服务响应较慢 · 稍后重试' : '部分单品待重试',
+        detail: task.error || '失败原图未加入衣橱，轻触仅重试未完成单品',
         tone: 'attention',
         progressDuration: 1800,
       };

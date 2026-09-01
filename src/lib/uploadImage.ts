@@ -113,6 +113,7 @@ export interface WardrobeImageUploaderDependencies {
 export function createWardrobeImageUploader(
   dependencies: WardrobeImageUploaderDependencies,
 ): UploadWardrobeImage {
+  let uploadSequence = 0;
   return async (localUri, userId, subfolder, options = {}) => {
     if (isRemoteUrl(localUri) && !options.persistRemote) {
       return localUri;
@@ -136,7 +137,8 @@ export function createWardrobeImageUploader(
       const blob = await response.blob();
       const { extension, contentType } = storageFormatFor(localUri, blob.type || '');
       const folder = subfolder ? `${userId}/${subfolder}` : userId;
-      const fileName = `${folder}/${(dependencies.now ?? Date.now)()}.${extension}`;
+      uploadSequence += 1;
+      const fileName = `${folder}/${(dependencies.now ?? Date.now)()}-${uploadSequence}.${extension}`;
       exceptionKind = 'storage_init_exception';
       const bucket = await dependencies.getBucket();
 
@@ -205,6 +207,14 @@ export type PersistGarmentMasterResult =
       metadata: PersistedGarmentMetadata;
     };
 
+export type PersistBatchImportMasterResult =
+  | PersistGarmentMasterResult
+  | { ok: false; reason: 'standardization_failed' | 'transparent_upload_failed' };
+
+export type PersistManualGarmentMasterResult =
+  | PersistGarmentMasterResult
+  | { ok: false; reason: 'original_confirmation_required' };
+
 export function shouldPersistReplacementImage(
   selectedReplacementUri: string | null | undefined,
 ): selectedReplacementUri is string {
@@ -260,4 +270,37 @@ export async function persistGarmentMaster(
     imageUrl: transparentMasterUrl ?? durableOriginalUrl,
     metadata,
   };
+}
+
+export async function persistBatchImportMaster(
+  input: PersistGarmentMasterInput,
+  upload: UploadWardrobeImage = uploadWardrobeImage,
+): Promise<PersistBatchImportMasterResult> {
+  if (!input.acceptance.ok) {
+    return { ok: false, reason: 'standardization_failed' };
+  }
+  const result = await persistGarmentMaster(input, upload);
+  if (result.ok && result.status !== 'transparent_master') {
+    return { ok: false, reason: 'transparent_upload_failed' };
+  }
+  return result;
+}
+
+/**
+ * Manual add may retain the source photo, but only after the user explicitly
+ * chooses that fallback. A generic Save action never promotes an original.
+ */
+export async function persistManualGarmentMaster(
+  input: PersistGarmentMasterInput,
+  originalConfirmed: boolean,
+  upload: UploadWardrobeImage = uploadWardrobeImage,
+): Promise<PersistManualGarmentMasterResult> {
+  if (!input.acceptance.ok && !originalConfirmed) {
+    return { ok: false, reason: 'original_confirmation_required' };
+  }
+  const result = await persistGarmentMaster(input, upload);
+  if (result.ok && result.status === 'fallback_original' && !originalConfirmed) {
+    return { ok: false, reason: 'original_confirmation_required' };
+  }
+  return result;
 }
