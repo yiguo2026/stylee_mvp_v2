@@ -15,8 +15,7 @@ import { useItemAttributes, ItemAttributesCard, ItemAttributesSheet } from '@/co
 import { useGarmentImageReplace } from '@/hooks/useGarmentImageReplace';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
-import { StyleeGarmentMedia } from '@/design-system';
-import type { GarmentMediaTone } from '@/design-system';
+import { ds, StyleeGarmentMedia, type GarmentMediaTone } from '@/design-system';
 import { WardrobeItem, RecommendedItem, RecognitionResult } from '@/types';
 
 // 详情页主图：以 contain 完整展示单品（不裁切），容器高度按图片真实长宽比自适应，
@@ -92,7 +91,7 @@ function getAddSourceLabel(item: WardrobeItem | RecommendedItem): string {
 
 export default function ItemDetailScreen() {
   const { id, itemData: itemDataParam } = useLocalSearchParams<{ id: string; itemData?: string }>();
-  const { items, deleteItem, updateItem, updateItemWithRollback } = useWardrobeStore();
+  const { items, archiveItem, updateItem, updateItemWithRollback } = useWardrobeStore();
   const [item, setItem] = useState<WardrobeItem | undefined>();
   const [recommendedItem, setRecommendedItem] = useState<RecommendedItem | undefined>();
   const [notFound, setNotFound] = useState(false);
@@ -160,7 +159,7 @@ export default function ItemDetailScreen() {
       item={item!}
       updateItem={updateItem}
       commitReplacementUpdate={updateItemWithRollback}
-      deleteItem={deleteItem}
+      archiveItem={archiveItem}
     />
   );
 }
@@ -287,17 +286,17 @@ function RecommendedItemDetail({ rec }: { rec: RecommendedItem }) {
   );
 }
 
-function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, deleteItem }: {
+function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, archiveItem }: {
   item: WardrobeItem;
   updateItem: (id: string, updates: Partial<WardrobeItem>) => void;
   commitReplacementUpdate: (
     id: string,
     updates: Partial<WardrobeItem>,
   ) => Promise<boolean>;
-  deleteItem: (id: string) => Promise<void>;
+  archiveItem: (id: string) => Promise<void>;
 }) {
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(item.name);
   const attrModel = useItemAttributes(item, (updates) => updateItem(item.item_id, updates));
@@ -341,7 +340,7 @@ function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, deleteItem
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.image_url]);
 
-  const handleDelete = () => setShowDeleteConfirm(true);
+  const handleArchive = () => setShowArchiveConfirm(true);
 
   const saveName = () => {
     const next = nameDraft.trim();
@@ -351,15 +350,15 @@ function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, deleteItem
     showToast('已更新名称', 'success');
   };
 
-  const confirmDelete = async () => {
-    setShowDeleteConfirm(false);
-    setDeleting(true);
+  const confirmArchive = async () => {
+    setShowArchiveConfirm(false);
+    setArchiving(true);
     try {
-      await deleteItem(item.item_id);
+      await archiveItem(item.item_id);
       router.replace('/wardrobe');
     } catch (e: any) {
-      setDeleting(false);
-      showToast('删除失败：' + (e.message || '请稍后重试'), 'error');
+      setArchiving(false);
+      showToast('移出失败：' + (e.message || '请稍后重试'), 'error');
     }
   };
 
@@ -373,8 +372,8 @@ function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, deleteItem
           <Text style={styles.back}>← 返回</Text>
         </TouchableOpacity>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleDelete}>
-            <Text style={styles.deleteBtn}>删除</Text>
+          <TouchableOpacity onPress={handleArchive}>
+            <Text style={styles.archiveBtn}>移出衣橱</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -444,14 +443,14 @@ function OwnedItemDetail({ item, updateItem, commitReplacementUpdate, deleteItem
       <ItemAttributesSheet model={attrModel} />
 
       <ConfirmModal
-        visible={showDeleteConfirm}
-        title="删除衣物"
-        message={`确认删除"${item.name}"吗？`}
-        confirmText="删除"
+        visible={showArchiveConfirm}
+        title="移出衣橱"
+        message={`移出"${item.name}"后，它将不再显示在衣橱中；历史搭配和已上传图片会继续保留。`}
+        confirmText="移出"
         confirmStyle="destructive"
-        onConfirm={confirmDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        loading={deleting}
+        onConfirm={confirmArchive}
+        onCancel={() => setShowArchiveConfirm(false)}
+        loading={archiving}
       />
     </SafeAreaView>
   );
@@ -476,7 +475,7 @@ const styles = StyleSheet.create({
   },
   back: { ...T.buttonSecondary, color: Colors.walnut },
   headerActions: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
-  deleteBtn: { ...T.buttonSecondary, color: Colors.accent },
+  archiveBtn: { ...T.buttonSecondary, color: ds.color.semantic.action.destructive },
   editBtn: { ...T.buttonSecondary, color: Colors.terracotta },
   content: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.four, gap: Spacing.three },
 

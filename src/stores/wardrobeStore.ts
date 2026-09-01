@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { WardrobeItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { buildWardrobeArchiveUpdate } from '@/lib/wardrobeArchivePolicy';
 import {
   applyWardrobeOptimisticUpdate,
   runRollbackableWardrobeUpdate,
@@ -18,14 +19,14 @@ export interface WardrobeState {
   // supabase.update({price: undefined}) 会在序列化时丢弃 undefined 字段，导致云端从未
   // 真正清除），若直接用云端旧数据覆盖，就会出现「删除的属性再次进入详情页又出现」。
   pendingEdits: Record<string, Partial<WardrobeItem>>;
-  deletedIds: string[];
+  archivedIds: string[];
   mutationGenerations: WardrobeMutationGenerations;
 
   fetchItems: (userId: string) => Promise<void>;
   addItem: (item: Omit<WardrobeItem, 'item_id' | 'created_at' | 'updated_at'>) => Promise<WardrobeItem | null>;
   updateItem: (itemId: string, updates: Partial<WardrobeItem>) => Promise<boolean>;
   updateItemWithRollback: (itemId: string, updates: Partial<WardrobeItem>) => Promise<boolean>;
-  deleteItem: (itemId: string) => Promise<void>;
+  archiveItem: (itemId: string) => Promise<void>;
   incrementWearCount: (itemId: string) => Promise<void>;
   setItems: (items: WardrobeItem[]) => void;
 }
@@ -101,7 +102,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   isLoading: false,
   error: null,
   pendingEdits: {},
-  deletedIds: [],
+  archivedIds: [],
   mutationGenerations: {},
 
   setItems: (items) => set({ items }),
@@ -118,10 +119,10 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       if (error) throw error;
       const rawItems = (data ?? []) as WardrobeItem[];
 
-      const { pendingEdits, deletedIds } = get();
+      const { pendingEdits, archivedIds } = get();
 
       // 附加穿搭/收藏次数，但衣橱列表始终保持按最新创建时间倒序展示
-      let items = rawItems.filter(it => !deletedIds.includes(it.item_id));
+      let items = rawItems.filter(it => !archivedIds.includes(it.item_id));
       try {
         const stats = await fetchItemUsageStats(userId);
         items = items.map(it => {
@@ -229,22 +230,22 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     return false;
   },
 
-  deleteItem: async (itemId) => {
-    // 乐观删除：先从本地列表移除（与 updateItem 的乐观策略一致），
-    // 保证即使云端鉴权异常/离线，用户的删除操作也能即时反映在 UI 上，
-    // 并记入 deletedIds，避免 focus 重新 fetchItems 时被云端旧数据「复活」。
+  archiveItem: async (itemId) => {
+    // 乐观移出：先从本地衣橱隐藏（与 updateItem 的乐观策略一致），
+    // 保证即使云端鉴权异常/离线，操作也能即时反映在 UI 上，
+    // 并记入 archivedIds，避免 focus 重新 fetchItems 时被云端旧数据「复活」。
     set(state => ({
       items: state.items.filter(i => i.item_id !== itemId),
-      deletedIds: state.deletedIds.includes(itemId) ? state.deletedIds : [...state.deletedIds, itemId],
+      archivedIds: state.archivedIds.includes(itemId) ? state.archivedIds : [...state.archivedIds, itemId],
     }));
     try {
       const { error } = await supabase
         .from('wardrobe_items')
-        .update({ status: 'archived', updated_at: new Date().toISOString() })
+        .update(buildWardrobeArchiveUpdate(new Date().toISOString()))
         .eq('item_id', itemId);
       if (error) throw error;
     } catch (e: any) {
-      // 云端失败不还原本地删除（demo 环境云端可能不可用），仅记录错误
+      // 云端失败不还原本地移出（demo 环境云端可能不可用），仅记录错误
       set({ error: e.message });
     }
   },
