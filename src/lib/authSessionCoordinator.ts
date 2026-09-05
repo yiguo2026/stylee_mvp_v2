@@ -58,6 +58,8 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
   publishSession: (session: S | null) => undefined;
 }>): Readonly<{
   current(): AuthCoordinatorState;
+  getSnapshot(): AuthCoordinatorState['phase'];
+  subscribe(listener: () => void): () => void;
   signalSerial(): number;
   isEffectCurrent(effect: AuthEffect): boolean;
   accept(event: AccountAuthEvent, session: S | null): AuthEffect;
@@ -69,6 +71,7 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
 }> {
   const { scope, publishSession } = options;
   let serial = 0;
+  const listeners = new Set<() => void>();
   let activeEffect: AuthEffect | null = null;
   let refreshMarker: string | null = null;
   let lastBlockedReason: BlockedReason | null = null;
@@ -82,14 +85,19 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
   function activateEffect(effect: AuthEffect): AuthEffect {
     // Refresh-only and ignored fallback signals preserve a pending route intent.
     if (effect.kind !== 'none') activeEffect = effect;
+    for (const listener of listeners) listener();
     return effect;
   }
 
-  function validSession(session: S | null): session is S {
-    if (session === null) return false;
+  function validSession(session: unknown): session is S {
+    if (typeof session !== 'object' || session === null || !('user' in session)
+      || typeof session.user !== 'object' || session.user === null
+      || !('id' in session.user) || !('refresh_token' in session)) return false;
     const accountId = session.user.id;
     const marker = session.refresh_token;
-    return accountId.length > 0
+    return typeof accountId === 'string'
+      && typeof marker === 'string'
+      && accountId.length > 0
       && accountId.trim() === accountId
       && marker.length > 0
       && marker.trim() === marker;
@@ -206,7 +214,8 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
 
     if (event === 'PASSWORD_RECOVERY') {
       if (!validSession(session)) return enterBlocked('invalid_session', true);
-      if (state.phase === 'authenticated' && state.accountId === session.user.id) {
+      if (state.phase === 'authenticated' && state.accountId === session.user.id
+        && refreshMarker === session.refresh_token) {
         return refreshAuthenticated(session, 'password_recovery');
       }
       return publishAuthenticated(session, 'password_recovery');
@@ -243,6 +252,11 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
 
   return Object.freeze({
     current: () => state,
+    getSnapshot: () => state.phase,
+    subscribe(listener: () => void): () => void {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
     signalSerial: () => serial,
     isEffectCurrent(effect: AuthEffect): boolean {
       return effect.kind !== 'none'

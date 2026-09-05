@@ -90,6 +90,7 @@ const errorIdentifiers = new Set([
   'artifact_prohibited_path',
   'artifact_sensitive_path',
   'artifact_tar_invalid',
+  'compiler_path_invalid',
   'isolated_consumer_failed',
   'lockfile_dependency_mismatch',
   'lockfile_integrity_mismatch',
@@ -246,11 +247,14 @@ async function verifyTarball(packageRecord, tarballPath) {
 
 function assertNoThirdStymobilePackage(packageManifest, lockfile) {
   const allowed = new Set(EXPECTED_PACKAGE_NAMES);
-  const manifestNames = Object.keys(packageManifest.dependencies ?? {}).filter((name) => name.startsWith('@stymobile/'));
-  const installedNames = Object.keys(lockfile.packages ?? {})
-    .filter((path) => path.startsWith('node_modules/@stymobile/'))
-    .map((path) => path.slice('node_modules/'.length));
-  if ([...manifestNames, ...installedNames].some((name) => !allowed.has(name))) {
+  const sections = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
+  const manifestNames = sections.flatMap((section) => Object.keys(packageManifest[section] ?? {}))
+    .filter((name) => name.startsWith('@stymobile/'));
+  const allowedPaths = new Set(EXPECTED_PACKAGE_NAMES.map((name) => `node_modules/${name}`));
+  const installedPaths = Object.keys(lockfile.packages ?? {})
+    .filter((path) => /(^|\/)node_modules\/@stymobile\//u.test(path));
+  if (manifestNames.some((name) => !allowed.has(name))
+    || installedPaths.some((path) => !allowedPaths.has(path))) {
     fail('third_stymobile_package');
   }
 }
@@ -316,6 +320,7 @@ async function verifyInstalledPath(consumerRoot, packageName) {
 }
 
 async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
+  if (process.versions.node.split('.')[0] !== '22') fail('toolchain_mismatch');
   const consumerRoot = await mkdtemp(join(tmpdir(), 'stylee-stymobile-consumer-'));
   try {
     const consumerRealRoot = await realpath(consumerRoot);
@@ -324,6 +329,9 @@ async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
     await writeFile(join(consumerRoot, '.npmrc-global'), '');
     const environment = isolatedEnvironment(consumerRoot);
     const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const { stdout: npmVersion } = await runFile(npmCommand, ['--version'],
+      { cwd: consumerRoot, env: environment, encoding: 'utf8', maxBuffer: 1024 }, 'toolchain_mismatch');
+    if (npmVersion.trim() !== '11.12.1') fail('toolchain_mismatch');
     await runFile(
       npmCommand,
       ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', ...tarballPaths],
@@ -413,7 +421,8 @@ async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
         '',
       ].join('\n'),
     );
-    const typescriptCompiler = resolve(repositoryRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+    const typescriptCompiler = await realpath(resolve(repositoryRoot, 'node_modules', 'typescript', 'bin', 'tsc'));
+    if (!isBeneath(repositoryRoot, typescriptCompiler)) fail('compiler_path_invalid');
     await requireRegularFile(typescriptCompiler, 'isolated_consumer_failed');
     await runFile(
       process.execPath,
@@ -435,7 +444,7 @@ async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
       'isolated_consumer_failed',
     );
   } catch (error) {
-    if (error instanceof Error && error.message === 'isolated_consumer_failed') throw error;
+    if (error instanceof Error && ['isolated_consumer_failed', 'compiler_path_invalid', 'toolchain_mismatch'].includes(error.message)) throw error;
     fail('isolated_consumer_failed');
   } finally {
     await rm(consumerRoot, { recursive: true, force: true });

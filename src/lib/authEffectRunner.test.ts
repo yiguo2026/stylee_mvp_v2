@@ -132,7 +132,7 @@ test('entering preview while gender is pending suppresses subsequent private eff
   assert.deepEqual(h.calls, []);
 });
 
-test('pending load cannot override same-account recovery, while token refresh preserves pending load', async () => {
+test('pending load cannot override same-marker recovery, while token refresh preserves pending load', async () => {
   for (const event of ['PASSWORD_RECOVERY', 'TOKEN_REFRESHED'] as const) {
     const h = harness();
     const coordinator = createAuthSessionCoordinator({ scope: h.scope, publishSession: () => undefined });
@@ -142,7 +142,7 @@ test('pending load cannot override same-account recovery, while token refresh pr
     let finish!: (gender: string) => void;
     h.ports.resolveGender = () => new Promise((resolve) => { finish = resolve; });
     const pending = runAuthEffect(load, h);
-    const next = coordinator.accept(event, { ...session, refresh_token: 'a-2' });
+    const next = coordinator.accept(event, { ...session, refresh_token: event === 'PASSWORD_RECOVERY' ? 'a-1' : 'a-2' });
     h.calls.length = 0;
     assert.equal(await runAuthEffect(next, h), event === 'PASSWORD_RECOVERY' ? 'applied' : 'discarded');
     assert.deepEqual(h.calls, event === 'PASSWORD_RECOVERY'

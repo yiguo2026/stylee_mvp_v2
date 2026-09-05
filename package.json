@@ -14,7 +14,7 @@
     "test:vendor": "node --test scripts/stymobile-vendor-contract.test.mjs",
     "vendor:check": "node scripts/verify-stymobile-vendor.mjs",
     "test:account-scope": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/accountScopeRuntime.test.ts src/lib/privateStateReset.test.ts src/lib/profileCache.test.ts src/lib/scopedStoreRead.test.ts src/lib/authSessionCoordinator.test.ts src/lib/storeReadPolicy.test.ts src/lib/authEffectRunner.test.ts src/lib/loginAuthFlow.test.ts src/lib/wardrobeScopedRead.test.ts src/lib/secondaryStoreReads.test.ts",
-    "test:account-scope-integration": "node --import ./src/lib/test-fixtures/wardrobeStore/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/wardrobeStore.integration.test.ts src/lib/secondaryStores.integration.test.ts",
+    "test:account-scope-integration": "node --import ./src/lib/test-fixtures/wardrobeStore/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/wardrobeStore.integration.test.ts src/lib/secondaryStores.integration.test.ts && node --import ./src/lib/test-fixtures/rootRoute/register.mjs --test src/lib/rootRoute.integration.test.mjs",
     "test:consumer-control": "node --test scripts/consumer-control.test.mjs",
     "check:consumer": "npm run test:vendor && npm run vendor:check && npm run test:account-scope && npm run test:account-scope-integration",
     "check": "npm run tokens:check && npm run design-system:check && npm run wardrobe-density:check && npm run check:consumer && tsc --noEmit",
@@ -63,6 +63,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.8.0"
   },
   "engines": {

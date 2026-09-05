@@ -150,3 +150,52 @@ test('rejects an injected dependency and package in the vendored lock contract',
     /lockfile_package_mismatch/,
   );
 });
+
+for (const section of ['devDependencies', 'optionalDependencies', 'peerDependencies']) {
+  test(`rejects manifest-section drift in ${section}`, async (t) => {
+    const fixture = await copyFixture(t);
+    const manifest = JSON.parse(await readFile(join(fixture, 'package.json'), 'utf8'));
+    manifest[section] = { ...manifest[section], '@stymobile/extra': '1.0.0' };
+    await writeFile(join(fixture, 'package.json'), JSON.stringify(manifest));
+    await assert.rejects(verifyStymobileVendor({ repositoryRoot: fixture, runConsumer: false }),
+      { message: 'third_stymobile_package' });
+  });
+}
+
+for (const name of ['extra', 'core']) {
+  test(`rejects nested ${name === 'core' ? 'duplicate' : 'unlisted'} stymobile package`, async (t) => {
+    const fixture = await copyFixture(t);
+    const lock = await readLock(fixture);
+    lock.packages[`node_modules/parent/node_modules/@stymobile/${name}`] = { version: '0.1.0' };
+    await writeLock(fixture, lock);
+    await assert.rejects(verifyStymobileVendor({ repositoryRoot: fixture, runConsumer: false }),
+      { message: 'third_stymobile_package' });
+  });
+}
+
+test('rejects compiler ancestor symlink escape for containment before executing it', async (t) => {
+  const fixture = await copyFixture(t);
+  await mkdir(join(fixture, 'node_modules'));
+  await symlink(join(repositoryRoot, 'node_modules', 'typescript'), join(fixture, 'node_modules', 'typescript'));
+  await assert.rejects(verifyStymobileVendor({ repositoryRoot: fixture }),
+    { message: 'compiler_path_invalid' });
+});
+
+test('rejects a running Node major mismatch without changing the host runtime', async () => {
+  const moduleUrl = new URL('./stymobile-vendor-contract.mjs', import.meta.url).href;
+  const probe = `Object.defineProperty(process.versions, 'node', { value: '20.0.0' });
+    const { verifyStymobileVendor } = await import(${JSON.stringify(moduleUrl)});
+    await verifyStymobileVendor({ repositoryRoot: ${JSON.stringify(repositoryRoot)} });`;
+  await assert.rejects(execFileAsync(process.execPath, ['--input-type=module', '-e', probe]),
+    (error) => error.code === 1 && /Error: toolchain_mismatch/.test(error.stderr));
+});
+
+test('rejects a running npm mismatch with a finite safe error', async (t) => {
+  const fixture = await copyFixture(t);
+  const bin = join(fixture, 'bin');
+  await mkdir(bin);
+  await writeFile(join(bin, 'npm'), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "10.0.0-private-detail"; else exit 41; fi\n', { mode: 0o755 });
+  await assert.rejects(execFileAsync(process.execPath, [join(repositoryRoot, 'scripts', 'verify-stymobile-vendor.mjs')],
+    { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } }),
+  (error) => error.code === 1 && error.stderr === 'toolchain_mismatch\n' && error.stdout === '');
+});

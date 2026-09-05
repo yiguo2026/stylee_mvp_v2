@@ -95,3 +95,19 @@ test('contains storage and serialization failures', () => {
   assert.equal(writeProfileCache('account-a', 1n, unavailable), undefined);
   assert.equal(clearProfileCache('account-a', unavailable), undefined);
 });
+
+test('contains a distinct setItem failure after successful serialization', () => {
+  let calls = 0;
+  const storage: ProfileStorage = {
+    getItem: () => null,
+    removeItem: () => undefined,
+    setItem(key, value) {
+      calls += 1;
+      assert.equal(key, 'stylee.profile.account-a');
+      assert.equal(value, '{"displayName":"A"}');
+      throw new Error('synthetic-quota-detail');
+    },
+  };
+  assert.equal(writeProfileCache('account-a', { displayName: 'A' }, storage), undefined);
+  assert.equal(calls, 1);
+});

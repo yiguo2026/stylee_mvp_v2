@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -78,3 +78,54 @@ test('design guard selects npm before installation', () => {
   assert.ok(npm > steps.findIndex(s => s.uses?.startsWith('actions/setup-node')));
   assert.ok(npm < steps.findIndex(s => s.run === 'npm ci'));
 });
+
+for (const eventName of ['pull_request', 'push']) {
+  test(`consumer ${eventName} checkout and base catch a violation before the last commit`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'consumer-history-'));
+    const source = path.join(dir, 'source');
+    const checkout = path.join(dir, 'checkout');
+    mkdirSync(source);
+    const git = (args, cwd = source) => {
+      const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    const write = (name, content) => {
+      mkdirSync(path.dirname(path.join(source, name)), { recursive: true });
+      writeFileSync(path.join(source, name), content);
+    };
+    const commit = () => {
+      git(['add', '.']);
+      git(['-c', 'user.name=Synthetic', '-c', 'user.email=synthetic@example.invalid',
+        '-c', 'commit.gpgsign=false', 'commit', '-m', 'synthetic']);
+      return git(['rev-parse', 'HEAD']);
+    };
+    try {
+      git(['init', '-b', 'main']);
+      for (const name of ['(tabs)/index', 'wardrobe/[id]', 'outfit/[id]', 'outfit/result',
+        'outfit/try-on', 'outfit/try-on-result', 'outfit/try-on-detail']) write(`src/app/${name}.tsx`, '');
+      write('src/app/probe.tsx', 'export const style = {};\n');
+      const base = commit();
+      write('src/app/probe.tsx', 'export const style = { color: "#abcdef" };\n');
+      commit();
+      write('README.md', 'A later unrelated commit\n');
+      commit();
+      const steps = workflow('consumer-control').jobs.check.steps;
+      const depth = steps.find(step => step.uses?.startsWith('actions/checkout')).with?.['fetch-depth'] ?? 1;
+      git(['clone', ...(depth === 0 ? [] : ['--depth', String(depth)]), `file://${source}`, checkout], dir);
+      const event = eventName === 'pull_request' ? { pull_request: { base: { sha: base } } } : { before: base };
+      // Evaluate the workflow's supported GitHub context expression against each
+      // synthetic event, then execute the actual design checker in that checkout.
+      const expression = steps.find(step => step.run === 'npm run check').env?.DESIGN_SYSTEM_BASE ?? '';
+      const resolvedBase = expression.replace(/^\$\{\{\s*|\s*\}\}$/g, '').split('||')
+        .map(term => term.trim().split('.').reduce((value, key) => value?.[key], { github: { event } }))
+        .find(Boolean);
+      const result = spawnSync(process.execPath, [new URL('scripts/check-design-system.mjs', root).pathname], {
+        cwd: checkout, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_BASE: resolvedBase ?? '' },
+      });
+      assert.equal(result.status, 1, `must reject the earlier raw color: ${result.stdout} ${result.stderr}`);
+      assert.match(result.stderr, /\[raw-color\]/);
+      assert.equal(resolvedBase, base);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+}

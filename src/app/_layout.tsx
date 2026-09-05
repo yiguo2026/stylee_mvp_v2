@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -22,7 +23,7 @@ import { webAuthCoordinator, webAccountScope } from '@/lib/webAuthRuntime';
 import { runAuthEffect, type AuthEffectPorts } from '@/lib/authEffectRunner';
 import type { AuthEffect } from '@/lib/authSessionCoordinator';
 import { useUserStore } from '@/stores/userStore';
-import { Colors } from '@/constants/theme';
+import { ds, StyleeButton, StyleeInlineStatus } from '@/design-system';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastHost, showToast } from '@/components/Toast';
 import { useImportStore } from '@/stores/importStore';
@@ -41,6 +42,8 @@ const authEffectPorts: AuthEffectPorts = {
 };
 
 export default function RootLayout() {
+  const authPhase = useSyncExternalStore(webAuthCoordinator.subscribe,
+    webAuthCoordinator.getSnapshot, webAuthCoordinator.getSnapshot);
   const pathname = usePathname();
   const designPreviewEnabled = process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1';
   const isDesignPreview = designPreviewEnabled && pathname.startsWith('/wardrobe-preview');
@@ -152,10 +155,28 @@ export default function RootLayout() {
 
   if (!fontsReady) return null;
 
+  if (!isPublicPreview && (authPhase === 'booting' || authPhase === 'blocked')) {
+    return (
+      <ErrorBoundary>
+        <StatusBar style="dark" />
+        <View style={styles.recovery}>
+          <StyleeInlineStatus tone={authPhase === 'blocked' ? 'attention' : 'neutral'} showIcon={false}>
+            {authPhase === 'blocked' ? '账号状态异常，请重新加载页面或关闭后重新打开应用' : '正在恢复账号，请稍候'}
+          </StyleeInlineStatus>
+          {authPhase === 'blocked' && Platform.OS === 'web' ? (
+            <StyleeButton label="重新加载页面" onPress={() => {
+              if (typeof window !== 'undefined') window.location.reload();
+            }} />
+          ) : null}
+        </View>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.paper } }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ds.color.semantic.surface.base } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
@@ -168,3 +189,13 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+const styles = StyleSheet.create({
+  recovery: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: ds.space[4],
+    gap: ds.space[4],
+    backgroundColor: ds.color.semantic.surface.base,
+  },
+});

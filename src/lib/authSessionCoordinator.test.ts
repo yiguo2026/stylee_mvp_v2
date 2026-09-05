@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 
-import { createAccountScope, type AccountScope, type AccountStamp } from '@stymobile/core';
+import { createAccountScope, runScopedRead, type AccountScope, type AccountStamp } from '@stymobile/core';
 
 import {
   createAuthSessionCoordinator,
@@ -254,10 +254,10 @@ test('post-bootstrap refresh, update, and MFA signals block null and cross-accou
   }
 });
 
-test('PASSWORD_RECOVERY creates or refreshes the valid current scope with a dedicated effect', () => {
+test('same-marker PASSWORD_RECOVERY keeps the stamp with a dedicated current effect', () => {
   const { coordinator, published, resetCount, scope } = createHarness();
   const first = session('account-a', 'A-password-first');
-  const second = session('account-a', 'A-password-second');
+  const second = session('account-a', 'A-password-first');
 
   const created = coordinator.accept('PASSWORD_RECOVERY', first);
   const stamp = scope.capture();
@@ -268,6 +268,31 @@ test('PASSWORD_RECOVERY creates or refreshes the valid current scope with a dedi
   assert.equal(scope.capture(), stamp);
   assert.equal(resetCount(), 1);
   assert.deepEqual(published, [first, second]);
+  assert.equal(coordinator.isEffectCurrent(created), false);
+  assert.equal(coordinator.isEffectCurrent(refreshed), true);
+});
+
+test('new-marker PASSWORD_RECOVERY replaces the epoch and discards the old deferred read', async () => {
+  const { coordinator, order, resetCount, scope } = createHarness();
+  coordinator.accept('INITIAL_SESSION', session('account-a', 'marker-1'));
+  const oldStamp = scope.capture()!;
+  let settle!: (value: string) => void;
+  let applied = false;
+  const read = runScopedRead({
+    scope, stamp: oldStamp,
+    execute: () => new Promise<string>((resolve) => { settle = resolve; }),
+    apply: () => { applied = true; },
+  });
+  const recovery = coordinator.accept('PASSWORD_RECOVERY', session('account-a', 'marker-2'));
+  assert.equal(scope.isCurrent(oldStamp), false);
+  assert.notEqual(scope.capture(), oldStamp);
+  assert.deepEqual(recovery, { kind: 'password_recovery', stamp: scope.capture() });
+  assert.equal(coordinator.isEffectCurrent(recovery), true);
+  assert.equal(resetCount(), 2);
+  assert.deepEqual(order, ['reset', 'publish:marker-1', 'reset', 'publish:marker-2']);
+  settle('old-private-data');
+  assert.deepEqual(await read, { kind: 'discarded' });
+  assert.equal(applied, false);
 });
 
 test('a failed A to B reset never publishes B and permanently blocks automatic retry and resume', () => {
@@ -367,6 +392,47 @@ test('public states, effects, and fallback error serialization never expose refr
   assert.equal(serialized.includes(firstMarker), false);
   assert.equal(serialized.includes(secondMarker), false);
   assert.equal(serialized.includes('refresh_token'), false);
+});
+
+for (const [field, candidate] of Object.entries({
+  undefined_session: undefined, primitive_session: 42,
+  missing_user: { refresh_token: 'synthetic' }, null_user: { user: null, refresh_token: 'synthetic' },
+  primitive_user: { user: 42, refresh_token: 'synthetic' },
+  missing_id: { user: {}, refresh_token: 'synthetic' },
+  null_id: { user: { id: null }, refresh_token: 'synthetic' },
+  number_id: { user: { id: 42 }, refresh_token: 'synthetic' },
+  missing_token: { user: { id: 'account-a' } },
+  null_token: { user: { id: 'account-a' }, refresh_token: null },
+  number_token: { user: { id: 'account-a' }, refresh_token: 42 },
+})) {
+  for (const authenticated of [false, true]) {
+    test(`malformed ${field} fails closed from ${authenticated ? 'authenticated' : 'booting'}`, () => {
+      const { coordinator, scope, published, resetCount } = createHarness();
+      if (authenticated) coordinator.accept('INITIAL_SESSION', session('account-a', 'old-marker'));
+      const oldStamp = scope.capture();
+      let effect: AuthEffect | undefined;
+      assert.doesNotThrow(() => { effect = coordinator.accept('SIGNED_IN', candidate as unknown as SyntheticSession); });
+      assert.deepEqual(effect, { kind: 'blocked', reason: 'invalid_session' });
+      assert.equal(coordinator.current().phase, 'blocked');
+      assert.equal(scope.capture(), null);
+      if (oldStamp) assert.equal(scope.isCurrent(oldStamp), false);
+      assert.equal(resetCount(), authenticated ? 2 : 1);
+      assert.equal(published.at(-1), null);
+      assert.equal(JSON.stringify({ effect, state: coordinator.current() }).includes('synthetic'), false);
+    });
+  }
+}
+
+test('malformed fallback and null recovery fail closed without throwing', () => {
+  const fallback = createHarness();
+  assert.doesNotThrow(() => fallback.coordinator.acceptFallback(0, {
+    session: { user: null } as unknown as SyntheticSession, error: null,
+  }));
+  assert.equal(fallback.coordinator.current().phase, 'blocked');
+  const recovery = createHarness();
+  assert.deepEqual(recovery.coordinator.accept('PASSWORD_RECOVERY', null), {
+    kind: 'blocked', reason: 'invalid_session',
+  });
 });
 
 test('same-stamp recovery supersedes load while metadata, token refresh, and duplicate signals preserve it', () => {

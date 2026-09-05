@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { createAccountScope } from '@stymobile/core';
 
 import { createPrivateResetRegistry } from './accountScopeRuntime.ts';
+import { createAuthSessionCoordinator } from './authSessionCoordinator.ts';
 import {
   createOrderedWebPrivateResetters,
   importPrivateReset,
@@ -100,6 +101,14 @@ test('resets all private state and only the departing profile cache before accou
   let outfitState: Record<string, unknown> = {};
   let preferenceState: Record<string, unknown> = {};
   let userState: Record<string, unknown> = {};
+  const coordinator = createAuthSessionCoordinator({
+    scope,
+    publishSession(next) {
+      publishedAccountId = next?.user.id ?? null;
+      calls.push(`publish:${publishedAccountId}`);
+      return undefined;
+    },
+  });
 
   function reset(
     name: string,
@@ -108,6 +117,7 @@ test('resets all private state and only the departing profile cache before accou
   ) {
     return () => {
       assert.equal(scope.capture(), null);
+      assert.notEqual(publishedAccountId, 'account-b');
       calls.push(name);
       apply(patch());
       return undefined;
@@ -124,14 +134,14 @@ test('resets all private state and only the departing profile cache before accou
     user: reset('user', userPrivateReset, (next) => { userState = next; }),
     profileCache: () => {
       assert.equal(scope.capture(), null);
+      assert.notEqual(publishedAccountId, 'account-b');
       calls.push('profile-cache');
       if (departingAccountId !== null) clearProfileCache(departingAccountId, storage);
       return undefined;
     },
   }));
 
-  assert.equal(scope.replaceAccount('account-a').kind, 'ready');
-  publishedAccountId = 'account-a';
+  coordinator.accept('INITIAL_SESSION', { user: { id: 'account-a' }, refresh_token: 'synthetic-a' });
   departingAccountId = publishedAccountId;
   calls.length = 0;
 
@@ -145,11 +155,11 @@ test('resets all private state and only the departing profile cache before accou
   writeProfileCache('account-a', { displayName: 'A' }, storage);
   writeProfileCache('account-b', { displayName: 'B' }, storage);
 
-  const transition = scope.replaceAccount('account-b');
+  const transition = coordinator.accept('SIGNED_IN', { user: { id: 'account-b' }, refresh_token: 'synthetic-b' });
 
-  assert.equal(transition.kind, 'ready');
-  assert.equal(publishedAccountId, 'account-a');
-  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache']);
+  assert.equal(transition.kind, 'load_account');
+  assert.equal(publishedAccountId, 'account-b');
+  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache', 'publish:account-b']);
   assert.deepEqual(importState, importPrivateReset());
   assert.deepEqual(tryOnState, tryOnPrivateReset());
   assert.deepEqual(wardrobeState, wardrobePrivateReset());
@@ -165,10 +175,17 @@ test('continues through all eight resetters and blocks account publish after one
   const registry = createPrivateResetRegistry();
   const scope = createAccountScope([registry.dispatch]);
   const calls: string[] = [];
+  const published: Array<string | null> = [];
+  let failReset = false;
+  const coordinator = createAuthSessionCoordinator({ scope, publishSession(next) {
+    published.push(next?.user.id ?? null);
+    calls.push(`publish:${next?.user.id ?? 'null'}`);
+    return undefined;
+  } });
   const action = (name: string, shouldThrow = false) => () => {
     assert.equal(scope.capture(), null);
     calls.push(name);
-    if (shouldThrow) throw new Error('private-detail');
+    if (shouldThrow && failReset) throw new Error('private-detail');
     return undefined;
   };
 
@@ -183,10 +200,14 @@ test('continues through all eight resetters and blocks account publish after one
     profileCache: action('profile-cache'),
   }));
 
-  const transition = scope.replaceAccount('account-b');
+  coordinator.accept('INITIAL_SESSION', { user: { id: 'account-a' }, refresh_token: 'synthetic-a' });
+  calls.length = 0;
+  failReset = true;
+  const transition = coordinator.accept('SIGNED_IN', { user: { id: 'account-b' }, refresh_token: 'synthetic-b' });
 
   assert.equal(transition.kind, 'blocked');
-  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache']);
+  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache', 'publish:null']);
+  assert.deepEqual(published, ['account-a', null]);
   assert.equal(scope.capture(), null);
   assert.equal(scope.current().status, 'blocked');
 });
