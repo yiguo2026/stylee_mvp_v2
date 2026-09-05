@@ -13,7 +13,7 @@
     "design-system:check": "node ./scripts/check-design-system.mjs",
     "test:vendor": "node --test scripts/stymobile-vendor-contract.test.mjs",
     "vendor:check": "node scripts/verify-stymobile-vendor.mjs",
-    "test:account-scope": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/accountScopeRuntime.test.ts src/lib/privateStateReset.test.ts src/lib/profileCache.test.ts src/lib/scopedStoreRead.test.ts src/lib/authSessionCoordinator.test.ts src/lib/storeReadPolicy.test.ts src/lib/routeGenderCompatibility.test.ts src/lib/wardrobeScopedRead.test.ts",
+    "test:account-scope": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/accountScopeRuntime.test.ts src/lib/privateStateReset.test.ts src/lib/profileCache.test.ts src/lib/scopedStoreRead.test.ts src/lib/authSessionCoordinator.test.ts src/lib/storeReadPolicy.test.ts src/lib/routeGenderCompatibility.test.ts src/lib/wardrobeScopedRead.test.ts && node --import ./src/lib/test-fixtures/wardrobeStore/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/wardrobeStore.integration.test.ts",
     "check": "npm run tokens:check && npm run design-system:check && npm run wardrobe-density:check && npm run test:account-scope && tsc --noEmit",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
