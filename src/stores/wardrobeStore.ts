@@ -13,8 +13,8 @@ import {
 } from '@/lib/wardrobeOptimisticUpdate';
 import { wardrobePrivateReset } from '@/lib/privateStateReset';
 import { webAccountScope } from '@/lib/accountScopeRuntime';
-import { createLatestReadSlot, runScopedStoreRead } from '@/lib/scopedStoreRead';
-import { mergeWardrobeRead } from '@/lib/storeReadPolicy';
+import { createLatestReadSlot } from '@/lib/scopedStoreRead';
+import { runScopedWardrobeFetch } from '@/lib/wardrobeScopedRead';
 
 export interface WardrobeState {
   items: WardrobeItem[];
@@ -121,7 +121,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   setItems: (items) => set({ items }),
 
   fetchItems: async (userId: string) => {
-    await runScopedStoreRead({
+    await runScopedWardrobeFetch({
       scope: webAccountScope,
       expectedAccountId: userId,
       slot: wardrobeReadSlot,
@@ -144,17 +144,16 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
         }
         return { rawItems, stats };
       },
-      apply: ({ rawItems, stats }) => {
+      readCurrentOverlays: () => {
         const { pendingEdits, deletedIds } = get();
-        if (stats === null) console.warn('[WardrobeStore] usage stats read failed');
-        set({
-          items: mergeWardrobeRead({
-            rawItems,
-            stats,
-            pendingEdits,
-            deletedIds,
-          }),
-        });
+        return { pendingEdits, deletedIds };
+      },
+      applyItems: (items) => {
+        set({ items });
+        return undefined;
+      },
+      onStatsFailure: () => {
+        console.warn('[WardrobeStore] usage stats read failed');
         return undefined;
       },
       onError: () => {
