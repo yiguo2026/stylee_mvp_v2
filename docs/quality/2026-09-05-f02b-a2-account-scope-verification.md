@@ -2,10 +2,12 @@
 
 Date: 2026-09-05. Status: local candidate source, **not production ADOPTED**.
 The scoped Store/read target is FIXED in candidate source only. SEC-03 and
-CF-10 remain OPEN. The final-review fixes are implemented and locally verified;
-the scoped independent re-review and Web PR/Hosted CI are pending controller
-work. **Hosted CI pending; no production adoption.** Production adoption is
-unverified and unapproved; no Web PR, push, merge, or deployment was performed.
+CF-10 remain OPEN. [Web PR #26](https://github.com/yiguo2026/stylee_mvp_v2/pull/26)
+remains Draft. Its Design System Guard failure is remediated locally below;
+the replacement Hosted result is pending controller verification.
+**Hosted CI pending; no production adoption.** Production adoption is
+unverified and unapproved. This remediation did not push, update the PR, merge
+or deploy.
 
 ## Immutable source and candidate identity
 
@@ -13,11 +15,13 @@ unverified and unapproved; no Web PR, push, merge, or deployment was performed.
 - Tasks 1–8 implementation HEAD: `47cd2d2c14e8e6ba37e934c38aaa5a28e3886038`.
 - Final-review code/CI anchor: `1bf3d400d6988d7324557b0e39a7a75e253ca008`,
   based on pre-fix candidate `ee3f411e9d33e916963560b227cc411488ca9e2e`.
-  The subsequent evidence-only commit contains this updated record; its full
-  candidate HEAD and exact cold verification are recorded in the final-fix
-  report and control repository. This anchor is not a self-referential claim
-  about the documentation commit. The earlier `ea2c36a`/`ee3f411` evidence below
-  is historical and does not represent the final fixed candidate.
+  Final-review evidence candidate was `e101e464a0386a1786cb9becd13935c9246fa69f`;
+  its exact cold verification is recorded in the final-fix report.
+- Hosted-remediation implementation anchor:
+  `f29f4598434928558850465e22a465f2d46d60cf`, based on `e101e46`.
+  The following evidence-only commit contains this record; its actual final
+  HEAD is recorded in the ignored hosted-ci-fix report. The document records
+  its preceding implementation anchor instead of claiming its own SHA.
 - Core source: `fitzw/stymobile@5b9b51adfb1dc9c10c61f13244087f6ecf54d34d`.
   [A1 PR #4](https://github.com/fitzw/stymobile/pull/4) HEAD was
   `6990331e6bd47a469187d1c04720ce534d3d3bc6`; [merged main CI 33937689381](https://github.com/fitzw/stymobile/actions/runs/33937689381)
@@ -66,6 +70,57 @@ dist/scoped-read.js
 package.json
 ```
 
+## Hosted CI remediation for Draft PR #26
+
+Controller-reported [Design System Guard run 33955207298, job 101277183031](https://github.com/yiguo2026/stylee_mvp_v2/actions/runs/33955207298/job/101277183031)
+failed `src/lib/outfitLayoutDemoRoute.test.ts:25`, "the shareable demo route is
+not redirected to login". Local exact reproduction used
+`node --experimental-strip-types --test src/lib/outfitLayoutDemoRoute.test.ts`:
+3 passed / 1 failed, ERR_ASSERTION at line 28. The test searched source for the
+removed direct `if (!isPublicPreview) router.replace('/(auth)/login')` statement.
+Root routing now intentionally uses the coordinator and post-commit effects;
+this source-text assertion did not measure the public-preview behavior.
+
+The remediation removes only that obsolete test, preserving the fixture,
+settings-entry and image-metric tests. Design System Guard now includes the
+named `Verify public demo Auth boundary` step, running the existing mounted
+React RootLayout test with its real loader:
+
+```bash
+node --import ./src/lib/test-fixtures/rootRoute/register.mjs --test \
+  --test-name-pattern='public preview /outfit-layout-demo' \
+  src/lib/rootRoute.integration.test.mjs
+```
+
+The new workflow contract reads that step from the real YAML and executes its
+actual command, then requires its named TAP result and exactly one pass. RED
+was `node --test --test-name-pattern='Design System Guard executes'
+scripts/consumer-control.test.mjs`: 0/1, missing mounted-preview step. After
+adding the workflow step it passes 1/1. The subprocess removes only inherited
+NODE_TEST_CONTEXT so it runs as a standalone workflow step; an initial nested
+test-runner context produced no TAP result and was corrected before GREEN.
+
+Local verification at implementation anchor `f29f459`:
+
+| Command / scope | Result |
+| --- | --- |
+| New executable workflow contract | 1/1; invokes real mounted preview test |
+| Former failing `outfitLayoutDemoRoute.test.ts` command | 3/3; other tests preserved |
+| Named mounted public-preview command above | 1/1 |
+| Entire former `Verify outfit canvas regressions` command | 98/98 |
+| `npm run test:consumer-control` | 7/7 (was 6) |
+| Root `npm run check` with fixed DESIGN_SYSTEM_BASE | 14 vendor, 115 pure, 13 Store + 7 RootLayout; token/design/density and TypeScript pass |
+| Placeholder `npm run build:web` | 970 modules; export and HTML patch pass |
+
+Logs: `/private/tmp/stylee-a2-hosted-ci-fix.itN28k`. Node 22.22.1/npm 11.12.1;
+no runtime, package/lockfile, generated tokens, model-service or control-repo
+change. Bundle remains `entry-240f032a6cfa92b52f83d228e0c1c5a7.js`.
+The existing MODULE_TYPELESS_PACKAGE_JSON and react-test-renderer warnings
+remain visible. Historical NO_COLOR/FORCE_COLOR and install deprecation records
+below are retained; the current build log had no NO_COLOR/FORCE_COLOR warning.
+PR #26 remains Draft, replacement Hosted CI has not been claimed successful,
+and SEC-03/CF-10 remain OPEN with no production adoption.
+
 ## Final-review fix wave and current local evidence
 
 The four Important findings and all five deferred minors were verified against
@@ -109,7 +164,7 @@ Current local commands use Node 22.22.1/npm 11.12.1:
 | `npm run vendor:check` | exact immutable pair and isolated runtime/TypeScript consumer pass |
 | `npm run test:account-scope` | 115/115 |
 | `npm run test:account-scope-integration` | 13/13 real Store + 7/7 real RootLayout React cases |
-| `npm run test:consumer-control` | 6/6, including executable PR/push history fixtures |
+| `npm run test:consumer-control` | 7/7 after Hosted remediation, including executable history and mounted-preview workflow cases |
 | `DESIGN_SYSTEM_BASE=7daf6f96a1cb4283aaf27789841b924fbd4c667a npm run check` | token/design/density, all consumers and TypeScript pass |
 | Placeholder-public-config `npm run build:web` | 970 modules; export and HTML patch pass |
 
@@ -320,6 +375,7 @@ src/lib/authSessionCoordinator.ts
 src/lib/authSessionCoordinator.type-test.ts
 src/lib/loginAuthFlow.test.ts
 src/lib/loginAuthFlow.ts
+src/lib/outfitLayoutDemoRoute.test.ts
 src/lib/privateStateReset.test.ts
 src/lib/privateStateReset.ts
 src/lib/profileCache.test.ts
