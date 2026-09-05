@@ -132,3 +132,21 @@ test('rejects lockfile resolution or integrity drift', async (t) => {
     (error) => error.code === 1 && error.stdout === '' && error.stderr === 'lockfile_resolution_mismatch\n',
   );
 });
+
+test('rejects an injected dependency and package in the vendored lock contract', async (t) => {
+  const fixture = await copyFixture(t);
+  const lock = await readLock(fixture);
+  lock.packages['node_modules/@stymobile/contracts'].dependencies = {
+    'injected-package': '1.0.0',
+  };
+  lock.packages['node_modules/injected-package'] = {
+    version: '1.0.0',
+    resolved: 'https://registry.example.invalid/injected-package-1.0.0.tgz',
+    integrity: 'sha512-synthetic-only',
+  };
+  await writeLock(fixture, lock);
+  await assert.rejects(
+    verifyStymobileVendor({ repositoryRoot: fixture, runConsumer: false }),
+    /lockfile_package_mismatch/,
+  );
+});

@@ -94,6 +94,7 @@ const errorIdentifiers = new Set([
   'lockfile_dependency_mismatch',
   'lockfile_integrity_mismatch',
   'lockfile_invalid',
+  'lockfile_package_mismatch',
   'lockfile_resolution_mismatch',
   'package_list_mismatch',
   'package_manifest_invalid',
@@ -269,6 +270,22 @@ function verifyRepositoryManifests(packageManifest, lockfile) {
       fail('lockfile_resolution_mismatch');
     }
     if (installed.integrity !== expectedRecord.integrity) fail('lockfile_integrity_mismatch');
+    const expectedInstalled = {
+      version: '0.1.0',
+      resolved: expectedResolution,
+      integrity: expectedRecord.integrity,
+      license: 'UNLICENSED',
+      ...(name === '@stymobile/core'
+        ? { dependencies: { '@stymobile/contracts': '0.1.0' } }
+        : {}),
+    };
+    if (
+      name === '@stymobile/core' &&
+      !isDeepStrictEqual(installed.dependencies, expectedInstalled.dependencies)
+    ) {
+      fail('lockfile_dependency_mismatch');
+    }
+    if (!isDeepStrictEqual(installed, expectedInstalled)) fail('lockfile_package_mismatch');
   }
   if (
     packageManifest.engines?.node !== '22.x' ||
@@ -277,13 +294,6 @@ function verifyRepositoryManifests(packageManifest, lockfile) {
     lockfile.packages?.['']?.engines?.npm !== '11.12.1'
   ) {
     fail('toolchain_mismatch');
-  }
-  if (
-    !isDeepStrictEqual(lockfile.packages?.['node_modules/@stymobile/core']?.dependencies, {
-      '@stymobile/contracts': '0.1.0',
-    })
-  ) {
-    fail('lockfile_dependency_mismatch');
   }
   assertNoThirdStymobilePackage(packageManifest, lockfile);
 }
