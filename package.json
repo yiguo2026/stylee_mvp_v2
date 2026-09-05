@@ -11,6 +11,8 @@
     "outfit-metrics:check": "python3 scripts/check-outfit-fixture-alpha.py --check",
     "wardrobe-density:check": "node ./scripts/check-wardrobe-density.mjs",
     "design-system:check": "node ./scripts/check-design-system.mjs",
+    "test:vendor": "node --test scripts/stymobile-vendor-contract.test.mjs",
+    "vendor:check": "node scripts/verify-stymobile-vendor.mjs",
     "check": "npm run tokens:check && npm run design-system:check && npm run wardrobe-density:check && tsc --noEmit",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
@@ -20,6 +22,8 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@stymobile/contracts": "file:vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/stymobile-contracts-0.1.0.tgz",
+    "@stymobile/core": "file:vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/stymobile-core-0.1.0.tgz",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -58,7 +62,8 @@
     "typescript": "~5.8.0"
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x",
+    "npm": "11.12.1"
   },
   "private": true
 }
