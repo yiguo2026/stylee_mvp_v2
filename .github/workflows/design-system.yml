@@ -109,6 +109,12 @@ jobs:
             src/lib/outfitLayoutDemoRoute.test.ts \
             src/lib/styleeMapping.test.ts
 
+      - name: Verify public demo Auth boundary
+        run: >-
+          node --import ./src/lib/test-fixtures/rootRoute/register.mjs --test
+          --test-name-pattern='public preview /outfit-layout-demo'
+          src/lib/rootRoute.integration.test.mjs
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

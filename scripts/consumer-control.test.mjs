@@ -79,6 +79,23 @@ test('design guard selects npm before installation', () => {
   assert.ok(npm < steps.findIndex(s => s.run === 'npm ci'));
 });
 
+test('Design System Guard executes the mounted public demo Auth boundary', () => {
+  const step = workflow('design-system').jobs.validate.steps
+    .find(candidate => candidate.name === 'Verify public demo Auth boundary');
+  assert.ok(step, 'Design System Guard must include the mounted public demo step');
+  const environment = { ...process.env };
+  // A workflow step is a fresh process, not a child of this Node test runner.
+  delete environment.NODE_TEST_CONTEXT;
+  const result = spawnSync('/bin/sh', ['-c', step.run], {
+    cwd: root, encoding: 'utf8', env: environment,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /# Subtest: public preview \/outfit-layout-demo mounts while booting and blocked without private Auth effects/);
+  assert.match(result.stdout, /^# tests 1$/m);
+  assert.match(result.stdout, /^# pass 1$/m);
+  assert.match(result.stdout, /^# fail 0$/m);
+});
+
 for (const eventName of ['pull_request', 'push']) {
   test(`consumer ${eventName} checkout and base catch a violation before the last commit`, () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'consumer-history-'));
