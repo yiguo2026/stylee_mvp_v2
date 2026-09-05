@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Session } from '@supabase/supabase-js';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import {
@@ -19,8 +19,11 @@ import {
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
 import { supabase } from '@/lib/supabase';
+import { webAuthCoordinator, webAccountScope } from '@/lib/webAuthRuntime';
+import { runAuthEffect, type AuthEffectPorts } from '@/lib/authEffectRunner';
+import type { AuthEffect } from '@/lib/authSessionCoordinator';
 import { useUserStore } from '@/stores/userStore';
-import { Colors } from '@/constants/theme';
+import { ds, StyleeButton, StyleeInlineStatus } from '@/design-system';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastHost, showToast } from '@/components/Toast';
 import { useImportStore } from '@/stores/importStore';
@@ -29,7 +32,19 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 SplashScreen.preventAutoHideAsync();
 
+const authEffectPorts: AuthEffectPorts = {
+  activateImportOwner: (accountId) => { useImportStore.getState().setActiveUser(accountId); },
+  hydrate: (accountId) => { useUserStore.getState().hydrateFromCache(accountId); },
+  resolveGender: (stamp) => useUserStore.getState().resolveRouteGender(stamp),
+  startProfileRead: () => { void useUserStore.getState().fetchProfile(); },
+  navigate: (path) => { router.replace(path); },
+  notifyBlocked: (message) => { showToast(message, 'error'); },
+};
+
 export default function RootLayout() {
+  const authPhase = useSyncExternalStore(webAuthCoordinator.subscribe,
+    webAuthCoordinator.getSnapshot, webAuthCoordinator.getSnapshot);
+  const [pendingAuthEffect, setPendingAuthEffect] = useState<AuthEffect | null>(null);
   const pathname = usePathname();
   const designPreviewEnabled = process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1';
   const isDesignPreview = designPreviewEnabled && pathname.startsWith('/wardrobe-preview');
@@ -37,8 +52,9 @@ export default function RootLayout() {
   const pendingSelectionCount = useImportStore((state) => state.pendingSelectionCount);
   const tasks = useImportStore((state) => state.tasks);
   const pendingToastCountRef = useRef(0);
-  const authRestoredRef = useRef(false);
-  const { setSession } = useUserStore();
+  const publicPreviewRef = useRef(isPublicPreview);
+  publicPreviewRef.current = isPublicPreview;
+  const previousPublicPreviewRef = useRef(isPublicPreview);
 
   const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
@@ -70,54 +86,60 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!fontsReady) return;
-
-    const handleSignIn = async (session: Session) => {
-      // 幂等：INITIAL_SESSION 事件与 getSession() 兜底可能同时触发，只处理一次
-      if (authRestoredRef.current) { setSession(session); return; }
-      authRestoredRef.current = true;
-      setSession(session);
-      if (isPublicPreview) return;
-      // 冷启动/记住登录：先用本地缓存的 profile 立即渲染，再解析路由 gender 立刻跳转，
-      // 完整 profile + 风格偏好后台刷新，避免开屏对着转圈等 DB。
-      const store = useUserStore.getState();
-      store.hydrateFromCache(session.user.id);
-      const gender = await store.resolveRouteGender();
-      void store.fetchProfile();
-      // DB trigger auto-creates users with gender='private'; onboarding sets it to female/male/other.
-      // Only go to onboarding if we positively know gender is 'private' (never completed).
-      if (gender === 'private') {
-        router.replace('/onboarding/step1-info');
-      } else {
-        router.replace('/(tabs)');
-      }
+    let active = true;
+    const schedule = (effect: AuthEffect) => {
+      queueMicrotask(() => {
+        if (active && effect.kind !== 'none') setPendingAuthEffect(effect);
+      });
     };
-
-    const goToLogin = () => {
-      setSession(null);
-      if (!isPublicPreview) router.replace('/(auth)/login');
-    };
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        authRestoredRef.current = false;
-        goToLogin();
-      } else if (event === 'INITIAL_SESSION') {
-        if (session) handleSignIn(session);
-        else if (!authRestoredRef.current) goToLogin();
-      }
+      const effect = webAuthCoordinator.accept(event, session);
+      schedule(effect);
     });
+    const fallbackSerial = webAuthCoordinator.signalSerial();
+    void supabase.auth.getSession().then(
+      ({ data, error }) => {
+        if (active) schedule(webAuthCoordinator.acceptFallback(fallbackSerial, { session: data.session, error }));
+      },
+      (error: unknown) => {
+        if (active) schedule(webAuthCoordinator.acceptFallback(fallbackSerial, { session: null, error }));
+      },
+    );
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [fontsReady]);
 
-    // 兜底：直接从持久化存储读取会话，确保“记住登录状态”不会因错过 INITIAL_SESSION 事件而被弹回登录页
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) handleSignIn(data.session);
-      else if (!authRestoredRef.current) goToLogin();
+  useEffect(() => {
+    if (!fontsReady) return;
+    const leavingPreview = previousPublicPreviewRef.current && !isPublicPreview;
+    previousPublicPreviewRef.current = isPublicPreview;
+    if (!leavingPreview) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setPendingAuthEffect(webAuthCoordinator.resume());
     });
-
-    return () => subscription.unsubscribe();
+    return () => { active = false; };
   }, [fontsReady, isPublicPreview]);
 
   useEffect(() => {
-    const shouldNotify = pendingSelectionCount > pendingToastCountRef.current && pathname !== '/wardrobe';
+    // Effects run after the route tree commits. Booting/blocked have no Stack;
+    // their persistent recovery UI owns the state without calling the router.
+    if (!fontsReady || authPhase === 'booting' || authPhase === 'blocked' || pendingAuthEffect === null) return;
+    let active = true;
+    void runAuthEffect(pendingAuthEffect, {
+      scope: webAccountScope,
+      isEffectCurrent: webAuthCoordinator.isEffectCurrent,
+      get publicPreview() { return !active || publicPreviewRef.current; },
+      ports: authEffectPorts,
+    });
+    return () => { active = false; };
+  }, [fontsReady, authPhase, pendingAuthEffect]);
+
+  useEffect(() => {
+    const shouldNotify = !isPublicPreview
+      && pendingSelectionCount > pendingToastCountRef.current && pathname !== '/wardrobe';
     if (shouldNotify) {
       const firstPendingTask = tasks.find((task) => task.status === 'needs_selection');
       showToast(`${pendingSelectionCount}张照片待确认`, 'info', 2600, {
@@ -134,14 +156,32 @@ export default function RootLayout() {
       });
     }
     pendingToastCountRef.current = pendingSelectionCount;
-  }, [pathname, pendingSelectionCount, tasks]);
+  }, [pathname, pendingSelectionCount, tasks, isPublicPreview]);
 
   if (!fontsReady) return null;
+
+  if (!isPublicPreview && (authPhase === 'booting' || authPhase === 'blocked')) {
+    return (
+      <ErrorBoundary>
+        <StatusBar style="dark" />
+        <View style={styles.recovery}>
+          <StyleeInlineStatus tone={authPhase === 'blocked' ? 'attention' : 'neutral'} showIcon={false}>
+            {authPhase === 'blocked' ? '账号状态异常，请重新加载页面或关闭后重新打开应用' : '正在恢复账号，请稍候'}
+          </StyleeInlineStatus>
+          {authPhase === 'blocked' && Platform.OS === 'web' ? (
+            <StyleeButton label="重新加载页面" onPress={() => {
+              if (typeof window !== 'undefined') window.location.reload();
+            }} />
+          ) : null}
+        </View>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.paper } }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ds.color.semantic.surface.base } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
@@ -154,3 +194,13 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+const styles = StyleSheet.create({
+  recovery: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: ds.space[4],
+    gap: ds.space[4],
+    backgroundColor: ds.color.semantic.surface.base,
+  },
+});

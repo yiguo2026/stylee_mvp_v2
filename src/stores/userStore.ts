@@ -1,9 +1,17 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
+import type { AccountStamp } from '@stymobile/core';
 import { UserProfile, UserStylePreference } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
-import { useImportStore } from '@/stores/importStore';
+import { readProfileCache, writeProfileCache } from '@/lib/profileCache';
+import { userPrivateReset } from '@/lib/privateStateReset';
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { createLatestReadSlot, runScopedStoreRead } from '@/lib/scopedStoreRead';
+import {
+  profileReadPatch,
+  type SettledRead,
+} from '@/lib/storeReadPolicy';
 
 interface UserState {
   session: Session | null;
@@ -12,128 +20,172 @@ interface UserState {
   stylePreferences: UserStylePreference[];
   isLoading: boolean;
 
-  setSession: (session: Session | null) => void;
+  publishSession: (session: Session | null) => undefined;
   setProfile: (profile: UserProfile | null) => void;
   setStylePreferences: (prefs: UserStylePreference[]) => void;
   fetchProfile: () => Promise<void>;
   // 仅解析路由所需的 gender：优先读本地缓存（瞬时），无缓存时只查单列，避免 select(*)+join 拖慢跳转
-  resolveRouteGender: () => Promise<string | null>;
+  resolveRouteGender: (stamp: AccountStamp) => Promise<string | null>;
   // 从本地缓存把 profile 直接灌进 store，先渲染再刷新（offline-first）
   hydrateFromCache: (userId: string) => UserProfile | null;
   // 把 gender 写进 auth user_metadata（服务端持久化），下次登录/冷启动路由可零 DB 查询
   syncGenderToAuth: (gender: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPrivateState: () => undefined;
 }
 
-const PROFILE_CACHE_PREFIX = 'stylee.profile.';
+const profileReadSlot = createLatestReadSlot();
+const routeGenderReadSlot = createLatestReadSlot();
 
-function readProfileCache(userId: string): UserProfile | null {
-  try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(PROFILE_CACHE_PREFIX + userId);
-    return raw ? (JSON.parse(raw) as UserProfile) : null;
-  } catch {
-    return null;
-  }
-}
+export const useUserStore = create<UserState>((set, get) => {
+  const publishSession = (session: Session | null): undefined => {
+    set({ session, user: session?.user ?? null });
+    return undefined;
+  };
 
-function writeProfileCache(userId: string, profile: UserProfile) {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(PROFILE_CACHE_PREFIX + userId, JSON.stringify(profile));
-  } catch {
-    /* ignore quota / serialization errors */
-  }
-}
+  const resolveRouteGender = async (stamp: AccountStamp): Promise<string | null> => {
+    if (!webAccountScope.isCurrent(stamp)) return null;
+    const publishedUser = get().user;
+    if (publishedUser?.id !== stamp.accountId) return null;
+    routeGenderReadSlot.cancel();
 
-function clearProfileCache(userId: string) {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.removeItem(PROFILE_CACHE_PREFIX + userId);
-  } catch {
-    /* ignore */
-  }
-}
+    const metadataGender = publishedUser.user_metadata?.gender;
+    if (
+      typeof metadataGender === 'string'
+      && metadataGender.length > 0
+      && webAccountScope.isCurrent(stamp)
+    ) {
+      return metadataGender;
+    }
 
-export const useUserStore = create<UserState>((set, get) => ({
+    const cached = readProfileCache<UserProfile>(stamp.accountId);
+    if (cached !== null && webAccountScope.isCurrent(stamp)) {
+      set({ profile: cached });
+      if (!webAccountScope.isCurrent(stamp)) return null;
+      if (typeof cached.gender === 'string' && cached.gender.length > 0) {
+        return cached.gender;
+      }
+    }
+
+    let resolvedGender: string | null = null;
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      stamp,
+      slot: routeGenderReadSlot,
+      execute: async ({ accountId }) => {
+        const response = await withTimeout(
+          supabase.from('users').select('gender').eq('user_id', accountId).single(),
+          6000,
+          'route-gender',
+        );
+        if (response.error) throw response.error;
+        return response.data as Readonly<{ gender?: unknown }> | null;
+      },
+      apply: (row) => {
+        resolvedGender = typeof row?.gender === 'string' && row.gender.length > 0
+          ? row.gender
+          : null;
+        return undefined;
+      },
+    });
+    return resolvedGender;
+  };
+
+  return ({
   session: null,
   user: null,
   profile: null,
   stylePreferences: [],
   isLoading: false,
 
-  setSession: (session) => {
-    useImportStore.getState().setActiveUser(session?.user.id ?? null);
-    set({ session, user: session?.user ?? null });
-  },
+  publishSession,
 
   setProfile: (profile) => set({ profile }),
 
   setStylePreferences: (prefs) => set({ stylePreferences: prefs }),
 
   fetchProfile: async () => {
-    const { user } = get();
-    if (!user) return;
-    set({ isLoading: true });
-    try {
-      // 两个查询相互独立，并行执行并各自加超时，避免顺序等待 + 网络挂起导致长时间转圈
-      const [profileRes, prefsRes] = await Promise.allSettled([
-        withTimeout(
-          supabase.from('users').select('*').eq('user_id', user.id).single(),
-          8000, 'profile',
-        ),
-        withTimeout(
-          supabase.from('user_style_preferences').select('*, tags(*)').eq('user_id', user.id),
-          8000, 'style-prefs',
-        ),
-      ]);
-      if (profileRes.status === 'fulfilled') {
-        const { data } = profileRes.value as { data: UserProfile | null };
-        set({ profile: data ? (data as UserProfile) : null });
-        if (data) writeProfileCache(user.id, data as UserProfile);
-      }
-      if (prefsRes.status === 'fulfilled') {
-        const { data: prefs } = prefsRes.value as { data: UserStylePreference[] | null };
-        if (prefs) set({ stylePreferences: prefs as UserStylePreference[] });
-      }
-    } catch (e: any) {
-      console.warn('[UserStore] fetchProfile failed:', e.message);
-    } finally {
-      set({ isLoading: false });
-    }
+    const stamp = webAccountScope.capture();
+    if (stamp === null) return;
+
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      stamp,
+      slot: profileReadSlot,
+      execute: async ({ accountId }) => {
+        const [profileResult, preferencesResult] = await Promise.allSettled([
+          withTimeout(
+            supabase.from('users').select('*').eq('user_id', accountId).single(),
+            8000,
+            'profile',
+          ),
+          withTimeout(
+            supabase
+              .from('user_style_preferences')
+              .select('*, tags(*)')
+              .eq('user_id', accountId),
+            8000,
+            'style-prefs',
+          ),
+        ]);
+
+        const profile: SettledRead<UserProfile> = profileResult.status === 'rejected'
+          ? { status: 'rejected' }
+          : {
+              status: 'fulfilled',
+              data: profileResult.value.data as UserProfile | null,
+              error: profileResult.value.error,
+            };
+        const stylePreferences: SettledRead<UserStylePreference[]> = preferencesResult.status === 'rejected'
+          ? { status: 'rejected' }
+          : {
+              status: 'fulfilled',
+              data: preferencesResult.value.data as UserStylePreference[] | null,
+              error: preferencesResult.value.error,
+            };
+        return { profile, stylePreferences };
+      },
+      apply: ({ profile, stylePreferences }) => {
+        const patch = profileReadPatch<UserProfile, UserStylePreference>(profile, stylePreferences);
+        const next: Partial<UserState> = {};
+        if (patch.profile.kind === 'replace') next.profile = patch.profile.value;
+        if (patch.stylePreferences.kind === 'replace') {
+          next.stylePreferences = patch.stylePreferences.value;
+        }
+        if (Object.keys(next).length > 0) set(next);
+        if (patch.cacheProfile !== null) {
+          writeProfileCache(stamp.accountId, patch.cacheProfile);
+        }
+        const failed = profile.status === 'rejected'
+          || (profile.status === 'fulfilled' && profile.error !== null)
+          || stylePreferences.status === 'rejected'
+          || (stylePreferences.status === 'fulfilled' && stylePreferences.error !== null);
+        if (failed) console.warn('[UserStore] profile read failed');
+        return undefined;
+      },
+      onError: () => {
+        console.warn('[UserStore] profile read failed');
+        return undefined;
+      },
+      onLoadingChange: (isLoading) => {
+        set({ isLoading });
+        return undefined;
+      },
+    });
   },
 
-  hydrateFromCache: (userId) => {
-    const cached = readProfileCache(userId);
-    if (cached) set({ profile: cached });
-    return cached;
+  hydrateFromCache: (accountId) => {
+    const stamp = webAccountScope.capture();
+    if (stamp?.accountId !== accountId) return null;
+
+    const cached = readProfileCache<UserProfile>(accountId);
+    if (!webAccountScope.isCurrent(stamp)) return null;
+    if (cached !== null) set({ profile: cached });
+    return webAccountScope.isCurrent(stamp) ? cached : null;
   },
 
-  resolveRouteGender: async () => {
-    const { user } = get();
-    if (!user) return null;
-    // 0) auth user_metadata 优先：登录返回的 session 自带 gender → 零 DB 查询、最快
-    const metaGender = (user.user_metadata as any)?.gender;
-    if (typeof metaGender === 'string' && metaGender) return metaGender;
-    // 1) 本地缓存：老设备/回访用户瞬时拿到 gender，跳转零等待
-    const cached = readProfileCache(user.id);
-    if (cached?.gender) {
-      set({ profile: cached });
-      return cached.gender;
-    }
-    // 2) 兜底：只查 gender 单列（比 select(*)+style_preferences join 快很多）
-    try {
-      const res: any = await withTimeout(
-        supabase.from('users').select('gender').eq('user_id', user.id).single(),
-        6000, 'route-gender',
-      );
-      return res?.data?.gender ?? null;
-    } catch (e: any) {
-      console.warn('[UserStore] resolveRouteGender failed:', e?.message);
-      return null;
-    }
-  },
+  resolveRouteGender,
 
   syncGenderToAuth: async (gender) => {
     try {
@@ -170,10 +222,15 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   signOut: async () => {
-    const { user } = get();
-    await supabase.auth.signOut();
-    if (user) clearProfileCache(user.id);
-    useImportStore.getState().setActiveUser(null);
-    set({ session: null, user: null, profile: null, stylePreferences: [] });
+    const { error } = await supabase.auth.signOut();
+    if (error) console.warn('[UserStore] signOut failed');
   },
-}));
+
+  resetPrivateState: () => {
+    profileReadSlot.cancel();
+    routeGenderReadSlot.cancel();
+    set(userPrivateReset());
+    return undefined;
+  },
+  });
+});
