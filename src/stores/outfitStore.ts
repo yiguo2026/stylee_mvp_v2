@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { outfitPrivateReset } from '@/lib/privateStateReset';
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { runScopedStoreRead } from '@/lib/scopedStoreRead';
+import { secondaryStoreReadSlots } from '@/lib/secondaryStoreReads';
 
 interface OutfitState {
   savedCount: number;
@@ -47,23 +50,37 @@ export const useOutfitStore = create<OutfitState>((set, get) => ({
   },
 
   refreshCounts: async (userId: string) => {
-    const [outfitRes, favRes] = await Promise.all([
-      supabase
-        .from('outfits')
-        .select('outfit_id', { count: 'exact', head: true })
-        .eq('user_id', userId),
-      supabase
-        .from('outfit_favorites')
-        .select('favorite_id', { count: 'exact', head: true })
-        .eq('user_id', userId),
-    ]);
-    set({
-      savedCount: outfitRes.count ?? 0,
-      favoriteCount: favRes.count ?? 0,
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: secondaryStoreReadSlots.outfitCounts,
+      execute: async ({ accountId }) => {
+        const [outfitRes, favRes] = await Promise.all([
+          supabase
+            .from('outfits')
+            .select('outfit_id', { count: 'exact', head: true })
+            .eq('user_id', accountId),
+          supabase
+            .from('outfit_favorites')
+            .select('favorite_id', { count: 'exact', head: true })
+            .eq('user_id', accountId),
+        ]);
+        if (outfitRes.error) throw outfitRes.error;
+        if (favRes.error) throw favRes.error;
+        return {
+          savedCount: outfitRes.count ?? 0,
+          favoriteCount: favRes.count ?? 0,
+        };
+      },
+      apply: (counts) => {
+        set(counts);
+        return undefined;
+      },
     });
   },
 
   resetPrivateState: () => {
+    secondaryStoreReadSlots.outfitCounts.cancel();
     set(outfitPrivateReset());
     return undefined;
   },

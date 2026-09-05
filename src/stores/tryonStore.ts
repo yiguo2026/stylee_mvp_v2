@@ -4,6 +4,9 @@ import { loadSelfie } from '@/lib/bodyModel';
 import { supabase } from '@/lib/supabase';
 import { tryOnPrivateReset } from '@/lib/privateStateReset';
 import type { TryOnSuggestion, AIMeta } from '@/lib/ai';
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { runScopedStoreRead } from '@/lib/scopedStoreRead';
+import { secondaryStoreReadSlots } from '@/lib/secondaryStoreReads';
 
 const isWeb = Platform.OS === 'web';
 
@@ -128,27 +131,46 @@ export const useTryOnStore = create<TryOnState>()((set, get) => ({
   },
 
   fetchRecords: async (userId) => {
-    const { data, error } = await supabase
-      .from('tryon_records')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.warn('[tryonStore] fetchRecords failed:', error.message);
-      return;
-    }
-
-    const records = (data ?? []).map(dbRowToRecord);
-    set({ records });
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: secondaryStoreReadSlots.tryOnRecords,
+      execute: async ({ accountId }) => {
+        const { data, error } = await supabase
+          .from('tryon_records')
+          .select('*')
+          .eq('user_id', accountId)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map(dbRowToRecord);
+      },
+      apply: (records) => {
+        set({ records });
+        return undefined;
+      },
+      onError: () => {
+        console.warn('[tryonStore] fetchRecords failed');
+        return undefined;
+      },
+    });
   },
 
   loadSelfieFromServer: async (userId) => {
-    const url = await loadSelfie(userId);
-    set({ selfieUri: url, loaded: true });
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: secondaryStoreReadSlots.tryOnSelfie,
+      execute: async ({ accountId }) => loadSelfie(accountId),
+      apply: (url) => {
+        set({ selfieUri: url, loaded: true });
+        return undefined;
+      },
+    });
   },
 
   resetPrivateState: () => {
+    secondaryStoreReadSlots.tryOnRecords.cancel();
+    secondaryStoreReadSlots.tryOnSelfie.cancel();
     removePersistedScene();
     set(tryOnPrivateReset());
     return undefined;

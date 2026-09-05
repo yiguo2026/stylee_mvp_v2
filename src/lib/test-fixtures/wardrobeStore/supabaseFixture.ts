@@ -11,6 +11,7 @@ export type SyntheticQueryCall = Readonly<{
 export type SyntheticQueryResult = Readonly<{
   data: unknown;
   error: unknown | null;
+  count?: number | null;
 }>;
 
 type QueryHandler = (call: SyntheticQueryCall) => Promise<SyntheticQueryResult>;
