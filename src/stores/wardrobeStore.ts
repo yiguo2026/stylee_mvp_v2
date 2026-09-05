@@ -12,6 +12,9 @@ import {
   type WardrobeRollbackTransaction,
 } from '@/lib/wardrobeOptimisticUpdate';
 import { wardrobePrivateReset } from '@/lib/privateStateReset';
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { createLatestReadSlot, runScopedStoreRead } from '@/lib/scopedStoreRead';
+import { mergeWardrobeRead } from '@/lib/storeReadPolicy';
 
 export interface WardrobeState {
   items: WardrobeItem[];
@@ -37,25 +40,28 @@ export interface WardrobeState {
 }
 
 // 计算每件单品的穿搭次数（含此单品的搭配数）与收藏次数（含此单品的收藏搭配数）
-async function fetchItemUsageStats(userId: string): Promise<Record<string, { wear: number; favorite: number }>> {
+async function fetchItemUsageStats(accountId: string): Promise<Record<string, { wear: number; favorite: number }>> {
   const stats: Record<string, { wear: number; favorite: number }> = {};
-  const { data: outfits } = await supabase
+  const { data: outfits, error: outfitsError } = await supabase
     .from('outfits')
     .select('outfit_id')
-    .eq('user_id', userId);
+    .eq('user_id', accountId);
+  if (outfitsError) throw outfitsError;
   const outfitIds = (outfits ?? []).map((o: any) => o.outfit_id);
   if (outfitIds.length === 0) return stats;
 
-  const { data: favs } = await supabase
+  const { data: favs, error: favoritesError } = await supabase
     .from('outfit_favorites')
     .select('outfit_id')
-    .eq('user_id', userId);
+    .eq('user_id', accountId);
+  if (favoritesError) throw favoritesError;
   const favSet = new Set((favs ?? []).map((f: any) => f.outfit_id));
 
-  const { data: rows } = await supabase
+  const { data: rows, error: outfitItemsError } = await supabase
     .from('outfit_items')
     .select('item_id, outfit_id')
     .in('outfit_id', outfitIds);
+  if (outfitItemsError) throw outfitItemsError;
 
   for (const r of rows ?? []) {
     const s = stats[r.item_id] ?? { wear: 0, favorite: 0 };
@@ -102,6 +108,8 @@ function applyOptimisticUpdate(
   return transaction;
 }
 
+const wardrobeReadSlot = createLatestReadSlot();
+
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   items: [],
   isLoading: false,
@@ -113,46 +121,51 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   setItems: (items) => set({ items }),
 
   fetchItems: async (userId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data, error } = await supabase
-        .from('wardrobe_items')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      const rawItems = (data ?? []) as WardrobeItem[];
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: wardrobeReadSlot,
+      execute: async ({ accountId }) => {
+        const { data, error } = await supabase
+          .from('wardrobe_items')
+          .select('*')
+          .eq('user_id', accountId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const rawItems = (data ?? []) as WardrobeItem[];
 
-      const { pendingEdits, deletedIds } = get();
-
-      // 附加穿搭/收藏次数，但衣橱列表始终保持按最新创建时间倒序展示
-      let items = rawItems.filter(it => !deletedIds.includes(it.item_id));
-      try {
-        const stats = await fetchItemUsageStats(userId);
-        items = items.map(it => {
-          const s = stats[it.item_id] ?? { wear: 0, favorite: 0 };
-          return { ...it, wear_count: s.wear, favorite_count: s.favorite };
+        // Stats are allowed to degrade, but a failed response is never interpreted as zero counts.
+        let stats: Record<string, { wear: number; favorite: number }> | null;
+        try {
+          stats = await fetchItemUsageStats(accountId);
+        } catch {
+          stats = null;
+        }
+        return { rawItems, stats };
+      },
+      apply: ({ rawItems, stats }) => {
+        const { pendingEdits, deletedIds } = get();
+        if (stats === null) console.warn('[WardrobeStore] usage stats read failed');
+        set({
+          items: mergeWardrobeRead({
+            rawItems,
+            stats,
+            pendingEdits,
+            deletedIds,
+          }),
         });
-      } catch (statErr) {
-        console.warn('[wardrobeStore.fetchItems] usage stats failed:', statErr);
-      }
-
-      // 用本次会话的本地乐观改动覆盖云端返回：demo 环境云端写可能失败/被丢弃，
-      // 本地才是这一次会话的可信来源，避免用旧数据把用户的删除/编辑回退掉。
-      items = items.map(it => {
-        const edit = pendingEdits[it.item_id];
-        return edit ? { ...it, ...edit } : it;
-      });
-
-      items = sortWardrobeItemsNewestFirst(items);
-
-      set({ items });
-    } catch (e: any) {
-      set({ error: e.message });
-    } finally {
-      set({ isLoading: false });
-    }
+        return undefined;
+      },
+      onError: () => {
+        set({ error: '衣橱加载失败，请重试' });
+        return undefined;
+      },
+      onLoadingChange: (isLoading) => {
+        set(isLoading ? { isLoading: true, error: null } : { isLoading: false });
+        return undefined;
+      },
+    });
   },
 
   addItem: async (item) => {
@@ -277,6 +290,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   resetPrivateState: () => {
+    wardrobeReadSlot.cancel();
     set(wardrobePrivateReset());
     return undefined;
   },
