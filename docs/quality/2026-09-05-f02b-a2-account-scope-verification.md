@@ -11,7 +11,7 @@ unverified and unapproved; no Web PR, push, merge, or deployment was performed.
 
 - Fixed Web base: `7daf6f96a1cb4283aaf27789841b924fbd4c667a`.
 - Tasks 1–8 implementation HEAD: `47cd2d2c14e8e6ba37e934c38aaa5a28e3886038`.
-- Final-review code/CI anchor: `2dd50f722d13f6a2e68d9aea2ebe04c2ef374915`,
+- Final-review code/CI anchor: `1bf3d400d6988d7324557b0e39a7a75e253ca008`,
   based on pre-fix candidate `ee3f411e9d33e916963560b227cc411488ca9e2e`.
   The subsequent evidence-only commit contains this updated record; its full
   candidate HEAD and exact cold verification are recorded in the final-fix
@@ -76,7 +76,7 @@ production mutations, then restored; they required no runtime change.
 | Finding | RED observation | GREEN evidence |
 | --- | --- | --- |
 | New-marker PASSWORD_RECOVERY | old stamp was still current (`true != false`) | explicit same-marker/new-marker tests; new epoch resets before publish and deferred old read is discarded |
-| Private route mounting | actual RootLayout mounted private sentinel during bootstrap and retained it after reset failure (`1 != 0`) | four real React RootLayout cases; gate-bypass mutation fails all four, restore passes |
+| Private route mounting | actual RootLayout mounted private sentinel during bootstrap and retained it after reset failure (`1 != 0`) | seven real React RootLayout cases; gate-bypass mutation fails all four original boundary cases, restore passes |
 | Malformed Session | `doesNotThrow` failed for missing/null user or fields | 23 malformed cases pass across booting/authenticated, plus existing empty/whitespace cases; old stamp invalidated and null published |
 | Additional/nested packages | five missing expected rejections | dev/optional/peer manifest sections and nested unlisted/duplicate nodes rejected; exact two top-level lock records retained |
 | Compiler containment | ancestor symlink escape accepted | canonical compiler must remain inside canonical Web root and that validated path is executed |
@@ -84,6 +84,15 @@ production mutations, then restored; they required no runtime change.
 | Publication ordering | early-publication mutation fails both real ordered-registry/coordinator tests | B follows all eight resets and is absent after a failing reset |
 | Storage failure | rejected-storage mutation fails serializable setItem case | setItem is called once, failure contained; separate BigInt case retained |
 | CI history/base | real Git fixture checker skipped old raw-color violation | PR/push both detect violation; shallow-history and omitted-base mutations each fail both tests |
+
+Root mounting-order follow-up also reproduced two assertions: blocked effects
+attempted navigation twice with no mounted route, and anonymous bootstrap
+attempted navigation once before mount. Root now places non-none effects in
+React state after callback return and runs them after the route tree commits;
+booting/blocked do not invoke the absent navigator. Two additional Root tests
+verify same-marker recovery supersedes a pending load and token refresh keeps
+it alive. Removing the non-none scheduler filter fails the refresh test
+(expected tabs navigation, actual none); restoring it passes all seven cases.
 
 The coordinator's React subscription exposes only the finite phase string.
 Booting renders a neutral loading state; blocked renders a persistent generic
@@ -99,7 +108,7 @@ Current local commands use Node 22.22.1/npm 11.12.1:
 | `npm run test:vendor` | 14/14 |
 | `npm run vendor:check` | exact immutable pair and isolated runtime/TypeScript consumer pass |
 | `npm run test:account-scope` | 115/115 |
-| `npm run test:account-scope-integration` | 13/13 real Store + 4/4 real RootLayout React cases |
+| `npm run test:account-scope-integration` | 13/13 real Store + 7/7 real RootLayout React cases |
 | `npm run test:consumer-control` | 6/6, including executable PR/push history fixtures |
 | `DESIGN_SYSTEM_BASE=7daf6f96a1cb4283aaf27789841b924fbd4c667a npm run check` | token/design/density, all consumers and TypeScript pass |
 | Placeholder-public-config `npm run build:web` | 970 modules; export and HTML patch pass |
@@ -119,12 +128,12 @@ HEAD and control-gate evidence. The CI now checks out full history and passes
 the exact PR base SHA or push-before SHA as DESIGN_SYSTEM_BASE; deployment
 permissions, secrets and destinations are unchanged.
 
-The clean local clone at code anchor `2dd50f722d13f6a2e68d9aea2ebe04c2ef374915`
+The clean local clone at code anchor `1bf3d400d6988d7324557b0e39a7a75e253ca008`
 installed 754 packages with `npm ci --ignore-scripts --offline --no-audit
 --no-fund`, a prepared cache and empty separate npm user/global configs under
 an allowlisted environment. It passed full `npm run check`, six workflow
 tests and the same 970-module placeholder Web export. Bundle:
-`entry-7ee534f2cebdc25a0da170e4a8e4e4db.js`. Logs are in
+`entry-240f032a6cfa92b52f83d228e0c1c5a7.js`. Logs are in
 `/private/tmp/stylee-a2-final-fix.w5fpwF`; the first install was launched before
 clone checkout completed and failed for missing lockfile, then was rerun after
 the clone completed and its clean HEAD was verified. That orchestration failure
