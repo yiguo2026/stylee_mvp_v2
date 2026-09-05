@@ -368,3 +368,61 @@ test('public states, effects, and fallback error serialization never expose refr
   assert.equal(serialized.includes(secondMarker), false);
   assert.equal(serialized.includes('refresh_token'), false);
 });
+
+test('same-stamp recovery supersedes load while metadata, token refresh, and duplicate signals preserve it', () => {
+  const { coordinator, scope } = createHarness();
+  const load = coordinator.accept('INITIAL_SESSION', session('A', 'marker-1'));
+  assert.equal(coordinator.isEffectCurrent(load), true);
+  for (const event of ['TOKEN_REFRESHED', 'USER_UPDATED', 'SIGNED_IN', 'INITIAL_SESSION'] as const) {
+    const none = coordinator.accept(event, session('A', 'marker-2'));
+    assert.equal(none.kind, 'none');
+    assert.equal(coordinator.isEffectCurrent(none), false);
+    assert.equal(coordinator.isEffectCurrent(load), true);
+  }
+  const stamp = scope.capture();
+  const recovery = coordinator.accept('PASSWORD_RECOVERY', session('A', 'marker-2'));
+  assert.equal(scope.capture(), stamp);
+  assert.equal(coordinator.isEffectCurrent(load), false);
+  assert.equal(coordinator.isEffectCurrent(recovery), true);
+  assert.equal(coordinator.isEffectCurrent({ ...recovery }), false);
+  assert.ok(Object.isFrozen(recovery));
+});
+
+test('new load, anonymous, blocked, and resume effects replace identity including unstamped effects', () => {
+  const { coordinator, scope } = createHarness();
+  const a = coordinator.accept('INITIAL_SESSION', session('A', 'a-1'));
+  const b = coordinator.accept('SIGNED_IN', session('B', 'b-1'));
+  assert.equal(coordinator.isEffectCurrent(a), false);
+  assert.equal(coordinator.isEffectCurrent(b), true);
+  const anonymous = coordinator.accept('SIGNED_OUT', null);
+  assert.equal(coordinator.isEffectCurrent(b), false);
+  assert.equal(coordinator.isEffectCurrent(anonymous), true);
+  const resumedAnonymous = coordinator.resume();
+  assert.notEqual(anonymous, resumedAnonymous);
+  assert.equal(coordinator.isEffectCurrent(anonymous), false);
+  assert.equal(coordinator.isEffectCurrent(resumedAnonymous), true);
+  const blocked = coordinator.accept('TOKEN_REFRESHED', null);
+  assert.equal(coordinator.isEffectCurrent(resumedAnonymous), false);
+  assert.equal(coordinator.isEffectCurrent(blocked), true);
+  const resumedBlocked = coordinator.resume();
+  assert.equal(coordinator.isEffectCurrent(blocked), false);
+  assert.equal(coordinator.isEffectCurrent(resumedBlocked), true);
+  assert.equal(coordinator.isEffectCurrent({ ...resumedBlocked }), false);
+  assert.equal(scope.capture(), null);
+});
+
+test('effect current validation rejects external scope changes and preserves active on ignored fallback', () => {
+  const { coordinator, scope } = createHarness();
+  const fallback = coordinator.acceptFallback(coordinator.signalSerial(), {
+    session: session('A', 'a-1'), error: null,
+  });
+  assert.equal(coordinator.isEffectCurrent(fallback), true);
+  const ignored = coordinator.acceptFallback(coordinator.signalSerial(), { session: null, error: null });
+  assert.equal(coordinator.isEffectCurrent(ignored), false);
+  assert.equal(coordinator.isEffectCurrent(fallback), true);
+  const resumed = coordinator.resume();
+  assert.equal(coordinator.isEffectCurrent(fallback), false);
+  assert.equal(coordinator.isEffectCurrent(resumed), true);
+  scope.signOut();
+  assert.equal(coordinator.isEffectCurrent(resumed), false);
+});

@@ -41,7 +41,6 @@ export type AuthEffect =
   | Readonly<{ kind: 'blocked'; reason: BlockedReason }>;
 
 const NONE_EFFECT: AuthEffect = Object.freeze({ kind: 'none' });
-const ANONYMOUS_EFFECT: AuthEffect = Object.freeze({ kind: 'anonymous' });
 
 function blockedEffect(reason: BlockedReason): AuthEffect {
   return Object.freeze({ kind: 'blocked', reason });
@@ -60,6 +59,7 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
 }>): Readonly<{
   current(): AuthCoordinatorState;
   signalSerial(): number;
+  isEffectCurrent(effect: AuthEffect): boolean;
   accept(event: AccountAuthEvent, session: S | null): AuthEffect;
   acceptFallback(
     startedAtSerial: number,
@@ -69,6 +69,7 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
 }> {
   const { scope, publishSession } = options;
   let serial = 0;
+  let activeEffect: AuthEffect | null = null;
   let refreshMarker: string | null = null;
   let lastBlockedReason: BlockedReason | null = null;
   let state: AuthCoordinatorState = Object.freeze({
@@ -77,6 +78,12 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
     stamp: null,
     signalSerial: serial,
   });
+
+  function activateEffect(effect: AuthEffect): AuthEffect {
+    // Refresh-only and ignored fallback signals preserve a pending route intent.
+    if (effect.kind !== 'none') activeEffect = effect;
+    return effect;
+  }
 
   function validSession(session: S | null): session is S {
     if (session === null) return false;
@@ -187,7 +194,7 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
       signalSerial: serial,
     });
     publishSession(null);
-    return ANONYMOUS_EFFECT;
+    return Object.freeze({ kind: 'anonymous' });
   }
 
   function reduceAuthSignal(event: AccountAuthEvent, session: S | null): AuthEffect {
@@ -237,25 +244,30 @@ export function createAuthSessionCoordinator<S extends AuthSessionLike>(options:
   return Object.freeze({
     current: () => state,
     signalSerial: () => serial,
+    isEffectCurrent(effect: AuthEffect): boolean {
+      return effect.kind !== 'none'
+        && effect === activeEffect
+        && (!('stamp' in effect) || scope.isCurrent(effect.stamp));
+    },
     accept(event: AccountAuthEvent, session: S | null): AuthEffect {
       replaceSerial(serial + 1);
-      return reduceAuthSignal(event, session);
+      return activateEffect(reduceAuthSignal(event, session));
     },
     acceptFallback(
       startedAtSerial: number,
       result: Readonly<{ session: S | null; error: unknown | null }>,
     ): AuthEffect {
       if (state.phase !== 'booting' || startedAtSerial !== serial) return NONE_EFFECT;
-      if (result.error !== null) return enterBlocked('bootstrap_failed', true);
-      if (result.session === null) return publishAnonymous();
-      if (!validSession(result.session)) return enterBlocked('invalid_session', true);
-      return publishAuthenticated(result.session, 'load_account');
+      if (result.error !== null) return activateEffect(enterBlocked('bootstrap_failed', true));
+      if (result.session === null) return activateEffect(publishAnonymous());
+      if (!validSession(result.session)) return activateEffect(enterBlocked('invalid_session', true));
+      return activateEffect(publishAuthenticated(result.session, 'load_account'));
     },
     resume(): AuthEffect {
-      if (state.phase === 'authenticated') return stampEffect('load_account', state.stamp);
-      if (state.phase === 'anonymous') return ANONYMOUS_EFFECT;
+      if (state.phase === 'authenticated') return activateEffect(stampEffect('load_account', state.stamp));
+      if (state.phase === 'anonymous') return activateEffect(Object.freeze({ kind: 'anonymous' }));
       if (state.phase === 'blocked') {
-        return blockedEffect(lastBlockedReason ?? 'scope_transition_failed');
+        return activateEffect(blockedEffect(lastBlockedReason ?? 'scope_transition_failed'));
       }
       return NONE_EFFECT;
     },

@@ -4,8 +4,7 @@ import type { AccountStamp } from '@stymobile/core';
 import { UserProfile, UserStylePreference } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
-import { useImportStore } from '@/stores/importStore';
-import { clearProfileCache, readProfileCache, writeProfileCache } from '@/lib/profileCache';
+import { readProfileCache, writeProfileCache } from '@/lib/profileCache';
 import { userPrivateReset } from '@/lib/privateStateReset';
 import { webAccountScope } from '@/lib/accountScopeRuntime';
 import { createLatestReadSlot, runScopedStoreRead } from '@/lib/scopedStoreRead';
@@ -13,12 +12,6 @@ import {
   profileReadPatch,
   type SettledRead,
 } from '@/lib/storeReadPolicy';
-import { resolveRouteGenderCompat } from '@/lib/routeGenderCompatibility';
-
-interface ResolveRouteGender {
-  (stamp: AccountStamp): Promise<string | null>;
-  (): Promise<string | null>;
-}
 
 interface UserState {
   session: Session | null;
@@ -28,13 +21,11 @@ interface UserState {
   isLoading: boolean;
 
   publishSession: (session: Session | null) => undefined;
-  // Task 6 branch-only compatibility alias. Task 8 removes it with both old callers.
-  setSession: (session: Session | null) => undefined;
   setProfile: (profile: UserProfile | null) => void;
   setStylePreferences: (prefs: UserStylePreference[]) => void;
   fetchProfile: () => Promise<void>;
   // 仅解析路由所需的 gender：优先读本地缓存（瞬时），无缓存时只查单列，避免 select(*)+join 拖慢跳转
-  resolveRouteGender: ResolveRouteGender;
+  resolveRouteGender: (stamp: AccountStamp) => Promise<string | null>;
   // 从本地缓存把 profile 直接灌进 store，先渲染再刷新（offline-first）
   hydrateFromCache: (userId: string) => UserProfile | null;
   // 把 gender 写进 auth user_metadata（服务端持久化），下次登录/冷启动路由可零 DB 查询
@@ -53,7 +44,7 @@ export const useUserStore = create<UserState>((set, get) => {
     return undefined;
   };
 
-  const resolveRouteGenderForStamp = async (stamp: AccountStamp): Promise<string | null> => {
+  const resolveRouteGender = async (stamp: AccountStamp): Promise<string | null> => {
     if (!webAccountScope.isCurrent(stamp)) return null;
     const publishedUser = get().user;
     if (publishedUser?.id !== stamp.accountId) return null;
@@ -101,14 +92,6 @@ export const useUserStore = create<UserState>((set, get) => {
     return resolvedGender;
   };
 
-  const resolveRouteGender: ResolveRouteGender = (stamp?: AccountStamp) => (
-    resolveRouteGenderCompat({
-      scope: webAccountScope,
-      ...(stamp === undefined ? {} : { stamp }),
-      resolve: resolveRouteGenderForStamp,
-    })
-  );
-
   return ({
   session: null,
   user: null,
@@ -117,7 +100,6 @@ export const useUserStore = create<UserState>((set, get) => {
   isLoading: false,
 
   publishSession,
-  setSession: publishSession,
 
   setProfile: (profile) => set({ profile }),
 
@@ -240,11 +222,8 @@ export const useUserStore = create<UserState>((set, get) => {
   },
 
   signOut: async () => {
-    const { user } = get();
-    await supabase.auth.signOut();
-    if (user) clearProfileCache(user.id);
-    useImportStore.getState().setActiveUser(null);
-    set({ session: null, user: null, profile: null, stylePreferences: [] });
+    const { error } = await supabase.auth.signOut();
+    if (error) console.warn('[UserStore] signOut failed');
   },
 
   resetPrivateState: () => {
