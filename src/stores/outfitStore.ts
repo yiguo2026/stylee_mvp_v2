@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { outfitPrivateReset } from '@/lib/privateStateReset';
 
 interface OutfitState {
   savedCount: number;
@@ -14,6 +15,7 @@ interface OutfitState {
     outfitId: string,
     currentlyFavorited: boolean,
   ) => Promise<boolean>;
+  resetPrivateState: () => undefined;
 }
 
 export const useOutfitStore = create<OutfitState>((set, get) => ({
@@ -59,5 +61,10 @@ export const useOutfitStore = create<OutfitState>((set, get) => ({
       savedCount: outfitRes.count ?? 0,
       favoriteCount: favRes.count ?? 0,
     });
+  },
+
+  resetPrivateState: () => {
+    set(outfitPrivateReset());
+    return undefined;
   },
 }));

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { WishlistItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { wishlistPrivateReset } from '@/lib/privateStateReset';
 
 interface WishlistState {
   items: WishlistItem[];
@@ -12,6 +13,7 @@ interface WishlistState {
   addItem: (item: Omit<WishlistItem, 'wish_id' | 'created_at'>) => Promise<WishlistItem | null>;
   removeItem: (wishId: string) => Promise<void>;
   moveToWardrobe: (wishId: string) => Promise<void>;
+  resetPrivateState: () => undefined;
 }
 
 export const useWishlistStore = create<WishlistState>((set, get) => ({
@@ -117,5 +119,10 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
       console.error('[wishlistStore.moveToWardrobe] unexpected error:', e?.message);
       set({ items: prevItems, error: e.message });
     }
+  },
+
+  resetPrivateState: () => {
+    set(wishlistPrivateReset());
+    return undefined;
   },
 }));

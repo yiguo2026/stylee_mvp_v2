@@ -4,6 +4,8 @@ import { UserProfile, UserStylePreference } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
 import { useImportStore } from '@/stores/importStore';
+import { clearProfileCache, readProfileCache, writeProfileCache } from '@/lib/profileCache';
+import { userPrivateReset } from '@/lib/privateStateReset';
 
 interface UserState {
   session: Session | null;
@@ -24,36 +26,7 @@ interface UserState {
   syncGenderToAuth: (gender: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   signOut: () => Promise<void>;
-}
-
-const PROFILE_CACHE_PREFIX = 'stylee.profile.';
-
-function readProfileCache(userId: string): UserProfile | null {
-  try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(PROFILE_CACHE_PREFIX + userId);
-    return raw ? (JSON.parse(raw) as UserProfile) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeProfileCache(userId: string, profile: UserProfile) {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(PROFILE_CACHE_PREFIX + userId, JSON.stringify(profile));
-  } catch {
-    /* ignore quota / serialization errors */
-  }
-}
-
-function clearProfileCache(userId: string) {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.removeItem(PROFILE_CACHE_PREFIX + userId);
-  } catch {
-    /* ignore */
-  }
+  resetPrivateState: () => undefined;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -105,7 +78,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   hydrateFromCache: (userId) => {
-    const cached = readProfileCache(userId);
+    const cached = readProfileCache<UserProfile>(userId);
     if (cached) set({ profile: cached });
     return cached;
   },
@@ -117,7 +90,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     const metaGender = (user.user_metadata as any)?.gender;
     if (typeof metaGender === 'string' && metaGender) return metaGender;
     // 1) 本地缓存：老设备/回访用户瞬时拿到 gender，跳转零等待
-    const cached = readProfileCache(user.id);
+    const cached = readProfileCache<UserProfile>(user.id);
     if (cached?.gender) {
       set({ profile: cached });
       return cached.gender;
@@ -175,5 +148,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (user) clearProfileCache(user.id);
     useImportStore.getState().setActiveUser(null);
     set({ session: null, user: null, profile: null, stylePreferences: [] });
+  },
+
+  resetPrivateState: () => {
+    set(userPrivateReset());
+    return undefined;
   },
 }));

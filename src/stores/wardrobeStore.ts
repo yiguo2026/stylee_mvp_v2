@@ -11,6 +11,7 @@ import {
   type WardrobeMutationGenerations,
   type WardrobeRollbackTransaction,
 } from '@/lib/wardrobeOptimisticUpdate';
+import { wardrobePrivateReset } from '@/lib/privateStateReset';
 
 export interface WardrobeState {
   items: WardrobeItem[];
@@ -32,6 +33,7 @@ export interface WardrobeState {
   deleteItem: (itemId: string) => Promise<void>;
   incrementWearCount: (itemId: string) => Promise<void>;
   setItems: (items: WardrobeItem[]) => void;
+  resetPrivateState: () => undefined;
 }
 
 // 计算每件单品的穿搭次数（含此单品的搭配数）与收藏次数（含此单品的收藏搭配数）
@@ -272,5 +274,10 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     } catch (e: any) {
       set({ error: e.message });
     }
+  },
+
+  resetPrivateState: () => {
+    set(wardrobePrivateReset());
+    return undefined;
   },
 }));

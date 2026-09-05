@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { Platform } from 'react-native';
+import { preferencePrivateReset } from '@/lib/privateStateReset';
 
 const isWeb = Platform.OS === 'web';
 const STORAGE_KEY = 'stylee-preference-store-v1';
@@ -18,10 +19,6 @@ export interface PreferenceRecord {
   sceneCode?: string; // S01..S08
   categories: string[]; // 出现在该套搭配里的品类列表
   colors: string[];     // 出现在该套搭配里的配色列表
-}
-
-interface PersistShape {
-  records: PreferenceRecord[];
 }
 
 interface PreferenceState {
@@ -44,35 +41,28 @@ interface PreferenceState {
 
   registerSwap: () => number;
   resetSwaps: () => void;
-
-  hydrate: () => void;
-  reset: () => void;
-}
-
-function loadPersisted(): PersistShape | null {
-  if (!isWeb) return null;
-  try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.records)) return parsed as PersistShape;
-  } catch {}
-  return null;
+  resetPrivateState: () => undefined;
 }
 
 function savePersisted(records: PreferenceRecord[]) {
   if (!isWeb) return;
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ records } satisfies PersistShape));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ records }));
     }
   } catch {}
 }
 
-const initial = loadPersisted();
+function removePersisted(): undefined {
+  if (!isWeb) return undefined;
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+  return undefined;
+}
 
 export const usePreferenceStore = create<PreferenceState>((set, get) => ({
-  records: initial?.records ?? [],
+  records: [],
   consecutiveSwapsSinceFavorite: 0,
   swapHintShownAt: null,
 
@@ -140,13 +130,9 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
 
   resetSwaps: () => set({ consecutiveSwapsSinceFavorite: 0, swapHintShownAt: null }),
 
-  hydrate: () => {
-    const persisted = loadPersisted();
-    if (persisted) set({ records: persisted.records });
-  },
-
-  reset: () => {
-    savePersisted([]);
-    set({ records: [], consecutiveSwapsSinceFavorite: 0, swapHintShownAt: null });
+  resetPrivateState: () => {
+    removePersisted();
+    set(preferencePrivateReset());
+    return undefined;
   },
 }));
