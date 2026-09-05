@@ -2,18 +2,22 @@
 
 Date: 2026-09-05. Status: local candidate source, **not production ADOPTED**.
 The scoped Store/read target is FIXED in candidate source only. SEC-03 and
-CF-10 remain OPEN. Web PR/Hosted CI and final independent whole-branch review
-are pending controller work; no Web PR, push, merge, or deployment was performed
-by this local task.
+CF-10 remain OPEN. The final-review fixes are implemented and locally verified;
+the scoped independent re-review and Web PR/Hosted CI are pending controller
+work. **Hosted CI pending; no production adoption.** Production adoption is
+unverified and unapproved; no Web PR, push, merge, or deployment was performed.
 
 ## Immutable source and candidate identity
 
 - Fixed Web base: `7daf6f96a1cb4283aaf27789841b924fbd4c667a`.
 - Tasks 1–8 implementation HEAD: `47cd2d2c14e8e6ba37e934c38aaa5a28e3886038`.
-- Code/CI candidate HEAD verified here: `ea2c36ad2b52944e821428b2963b40b803f01cbe`.
-  The subsequent documentation commit contains this record and README only;
-  its full HEAD and repeated cold verification are recorded in the Task 9
-  report. A document cannot embed its own containing commit hash.
+- Final-review code/CI anchor: `2dd50f722d13f6a2e68d9aea2ebe04c2ef374915`,
+  based on pre-fix candidate `ee3f411e9d33e916963560b227cc411488ca9e2e`.
+  The subsequent evidence-only commit contains this updated record; its full
+  candidate HEAD and exact cold verification are recorded in the final-fix
+  report and control repository. This anchor is not a self-referential claim
+  about the documentation commit. The earlier `ea2c36a`/`ee3f411` evidence below
+  is historical and does not represent the final fixed candidate.
 - Core source: `fitzw/stymobile@5b9b51adfb1dc9c10c61f13244087f6ecf54d34d`.
   [A1 PR #4](https://github.com/fitzw/stymobile/pull/4) HEAD was
   `6990331e6bd47a469187d1c04720ce534d3d3bc6`; [merged main CI 33937689381](https://github.com/fitzw/stymobile/actions/runs/33937689381)
@@ -61,6 +65,70 @@ dist/scoped-read.d.ts
 dist/scoped-read.js
 package.json
 ```
+
+## Final-review fix wave and current local evidence
+
+The four Important findings and all five deferred minors were verified against
+the real code before changes. Behavioral regressions failed with assertions,
+not missing modules. Test-only coverage gaps were checked against deliberate
+production mutations, then restored; they required no runtime change.
+
+| Finding | RED observation | GREEN evidence |
+| --- | --- | --- |
+| New-marker PASSWORD_RECOVERY | old stamp was still current (`true != false`) | explicit same-marker/new-marker tests; new epoch resets before publish and deferred old read is discarded |
+| Private route mounting | actual RootLayout mounted private sentinel during bootstrap and retained it after reset failure (`1 != 0`) | four real React RootLayout cases; gate-bypass mutation fails all four, restore passes |
+| Malformed Session | `doesNotThrow` failed for missing/null user or fields | 23 malformed cases pass across booting/authenticated, plus existing empty/whitespace cases; old stamp invalidated and null published |
+| Additional/nested packages | five missing expected rejections | dev/optional/peer manifest sections and nested unlisted/duplicate nodes rejected; exact two top-level lock records retained |
+| Compiler containment | ancestor symlink escape accepted | canonical compiler must remain inside canonical Web root and that validated path is executed |
+| Running toolchain | wrong Node accepted; wrong npm reached isolated-consumer failure | process-local Node mismatch and synthetic npm mismatch yield finite `toolchain_mismatch` |
+| Publication ordering | early-publication mutation fails both real ordered-registry/coordinator tests | B follows all eight resets and is absent after a failing reset |
+| Storage failure | rejected-storage mutation fails serializable setItem case | setItem is called once, failure contained; separate BigInt case retained |
+| CI history/base | real Git fixture checker skipped old raw-color violation | PR/push both detect violation; shallow-history and omitted-base mutations each fail both tests |
+
+The coordinator's React subscription exposes only the finite phase string.
+Booting renders a neutral loading state; blocked renders a persistent generic
+recovery state and real Web reload action. Both public-preview exceptions stay
+renderable and suppress private Auth effects. Same-marker recovery retains the
+stamp and supersedes an older load through effect identity; new-marker recovery
+replaces the epoch. Ordinary refresh/update `none` effects preserve load intent.
+
+Current local commands use Node 22.22.1/npm 11.12.1:
+
+| Command | Result |
+| --- | --- |
+| `npm run test:vendor` | 14/14 |
+| `npm run vendor:check` | exact immutable pair and isolated runtime/TypeScript consumer pass |
+| `npm run test:account-scope` | 115/115 |
+| `npm run test:account-scope-integration` | 13/13 real Store + 4/4 real RootLayout React cases |
+| `npm run test:consumer-control` | 6/6, including executable PR/push history fixtures |
+| `DESIGN_SYSTEM_BASE=7daf6f96a1cb4283aaf27789841b924fbd4c667a npm run check` | token/design/density, all consumers and TypeScript pass |
+| Placeholder-public-config `npm run build:web` | 970 modules; export and HTML patch pass |
+
+The build uses exactly `EXPO_PUBLIC_SUPABASE_URL=https://example.supabase.co`,
+`EXPO_PUBLIC_SUPABASE_ANON_KEY=public-anon-placeholder`, and
+`EXPO_PUBLIC_STYLEE_API=https://example.com`. The new React test dependency is
+dev-only `react-test-renderer@19.1.0`, pinned to the installed React version;
+its deprecation warning remains visible. The existing NO_COLOR/FORCE_COLOR
+build warning remains. Platform, Auth and Store ports in the RootLayout test
+are synthetic; React, Core, coordinator, RootLayout and the released status
+and button components are real. This proves mounting boundaries, not a live
+authenticated browser or real-device acceptance.
+
+Full command logs and the final-fix report retain exact cold-install, candidate
+HEAD and control-gate evidence. The CI now checks out full history and passes
+the exact PR base SHA or push-before SHA as DESIGN_SYSTEM_BASE; deployment
+permissions, secrets and destinations are unchanged.
+
+The clean local clone at code anchor `2dd50f722d13f6a2e68d9aea2ebe04c2ef374915`
+installed 754 packages with `npm ci --ignore-scripts --offline --no-audit
+--no-fund`, a prepared cache and empty separate npm user/global configs under
+an allowlisted environment. It passed full `npm run check`, six workflow
+tests and the same 970-module placeholder Web export. Bundle:
+`entry-7ee534f2cebdc25a0da170e4a8e4e4db.js`. Logs are in
+`/private/tmp/stylee-a2-final-fix.w5fpwF`; the first install was launched before
+clone checkout completed and failed for missing lockfile, then was rerun after
+the clone completed and its clean HEAD was verified. That orchestration failure
+is retained as `cold-premature-install.log`, not counted as a passing install.
 
 ## Historical RED/GREEN evidence, Tasks 1–8
 
@@ -124,17 +192,17 @@ compatibility and `setSession` were removed in Task 8.
 This is pure, synthetic integration, type and build evidence. It does not
 prove a live authenticated browser session or production RLS behavior.
 
-## Task 9 gates and reproducible cold checks
+## Historical Task 9 gates and reproducible cold checks
 
 Task 9 `node --test scripts/consumer-control.test.mjs` first failed 4/4:
 missing consumer script/workflow, deploy Node 20, and missing npm selection.
 After implementation it passed 4/4, including executing the actual consumer
 script with failing command boundaries to prove short-circuit behavior.
 
-The controller ruling recorded in control commit `699559b` keeps all
-review-required tests: `test:account-scope` has 90 pure cases,
-`test:account-scope-integration` has 13 real Store cases, and `check:consumer`
-runs vendor tests, verifier, then both scripts. Root `check`, PR CI and deploy
+At the pre-fix Task 9 candidate, the ruling recorded in control commit `699559b` kept all
+review-required tests: `test:account-scope` had 90 pure cases,
+`test:account-scope-integration` had 13 real Store cases, and `check:consumer`
+ran vendor tests, verifier, then both scripts. Root `check`, PR CI and deploy
 preflight therefore all retain the same coverage. No compile-only test is run
 as JavaScript.
 
@@ -247,6 +315,7 @@ src/lib/privateStateReset.test.ts
 src/lib/privateStateReset.ts
 src/lib/profileCache.test.ts
 src/lib/profileCache.ts
+src/lib/rootRoute.integration.test.mjs
 src/lib/scopedStoreRead.test.ts
 src/lib/scopedStoreRead.ts
 src/lib/scopedStoreRead.type-test.ts
@@ -255,6 +324,10 @@ src/lib/secondaryStoreReads.ts
 src/lib/secondaryStores.integration.test.ts
 src/lib/storeReadPolicy.test.ts
 src/lib/storeReadPolicy.ts
+src/lib/test-fixtures/rootRoute/designSystem.mjs
+src/lib/test-fixtures/rootRoute/loader.mjs
+src/lib/test-fixtures/rootRoute/platform.mjs
+src/lib/test-fixtures/rootRoute/register.mjs
 src/lib/test-fixtures/wardrobeStore/bodyModelFixture.ts
 src/lib/test-fixtures/wardrobeStore/loader.mjs
 src/lib/test-fixtures/wardrobeStore/reactNativeFixture.ts
@@ -278,7 +351,7 @@ vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/stymobile-contracts-0.
 vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/stymobile-core-0.1.0.tgz
 ```
 
-Cold results: all commands above exited 0 after the explicit registry retry;
+Historical Task 9 cold results: commands exited 0 after the explicit registry retry;
 CI guards 4/4, vendor 6/6, pure 90/90, actual Store 13/13, token/design/density
 and TypeScript checks passed. Web export bundled 970 modules to
 `entry-e0db09b0b832b900672b4d5155e81705.js`; HTML/lang/font/shell/404 patch passed.
