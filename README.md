@@ -2,6 +2,14 @@
 
 基于 Expo (React Native) + Supabase 的智能穿搭推荐应用，支持 Web / iOS / Android。
 
+## Shared Core consumer
+
+F02B-A2 候选通过不可变本地 tarball 消费 `@stymobile/contracts/core@0.1.0`，
+来源与完整性见 [provenance](vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/provenance.json)，
+账号隔离、冷安装结果与残余范围见 [验证记录](docs/quality/2026-09-05-f02b-a2-account-scope-verification.md)。
+Node 22.22.1/npm 11.12.1 下运行 `npm run check` 会覆盖 vendor、账号纯逻辑及真实 Store 集成回归。
+此候选尚未部署，SEC-03/CF-10 仍为 OPEN；Web main 合并触发生产部署，须另行授权。
+
 **在线体验：** https://yiguo2026.github.io/
 
 **本地体验：** `npx expo start --web` 后访问 http://localhost:8081
