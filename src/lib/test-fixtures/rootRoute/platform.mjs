@@ -16,7 +16,8 @@ export function resetHarness(path, failResetAt) {
   pathname = path;
   listener = null;
   Object.assign(observations, { privateMounts: 0, privateUnmounts: 0, previewMounts: 0, resets: 0,
-    authCallbacks: 0, privateEffects: 0, reloads: 0 });
+    authCallbacks: 0, privateEffects: 0, reloads: 0, navigationWithoutRoute: 0, routes: [] });
+  userState.resolveRouteGender = async () => 'female';
   webAccountScope = createAccountScope([() => {
     observations.resets += 1;
     if (observations.resets === failResetAt) throw new Error('synthetic-reset-failure');
@@ -54,8 +55,19 @@ export function Stack() {
 Stack.Screen = () => null;
 export const usePathname = () => pathname;
 const privateEffect = () => { observations.privateEffects += 1; };
-export const router = { replace: privateEffect, push: privateEffect };
+const navigate = path => {
+  privateEffect();
+  observations.routes.push(path);
+  if (observations.privateMounts === observations.privateUnmounts) observations.navigationWithoutRoute += 1;
+};
+export const router = { replace: navigate, push: navigate };
 const userState = { hydrateFromCache: privateEffect, resolveRouteGender: async () => 'female', fetchProfile: privateEffect };
+export function deferGender() {
+  let settle;
+  const pending = new Promise(resolve => { settle = resolve; });
+  userState.resolveRouteGender = () => pending;
+  return settle;
+}
 export const useUserStore = { getState: () => userState };
 export const useImportStore = Object.assign(selector => selector({ tasks, pendingSelectionCount: 0 }),
   { getState: () => ({ setActiveUser: privateEffect }) });

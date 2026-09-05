@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -44,6 +44,7 @@ const authEffectPorts: AuthEffectPorts = {
 export default function RootLayout() {
   const authPhase = useSyncExternalStore(webAuthCoordinator.subscribe,
     webAuthCoordinator.getSnapshot, webAuthCoordinator.getSnapshot);
+  const [pendingAuthEffect, setPendingAuthEffect] = useState<AuthEffect | null>(null);
   const pathname = usePathname();
   const designPreviewEnabled = process.env.EXPO_PUBLIC_DESIGN_SYSTEM_PREVIEW === '1';
   const isDesignPreview = designPreviewEnabled && pathname.startsWith('/wardrobe-preview');
@@ -88,12 +89,7 @@ export default function RootLayout() {
     let active = true;
     const schedule = (effect: AuthEffect) => {
       queueMicrotask(() => {
-        if (active) void runAuthEffect(effect, {
-          scope: webAccountScope,
-          isEffectCurrent: webAuthCoordinator.isEffectCurrent,
-          get publicPreview() { return !active || publicPreviewRef.current; },
-          ports: authEffectPorts,
-        });
+        if (active && effect.kind !== 'none') setPendingAuthEffect(effect);
       });
     };
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -122,15 +118,24 @@ export default function RootLayout() {
     if (!leavingPreview) return;
     let active = true;
     queueMicrotask(() => {
-      if (active) void runAuthEffect(webAuthCoordinator.resume(), {
-        scope: webAccountScope,
-        isEffectCurrent: webAuthCoordinator.isEffectCurrent,
-        get publicPreview() { return !active || publicPreviewRef.current; },
-        ports: authEffectPorts,
-      });
+      if (active) setPendingAuthEffect(webAuthCoordinator.resume());
     });
     return () => { active = false; };
   }, [fontsReady, isPublicPreview]);
+
+  useEffect(() => {
+    // Effects run after the route tree commits. Booting/blocked have no Stack;
+    // their persistent recovery UI owns the state without calling the router.
+    if (!fontsReady || authPhase === 'booting' || authPhase === 'blocked' || pendingAuthEffect === null) return;
+    let active = true;
+    void runAuthEffect(pendingAuthEffect, {
+      scope: webAccountScope,
+      isEffectCurrent: webAuthCoordinator.isEffectCurrent,
+      get publicPreview() { return !active || publicPreviewRef.current; },
+      ports: authEffectPorts,
+    });
+    return () => { active = false; };
+  }, [fontsReady, authPhase, pendingAuthEffect]);
 
   useEffect(() => {
     const shouldNotify = !isPublicPreview
