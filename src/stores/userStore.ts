@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import type { AccountStamp } from '@stymobile/core';
-import { UserProfile, UserStylePreference } from '@/types';
+import { UserProfile } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { withTimeout } from '@/lib/withTimeout';
 import { readProfileCache, writeProfileCache } from '@/lib/profileCache';
@@ -17,12 +17,10 @@ interface UserState {
   session: Session | null;
   user: User | null;
   profile: UserProfile | null;
-  stylePreferences: UserStylePreference[];
   isLoading: boolean;
 
   publishSession: (session: Session | null) => undefined;
   setProfile: (profile: UserProfile | null) => void;
-  setStylePreferences: (prefs: UserStylePreference[]) => void;
   fetchProfile: () => Promise<void>;
   // 仅解析路由所需的 gender：优先读本地缓存（瞬时），无缓存时只查单列，避免 select(*)+join 拖慢跳转
   resolveRouteGender: (stamp: AccountStamp) => Promise<string | null>;
@@ -96,14 +94,11 @@ export const useUserStore = create<UserState>((set, get) => {
   session: null,
   user: null,
   profile: null,
-  stylePreferences: [],
   isLoading: false,
 
   publishSession,
 
   setProfile: (profile) => set({ profile }),
-
-  setStylePreferences: (prefs) => set({ stylePreferences: prefs }),
 
   fetchProfile: async () => {
     const stamp = webAccountScope.capture();
@@ -114,21 +109,14 @@ export const useUserStore = create<UserState>((set, get) => {
       stamp,
       slot: profileReadSlot,
       execute: async ({ accountId }) => {
-        const [profileResult, preferencesResult] = await Promise.allSettled([
-          withTimeout(
-            supabase.from('users').select('*').eq('user_id', accountId).single(),
-            8000,
-            'profile',
-          ),
-          withTimeout(
-            supabase
-              .from('user_style_preferences')
-              .select('*, tags(*)')
-              .eq('user_id', accountId),
-            8000,
-            'style-prefs',
-          ),
-        ]);
+        const profileResult = await Promise.resolve(withTimeout(
+          supabase.from('users').select('*').eq('user_id', accountId).single(),
+          8000,
+          'profile',
+        )).then(
+          (value) => ({ status: 'fulfilled', value } as const),
+          () => ({ status: 'rejected' } as const),
+        );
 
         const profile: SettledRead<UserProfile> = profileResult.status === 'rejected'
           ? { status: 'rejected' }
@@ -137,30 +125,18 @@ export const useUserStore = create<UserState>((set, get) => {
               data: profileResult.value.data as UserProfile | null,
               error: profileResult.value.error,
             };
-        const stylePreferences: SettledRead<UserStylePreference[]> = preferencesResult.status === 'rejected'
-          ? { status: 'rejected' }
-          : {
-              status: 'fulfilled',
-              data: preferencesResult.value.data as UserStylePreference[] | null,
-              error: preferencesResult.value.error,
-            };
-        return { profile, stylePreferences };
+        return profile;
       },
-      apply: ({ profile, stylePreferences }) => {
-        const patch = profileReadPatch<UserProfile, UserStylePreference>(profile, stylePreferences);
+      apply: (profile) => {
+        const patch = profileReadPatch<UserProfile>(profile);
         const next: Partial<UserState> = {};
         if (patch.profile.kind === 'replace') next.profile = patch.profile.value;
-        if (patch.stylePreferences.kind === 'replace') {
-          next.stylePreferences = patch.stylePreferences.value;
-        }
         if (Object.keys(next).length > 0) set(next);
         if (patch.cacheProfile !== null) {
           writeProfileCache(stamp.accountId, patch.cacheProfile);
         }
         const failed = profile.status === 'rejected'
-          || (profile.status === 'fulfilled' && profile.error !== null)
-          || stylePreferences.status === 'rejected'
-          || (stylePreferences.status === 'fulfilled' && stylePreferences.error !== null);
+          || (profile.status === 'fulfilled' && profile.error !== null);
         if (failed) console.warn('[UserStore] profile read failed');
         return undefined;
       },

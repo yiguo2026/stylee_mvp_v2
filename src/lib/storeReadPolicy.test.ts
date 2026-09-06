@@ -1,4 +1,6 @@
 import assert from 'node:assert';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath, URL as NodeURL } from 'node:url';
 import { test } from 'node:test';
 
 import {
@@ -8,63 +10,52 @@ import {
 } from './storeReadPolicy.ts';
 
 type Profile = Readonly<{ user_id: string; nickname: string }>;
-type Preference = Readonly<{ preference_id: string }>;
-
 const rejected = Object.freeze({ status: 'rejected' } as const);
 
-test('keeps a failed profile unchanged while applying successful preferences independently', () => {
+test('keeps a failed profile unchanged without publishing cache data', () => {
   const profile: SettledRead<Profile> = {
     status: 'fulfilled',
     data: { user_id: 'account-a', nickname: 'A' },
     error: new Error('profile failed'),
   };
-  const preferences: SettledRead<Preference[]> = {
-    status: 'fulfilled',
-    data: [{ preference_id: 'pref-a' }],
-    error: null,
-  };
-
-  assert.deepEqual(profileReadPatch(profile, preferences), {
+  assert.deepEqual(profileReadPatch(profile), {
     profile: { kind: 'unchanged' },
-    stylePreferences: {
-      kind: 'replace',
-      value: [{ preference_id: 'pref-a' }],
-    },
     cacheProfile: null,
   });
 });
 
-test('applies successful profile independently and caches only returned non-null profile data', () => {
+test('applies a successful profile and caches only returned non-null profile data', () => {
   const returnedProfile = { user_id: 'account-a', nickname: 'A' };
 
-  assert.deepEqual(profileReadPatch<Profile, Preference>(
+  assert.deepEqual(profileReadPatch<Profile>(
     { status: 'fulfilled', data: returnedProfile, error: null },
-    rejected,
   ), {
     profile: { kind: 'replace', value: returnedProfile },
-    stylePreferences: { kind: 'unchanged' },
     cacheProfile: returnedProfile,
   });
 });
 
 test('distinguishes successful nulls from rejected and errored reads', () => {
-  assert.deepEqual(profileReadPatch<Profile, Preference>(
-    { status: 'fulfilled', data: null, error: null },
+  assert.deepEqual(profileReadPatch<Profile>(
     { status: 'fulfilled', data: null, error: null },
   ), {
     profile: { kind: 'replace', value: null },
-    stylePreferences: { kind: 'replace', value: [] },
     cacheProfile: null,
   });
 
-  assert.deepEqual(profileReadPatch<Profile, Preference>(
+  assert.deepEqual(profileReadPatch<Profile>(
     rejected,
-    { status: 'fulfilled', data: [{ preference_id: 'pref-a' }], error: 'failed' },
   ), {
     profile: { kind: 'unchanged' },
-    stylePreferences: { kind: 'unchanged' },
     cacheProfile: null,
   });
+});
+
+test('user profile store has no raw preference join or second preference state source', async () => {
+  const source = await readFile(fileURLToPath(new NodeURL('../stores/userStore.ts', import.meta.url)), 'utf8');
+
+  assert.doesNotMatch(source, /user_style_preferences|tags\(\*\)/u);
+  assert.doesNotMatch(source, /\bstylePreferences\b|\bsetStylePreferences\b/u);
 });
 
 type Item = Readonly<{

@@ -52,7 +52,7 @@ export function preferencePrivateReset() {
 }
 
 export function userPrivateReset() {
-  return { profile: null, stylePreferences: [], isLoading: false };
+  return { profile: null, isLoading: false };
 }
 
 export interface WebPrivateResetters {

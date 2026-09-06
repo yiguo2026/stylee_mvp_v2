@@ -2,30 +2,21 @@ export type SettledRead<T> =
   | Readonly<{ status: 'fulfilled'; data: T | null; error: unknown | null }>
   | Readonly<{ status: 'rejected' }>;
 
-export type ProfileReadPatch<P, S> = Readonly<{
+export type ProfileReadPatch<P> = Readonly<{
   profile:
     | Readonly<{ kind: 'unchanged' }>
     | Readonly<{ kind: 'replace'; value: P | null }>;
-  stylePreferences:
-    | Readonly<{ kind: 'unchanged' }>
-    | Readonly<{ kind: 'replace'; value: S[] }>;
   cacheProfile: P | null;
 }>;
 
-export function profileReadPatch<P, S>(
+export function profileReadPatch<P>(
   profile: SettledRead<P>,
-  stylePreferences: SettledRead<S[]>,
-): ProfileReadPatch<P, S> {
+): ProfileReadPatch<P> {
   const profileSucceeded = profile.status === 'fulfilled' && profile.error === null;
-  const preferencesSucceeded = stylePreferences.status === 'fulfilled'
-    && stylePreferences.error === null;
 
   return {
     profile: profileSucceeded
       ? { kind: 'replace', value: profile.data }
-      : { kind: 'unchanged' },
-    stylePreferences: preferencesSucceeded
-      ? { kind: 'replace', value: stylePreferences.data ?? [] }
       : { kind: 'unchanged' },
     cacheProfile: profileSucceeded ? profile.data : null,
   };

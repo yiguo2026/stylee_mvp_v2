@@ -56,8 +56,8 @@ test('private reset patches overwrite every seeded private value', () => {
   assert.deepEqual({ ...{ records: ['record'], consecutiveSwapsSinceFavorite: 1, swapHintShownAt: 123 }, ...preferencePrivateReset() }, {
     records: [], consecutiveSwapsSinceFavorite: 0, swapHintShownAt: null,
   });
-  assert.deepEqual({ ...{ profile: { id: 'profile-a' }, stylePreferences: ['minimal'], isLoading: true }, ...userPrivateReset() }, {
-    profile: null, stylePreferences: [], isLoading: false,
+  assert.deepEqual({ ...{ profile: { id: 'profile-a' }, isLoading: true }, ...userPrivateReset() }, {
+    profile: null, isLoading: false,
   });
 });
 
@@ -66,7 +66,7 @@ test('private reset patches allocate fresh mutable values', () => {
   assert.notEqual(tryOnPrivateReset().records, tryOnPrivateReset().records);
   assert.notEqual(wardrobePrivateReset().pendingEdits, wardrobePrivateReset().pendingEdits);
   assert.notEqual(wishlistPrivateReset().items, wishlistPrivateReset().items);
-  assert.notEqual(userPrivateReset().stylePreferences, userPrivateReset().stylePreferences);
+  assert.deepEqual(Object.keys(userPrivateReset()).sort(), ['isLoading', 'profile']);
 });
 
 test('orders the style-preference command reset before user and profile publication boundaries', () => {
@@ -164,7 +164,7 @@ test('resets all private state and only the departing profile cache before accou
   outfitState = { savedCount: 3, favoriteCount: 2 };
   preferenceState = { records: ['private'], consecutiveSwapsSinceFavorite: 4 };
   stylePreferenceAccountId = 'account-a';
-  userState = { profile: { name: 'private' }, stylePreferences: ['private'], isLoading: true };
+  userState = { profile: { name: 'private' }, isLoading: true };
   writeProfileCache('account-a', { displayName: 'A' }, storage);
   writeProfileCache('account-b', { displayName: 'B' }, storage);
 

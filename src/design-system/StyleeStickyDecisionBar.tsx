@@ -13,6 +13,7 @@ interface StyleeStickyDecisionBarProps {
   primaryLabel: string;
   onPrimaryPress: () => void;
   state?: 'default' | 'saving' | 'saved';
+  primaryDisabled?: boolean;
   secondaryActions?: SecondaryAction[];
 }
 
@@ -20,6 +21,7 @@ export function StyleeStickyDecisionBar({
   primaryLabel,
   onPrimaryPress,
   state = 'default',
+  primaryDisabled = false,
   secondaryActions = [],
 }: StyleeStickyDecisionBarProps) {
   return (
@@ -28,7 +30,7 @@ export function StyleeStickyDecisionBar({
         label={primaryLabel}
         onPress={onPrimaryPress}
         loading={state === 'saving'}
-        disabled={state === 'saved'}
+        disabled={primaryDisabled || state === 'saved'}
         style={[styles.primary, state === 'saved' && styles.saved]}
         labelStyle={state === 'saved' ? styles.savedLabel : undefined}
       />

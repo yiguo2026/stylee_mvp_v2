@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, Image,
@@ -12,12 +12,9 @@ import { useOutfitStore } from '@/stores/outfitStore';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
 import { ds } from '@/design-system';
-import { STYLE_TAGS } from '@/types';
-
-function getTagName(tagId: string, fallback?: string): string {
-  const found = STYLE_TAGS.find(t => t.id === tagId);
-  return found ? found.label : (fallback ?? tagId);
-}
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { stylePreferenceSummary } from '@/lib/stylePreferenceSelectors';
+import { webStylePreferenceController } from '@/lib/webStylePreferenceRuntime';
 
 const TRYON_SCENE_IMAGES: Record<string, any> = {
   cafe: require('../../../assets/tryon/casual.png'),
@@ -31,22 +28,32 @@ function tryOnSceneImageUri(scene: string) {
 }
 
 export default function ProfileTab() {
-  const { profile, stylePreferences, signOut, user, fetchProfile } = useUserStore();
+  const { profile, signOut, user, fetchProfile } = useUserStore();
   const { items } = useWardrobeStore();
   const { records: tryOnRecords, fetchRecords: fetchTryOnRecords } = useTryOnStore();
   const { savedCount, favoriteCount, refreshCounts } = useOutfitStore();
   const [showSignOut, setShowSignOut] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const preferenceSnapshot = useSyncExternalStore(
+    webStylePreferenceController.subscribe,
+    webStylePreferenceController.getSnapshot,
+    webStylePreferenceController.getSnapshot,
+  );
+  const preferenceSummary = stylePreferenceSummary(
+    preferenceSnapshot,
+    webAccountScope.capture()?.accountId ?? null,
+  );
 
   useEffect(() => {
     if (user?.id) {
       fetchProfile();
       refreshCounts(user.id);
       fetchTryOnRecords(user.id);
+      if (webStylePreferenceController.getSnapshot().phase === 'idle') {
+        void webStylePreferenceController.load();
+      }
     }
   }, [user?.id, fetchProfile, refreshCounts, fetchTryOnRecords]);
-
-  const liked = stylePreferences.filter(p => p.preference_type === 'like');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -105,12 +112,17 @@ export default function ProfileTab() {
             <Text style={styles.menuCardArrow}>›</Text>
           </View>
           <View style={styles.styleTags}>
-            {liked.length > 0 ? liked.map(p => (
-              <View key={p.preference_id} style={[styles.stylePill, styles.stylePillLiked]}>
-                <Text style={styles.stylePillText}>{getTagName(p.tag_id, p.tag?.tag_name)}</Text>
+            {preferenceSummary.kind === 'selected' ? preferenceSummary.selections.map(selection => (
+              <View key={selection.tagId} style={[styles.stylePill, styles.stylePillLiked]}>
+                <Text style={styles.stylePillText}>{selection.displayName}</Text>
               </View>
             )) : (
-              <Text style={styles.stylePillEmpty}>点击设置你喜欢的风格 →</Text>
+              <Text style={styles.stylePillEmpty}>
+                {preferenceSummary.kind === 'loading' ? '正在读取风格偏好'
+                  : preferenceSummary.kind === 'read_failed' ? '暂时无法读取，点击进入重试'
+                  : preferenceSummary.kind === 'skipped' ? '尚未设置风格偏好'
+                  : '点击设置你喜欢的风格 →'}
+              </Text>
             )}
           </View>
         </TouchableOpacity>
