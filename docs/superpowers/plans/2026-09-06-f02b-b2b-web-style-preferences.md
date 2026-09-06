@@ -149,6 +149,10 @@ Exact file lists:
 
 **GREEN:** focused store/runtime/mounted Root tests, account-scope suite, TypeScript, vendor verifier, full check/build. Commit: `feat(web): bind preference controller to account scope`.
 
+#### Execution amendment after Task 2 review
+
+Tasks 3–5 are one dependency-closed vertical slice and will be implemented/reviewed as one atomic commit with three internal RED/GREEN checkpoints. All three consume or remove `userStore.stylePreferences`: deleting it in Task 3 would break the two legacy routes and recommendation, while keeping a compatibility field or landing versioned reads before deleting direct DML would create a stale dual-source/hybrid write state. The combined slice therefore changes selectors, userStore/profile summary, both shared-screen routes, recommendation `modelValue`, and the executable no-legacy-write guard together. The detailed requirements below remain unchanged; only the commit boundary becomes `feat(web): adopt versioned style preferences` after every Task 3–5 gate is green.
+
 ### Task 3: Remove the legacy preference state source and define confirmed selectors
 
 **Files:**
