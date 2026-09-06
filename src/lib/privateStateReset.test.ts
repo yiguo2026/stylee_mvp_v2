@@ -69,7 +69,7 @@ test('private reset patches allocate fresh mutable values', () => {
   assert.notEqual(userPrivateReset().stylePreferences, userPrivateReset().stylePreferences);
 });
 
-test('orders private resetters before the profile cache resetter', () => {
+test('orders the style-preference command reset before user and profile publication boundaries', () => {
   const calls: string[] = [];
   const resetters = createOrderedWebPrivateResetters({
     import: () => { calls.push('import'); return undefined; },
@@ -78,13 +78,17 @@ test('orders private resetters before the profile cache resetter', () => {
     wishlist: () => { calls.push('wishlist'); return undefined; },
     outfit: () => { calls.push('outfit'); return undefined; },
     preference: () => { calls.push('preference'); return undefined; },
+    stylePreferenceCommand: () => { calls.push('style-preference-command'); return undefined; },
     user: () => { calls.push('user'); return undefined; },
     profileCache: () => { calls.push('profile-cache'); return undefined; },
   });
 
   assert.equal(Object.isFrozen(resetters), true);
   resetters.forEach((reset) => reset());
-  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache']);
+  assert.deepEqual(calls, [
+    'import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference',
+    'style-preference-command', 'user', 'profile-cache',
+  ]);
 });
 
 test('resets all private state and only the departing profile cache before account publish', () => {
@@ -100,6 +104,7 @@ test('resets all private state and only the departing profile cache before accou
   let wishlistState: Record<string, unknown> = {};
   let outfitState: Record<string, unknown> = {};
   let preferenceState: Record<string, unknown> = {};
+  let stylePreferenceAccountId: string | null = null;
   let userState: Record<string, unknown> = {};
   const coordinator = createAuthSessionCoordinator({
     scope,
@@ -131,6 +136,13 @@ test('resets all private state and only the departing profile cache before accou
     wishlist: reset('wishlist', wishlistPrivateReset, (next) => { wishlistState = next; }),
     outfit: reset('outfit', outfitPrivateReset, (next) => { outfitState = next; }),
     preference: reset('preference', preferencePrivateReset, (next) => { preferenceState = next; }),
+    stylePreferenceCommand: () => {
+      assert.equal(scope.capture(), null);
+      assert.notEqual(publishedAccountId, 'account-b');
+      calls.push('style-preference-command');
+      stylePreferenceAccountId = null;
+      return undefined;
+    },
     user: reset('user', userPrivateReset, (next) => { userState = next; }),
     profileCache: () => {
       assert.equal(scope.capture(), null);
@@ -151,6 +163,7 @@ test('resets all private state and only the departing profile cache before accou
   wishlistState = { items: ['private'], error: 'private' };
   outfitState = { savedCount: 3, favoriteCount: 2 };
   preferenceState = { records: ['private'], consecutiveSwapsSinceFavorite: 4 };
+  stylePreferenceAccountId = 'account-a';
   userState = { profile: { name: 'private' }, stylePreferences: ['private'], isLoading: true };
   writeProfileCache('account-a', { displayName: 'A' }, storage);
   writeProfileCache('account-b', { displayName: 'B' }, storage);
@@ -159,19 +172,23 @@ test('resets all private state and only the departing profile cache before accou
 
   assert.equal(transition.kind, 'load_account');
   assert.equal(publishedAccountId, 'account-b');
-  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache', 'publish:account-b']);
+  assert.deepEqual(calls, [
+    'import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference',
+    'style-preference-command', 'user', 'profile-cache', 'publish:account-b',
+  ]);
   assert.deepEqual(importState, importPrivateReset());
   assert.deepEqual(tryOnState, tryOnPrivateReset());
   assert.deepEqual(wardrobeState, wardrobePrivateReset());
   assert.deepEqual(wishlistState, wishlistPrivateReset());
   assert.deepEqual(outfitState, outfitPrivateReset());
   assert.deepEqual(preferenceState, preferencePrivateReset());
+  assert.equal(stylePreferenceAccountId, null);
   assert.deepEqual(userState, userPrivateReset());
   assert.equal(readProfileCache('account-a', storage), null);
   assert.deepEqual(readProfileCache('account-b', storage), { displayName: 'B' });
 });
 
-test('continues through all eight resetters and blocks account publish after one throws', () => {
+test('continues through all nine resetters and a command reset failure blocks account publish', () => {
   const registry = createPrivateResetRegistry();
   const scope = createAccountScope([registry.dispatch]);
   const calls: string[] = [];
@@ -193,9 +210,10 @@ test('continues through all eight resetters and blocks account publish after one
     import: action('import'),
     tryon: action('tryon'),
     wardrobe: action('wardrobe'),
-    wishlist: action('wishlist', true),
+    wishlist: action('wishlist'),
     outfit: action('outfit'),
     preference: action('preference'),
+    stylePreferenceCommand: action('style-preference-command', true),
     user: action('user'),
     profileCache: action('profile-cache'),
   }));
@@ -206,7 +224,10 @@ test('continues through all eight resetters and blocks account publish after one
   const transition = coordinator.accept('SIGNED_IN', { user: { id: 'account-b' }, refresh_token: 'synthetic-b' });
 
   assert.equal(transition.kind, 'blocked');
-  assert.deepEqual(calls, ['import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference', 'user', 'profile-cache', 'publish:null']);
+  assert.deepEqual(calls, [
+    'import', 'tryon', 'wardrobe', 'wishlist', 'outfit', 'preference',
+    'style-preference-command', 'user', 'profile-cache', 'publish:null',
+  ]);
   assert.deepEqual(published, ['account-a', null]);
   assert.equal(scope.capture(), null);
   assert.equal(scope.current().status, 'blocked');

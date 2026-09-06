@@ -13,3 +13,4 @@ export const webAuthCoordinator = createAuthSessionCoordinator<Session>({
 });
 
 export { webAccountScope };
+export { webStylePreferenceController } from './webStylePreferenceRuntime.ts';

@@ -12,18 +12,20 @@ const root = new URL('../', import.meta.url);
 const scripts = JSON.parse(readFileSync(new URL('package.json', root))).scripts;
 const workflow = (name) => load(readFileSync(new URL(`.github/workflows/${name}.yml`, root), 'utf8'));
 
-test('consumer gate stops at a failing vendor test before accepting account checks', () => {
+test('consumer gate stops at style preferences before accepting account checks', () => {
   assert.equal(typeof scripts['check:consumer'], 'string');
+  assert.equal(typeof scripts['test:style-preferences'], 'string');
   const dir = mkdtempSync(path.join(tmpdir(), 'consumer-gate-'));
   try {
     // Substitute command boundaries only; execute the actual npm script's shell control flow.
     writeFileSync(path.join(dir, 'npm'), '#!/bin/sh\necho "$2"\nif [ "$2" = "$FAIL_GATE" ]; then exit 17; fi\n', { mode: 0o755 });
     for (const [failure, expected] of [
-      ['', ['test:vendor', 'vendor:check', 'test:account-scope', 'test:account-scope-integration']],
+      ['', ['test:vendor', 'vendor:check', 'test:style-preferences', 'test:account-scope', 'test:account-scope-integration']],
       ['test:vendor', ['test:vendor']],
       ['vendor:check', ['test:vendor', 'vendor:check']],
-      ['test:account-scope', ['test:vendor', 'vendor:check', 'test:account-scope']],
-      ['test:account-scope-integration', ['test:vendor', 'vendor:check', 'test:account-scope', 'test:account-scope-integration']],
+      ['test:style-preferences', ['test:vendor', 'vendor:check', 'test:style-preferences']],
+      ['test:account-scope', ['test:vendor', 'vendor:check', 'test:style-preferences', 'test:account-scope']],
+      ['test:account-scope-integration', ['test:vendor', 'vendor:check', 'test:style-preferences', 'test:account-scope', 'test:account-scope-integration']],
     ]) {
       const result = spawnSync('/bin/sh', ['-c', scripts['check:consumer']], {
         env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAIL_GATE: failure }, encoding: 'utf8',

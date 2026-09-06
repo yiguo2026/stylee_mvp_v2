@@ -19,7 +19,11 @@ import {
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
 import { supabase } from '@/lib/supabase';
-import { webAuthCoordinator, webAccountScope } from '@/lib/webAuthRuntime';
+import {
+  webAuthCoordinator,
+  webAccountScope,
+  webStylePreferenceController,
+} from '@/lib/webAuthRuntime';
 import { runAuthEffect, type AuthEffectPorts } from '@/lib/authEffectRunner';
 import type { AuthEffect } from '@/lib/authSessionCoordinator';
 import { useUserStore } from '@/stores/userStore';
@@ -36,7 +40,10 @@ const authEffectPorts: AuthEffectPorts = {
   activateImportOwner: (accountId) => { useImportStore.getState().setActiveUser(accountId); },
   hydrate: (accountId) => { useUserStore.getState().hydrateFromCache(accountId); },
   resolveGender: (stamp) => useUserStore.getState().resolveRouteGender(stamp),
-  startProfileRead: () => { void useUserStore.getState().fetchProfile(); },
+  startProfileRead: () => {
+    void useUserStore.getState().fetchProfile();
+    void webStylePreferenceController.load();
+  },
   navigate: (path) => { router.replace(path); },
   notifyBlocked: (message) => { showToast(message, 'error'); },
 };

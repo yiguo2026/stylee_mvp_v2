@@ -1,6 +1,7 @@
 import { installWebPrivateResetters } from '@/lib/accountScopeRuntime';
 import { clearProfileCache } from '@/lib/profileCache';
 import { createOrderedWebPrivateResetters } from '@/lib/privateStateReset';
+import { webStylePreferenceController } from '@/lib/webStylePreferenceRuntime';
 import { useImportStore } from '@/stores/importStore';
 import { useOutfitStore } from '@/stores/outfitStore';
 import { usePreferenceStore } from '@/stores/preferenceStore';
@@ -16,6 +17,7 @@ installWebPrivateResetters(createOrderedWebPrivateResetters({
   wishlist: () => useWishlistStore.getState().resetPrivateState(),
   outfit: () => useOutfitStore.getState().resetPrivateState(),
   preference: () => usePreferenceStore.getState().resetPrivateState(),
+  stylePreferenceCommand: () => webStylePreferenceController.reset(),
   user: () => useUserStore.getState().resetPrivateState(),
   profileCache: () => {
     const departingAccountId = useUserStore.getState().user?.id;

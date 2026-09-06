@@ -62,6 +62,7 @@ export interface WebPrivateResetters {
   wishlist: ScopeResetter;
   outfit: ScopeResetter;
   preference: ScopeResetter;
+  stylePreferenceCommand: ScopeResetter;
   user: ScopeResetter;
   profileCache: ScopeResetter;
 }
@@ -76,6 +77,7 @@ export function createOrderedWebPrivateResetters(
     resetters.wishlist,
     resetters.outfit,
     resetters.preference,
+    resetters.stylePreferenceCommand,
     resetters.user,
     resetters.profileCache,
   ]);
