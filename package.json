@@ -26,8 +26,9 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@stymobile/contracts": "file:vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/stymobile-contracts-0.1.0.tgz",
-    "@stymobile/core": "file:vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/stymobile-core-0.1.0.tgz",
+    "@stymobile/api-client": "file:vendor/stymobile/a2c1342878aa5fcd1ad21651085d319bda19a3e1/stymobile-api-client-0.2.1.tgz",
+    "@stymobile/contracts": "file:vendor/stymobile/a2c1342878aa5fcd1ad21651085d319bda19a3e1/stymobile-contracts-0.3.0.tgz",
+    "@stymobile/core": "file:vendor/stymobile/a2c1342878aa5fcd1ad21651085d319bda19a3e1/stymobile-core-0.3.0.tgz",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",

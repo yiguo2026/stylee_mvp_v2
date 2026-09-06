@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import {
+  copyFile,
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
   realpath,
@@ -14,51 +16,69 @@ import { isDeepStrictEqual, promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export const EXPECTED_SOURCE_COMMIT = '5b9b51adfb1dc9c10c61f13244087f6ecf54d34d';
-export const EXPECTED_PACKAGE_NAMES = Object.freeze(['@stymobile/contracts', '@stymobile/core']);
+export const EXPECTED_SOURCE_COMMIT = 'a2c1342878aa5fcd1ad21651085d319bda19a3e1';
+export const EXPECTED_SOURCE_TREE = '03814cceb1084c94c33898d1e315c035a441d045';
+export const EXPECTED_PACKAGE_NAMES = Object.freeze([
+  '@stymobile/contracts',
+  '@stymobile/core',
+  '@stymobile/api-client',
+]);
 
 const VENDOR_DIRECTORY = join('vendor', 'stymobile', EXPECTED_SOURCE_COMMIT);
 const EXPECTED_PROVENANCE = Object.freeze({
-  schema_version: 1,
+  schema_version: 2,
   source: Object.freeze({
     repository: 'https://github.com/fitzw/stymobile',
     commit: EXPECTED_SOURCE_COMMIT,
+    tree: EXPECTED_SOURCE_TREE,
   }),
   toolchain: Object.freeze({
     node: '22.22.1',
     npm: '11.12.1',
     commands: Object.freeze([
       'npm ci --ignore-scripts --no-audit --no-fund --offline',
-      'npm run check',
-      'npm pack --ignore-scripts --json ./packages/contracts ./packages/core',
+      'npm run build',
+      'npm pack --ignore-scripts --json ./packages/contracts ./packages/core ./packages/api-client',
     ]),
   }),
   packages: Object.freeze([
     Object.freeze({
       name: '@stymobile/contracts',
-      version: '0.1.0',
-      file: 'stymobile-contracts-0.1.0.tgz',
-      tarball_sha256: '79745ee0ac9d8adf9272760d9c1203cf6f2e8c01669ea3081d2838db76738194',
+      version: '0.3.0',
+      dependencies: Object.freeze({}),
+      file: 'stymobile-contracts-0.3.0.tgz',
+      size: 3828,
+      unpacked_size: 11505,
+      shasum: '6e3938f2d63ffb1b132047ab5cc426b6e338134d',
       integrity:
-        'sha512-FXZZJS39EbDqyFlXsLQ1QKW4P58zNwUJXoDoCd8QfHstpY5hMrG6xQccrqFs+Ifyl5/CFBTO4lqEMBi52mG7sA==',
-      source_manifest_sha256: 'bb6d62b0b70ea3833cc55cd804b70619386a4853cb2ca37b7f24d2f35b1736ee',
+        'sha512-lb0Zrd8Z9A4qchX3zkeaBVTz500l18uhzhXS5mUHg37EKvooNSiYbQ3/n6ArGBiDeeO1PZhs3UIaFeJ7+UQs+w==',
+      tarball_sha256: '1749daf8244819cf25753c74c8fb00e4a3b1481153c86b66fb15107b33e0fd3e',
+      source_manifest_sha256: '8e535015bfa9788dfc1ce77e49309de7b244894cde9544aa7fa89f747c7d9e3c',
       files: Object.freeze([
         'README.md',
+        'dist/auth.d.ts',
+        'dist/auth.js',
         'dist/command-result.d.ts',
         'dist/command-result.js',
         'dist/index.d.ts',
         'dist/index.js',
+        'dist/style-preferences.d.ts',
+        'dist/style-preferences.js',
         'package.json',
       ]),
     }),
     Object.freeze({
       name: '@stymobile/core',
-      version: '0.1.0',
-      file: 'stymobile-core-0.1.0.tgz',
-      tarball_sha256: 'daa7a7dc4e2bd60e251bba6bc9f1e284b939c77ec3c715690ced92cfcd551b2b',
+      version: '0.3.0',
+      dependencies: Object.freeze({ '@stymobile/contracts': '0.3.0' }),
+      file: 'stymobile-core-0.3.0.tgz',
+      size: 4921,
+      unpacked_size: 18086,
+      shasum: '4c5044289ad39e9294344bb4e8d4637f955e5871',
       integrity:
-        'sha512-StrUUyaoHCTblQ73bwazeZSxAzi3uBa6E0Fysyz+k7WlubI8sqbdBFdYwKaQNRaUomjDArtW0N7sR0l21XqbkQ==',
-      source_manifest_sha256: '3928ae3308e90084c3e60a73d55bc27d3a1c83bc728cf87caa2c70de91753492',
+        'sha512-bTr5m4dBv5LBQrnjycwUc6B2zapGaGIDbhJK6fG5WipQp/qyjjPVs4n2vI6DaR9Xf24Mjd7KjDtb/i6CjbuL6g==',
+      tarball_sha256: 'd1f1ad8c765ad7e6143192778de96ec90ae26f56f9eaf755e907542732f341f7',
+      source_manifest_sha256: '3e318728aaaeaa3acb926810e084da032b22fc97e37dfcc132653eb4e23c1ded',
       files: Object.freeze([
         'README.md',
         'dist/account-scope.d.ts',
@@ -71,6 +91,54 @@ const EXPECTED_PROVENANCE = Object.freeze({
         'dist/scoped-command.js',
         'dist/scoped-read.d.ts',
         'dist/scoped-read.js',
+        'dist/style-preference-aggregate.d.ts',
+        'dist/style-preference-aggregate.js',
+        'package.json',
+      ]),
+    }),
+    Object.freeze({
+      name: '@stymobile/api-client',
+      version: '0.2.1',
+      dependencies: Object.freeze({
+        '@stymobile/contracts': '0.3.0',
+        '@stymobile/core': '0.3.0',
+      }),
+      file: 'stymobile-api-client-0.2.1.tgz',
+      size: 19813,
+      unpacked_size: 85875,
+      shasum: 'c20e8bb6c6c987a6fe156e34277c350ed6e4e279',
+      integrity:
+        'sha512-RfEZlJL7YUC5N9Wf5cn1Jb/Q2liEANkDUbSruUZUOlGTk9ICUrE+ocT4fBoGjmNl+Eao8hsTPAJOJsaOKY0PSg==',
+      tarball_sha256: 'eb89413a29a011003dc6ca0637403d60c0c0191a0e63496ae374d50c9dd997cf',
+      source_manifest_sha256: '76096ee165fec8f081a2614f392465cd266e3a47556d3c2c4731c60481e8648f',
+      files: Object.freeze([
+        'README.md',
+        'dist/auth-controller.d.ts',
+        'dist/auth-controller.js',
+        'dist/auth-flight.d.ts',
+        'dist/auth-flight.js',
+        'dist/auth-port.d.ts',
+        'dist/auth-port.js',
+        'dist/auth-profile.d.ts',
+        'dist/auth-profile.js',
+        'dist/auth-validation.d.ts',
+        'dist/auth-validation.js',
+        'dist/index.d.ts',
+        'dist/index.js',
+        'dist/style-preference-controller.d.ts',
+        'dist/style-preference-controller.js',
+        'dist/style-preference-decode.d.ts',
+        'dist/style-preference-decode.js',
+        'dist/style-preference-port.d.ts',
+        'dist/style-preference-port.js',
+        'dist/supabase-auth-decode.d.ts',
+        'dist/supabase-auth-decode.js',
+        'dist/supabase-auth-port.d.ts',
+        'dist/supabase-auth-port.js',
+        'dist/supabase-auth-types.d.ts',
+        'dist/supabase-auth-types.js',
+        'dist/supabase-style-preference-port.d.ts',
+        'dist/supabase-style-preference-port.js',
         'package.json',
       ]),
     }),
@@ -90,6 +158,7 @@ const errorIdentifiers = new Set([
   'artifact_prohibited_path',
   'artifact_sensitive_path',
   'artifact_tar_invalid',
+  'artifact_unpacked_size_mismatch',
   'compiler_path_invalid',
   'isolated_consumer_failed',
   'lockfile_dependency_mismatch',
@@ -109,8 +178,11 @@ const errorIdentifiers = new Set([
   'source_commit_mismatch',
   'source_manifest_mismatch',
   'source_repository_mismatch',
+  'source_tree_mismatch',
   'tarball_integrity_mismatch',
   'tarball_sha256_mismatch',
+  'tarball_shasum_mismatch',
+  'tarball_size_mismatch',
   'third_stymobile_package',
   'toolchain_mismatch',
   'vendor_verification_failed',
@@ -129,6 +201,7 @@ async function requireRegularFile(path, identifier = 'artifact_must_be_regular_f
   try {
     const status = await lstat(path);
     if (status.isSymbolicLink() || !status.isFile()) fail(identifier);
+    return status;
   } catch (error) {
     if (error instanceof Error && error.message === identifier) throw error;
     fail(identifier);
@@ -169,11 +242,12 @@ function assertSafeArtifactPath(path) {
 }
 
 function assertExactProvenance(provenance) {
-  if (provenance?.schema_version !== 1) fail('schema_version_mismatch');
+  if (provenance?.schema_version !== 2) fail('schema_version_mismatch');
   if (provenance?.source?.repository !== EXPECTED_PROVENANCE.source.repository) {
     fail('source_repository_mismatch');
   }
   if (provenance?.source?.commit !== EXPECTED_SOURCE_COMMIT) fail('source_commit_mismatch');
+  if (provenance?.source?.tree !== EXPECTED_SOURCE_TREE) fail('source_tree_mismatch');
   if (!isDeepStrictEqual(provenance?.toolchain, EXPECTED_PROVENANCE.toolchain)) {
     fail('toolchain_mismatch');
   }
@@ -189,8 +263,14 @@ function assertExactProvenance(provenance) {
   if (!isDeepStrictEqual(provenance, EXPECTED_PROVENANCE)) fail('provenance_mismatch');
 }
 
-async function verifyTarball(packageRecord, tarballPath) {
+export async function verifyStymobilePackageArtifact({ packageRecord, tarballPath }) {
+  const status = await requireRegularFile(tarballPath);
+  assertSafeArtifactPath(packageRecord.file);
+  if (status.size !== packageRecord.size) fail('tarball_size_mismatch');
+
   const bytes = await readFile(tarballPath);
+  const shasum = createHash('sha1').update(bytes).digest('hex');
+  if (shasum !== packageRecord.shasum) fail('tarball_shasum_mismatch');
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   if (sha256 !== packageRecord.tarball_sha256) fail('tarball_sha256_mismatch');
   const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
@@ -212,12 +292,20 @@ async function verifyTarball(packageRecord, tarballPath) {
     fail('artifact_file_list_mismatch');
   }
 
-  const { stdout: sourceManifest } = await runFile(
-    'tar',
-    ['-xOf', tarballPath, 'package/package.json'],
-    { encoding: 'buffer', maxBuffer: 1024 * 1024 },
-    'artifact_manifest_invalid',
-  );
+  let unpackedSize = 0;
+  let sourceManifest;
+  for (const path of paths) {
+    const { stdout } = await runFile(
+      'tar',
+      ['-xOf', tarballPath, `package/${path}`],
+      { encoding: 'buffer', maxBuffer: 4 * 1024 * 1024 },
+      'artifact_tar_invalid',
+    );
+    unpackedSize += stdout.length;
+    if (path === 'package.json') sourceManifest = stdout;
+  }
+  if (unpackedSize !== packageRecord.unpacked_size) fail('artifact_unpacked_size_mismatch');
+  if (!sourceManifest) fail('artifact_manifest_invalid');
   if (createHash('sha256').update(sourceManifest).digest('hex') !== packageRecord.source_manifest_sha256) {
     fail('source_manifest_mismatch');
   }
@@ -236,26 +324,38 @@ async function verifyTarball(packageRecord, tarballPath) {
   ) {
     fail('artifact_manifest_mismatch');
   }
-  if (packageRecord.name === '@stymobile/core') {
-    if (!isDeepStrictEqual(packageManifest.dependencies, { '@stymobile/contracts': '0.1.0' })) {
-      fail('artifact_dependency_mismatch');
-    }
-  } else if (packageManifest.dependencies !== undefined) {
+  if (!isDeepStrictEqual(packageManifest.dependencies ?? {}, packageRecord.dependencies)) {
     fail('artifact_dependency_mismatch');
   }
 }
 
-function assertNoThirdStymobilePackage(packageManifest, lockfile) {
+function stymobileNames(record, sections) {
+  return sections.flatMap((section) => Object.keys(record?.[section] ?? {}))
+    .filter((name) => name.startsWith('@stymobile/'));
+}
+
+function assertNoUnexpectedStymobile(packageManifest, lockfile) {
   const allowed = new Set(EXPECTED_PACKAGE_NAMES);
   const sections = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
-  const manifestNames = sections.flatMap((section) => Object.keys(packageManifest[section] ?? {}))
-    .filter((name) => name.startsWith('@stymobile/'));
+  const rootManifestNames = stymobileNames(packageManifest, sections);
+  const rootLockNames = stymobileNames(lockfile.packages?.[''], sections);
+  if (
+    rootManifestNames.some((name) => !allowed.has(name)) ||
+    rootLockNames.some((name) => !allowed.has(name)) ||
+    stymobileNames(packageManifest, sections.slice(1)).length !== 0 ||
+    stymobileNames(lockfile.packages?.[''], sections.slice(1)).length !== 0
+  ) {
+    fail('third_stymobile_package');
+  }
+
   const allowedPaths = new Set(EXPECTED_PACKAGE_NAMES.map((name) => `node_modules/${name}`));
   const installedPaths = Object.keys(lockfile.packages ?? {})
     .filter((path) => /(^|\/)node_modules\/@stymobile\//u.test(path));
-  if (manifestNames.some((name) => !allowed.has(name))
-    || installedPaths.some((path) => !allowedPaths.has(path))) {
-    fail('third_stymobile_package');
+  if (installedPaths.some((path) => !allowedPaths.has(path))) fail('third_stymobile_package');
+
+  for (const [path, record] of Object.entries(lockfile.packages ?? {})) {
+    if (path === '' || allowedPaths.has(path)) continue;
+    if (stymobileNames(record, sections).length !== 0) fail('third_stymobile_package');
   }
 }
 
@@ -270,23 +370,20 @@ function verifyRepositoryManifests(packageManifest, lockfile) {
     }
     const installed = lockfile.packages?.[`node_modules/${name}`];
     const expectedRecord = EXPECTED_PROVENANCE.packages.find((record) => record.name === name);
-    if (installed?.version !== '0.1.0' || installed?.resolved !== expectedResolution) {
+    if (installed?.version !== expectedRecord.version || installed?.resolved !== expectedResolution) {
       fail('lockfile_resolution_mismatch');
     }
     if (installed.integrity !== expectedRecord.integrity) fail('lockfile_integrity_mismatch');
     const expectedInstalled = {
-      version: '0.1.0',
+      version: expectedRecord.version,
       resolved: expectedResolution,
       integrity: expectedRecord.integrity,
       license: 'UNLICENSED',
-      ...(name === '@stymobile/core'
-        ? { dependencies: { '@stymobile/contracts': '0.1.0' } }
+      ...(Object.keys(expectedRecord.dependencies).length > 0
+        ? { dependencies: expectedRecord.dependencies }
         : {}),
     };
-    if (
-      name === '@stymobile/core' &&
-      !isDeepStrictEqual(installed.dependencies, expectedInstalled.dependencies)
-    ) {
+    if (!isDeepStrictEqual(installed.dependencies ?? {}, expectedRecord.dependencies)) {
       fail('lockfile_dependency_mismatch');
     }
     if (!isDeepStrictEqual(installed, expectedInstalled)) fail('lockfile_package_mismatch');
@@ -299,7 +396,7 @@ function verifyRepositoryManifests(packageManifest, lockfile) {
   ) {
     fail('toolchain_mismatch');
   }
-  assertNoThirdStymobilePackage(packageManifest, lockfile);
+  assertNoUnexpectedStymobile(packageManifest, lockfile);
 }
 
 function isolatedEnvironment(consumerRoot) {
@@ -319,46 +416,151 @@ async function verifyInstalledPath(consumerRoot, packageName) {
   if (!isBeneath(consumerRoot, installedPath)) fail('isolated_consumer_failed');
 }
 
+function assertIsolatedMetadataValue(value, consumerRoot, repositoryRoot) {
+  if (typeof value === 'string') {
+    if (value.includes(repositoryRoot) || /^https?:\/\//u.test(value)) {
+      fail('isolated_consumer_failed');
+    }
+    if (value.startsWith('file:')) {
+      const fileResolution = value.slice('file:'.length);
+      if (
+        isAbsolute(fileResolution) ||
+        /^[A-Za-z]:[\\/]/u.test(fileResolution) ||
+        fileResolution.includes('\\') ||
+        fileResolution.split('/').includes('..') ||
+        !isBeneath(consumerRoot, resolve(consumerRoot, fileResolution))
+      ) {
+        fail('isolated_consumer_failed');
+      }
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) assertIsolatedMetadataValue(entry, consumerRoot, repositoryRoot);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      assertIsolatedMetadataValue(entry, consumerRoot, repositoryRoot);
+    }
+  }
+}
+
+async function verifyIsolatedDependencyMetadata(consumerRoot, repositoryRoot) {
+  const [packageManifest, lockfile] = await Promise.all([
+    readJson(join(consumerRoot, 'package.json'), 'isolated_consumer_failed'),
+    readJson(join(consumerRoot, 'package-lock.json'), 'isolated_consumer_failed'),
+  ]);
+  const expectedDependencies = Object.fromEntries(
+    EXPECTED_PROVENANCE.packages.map((record) => [record.name, `file:artifacts/${record.file}`]),
+  );
+  if (!isDeepStrictEqual(packageManifest.dependencies, expectedDependencies)) {
+    fail('isolated_consumer_failed');
+  }
+  if (!isDeepStrictEqual(lockfile.packages?.['']?.dependencies, expectedDependencies)) {
+    fail('isolated_consumer_failed');
+  }
+  const expectedLockPaths = ['', ...EXPECTED_PACKAGE_NAMES.map((name) => `node_modules/${name}`)];
+  if (!isDeepStrictEqual(bytewiseSort(Object.keys(lockfile.packages ?? {})), bytewiseSort(expectedLockPaths))) {
+    fail('isolated_consumer_failed');
+  }
+  for (const record of EXPECTED_PROVENANCE.packages) {
+    const installed = lockfile.packages[`node_modules/${record.name}`];
+    const expectedInstalled = {
+      version: record.version,
+      resolved: `file:artifacts/${record.file}`,
+      integrity: record.integrity,
+      license: 'UNLICENSED',
+      ...(Object.keys(record.dependencies).length > 0
+        ? { dependencies: record.dependencies }
+        : {}),
+    };
+    if (!isDeepStrictEqual(installed, expectedInstalled)) fail('isolated_consumer_failed');
+  }
+  assertIsolatedMetadataValue(packageManifest, consumerRoot, repositoryRoot);
+  assertIsolatedMetadataValue(lockfile, consumerRoot, repositoryRoot);
+}
+
 async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
   if (process.versions.node.split('.')[0] !== '22') fail('toolchain_mismatch');
   const consumerRoot = await mkdtemp(join(tmpdir(), 'stylee-stymobile-consumer-'));
   try {
     const consumerRealRoot = await realpath(consumerRoot);
+    const artifactDirectory = join(consumerRoot, 'artifacts');
+    await mkdir(artifactDirectory);
+    const artifactDirectoryStatus = await lstat(artifactDirectory);
+    const artifactRealRoot = await realpath(artifactDirectory);
+    if (
+      artifactDirectoryStatus.isSymbolicLink() ||
+      !artifactDirectoryStatus.isDirectory() ||
+      !isBeneath(consumerRealRoot, artifactRealRoot)
+    ) {
+      fail('isolated_consumer_failed');
+    }
+    const consumerTarballPaths = [];
+    for (let index = 0; index < tarballPaths.length; index += 1) {
+      const record = EXPECTED_PROVENANCE.packages[index];
+      const localTarballPath = join(artifactDirectory, record.file);
+      await copyFile(tarballPaths[index], localTarballPath);
+      const localStatus = await requireRegularFile(localTarballPath, 'isolated_consumer_failed');
+      const localRealPath = await realpath(localTarballPath);
+      if (localStatus.size !== record.size || !isBeneath(artifactRealRoot, localRealPath)) {
+        fail('isolated_consumer_failed');
+      }
+      await verifyStymobilePackageArtifact({
+        packageRecord: record,
+        tarballPath: localTarballPath,
+      });
+      consumerTarballPaths.push(`./artifacts/${record.file}`);
+    }
     await writeFile(join(consumerRoot, 'package.json'), '{"name":"stymobile-consumer","private":true,"type":"module"}\n');
     await writeFile(join(consumerRoot, '.npmrc'), '');
     await writeFile(join(consumerRoot, '.npmrc-global'), '');
     const environment = isolatedEnvironment(consumerRoot);
     const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const { stdout: npmVersion } = await runFile(npmCommand, ['--version'],
-      { cwd: consumerRoot, env: environment, encoding: 'utf8', maxBuffer: 1024 }, 'toolchain_mismatch');
+    const { stdout: npmVersion } = await runFile(
+      npmCommand,
+      ['--version'],
+      { cwd: consumerRoot, env: environment, encoding: 'utf8', maxBuffer: 1024 },
+      'toolchain_mismatch',
+    );
     if (npmVersion.trim() !== '11.12.1') fail('toolchain_mismatch');
     await runFile(
       npmCommand,
-      ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', ...tarballPaths],
+      ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', ...consumerTarballPaths],
       { cwd: consumerRoot, env: environment, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 },
       'isolated_consumer_failed',
     );
     await Promise.all(EXPECTED_PACKAGE_NAMES.map((name) => verifyInstalledPath(consumerRealRoot, name)));
+    await verifyIsolatedDependencyMetadata(consumerRealRoot, repositoryRoot);
 
     const runtimeProbe = join(consumerRoot, 'runtime-probe.mjs');
     await writeFile(
       runtimeProbe,
       [
-        "import { createAccountScope, runScopedRead } from '@stymobile/core';",
-        "const scope = createAccountScope();",
-        "scope.replaceAccount('web-consumer');",
-        'const stamp = scope.capture();',
-        "if (!stamp) throw new Error('probe_failed');",
-        'let applied;',
-        'const outcome = await runScopedRead({',
-        '  scope,',
-        '  stamp,',
-        '  execute: async ({ accountId }) => ({ accountId, value: 42 }),',
-        '  apply: (value) => { applied = value; },',
-        '});',
-        "if (outcome.kind !== 'committed' || applied?.accountId !== 'web-consumer' || applied?.value !== 42) {",
-        "  throw new Error('probe_failed');",
-        '}',
+        "import { STYLE_PREFERENCE_V1_OPTIONS } from '@stymobile/contracts';",
+        "import { createAccountScope } from '@stymobile/core';",
+        "import { createStylePreferenceController } from '@stymobile/api-client';",
+        "const accountId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';",
+        "const operationId = '10000000-0000-4000-8000-000000000001';",
+        'const server = { accountId, status: "unseen", catalogVersion: "stylee-style-v1", revision: null, selected: [], options: STYLE_PREFERENCE_V1_OPTIONS };',
+        'const selected = { ...server, status: "selected", revision: 1, selected: [STYLE_PREFERENCE_V1_OPTIONS[1]] };',
+        'const scope = createAccountScope();',
+        'scope.replaceAccount(accountId);',
+        'let pendingWrites = 0; let replacements = 0; let queries = 0;',
+        'const pendingStore = { read: async () => null, write: async () => { pendingWrites += 1; }, remove: async () => undefined };',
+        'const port = {',
+        '  read: async () => server,',
+        '  replace: async request => { replacements += 1; return { schema_version: 1, operation_id: request.operation_id, request_id: "request", server_time: "2026-09-06T08:00:00.000Z", entity_revision: 1, state: "succeeded", result: selected, error: null }; },',
+        '  query: async () => { queries += 1; throw new Error("unexpected_query"); },',
+        '};',
+        'const valid = createStylePreferenceController({ port, pendingStore, scope, createOperationId: () => operationId });',
+        'await valid.load(); valid.toggle("minimalist"); await valid.save();',
+        'if (valid.getSnapshot().message !== "preference_saved" || pendingWrites !== 1 || replacements !== 1 || queries !== 0) throw new Error("valid_probe_failed");',
+        'pendingWrites = 0; replacements = 0; queries = 0;',
+        'const invalid = createStylePreferenceController({ port, pendingStore, scope, createOperationId: () => "not-a-uuid" });',
+        'await invalid.load(); invalid.toggle("minimalist"); await invalid.save();',
+        'if (invalid.getSnapshot().message !== "preference_save_failed" || pendingWrites !== 0 || replacements !== 0 || queries !== 0) throw new Error("invalid_probe_failed");',
         '',
       ].join('\n'),
     );
@@ -373,51 +575,15 @@ async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
     await writeFile(
       typeProbe,
       [
-        "import { commandRecovery, type AccountId, type CommandResult } from '@stymobile/contracts';",
-        'import {',
-        '  chooseEntityVersion,',
-        '  createAccountScope,',
-        '  runScopedCommand,',
-        '  runScopedRead,',
-        '  type AccountScope,',
-        '  type AccountScopeState,',
-        '  type AccountStamp,',
-        '  type EntityDecision,',
-        '  type EntityKey,',
-        '  type RevisionedEntity,',
-        '  type ScopeResetter,',
-        '  type ScopeTransition,',
-        '  type ScopedCommandOptions,',
-        '  type ScopedCommandOutcome,',
-        '  type ScopedReadFailureReason,',
-        '  type ScopedReadOptions,',
-        '  type ScopedReadOutcome,',
-        "} from '@stymobile/core';",
-        "const accountId = 'web-consumer' as AccountId;",
-        'const resetter: ScopeResetter = () => undefined;',
-        'const scope: AccountScope = createAccountScope([resetter]);',
-        'const transition: ScopeTransition = scope.replaceAccount(accountId);',
-        'const state: AccountScopeState = transition.state;',
-        'const stamp: AccountStamp | null = scope.capture();',
-        'const result: CommandResult<number> = {',
-        '  schema_version: 1,',
-        '  operation_id: "operation",',
-        '  request_id: "request",',
-        '  server_time: "1970-01-01T00:00:00.000Z",',
-        '  state: "pending",',
-        '  result: null,',
-        '  error: null,',
-        '};',
-        'commandRecovery(result);',
-        'const key: EntityKey = { ownerId: accountId, entityId: "entity" };',
-        'const entity: RevisionedEntity<number> = { ...key, revision: 1, value: 42 };',
-        'const decision: EntityDecision<number> = chooseEntityVersion(key, null, entity);',
-        'const readOptions = {} as ScopedReadOptions<number>;',
-        'const readOutcome: Promise<ScopedReadOutcome> = runScopedRead(readOptions);',
-        'const commandOptions = {} as ScopedCommandOptions<number>;',
-        'const commandOutcome: Promise<ScopedCommandOutcome> = runScopedCommand(commandOptions);',
-        'const reason: ScopedReadFailureReason = "execute_failed";',
-        'void [state, stamp, decision, readOutcome, commandOutcome, reason];',
+        "import { STYLE_PREFERENCE_V1_OPTIONS, type StylePreferenceControllerSnapshot } from '@stymobile/contracts';",
+        "import { createAccountScope, type AccountScope } from '@stymobile/core';",
+        "import { createStylePreferenceController, type PendingPreferenceStore, type StylePreferencePort } from '@stymobile/api-client';",
+        'const scope: AccountScope = createAccountScope();',
+        'const port = {} as StylePreferencePort;',
+        'const pendingStore = {} as PendingPreferenceStore;',
+        'const controller = createStylePreferenceController({ port, pendingStore, scope, createOperationId: () => "10000000-0000-4000-8000-000000000001" });',
+        'const snapshot: StylePreferenceControllerSnapshot = controller.getSnapshot();',
+        'void [STYLE_PREFERENCE_V1_OPTIONS, snapshot];',
         '',
       ].join('\n'),
     );
@@ -444,7 +610,12 @@ async function verifyIsolatedConsumer(repositoryRoot, tarballPaths) {
       'isolated_consumer_failed',
     );
   } catch (error) {
-    if (error instanceof Error && ['isolated_consumer_failed', 'compiler_path_invalid', 'toolchain_mismatch'].includes(error.message)) throw error;
+    if (
+      error instanceof Error &&
+      ['isolated_consumer_failed', 'compiler_path_invalid', 'toolchain_mismatch'].includes(error.message)
+    ) {
+      throw error;
+    }
     fail('isolated_consumer_failed');
   } finally {
     await rm(consumerRoot, { recursive: true, force: true });
@@ -475,7 +646,10 @@ async function verifyStymobileVendorInternal({ repositoryRoot, runConsumer }) {
     if (!isBeneath(root, tarballPath)) fail('artifact_path_invalid');
     await requireRegularFile(tarballPath);
     if (!isBeneath(root, await realpath(tarballPath))) fail('artifact_path_invalid');
-    await verifyTarball(provenance.packages[index], tarballPath);
+    await verifyStymobilePackageArtifact({
+      packageRecord: provenance.packages[index],
+      tarballPath,
+    });
   }
 
   const packagePath = resolve(root, 'package.json');
@@ -492,6 +666,7 @@ async function verifyStymobileVendorInternal({ repositoryRoot, runConsumer }) {
 
   return Object.freeze({
     sourceCommit: EXPECTED_SOURCE_COMMIT,
+    sourceTree: EXPECTED_SOURCE_TREE,
     packages: EXPECTED_PACKAGE_NAMES,
   });
 }
