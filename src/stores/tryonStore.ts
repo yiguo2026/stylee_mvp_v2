@@ -2,7 +2,11 @@ import { create } from 'zustand';
 import { Platform } from 'react-native';
 import { loadSelfie } from '@/lib/bodyModel';
 import { supabase } from '@/lib/supabase';
+import { tryOnPrivateReset } from '@/lib/privateStateReset';
 import type { TryOnSuggestion, AIMeta } from '@/lib/ai';
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { runScopedStoreRead } from '@/lib/scopedStoreRead';
+import { secondaryStoreReadSlots } from '@/lib/secondaryStoreReads';
 
 const isWeb = Platform.OS === 'web';
 
@@ -53,23 +57,20 @@ interface TryOnState {
   addRecord: (record: Omit<TryOnRecord, 'record_id' | 'user_id' | 'createdAt'>, userId: string) => Promise<void>;
   fetchRecords: (userId: string) => Promise<void>;
   loadSelfieFromServer: (userId: string) => Promise<void>;
-  clearAll: () => void;
+  resetPrivateState: () => undefined;
 }
 
 const SCENE_KEY = 'stylee-tryon-scene';
 
-const loadPersistedScene = (): string => {
-  if (!isWeb) return 'cafe';
-  try {
-    const raw = localStorage.getItem(SCENE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return 'cafe';
-};
-
 const persistScene = (scene: string) => {
   if (!isWeb) return;
   try { localStorage.setItem(SCENE_KEY, JSON.stringify(scene)); } catch {}
+};
+
+const removePersistedScene = (): undefined => {
+  if (!isWeb) return undefined;
+  try { localStorage.removeItem(SCENE_KEY); } catch {}
+  return undefined;
 };
 
 function dbRowToRecord(row: any): TryOnRecord {
@@ -90,7 +91,7 @@ function dbRowToRecord(row: any): TryOnRecord {
 export const useTryOnStore = create<TryOnState>()((set, get) => ({
   selfieUri: null,
   selectedOutfitId: null,
-  selectedScene: loadPersistedScene(),
+  selectedScene: 'cafe',
   tryOnResult: null,
   lastResult: null,
   records: [],
@@ -130,25 +131,48 @@ export const useTryOnStore = create<TryOnState>()((set, get) => ({
   },
 
   fetchRecords: async (userId) => {
-    const { data, error } = await supabase
-      .from('tryon_records')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.warn('[tryonStore] fetchRecords failed:', error.message);
-      return;
-    }
-
-    const records = (data ?? []).map(dbRowToRecord);
-    set({ records });
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: secondaryStoreReadSlots.tryOnRecords,
+      execute: async ({ accountId }) => {
+        const { data, error } = await supabase
+          .from('tryon_records')
+          .select('*')
+          .eq('user_id', accountId)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map(dbRowToRecord);
+      },
+      apply: (records) => {
+        set({ records });
+        return undefined;
+      },
+      onError: () => {
+        console.warn('[tryonStore] fetchRecords failed');
+        return undefined;
+      },
+    });
   },
 
   loadSelfieFromServer: async (userId) => {
-    const url = await loadSelfie(userId);
-    set({ selfieUri: url, loaded: true });
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: secondaryStoreReadSlots.tryOnSelfie,
+      execute: async ({ accountId }) => loadSelfie(accountId),
+      apply: (url) => {
+        set({ selfieUri: url, loaded: true });
+        return undefined;
+      },
+    });
   },
 
-  clearAll: () => set({ selfieUri: null, selectedOutfitId: null, selectedScene: 'cafe', tryOnResult: null, lastResult: null }),
+  resetPrivateState: () => {
+    secondaryStoreReadSlots.tryOnRecords.cancel();
+    secondaryStoreReadSlots.tryOnSelfie.cancel();
+    removePersistedScene();
+    set(tryOnPrivateReset());
+    return undefined;
+  },
 }));

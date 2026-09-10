@@ -1,8 +1,11 @@
 # Stylee 运行架构、模型服务与发布规则
 
-> 状态：已核验的当前架构说明
+> 状态：2026-08-20 部署治理与安全处置历史快照；不再作为当前推荐逻辑基线
 > 最近核验：2026-08-20（Asia/Singapore）
 > 适用仓库：`yiguo2026/stylee_mvp_v2`、`fitzw/style-model`
+>
+> 当前采用版本与P2/P3计划以[Core主仓交接手册](https://github.com/fitzw/stymobile/blob/main/docs/coordination/2026-09-07-testflight-20h/post-testflight-3phase/handoff/README.md)及实际服务回读为准。
+> 本文其余内容用于追溯2026-08-20当时的发布控制面与安全治理证据。
 
 ## 1. 本文解决什么问题
 

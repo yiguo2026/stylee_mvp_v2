@@ -32,3 +32,20 @@ governed, inert test context; never copy them into the App root `.github`.
 Sync/check provenance comes only from a temporary `git archive` of the captured
 canonical SHA, never from live checkout bytes. The sync publishes
 `UPSTREAM_COMMIT` atomically and last, after archive parity validation.
+
+# GitHub CLI operation rule — 2026-09-09
+
+Automated shell calls on this Mac must explicitly use `login: false`; shell
+startup currently contains credential-export hooks. Do not run `gh auth token`,
+print credential files or dump environment values when diagnosing Git access.
+Use the normal approved host-execution path when GitHub requests cannot reach
+the existing loopback proxy/keychain from the sandbox; never weaken sandbox,
+proxy or TLS settings. `gh auth status` exit 1, "invalid token", or startup
+"no oauth token" is not proof of expired credentials. Verify identity with
+`gh api --hostname github.com user --jq .login` on the working approved path
+before considering reauthentication; only a real identity API 401 supports it.
+GitHub connector 403/404 is a separate grant, not CLI credential failure.
+Keep the verified HTTPS remote plus gh credential helper. Do not switch to SSH,
+logout, reset or ask the user to log in repeatedly as an error-handling shortcut.
+For the local Mobile coordination workspace, use its read-only
+`scripts/github-access.mjs --git` probe and GitHub-access runbook.

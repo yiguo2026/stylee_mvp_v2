@@ -6,14 +6,16 @@ App 发它原生形状(中文品类/颜色单值/英文标签 ID/Outfit 形状),
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from ..contracts import (
     BodyShape, Category, FilterTags, Fit, InputMode, RequestContext,
     ItemSource, LayerRole, Season, Sleeve, UserProfile, WardrobeItem, Weather,
     Outfit, OutfitItemRef, GapSuggestion, RecommendationResult, IngestResult,
-    StandardizedImage,
+    StandardizedImage, CATEGORY_SLOT,
 )
 from ..outfit_policy import build_item_facts
+from ..public_candidates import bind_public_gap, find_public_candidate, model_category, parse_public_candidates
 
 _OCCASION = {"commute": "通勤", "date": "约会", "travel": "差旅",
              "casual": "休闲", "work": "正式", "sport": "运动"}
@@ -38,27 +40,6 @@ _CONSTRAINT_TRACE_KEYS = (
 
 def label(tag_id: str) -> str:
     return _OCCASION.get(tag_id) or _STYLE.get(tag_id) or _COLOR.get(tag_id) or tag_id
-
-
-def model_category(value: str, name: str = "") -> Category:
-    lowered = str(name or "").lower()
-    if value == "帽巾":
-        if any(token in lowered for token in ("帽", "cap", "hat", "beanie")):
-            return Category.HAT
-        if any(token in lowered for token in ("围巾", "丝巾", "领巾", "scarf")):
-            return Category.SCARF
-        return Category.SCARF
-    if value == "配饰":
-        return Category.ACCESSORY
-    aliases = {
-        "连体装": Category.DRESS, "鞋履": Category.SHOES, "包袋": Category.BAG,
-    }
-    if value in aliases:
-        return aliases[value]
-    for c in Category:
-        if c.value == value:
-            return c
-    return Category.TOP
 
 
 def app_category(cat: Category) -> str:
@@ -137,6 +118,7 @@ def wardrobe_item(d: dict) -> WardrobeItem:
 
 
 def to_request_context(payload: dict) -> RequestContext:
+    public_candidates = parse_public_candidates(payload["public_candidates"]) if "public_candidates" in payload else ()
     mode = InputMode.TAGS if payload.get("input_mode") == "tags" else InputMode.NL
     wardrobe = [wardrobe_item(x) for x in (payload.get("wardrobe") or [])]
 
@@ -176,6 +158,7 @@ def to_request_context(payload: dict) -> RequestContext:
     return RequestContext(
         input_mode=mode, wardrobe=wardrobe, user_profile=profile, weather=weather,
         query_text=query, filter_tags=filter_tags, n=int(payload.get("n", 4)),
+        public_candidates=public_candidates,
     )
 
 
@@ -230,6 +213,10 @@ def outfits_to_app(result, ctx) -> dict:
         layout_valid = True
 
         for ref in outfit.items:
+            if not ref.owned and ref.suggest:
+                suggestion = bind_public_gap(ref.suggest, ctx)
+                if suggestion.candidate_id is not None:
+                    ref = replace(ref, suggest=suggestion, role=CATEGORY_SLOT[suggestion.category])
             role = layout_role_for_ref(ref, item_index)
             if ref.owned and ref.ref:
                 owned_ids.append(ref.ref)
@@ -238,11 +225,14 @@ def outfits_to_app(result, ctx) -> dict:
             elif not ref.owned and ref.suggest:
                 suggestion = ref.suggest
                 recommended_index = len(recommended_items)
+                candidate = find_public_candidate(ctx, suggestion.candidate_id)
                 recommended_items.append({
                     "name": compact_recommended_name(suggestion.desc, suggestion.category),
                     "category": app_category(suggestion.category),
                     "color": "",
                     "description": suggestion.reason,
+                    **({"candidate_id": candidate.candidate_id, "name": candidate.name,
+                        "category": candidate.category, "color": candidate.color} if candidate is not None else {}),
                 })
                 key = ("recommended", recommended_index)
                 entry = {

@@ -195,6 +195,16 @@ class RequestContext:
     query_text: str = ""                       # NL 模式
     filter_tags: FilterTags = field(default_factory=FilterTags)  # TAGS 模式
     n: int = 4                                  # 想要几套
+    public_candidates: tuple[PublicCandidate, ...] = ()  # 独立补缺目录，不是 owned 衣橱
+
+
+@dataclass(frozen=True)
+class PublicCandidate:
+    """GAP1 App 捕获的四字段投影，不包含图像或私有资产信息。"""
+    candidate_id: str
+    name: str
+    category: str
+    color: str
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +228,7 @@ class GapSuggestion:
     category: Category
     desc: str
     reason: str
+    candidate_id: Optional[str] = None  # 仅同次公共候选精确匹配后保留
 
 
 @dataclass
@@ -272,7 +283,14 @@ class RecommendationResult:
     trace: dict = field(default_factory=dict)         # 调试:各阶段计数
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        result = asdict(self)
+        # An internal optional identity must not add null fields to legacy output.
+        for outfit in result["outfits"] + result["pool"]:
+            for item in outfit["items"]:
+                suggestion = item.get("suggest")
+                if suggestion and suggestion.get("candidate_id") is None:
+                    suggestion.pop("candidate_id", None)
+        return result
 
 
 @dataclass

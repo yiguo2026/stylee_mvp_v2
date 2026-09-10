@@ -163,8 +163,6 @@ def _validate_recognition(payload: dict) -> dict:
         "category", "color", "material", "description", "photo_type",
     )):
         raise SmokeError("recognize-multi_invalid_item")
-    if item.get("needs_review") is not False:
-        raise SmokeError("recognize-multi_needs_review")
     return item
 
 

@@ -6,11 +6,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..contracts import PhotoType, WardrobeItem
 from ..ingest import recognize_item, standardize_item
 from ..pipeline import recommend
+from ..public_candidates import PublicCandidatesError
 from ..providers import build_provider
 from ..rag import default_retriever
 from ..release_info import health_payload
@@ -20,6 +23,7 @@ from ..vision.mock import MockAlphaMatteProcessor, MockImageStandardizer
 from . import adapter
 from . import ai_features
 from . import gamma
+from .media import MAX_REQUEST_BYTES as MAX_MEDIA_REQUEST_BYTES, MediaPreparationError, prepare_media
 from .request_trace import RequestTrace, error_status, normalize_request_id
 from .security import RateLimiter, TokenVerifier, allowed_origins, env_bool
 
@@ -29,6 +33,13 @@ _CORS = {
     "Access-Control-Expose-Headers": "X-Request-ID",
     "Cache-Control": "no-store",
 }
+BODY_READ_TIMEOUT_SECONDS = 10.0
+
+
+class _RequestBodyError(ValueError):
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.status = status
 
 
 def _photo_type(value):
@@ -101,6 +112,55 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send(404, {"error": "not found"})
 
+    def _read_payload(self) -> dict:
+        lengths = self.headers.get_all("Content-Length") or []
+        if (len(lengths) != 1 or len(lengths[0]) > 20
+                or not re.fullmatch(r"[0-9]+", lengths[0])
+                or self.headers.get("Transfer-Encoding") is not None):
+            raise _RequestBodyError("invalid content length")
+        n = int(lengths[0])
+        try:
+            limit = int(os.environ.get("STYLEE_MAX_BODY_BYTES", "15728640"))
+        except ValueError:
+            raise _RequestBodyError("request limit unavailable", 503) from None
+        if self.path == "/prepare-media":
+            limit = min(limit, MAX_MEDIA_REQUEST_BYTES)
+        if n > limit:
+            raise _RequestBodyError("request too large", 413)
+
+        chunks = []
+        remaining = n
+        deadline = time.monotonic() + BODY_READ_TIMEOUT_SECONDS
+        previous_timeout = self.connection.gettimeout()
+        try:
+            while remaining:
+                budget = deadline - time.monotonic()
+                if budget <= 0:
+                    raise _RequestBodyError("request body timed out", 408)
+                self.connection.settimeout(budget)
+                # read1 returns after one buffered/socket read. Recompute the total
+                # deadline even if a slow sender keeps every individual read alive.
+                chunk = self.rfile.read1(min(remaining, 64 * 1024))
+                if not chunk:
+                    raise _RequestBodyError("incomplete request body")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if time.monotonic() > deadline:
+                raise _RequestBodyError("request body timed out", 408)
+        except TimeoutError:
+            raise _RequestBodyError("request body timed out", 408) from None
+        except OSError:
+            raise _RequestBodyError("request body could not be read") from None
+        finally:
+            self.connection.settimeout(previous_timeout)
+        try:
+            payload = json.loads(b"".join(chunks).decode("utf-8")) if n else {}
+        except (ValueError, UnicodeError, RecursionError):
+            raise _RequestBodyError("invalid JSON object") from None
+        if not isinstance(payload, dict):
+            raise _RequestBodyError("invalid JSON object")
+        return payload
+
     def do_POST(self) -> None:
         request_id = normalize_request_id(self.headers.get("X-Request-ID"))
         trace = RequestTrace(
@@ -115,7 +175,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         user_id = "local"
         if self.require_auth:
-            user_id = self.verifier.verify(self.headers.get("Authorization") or "") or ""
+            try:
+                user_id = self.verifier.verify(self.headers.get("Authorization") or "") or ""
+            except Exception:  # A verifier outage must not disconnect or leak auth data.
+                trace.emit(503)
+                self._send(503, {"error": "authentication unavailable", "request_id": request_id}, request_id)
+                return
             if not user_id:
                 trace.emit(401)
                 self._send(401, {"error": "valid user access token required", "request_id": request_id}, request_id)
@@ -127,20 +192,19 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             with trace.stage("request.parse_json"):
-                n = int(self.headers.get("Content-Length") or 0)
-                if n > int(os.environ.get("STYLEE_MAX_BODY_BYTES", "15728640")):
-                    trace.emit(413)
-                    self._send(413, {"error": "request too large", "request_id": request_id}, request_id)
-                    return
-                payload = json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
-        except Exception as e:  # noqa: BLE001
-            trace.emit(400, e)
-            self._send(400, {"error": f"bad json: {e}", "request_id": request_id}, request_id)
+                payload = self._read_payload()
+        except _RequestBodyError as e:
+            self.close_connection = True
+            trace.emit(e.status, e)
+            self._send(e.status, {"error": str(e), "request_id": request_id}, request_id)
             return
 
         error = None
         try:
-            if self.path == "/recommend":
+            if self.path == "/prepare-media":
+                with trace.stage("media.prepare"):
+                    response = prepare_media(payload)
+            elif self.path == "/recommend":
                 response = self._recommend(payload, trace)
             elif self.path == "/recognize":
                 response = self._recognize(payload, trace)
@@ -204,13 +268,26 @@ class Handler(BaseHTTPRequestHandler):
                 trace.emit(404)
                 self._send(404, {"error": "not found", "request_id": request_id}, request_id)
                 return
+        except PublicCandidatesError as e:
+            error = e
+            status = 400
+            response = {"error": "invalid_public_candidates", "request_id": request_id}
+        except MediaPreparationError as e:
+            error = e
+            status = e.status
+            response = {"error": e.code, "request_id": request_id}
         except Exception as e:  # noqa: BLE001
+            if self.path == "/prepare-media":
+                e = RuntimeError("media preparation failed")
             error = e
             status = error_status(e)
             response = trace.error_summary(e)
+            if self.path == "/tryon-image" and isinstance(e, (ai_features.TryOnOutcomeUnknown, ai_features.TryOnFailed)):
+                response["execution_state"] = "unknown" if isinstance(e, ai_features.TryOnOutcomeUnknown) else "failed"
+                response["retryable"] = False
         else:
             status = 200
-            if isinstance(response, dict):
+            if isinstance(response, dict) and self.path != "/prepare-media":
                 existing_trace = response.get("trace")
                 if not isinstance(existing_trace, dict):
                     existing_trace = {}

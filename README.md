@@ -2,6 +2,14 @@
 
 基于 Expo (React Native) + Supabase 的智能穿搭推荐应用，支持 Web / iOS / Android。
 
+## Shared Core consumer
+
+2026-09-11 已有账号隔离和B2B偏好候选按用户授权整合。活动vendor固定为Core源`a2c1342`：contracts/core0.3.0、api-client0.2.1；旧0.1.0包保留为历史。这些早期固定包不是现行iOS/Core版本采用证明。
+
+本轮合入范围、离线工程验证、原稿保留与未验边界见[Web整合记录](docs/quality/2026-09-11-web-source-integration.md)。Node22.22.1/npm11.12.1的vendor/consumer、账号、偏好、类型和Web构建验证已通过；SEC-03/CF-10及当前Core真实业务联调仍未关闭。main合入会触发现有Pages流水线，不能把页面构建/部署当联调验收。
+
+后续由同事按照[Core主仓P2/P3交接手册](https://github.com/fitzw/stymobile/blob/main/docs/coordination/2026-09-07-testflight-20h/post-testflight-3phase/handoff/README.md)，在Core关键基建就绪后逐模块采用当前SDK/API并验证双端读写；不恢复旧表直写来获取表面成功。
+
 **在线体验：** https://yiguo2026.github.io/
 
 **本地体验：** `npx expo start --web` 后访问 http://localhost:8081

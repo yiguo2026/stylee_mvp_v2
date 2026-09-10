@@ -23,6 +23,7 @@ import {
   summarizeImportTasks,
   tasksForUser,
 } from '@/lib/importTaskPolicy';
+import { importPrivateReset } from '@/lib/privateStateReset';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ interface ImportState {
   retryFailed: (taskId: string) => void;
   clearCompleted: () => void;
   removeTask: (taskId: string) => void;
+  resetPrivateState: () => undefined;
 }
 
 let taskIdCounter = 0;
@@ -203,7 +205,12 @@ export const useImportStore = create<ImportState>((set, get) => ({
         ...summarizeImportTasks(newTasks),
       };
     });
-  }
+  },
+
+  resetPrivateState: () => {
+    set(importPrivateReset());
+    return undefined;
+  },
 }));
 
 // ─── Background Processing ────────────────────────────────
