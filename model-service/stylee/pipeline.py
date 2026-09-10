@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections import Counter
 from contextlib import nullcontext
+from dataclasses import replace
 import time
 from typing import Callable, ContextManager
 
@@ -19,8 +20,9 @@ from .contracts import (
     Outfit,
     RecommendationResult,
     RequestContext,
-    WardrobeItem,
+    WardrobeItem, CATEGORY_SLOT,
 )
+from .public_candidates import bind_public_gap
 from .outfit_fallback import build_safe_fallback
 from .outfit_policy import ConstraintPolicy, build_constraint_policy
 from .providers.base import LLMProvider
@@ -89,6 +91,13 @@ def _validate_and_score(
     gap_count = 0
     clash_count = 0
     for outfit in drafts:
+        # Apply the same request-local facts before B4, including alternate
+        # provider implementations. Never promote a public gap into ownership.
+        for index, ref in enumerate(outfit.items):
+            if not ref.owned and ref.suggest and ref.suggest.candidate_id is not None:
+                suggestion = bind_public_gap(ref.suggest, ctx)
+                outfit.items[index] = replace(ref, suggest=suggestion,
+                    role=CATEGORY_SLOT[suggestion.category] if suggestion.candidate_id is not None else ref.role)
         checked = validate_outfit_result(outfit, ctx, scene, item_index, policy=policy)
         if not checked.valid:
             rejected_count += 1

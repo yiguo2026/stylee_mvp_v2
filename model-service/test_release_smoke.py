@@ -249,6 +249,63 @@ def _expect_smoke_error(responses, expected_code):
         assert error.code == expected_code
 
 
+def test_recognition_accepts_valid_single_item_with_review_metadata():
+    for needs_review in (False, True):
+        payload = _responses()[1].payload
+        payload["items"][0]["needs_review"] = needs_review
+        item = release_smoke._validate_recognition(payload)
+        assert item == {
+            "category": "上装",
+            "color": "白色",
+            "material": "棉",
+            "description": "白色衬衫",
+            "photo_type": "web",
+            "needs_review": needs_review,
+            "confidence": 0.95,
+        }
+
+
+def test_release_smoke_completes_with_single_item_needing_review():
+    for needs_review in (False, True):
+        responses = _responses()
+        responses[1].payload["items"][0]["needs_review"] = needs_review
+        result, requests, _output, _garment, _person = _run(responses)
+        assert result == {
+            "status": "ok",
+            "stages": ["auth", "recognize-multi", "standardize", "recommend", "tryon-image"],
+        }
+        assert json.loads(requests[2].data)["item"]["category"] == "上装"
+
+
+def test_recognition_review_metadata_does_not_bypass_invalid_contracts():
+    for needs_review in (False, True):
+        for field in ("category", "color", "material", "description", "photo_type"):
+            for missing in (False, True):
+                responses = _responses()
+                item = responses[1].payload["items"][0]
+                item["needs_review"] = needs_review
+                if missing:
+                    del item[field]
+                else:
+                    item[field] = ""
+                _expect_recognition_error(responses, "recognize-multi_invalid_item")
+        responses = _responses()
+        responses[1].payload["items"] = []
+        _expect_recognition_error(responses, "recognize-multi_empty_items")
+        responses = _responses(recognition_provider="mock")
+        responses[1].payload["items"][0]["needs_review"] = needs_review
+        _expect_recognition_error(responses, "recognize-multi_mock_provider")
+
+
+def _expect_recognition_error(responses, expected_code):
+    try:
+        release_smoke._validate_recognition(responses[1].payload)
+        assert False, f"{expected_code} must reject recognition"
+    except SmokeError as error:
+        assert error.code == expected_code
+    _expect_smoke_error(responses, expected_code)
+
+
 def test_release_smoke_rejects_invalid_endpoint_contracts():
     responses = _responses()
     responses[0].payload["expires_in"] = 7200
@@ -429,6 +486,9 @@ def test_release_smoke_cli_can_import_repository_package():
 
 
 def main():
+    test_recognition_accepts_valid_single_item_with_review_metadata()
+    test_release_smoke_completes_with_single_item_needing_review()
+    test_recognition_review_metadata_does_not_bypass_invalid_contracts()
     test_release_smoke_request_sequence_auth_contract_and_log_redaction()
     test_release_smoke_rejects_mock_provider_contract()
     test_release_smoke_rejects_invalid_endpoint_contracts()
