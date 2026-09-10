@@ -4,11 +4,11 @@
 
 ## Shared Core consumer
 
-F02B-A2 候选通过不可变本地 tarball 消费 `@stymobile/contracts/core@0.1.0`，
-来源与完整性见 [provenance](vendor/stymobile/5b9b51adfb1dc9c10c61f13244087f6ecf54d34d/provenance.json)，
-账号隔离、冷安装结果与残余范围见 [验证记录](docs/quality/2026-09-05-f02b-a2-account-scope-verification.md)。
-Node 22.22.1/npm 11.12.1 下运行 `npm run check` 会覆盖 vendor、账号纯逻辑及真实 Store 集成回归。
-此候选尚未部署，SEC-03/CF-10 仍为 OPEN；Web main 合并触发生产部署，须另行授权。
+2026-09-11 已有账号隔离和B2B偏好候选按用户授权整合。活动vendor固定为Core源`a2c1342`：contracts/core0.3.0、api-client0.2.1；旧0.1.0包保留为历史。这些早期固定包不是现行iOS/Core版本采用证明。
+
+本轮合入范围、离线工程验证、原稿保留与未验边界见[Web整合记录](docs/quality/2026-09-11-web-source-integration.md)。Node22.22.1/npm11.12.1的vendor/consumer、账号、偏好、类型和Web构建验证已通过；SEC-03/CF-10及当前Core真实业务联调仍未关闭。main合入会触发现有Pages流水线，不能把页面构建/部署当联调验收。
+
+后续由同事按照[Core主仓P2/P3交接手册](https://github.com/fitzw/stymobile/blob/main/docs/coordination/2026-09-07-testflight-20h/post-testflight-3phase/handoff/README.md)，在Core关键基建就绪后逐模块采用当前SDK/API并验证双端读写；不恢复旧表直写来获取表面成功。
 
 **在线体验：** https://yiguo2026.github.io/
 
