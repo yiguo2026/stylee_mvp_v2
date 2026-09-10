@@ -36,6 +36,8 @@ import { outfitImageMetricsForWardrobeItem } from '@/lib/outfitImageMetrics';
 import { buildTryOnItemBrief } from '@/lib/tryonItemPolicy';
 import { Outfit, OutfitItem, WardrobeItem, RecommendedItem, ClothingCategory } from '@/types';
 import type { OutfitCanvasLayoutItem } from '@/lib/outfitCanvasLayout';
+import { withConfirmedStylePreferenceContext } from '@/lib/stylePreferenceSelectors';
+import { webStylePreferenceController } from '@/lib/webStylePreferenceRuntime';
 
 const isWeb = Platform.OS === 'web';
 
@@ -166,25 +168,18 @@ export default function OutfitResultScreen() {
 
     const sessionId = `session_${Date.now()}`;
     const freshItems = useWardrobeStore.getState().items;
-    const freshPrefs = useUserStore.getState().stylePreferences;
-    const likedStyleNames = freshPrefs
-      ?.filter(p => p.preference_type === 'like')
-      .map(p => p.tag?.tag_name)
-      .filter((name): name is string => Boolean(name))
-      .join('、') ?? '';
 
     const aiPromise = aiRecommendOutfits(
       freshItems,
       userId,
       sessionId,
-      {
+      withConfirmedStylePreferenceContext({
         weather: params.weather,
         temp: params.temp,
         city: params.city,
         query: params.query,
         tags: params.tags,
-        stylePreferences: likedStyleNames,
-      },
+      }, webStylePreferenceController.getSnapshot(), userId),
     );
 
     const aiResult = await aiPromise;

@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { WishlistItem, normalizeCategory } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useWardrobeStore } from '@/stores/wardrobeStore';
+import { wishlistPrivateReset } from '@/lib/privateStateReset';
+import { webAccountScope } from '@/lib/accountScopeRuntime';
+import { runScopedStoreRead } from '@/lib/scopedStoreRead';
+import { secondaryStoreReadSlots } from '@/lib/secondaryStoreReads';
 
 interface WishlistState {
   items: WishlistItem[];
@@ -12,6 +16,7 @@ interface WishlistState {
   addItem: (item: Omit<WishlistItem, 'wish_id' | 'created_at'>) => Promise<WishlistItem | null>;
   removeItem: (wishId: string) => Promise<void>;
   moveToWardrobe: (wishId: string) => Promise<void>;
+  resetPrivateState: () => undefined;
 }
 
 export const useWishlistStore = create<WishlistState>((set, get) => ({
@@ -20,20 +25,32 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
   error: null,
 
   fetchItems: async (userId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      set({ items: (data ?? []) as WishlistItem[] });
-    } catch (e: any) {
-      set({ error: e.message });
-    } finally {
-      set({ isLoading: false });
-    }
+    await runScopedStoreRead({
+      scope: webAccountScope,
+      expectedAccountId: userId,
+      slot: secondaryStoreReadSlots.wishlist,
+      execute: async ({ accountId }) => {
+        const { data, error } = await supabase
+          .from('wishlist_items')
+          .select('*')
+          .eq('user_id', accountId)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data ?? []) as WishlistItem[];
+      },
+      apply: (items) => {
+        set({ items });
+        return undefined;
+      },
+      onError: () => {
+        set({ error: '心愿单加载失败，请重试' });
+        return undefined;
+      },
+      onLoadingChange: (isLoading) => {
+        set(isLoading ? { isLoading: true, error: null } : { isLoading: false });
+        return undefined;
+      },
+    });
   },
 
   addItem: async (item) => {
@@ -117,5 +134,11 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
       console.error('[wishlistStore.moveToWardrobe] unexpected error:', e?.message);
       set({ items: prevItems, error: e.message });
     }
+  },
+
+  resetPrivateState: () => {
+    secondaryStoreReadSlots.wishlist.cancel();
+    set(wishlistPrivateReset());
+    return undefined;
   },
 }));

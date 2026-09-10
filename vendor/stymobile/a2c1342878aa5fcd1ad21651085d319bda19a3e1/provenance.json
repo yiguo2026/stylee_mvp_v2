@@ -1,0 +1,118 @@
+{
+  "schema_version": 2,
+  "source": {
+    "repository": "https://github.com/fitzw/stymobile",
+    "commit": "a2c1342878aa5fcd1ad21651085d319bda19a3e1",
+    "tree": "03814cceb1084c94c33898d1e315c035a441d045"
+  },
+  "toolchain": {
+    "node": "22.22.1",
+    "npm": "11.12.1",
+    "commands": [
+      "npm ci --ignore-scripts --no-audit --no-fund --offline",
+      "npm run build",
+      "npm pack --ignore-scripts --json ./packages/contracts ./packages/core ./packages/api-client"
+    ]
+  },
+  "packages": [
+    {
+      "name": "@stymobile/contracts",
+      "version": "0.3.0",
+      "dependencies": {},
+      "file": "stymobile-contracts-0.3.0.tgz",
+      "size": 3828,
+      "unpacked_size": 11505,
+      "shasum": "6e3938f2d63ffb1b132047ab5cc426b6e338134d",
+      "integrity": "sha512-lb0Zrd8Z9A4qchX3zkeaBVTz500l18uhzhXS5mUHg37EKvooNSiYbQ3/n6ArGBiDeeO1PZhs3UIaFeJ7+UQs+w==",
+      "tarball_sha256": "1749daf8244819cf25753c74c8fb00e4a3b1481153c86b66fb15107b33e0fd3e",
+      "source_manifest_sha256": "8e535015bfa9788dfc1ce77e49309de7b244894cde9544aa7fa89f747c7d9e3c",
+      "files": [
+        "README.md",
+        "dist/auth.d.ts",
+        "dist/auth.js",
+        "dist/command-result.d.ts",
+        "dist/command-result.js",
+        "dist/index.d.ts",
+        "dist/index.js",
+        "dist/style-preferences.d.ts",
+        "dist/style-preferences.js",
+        "package.json"
+      ]
+    },
+    {
+      "name": "@stymobile/core",
+      "version": "0.3.0",
+      "dependencies": {
+        "@stymobile/contracts": "0.3.0"
+      },
+      "file": "stymobile-core-0.3.0.tgz",
+      "size": 4921,
+      "unpacked_size": 18086,
+      "shasum": "4c5044289ad39e9294344bb4e8d4637f955e5871",
+      "integrity": "sha512-bTr5m4dBv5LBQrnjycwUc6B2zapGaGIDbhJK6fG5WipQp/qyjjPVs4n2vI6DaR9Xf24Mjd7KjDtb/i6CjbuL6g==",
+      "tarball_sha256": "d1f1ad8c765ad7e6143192778de96ec90ae26f56f9eaf755e907542732f341f7",
+      "source_manifest_sha256": "3e318728aaaeaa3acb926810e084da032b22fc97e37dfcc132653eb4e23c1ded",
+      "files": [
+        "README.md",
+        "dist/account-scope.d.ts",
+        "dist/account-scope.js",
+        "dist/entity-revision.d.ts",
+        "dist/entity-revision.js",
+        "dist/index.d.ts",
+        "dist/index.js",
+        "dist/scoped-command.d.ts",
+        "dist/scoped-command.js",
+        "dist/scoped-read.d.ts",
+        "dist/scoped-read.js",
+        "dist/style-preference-aggregate.d.ts",
+        "dist/style-preference-aggregate.js",
+        "package.json"
+      ]
+    },
+    {
+      "name": "@stymobile/api-client",
+      "version": "0.2.1",
+      "dependencies": {
+        "@stymobile/contracts": "0.3.0",
+        "@stymobile/core": "0.3.0"
+      },
+      "file": "stymobile-api-client-0.2.1.tgz",
+      "size": 19813,
+      "unpacked_size": 85875,
+      "shasum": "c20e8bb6c6c987a6fe156e34277c350ed6e4e279",
+      "integrity": "sha512-RfEZlJL7YUC5N9Wf5cn1Jb/Q2liEANkDUbSruUZUOlGTk9ICUrE+ocT4fBoGjmNl+Eao8hsTPAJOJsaOKY0PSg==",
+      "tarball_sha256": "eb89413a29a011003dc6ca0637403d60c0c0191a0e63496ae374d50c9dd997cf",
+      "source_manifest_sha256": "76096ee165fec8f081a2614f392465cd266e3a47556d3c2c4731c60481e8648f",
+      "files": [
+        "README.md",
+        "dist/auth-controller.d.ts",
+        "dist/auth-controller.js",
+        "dist/auth-flight.d.ts",
+        "dist/auth-flight.js",
+        "dist/auth-port.d.ts",
+        "dist/auth-port.js",
+        "dist/auth-profile.d.ts",
+        "dist/auth-profile.js",
+        "dist/auth-validation.d.ts",
+        "dist/auth-validation.js",
+        "dist/index.d.ts",
+        "dist/index.js",
+        "dist/style-preference-controller.d.ts",
+        "dist/style-preference-controller.js",
+        "dist/style-preference-decode.d.ts",
+        "dist/style-preference-decode.js",
+        "dist/style-preference-port.d.ts",
+        "dist/style-preference-port.js",
+        "dist/supabase-auth-decode.d.ts",
+        "dist/supabase-auth-decode.js",
+        "dist/supabase-auth-port.d.ts",
+        "dist/supabase-auth-port.js",
+        "dist/supabase-auth-types.d.ts",
+        "dist/supabase-auth-types.js",
+        "dist/supabase-style-preference-port.d.ts",
+        "dist/supabase-style-preference-port.js",
+        "package.json"
+      ]
+    }
+  ]
+}
