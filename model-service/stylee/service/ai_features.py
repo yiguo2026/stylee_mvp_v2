@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 import json
+import http.client
 import math
 import os
 import time
@@ -233,7 +234,7 @@ def _tryon_quality_messages(image_ref: str, items: list[dict]) -> list[dict]:
 def verify_tryon_output(image_ref: str, items: list[dict]) -> dict:
     key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not key or not image_ref:
-        return {"ok": False, "reason": "quality verifier unavailable"}
+        raise TryOnFailed("try-on quality verification unavailable")
     model = os.environ.get(
         "TRYON_VERIFY_MODEL",
         os.environ.get("VL_MULTI_MODEL", os.environ.get("VL_MODEL", "qwen3-vl-flash")),
@@ -248,6 +249,9 @@ def verify_tryon_output(image_ref: str, items: list[dict]) -> dict:
         True,
     )
     result = _extract_json(content)
+    required = ("has_text_or_watermark", "garment_match", "detail_match", "sleeve_match", "sleeveless_not_straps")
+    if not isinstance(result, dict) or any(type(result.get(field)) is not bool for field in required):
+        raise TryOnFailed("try-on quality verification unavailable")
     ok = (
         result.get("has_text_or_watermark") is False
         and result.get("garment_match") is True
@@ -258,13 +262,21 @@ def verify_tryon_output(image_ref: str, items: list[dict]) -> dict:
     return {"ok": ok, "reason": str(result.get("reason") or "")[:200]}
 
 
+class TryOnOutcomeUnknown(VisionError):
+    """The original image request may have executed; never generate again."""
+
+
+class TryOnFailed(VisionError):
+    """No image producer remains in flight for this failed invocation."""
+
+
 def tryon_image(payload: dict, generate=None, verify=None, stage_timer=None) -> str:
     person_image = str(payload.get("image_url") or "")
     items = normalize_tryon_items(
         payload.get("items") if isinstance(payload.get("items"), list) else []
     )
     if not person_image or not items:
-        raise VisionError("try-on requires a person image and at least one garment")
+        raise TryOnFailed("try-on requires a person image and at least one garment")
     references = tryon_reference_images(items)
     images = [person_image, *references]
     prompt = build_tryon_prompt(
@@ -282,14 +294,28 @@ def tryon_image(payload: dict, generate=None, verify=None, stage_timer=None) -> 
             + "。重新生成整张图片并严格修正。"
             if attempt else ""
         )
-        with stage_timer(f"tryon.generate.{attempt + 1}") if stage_timer else nullcontext():
-            image_ref = generate_fn(images, prompt + retry_instruction, "tryon")
-        with stage_timer(f"tryon.verify.{attempt + 1}") if stage_timer else nullcontext():
-            quality = verify_fn(image_ref, items)
+        try:
+            with stage_timer(f"tryon.generate.{attempt + 1}") if stage_timer else nullcontext():
+                image_ref = generate_fn(images, prompt + retry_instruction, "tryon")
+        except (TryOnOutcomeUnknown, TryOnFailed):
+            raise
+        except Exception:
+            raise TryOnOutcomeUnknown("try-on generation outcome unknown") from None
+        if not isinstance(image_ref, str) or not image_ref.strip():
+            raise TryOnOutcomeUnknown("try-on generation outcome unknown")
+        try:
+            with stage_timer(f"tryon.verify.{attempt + 1}") if stage_timer else nullcontext():
+                quality = verify_fn(image_ref, items)
+        except Exception:
+            # Generation already returned a result. A failed quality request is
+            # not an instruction to start another paid image generation.
+            raise TryOnFailed("try-on quality verification unavailable") from None
+        if not isinstance(quality, dict) or type(quality.get("ok")) is not bool:
+            raise TryOnFailed("try-on quality verification unavailable")
         if quality.get("ok") is True:
             return image_ref
         last_reason = str(quality.get("reason") or "quality verification failed")[:200]
-    raise VisionError("try-on output failed quality verification: " + last_reason)
+    raise TryOnFailed("try-on output failed quality verification")
 
 
 def tryon_edit_parameters(model: str) -> dict:
@@ -308,6 +334,8 @@ def tryon_edit_parameters(model: str) -> dict:
 def edit_image(image_url: str | list[str], prompt: str, feature: str) -> str:
     key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not key:
+        if feature == "tryon":
+            raise TryOnFailed("try-on provider unavailable")
         return ""
     model = os.environ.get("IMG_EDIT_MODEL", "qwen-image-edit")
     parameters = tryon_edit_parameters(model) if feature == "tryon" else None
@@ -324,8 +352,17 @@ def edit_image(image_url: str | list[str], prompt: str, feature: str) -> str:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         url = parse_edit_response(body)
+        if feature == "tryon" and (not isinstance(url, str) or not url.strip()):
+            raise TryOnOutcomeUnknown("try-on generation outcome unknown")
         log_usage("qwen", model, feature, "image", body.get("usage"), int((time.time() - t0) * 1000), True, body.get("request_id"))
         return url
     except (urllib.error.HTTPError, urllib.error.URLError, ValueError):
         log_usage("qwen", model, feature, "image", None, int((time.time() - t0) * 1000), False)
+        if feature == "tryon":
+            raise TryOnOutcomeUnknown("try-on generation outcome unknown") from None
         return ""
+    except (OSError, http.client.HTTPException, VisionError):
+        if feature == "tryon":
+            log_usage("qwen", model, feature, "image", None, int((time.time() - t0) * 1000), False)
+            raise TryOnOutcomeUnknown("try-on generation outcome unknown") from None
+        raise
