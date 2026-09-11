@@ -207,6 +207,8 @@ def _tryon_quality_messages(image_ref: str, items: list[dict]) -> list[dict]:
             "color": item.get("color"),
             "material": item.get("material"),
             "sleeve_length": item.get("sleeve_length"),
+            "sleeve_check_applicable": item.get("sleeve_length") in {"无袖", "短袖", "长袖"},
+            "sleeveless_check_applicable": item.get("sleeve_length") == "无袖",
             "fit_type": item.get("fit_type"),
             "description": item.get("description"),
         }
@@ -224,6 +226,11 @@ def _tryon_quality_messages(image_ref: str, items: list[dict]) -> list[dict]:
                 "你是虚拟试穿成图质检器。检查画面是否出现任何文字、伪文字、签名、"
                 "社交媒体标记、Logo或水印，并检查服装品类、颜色、材质、描述细节、袖型与版型是否匹配。"
                 "当期望为无袖时，宽肩无袖可以，但绝不能变成细肩带、吊带、抹胸或露肩款。"
+                "袖型仅检查sleeve_check_applicable为true的单品；false表示袖型未知或不适用，"
+                "不得猜测其目标袖型，也不得仅因缺少袖型把garment_match或detail_match判为false。"
+                "没有需要检查袖型的单品时，sleeve_match返回true。"
+                "sleeveless_not_straps仅检查sleeveless_check_applicable为true的单品，其他单品不参与；"
+                "没有明确无袖单品时该项返回true。其他品类、颜色、细节和文字水印检查保持不变。"
                 "只输出JSON，schema:" + schema
             ),
         },
@@ -255,17 +262,17 @@ def verify_tryon_output(image_ref: str, items: list[dict]) -> dict:
         True,
     )
     result = _extract_json(content)
-    required = ("has_text_or_watermark", "garment_match", "detail_match", "sleeve_match", "sleeveless_not_straps")
+    required = ["has_text_or_watermark", "garment_match", "detail_match"]
+    if any(item.get("sleeve_length") in {"无袖", "短袖", "长袖"} for item in items):
+        required.append("sleeve_match")
+    if any(item.get("sleeve_length") == "无袖" for item in items):
+        required.append("sleeveless_not_straps")
     if not isinstance(result, dict) or any(type(result.get(field)) is not bool for field in required):
         raise TryOnFailed("try-on quality verification unavailable")
-    ok = (
-        result.get("has_text_or_watermark") is False
-        and result.get("garment_match") is True
-        and result.get("detail_match") is True
-        and result.get("sleeve_match") is True
-        and result.get("sleeveless_not_straps") is True
-    )
-    return {"ok": ok, "reason": str(result.get("reason") or "")[:200]}
+    failed_checks = [field for field in required
+                     if result[field] is not (False if field == "has_text_or_watermark" else True)]
+    return {"ok": not failed_checks, "reason": str(result.get("reason") or "")[:200],
+            "failed_checks": failed_checks}
 
 
 class TryOnOutcomeUnknown(VisionError):
@@ -388,6 +395,7 @@ def tryon_image(payload: dict, generate=None, verify=None, stage_timer=None) -> 
         verify_args = (items,)
     generate_fn = generate or edit_image
     last_reason = ""
+    last_failed_checks = []
     for attempt in range(2):
         retry_instruction = (
             " 上一张候选未通过质检，原因：" + last_reason
@@ -415,7 +423,14 @@ def tryon_image(payload: dict, generate=None, verify=None, stage_timer=None) -> 
         if quality.get("ok") is True:
             return image_ref
         last_reason = str(quality.get("reason") or "quality verification failed")[:200]
-    raise TryOnFailed("try-on output failed quality verification")
+        # Only fixed diagnostic codes leave this boundary; never expose the
+        # verifier's free text, private image reference or a request's metadata.
+        checks = quality.get("failed_checks")
+        last_failed_checks = [name for name in ("has_text_or_watermark", "garment_match", "detail_match",
+                                               "sleeve_match", "sleeveless_not_straps")
+                              if isinstance(checks, list) and name in checks]
+    suffix = ": " + ",".join(last_failed_checks) if last_failed_checks else ""
+    raise TryOnFailed("try-on output failed quality verification" + suffix)
 
 
 def tryon_edit_parameters(model: str, photo_source: bool = False) -> dict:
