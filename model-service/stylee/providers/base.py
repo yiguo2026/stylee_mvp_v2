@@ -11,6 +11,16 @@ from abc import ABC, abstractmethod
 from ..contracts import Outfit, RequestContext, SceneSpec
 
 
+class OutfitOutputError(RuntimeError):
+    """Only an unusable B3 output, never transport/authentication/program errors."""
+
+    def __init__(self, code: str):
+        if code not in {"output_truncated", "output_invalid_json"}:
+            raise ValueError("unknown outfit output error")
+        self.code = code
+        super().__init__(code)
+
+
 class LLMProvider(ABC):
     name: str = "base"
 

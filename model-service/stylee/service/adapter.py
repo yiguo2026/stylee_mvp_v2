@@ -33,6 +33,7 @@ _CONSTRAINT_TRACE_KEYS = (
     "retry_triggered",
     "retry_candidate_count",
     "retry_duration_ms",
+    "generation_output_errors",
     "recommended_gap_count",
     "fallback_type",
 )

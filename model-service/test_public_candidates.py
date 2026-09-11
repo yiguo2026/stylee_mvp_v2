@@ -128,7 +128,7 @@ class PublicCandidatesTest(unittest.TestCase):
         scene = SceneSpec()
         bodies = []
 
-        def call(messages, temperature, model):
+        def call(messages, temperature, model, *, outfit_output=False):
             bodies.append(json.loads(messages[1]["content"]))
             return model_result(category="鞋")
 
