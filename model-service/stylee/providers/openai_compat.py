@@ -32,7 +32,7 @@ from ..contracts import (
 )
 from ..outfit_policy import allowed_styles_for_scene, build_constraint_policy
 from ..public_candidates import bind_public_gap
-from .base import LLMProvider
+from .base import LLMProvider, OutfitOutputError
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,9 @@ class ProviderTimeoutError(ProviderError):
 
 
 def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dict],
-                     temperature: float, timeout: int, json_mode: bool) -> str:
+                     temperature: float, timeout: int, json_mode: bool, *,
+                     max_output_tokens: int | None = None,
+                     require_complete_outfits: bool = False) -> str:
     url = base_url.rstrip("/") + "/chat/completions"
     provider = "deepseek" if "deepseek" in url else "qwen"
     payload: dict = {"model": model, "messages": messages, "temperature": temperature}
@@ -56,8 +58,10 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
     if provider == "deepseek":
         thinking = os.environ.get("DEEPSEEK_THINKING", "disabled").strip().lower()
         payload["thinking"] = {"type": thinking if thinking in {"enabled", "disabled"} else "disabled"}
-    # 成本护栏：所有文本/视觉 chat 输出 token 封顶。可用 LLM_MAX_TOKENS 调整，0=不封顶。
-    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+    # Legacy B0/vision callers retain LLM_MAX_TOKENS semantics. B3 supplies its
+    # separately bounded budget because six complete outfits exceed this default.
+    max_tokens = (int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+                  if max_output_tokens is None else max_output_tokens)
     if max_tokens > 0:
         payload["max_tokens"] = max_tokens
     data = json.dumps(payload).encode("utf-8")
@@ -107,6 +111,10 @@ def _chat_completion(base_url: str, api_key: str, model: str, messages: list[dic
         "total_tokens": usage.get("total_tokens"),
     }, ensure_ascii=False, separators=(",", ":")), flush=True)
     log_usage(provider, model, feature, call_type, body.get("usage"), int((time.time() - t0) * 1000), True, body.get("id"))
+    if require_complete_outfits and choice.get("finish_reason") == "length":
+        # Even a parseable prefix is not a complete response. Usage above remains
+        # the actual successful HTTP/provider response, including charged tokens.
+        raise OutfitOutputError("output_truncated")
     return content
 
 
@@ -180,7 +188,8 @@ def build_gen_messages(ctx: RequestContext, scene: SceneSpec, pool: CandidatePoo
     policy = build_constraint_policy(ctx, scene)
     retry_codes = [
         code for code in (violations or [])
-        if isinstance(code, str) and code.startswith(("H_", "D_")) and len(code) <= 64
+        if isinstance(code, str) and len(code) <= 64
+        and (code.startswith(("H_", "D_")) or code in {"output_truncated", "output_invalid_json"})
     ]
     retry_header = (
         f"上轮候选全部未通过代码校验。这是定向重生成，重新生成 {k} 套。\n"
@@ -343,10 +352,28 @@ class OpenAICompatProvider(LLMProvider):
         self.timeout = timeout
         self.json_mode = json_mode
 
-    def _call(self, messages: list[dict], temperature: float, model: str) -> dict:
+    def _call(self, messages: list[dict], temperature: float, model: str, *,
+              outfit_output: bool = False) -> dict:
+        # B3 explicitly opts in; prompt wording and usage tagging cannot select
+        # the budget or turn unrelated failures into a recommendation fallback.
+        options = {}
+        if outfit_output:
+            try:
+                budget = int(os.environ.get("LLM_RECOMMEND_MAX_TOKENS", "6144"))
+            except ValueError:
+                raise ValueError("LLM_RECOMMEND_MAX_TOKENS must be an integer from 1 to 8192") from None
+            if not 1 <= budget <= 8192:
+                raise ValueError("LLM_RECOMMEND_MAX_TOKENS must be an integer from 1 to 8192")
+            options = {"max_output_tokens": budget, "require_complete_outfits": True}
         content = _chat_completion(self.base_url, self.api_key, model, messages,
-                                   temperature, self.timeout, self.json_mode)
-        return _extract_json(content)
+                                   temperature, self.timeout, self.json_mode, **options)
+        try:
+            return _extract_json(content)
+        except json.JSONDecodeError:
+            if not outfit_output:
+                raise
+            # Keep generated text out of retries, traces, and error messages.
+            raise OutfitOutputError("output_invalid_json") from None
 
     def parse_intent(self, ctx: RequestContext) -> SceneSpec:
         # 标签路径其实不需要模型,但真 provider 也支持;成本敏感可在 pipeline 外做 code 短路
@@ -355,7 +382,7 @@ class OpenAICompatProvider(LLMProvider):
 
     def generate_outfits(self, ctx, scene, pool, exemplars, k) -> list[Outfit]:
         data = self._call(build_gen_messages(ctx, scene, pool, exemplars, k),
-                          self.t_gen, self.model_gen)
+                          self.t_gen, self.model_gen, outfit_output=True)
         return parse_outfits_json(data, ctx=ctx)
 
     def regenerate_outfits(self, ctx, scene, pool, exemplars, k, violations) -> list[Outfit]:
@@ -363,6 +390,7 @@ class OpenAICompatProvider(LLMProvider):
             build_gen_messages(ctx, scene, pool, exemplars, k, violations=violations),
             self.t_gen,
             self.model_gen,
+            outfit_output=True,
         )
         return parse_outfits_json(data, ctx=ctx)
 

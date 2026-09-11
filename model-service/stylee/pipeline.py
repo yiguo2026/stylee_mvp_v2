@@ -25,7 +25,7 @@ from .contracts import (
 from .public_candidates import bind_public_gap
 from .outfit_fallback import build_safe_fallback
 from .outfit_policy import ConstraintPolicy, build_constraint_policy
-from .providers.base import LLMProvider
+from .providers.base import LLMProvider, OutfitOutputError
 from .rag import default_retriever, ExemplarRetriever
 from .scoring import PRIORITY_WEIGHTS, has_style_clash, score_outfit
 
@@ -143,8 +143,13 @@ def recommend(
         exemplars = retriever.retrieve(scene, k=3, season=pool.season)
 
     # B3 生成 K 套(模型,受约束于 pool 的真实 id)
+    generation_output_errors: Counter[str] = Counter()
     with timed("B3.generate_outfits"):
-        first_drafts = provider.generate_outfits(ctx, scene, pool, exemplars, first_k)
+        try:
+            first_drafts = provider.generate_outfits(ctx, scene, pool, exemplars, first_k)
+        except OutfitOutputError as error:
+            generation_output_errors[error.code] += 1
+            first_drafts = []
 
     # B4 硬校验 + 四维打分(纯 code,挡掉非法)
     with timed("B4.validate_and_score"):
@@ -163,14 +168,18 @@ def recommend(
         retry_triggered = True
         retry_started = time.monotonic()
         with timed("B3.regenerate_outfits"):
-            retry_drafts = provider.regenerate_outfits(
-                ctx,
-                scene,
-                pool,
-                exemplars,
-                ctx.n + 1,
-                sorted(rejected_by_rule),
-            )
+            try:
+                retry_drafts = provider.regenerate_outfits(
+                    ctx,
+                    scene,
+                    pool,
+                    exemplars,
+                    ctx.n + 1,
+                    sorted(set(rejected_by_rule) | set(generation_output_errors)),
+                )
+            except OutfitOutputError as error:
+                generation_output_errors[error.code] += 1
+                retry_drafts = []
         retry_duration_ms = round((time.monotonic() - retry_started) * 1000)
         with timed("B4.validate_retry"):
             (valid, retry_rejections, retry_rejected, retry_gaps,
@@ -235,6 +244,7 @@ def recommend(
             "retry_triggered": retry_triggered,
             "retry_candidate_count": len(retry_drafts),
             "retry_duration_ms": retry_duration_ms,
+            "generation_output_errors": dict(sorted(generation_output_errors.items())),
             "recommended_gap_count": sum(
                 1 for outfit in top for item in outfit.items if not item.owned
             ),
