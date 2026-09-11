@@ -165,7 +165,7 @@ class PhotoTryOnTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             chat.assert_not_called()
 
-    def test_photo_provider_payload_preserves_existing_print_and_numbers(self):
+    def test_photo_provider_payload_bans_text_logo_and_numbers_including_garment_print(self):
         requests, usage = [], []
         shirt = Image.new("RGB", (96, 128), "white")
         drawing = ImageDraw.Draw(shirt)
@@ -194,15 +194,31 @@ class PhotoTryOnTests(unittest.TestCase):
         self.assertEqual(sent["input"]["messages"][0]["content"][1],
                          {"image": "data:image/png;base64," + printed_source})
         prompt = sent["input"]["messages"][0]["content"][-1]["text"]
-        self.assertIn("已有的文字、Logo、字母和数字印花必须原样保留", prompt)
+        self.assertIn("移除服装已有的文字、Logo、字母和数字印花，包括球衣号码", prompt)
         negative = sent["parameters"]["negative_prompt"]
-        for generic_ban in ("文字", "字母", "数字", "Logo"):
-            self.assertNotIn(generic_ban, negative.split("，"))
-        self.assertIn("新增水印", negative)
-        self.assertIn("新增伪文字", negative)
+        for generic_ban in ("文字", "字母", "数字", "Logo", "标题", "水印"):
+            self.assertIn(generic_ban, negative.split("，"))
         self.assertFalse(sent["parameters"]["watermark"])
         self.assertEqual(timeout, 35)
         self.assertEqual(usage[0][2:4], ("tryon", "image"))
+
+    def test_photo_quality_bans_all_text_but_excludes_text_removal_from_detail_mismatch(self):
+        messages = []
+        replies = iter([GOOD, {**GOOD, "has_text_or_watermark": True},
+                        {**GOOD, "detail_match": False}])
+        def chat(_base, _key, _model, sent, *_args):
+            messages.append(sent)
+            return json.dumps(next(replies))
+        with patch.object(ai_features, "_chat_completion", chat):
+            accepted = ai_features.verify_tryon_photo_output(RESULT, PERSON_REF, SOURCE_REF)
+            text_rejected = ai_features.verify_tryon_photo_output(RESULT, PERSON_REF, SOURCE_REF)
+            detail_rejected = ai_features.verify_tryon_photo_output(RESULT, PERSON_REF, SOURCE_REF)
+        prompt = messages[0][0]["content"]
+        self.assertIn("服装上的文字、Logo、字母和数字也必须判为has_text_or_watermark=true", prompt)
+        self.assertIn("不得仅因移除这些禁用内容而将detail_match或whole_outfit_match判为false", prompt)
+        self.assertTrue(accepted["ok"])
+        self.assertFalse(text_rejected["ok"])
+        self.assertFalse(detail_rejected["ok"])
 
     def test_photo_provider_failures_keep_original_tryon_outcome_and_billing(self):
         with patch.dict(ai_features.os.environ, {"DASHSCOPE_API_KEY": ""}), \
